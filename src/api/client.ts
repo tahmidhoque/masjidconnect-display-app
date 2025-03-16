@@ -116,13 +116,13 @@ class ApiClient {
         // Log the request for debugging
         console.log('Using mock response for pairing request:', pairingData);
         
-        // Return a mock successful response
+        // Return a mock successful response with clearly marked mock IDs
         return {
           success: true,
           data: {
             screen: {
               id: 'mock-screen-id-' + Date.now(),
-              name: 'Development Screen',
+              name: 'MOCK Development Screen',
               apiKey: 'mock-api-key-' + Math.random().toString(36).substring(2, 15),
             }
           }

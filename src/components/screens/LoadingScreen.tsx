@@ -51,26 +51,26 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       setTimeout(() => {
         setLoadingStage('complete');
         
-        // Call onComplete after a short delay
+        // Call onComplete after a longer delay to ensure initialization is complete
         if (onComplete) {
-          console.log("LoadingScreen: Will call onComplete in 1.5 seconds");
+          console.log("LoadingScreen: Will call onComplete in 3 seconds");
           setTimeout(() => {
             console.log("LoadingScreen: Calling onComplete callback NOW");
             onComplete();
-          }, 1500);
+          }, 3000);
         }
-      }, 1000);
+      }, 2000);
     }
   }, [loadingMessage, onComplete]);
 
-  // Guaranteed transition after a maximum time
+  // Guaranteed transition after a maximum time - increased to 10 seconds
   useEffect(() => {
     const forceTransitionTimer = setTimeout(() => {
       if (onComplete) {
-        console.log("LoadingScreen: Force transition timer triggered after 5 seconds");
+        console.log("LoadingScreen: Force transition timer triggered after 10 seconds");
         onComplete();
       }
-    }, 5000);
+    }, 10000);
     
     return () => clearTimeout(forceTransitionTimer);
   }, [onComplete]);

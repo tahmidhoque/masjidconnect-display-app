@@ -16,7 +16,6 @@ const AppContent: React.FC = () => {
   const { isAuthenticated, isPairing } = useAuth();
   const { isInitializing } = useAppInitialization();
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [showPairingScreen, setShowPairingScreen] = useState<boolean>(false);
 
   // Log state changes for debugging
   useEffect(() => {
@@ -24,16 +23,14 @@ const AppContent: React.FC = () => {
       isInitializing, 
       isAuthenticated, 
       isPairing,
-      isLoading, 
-      showPairingScreen 
+      isLoading
     });
-  }, [isInitializing, isAuthenticated, isPairing, isLoading, showPairingScreen]);
+  }, [isInitializing, isAuthenticated, isPairing, isLoading]);
 
   // Handle completion of loading screen
   const handleLoadingComplete = () => {
     console.log("App: Loading complete, transitioning to next screen");
     setIsLoading(false);
-    setShowPairingScreen(true);
   };
 
   // Determine which screen to show

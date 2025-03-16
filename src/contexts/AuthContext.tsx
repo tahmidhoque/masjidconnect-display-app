@@ -80,9 +80,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       apiClient.setCredentials(credentials);
       setScreenId(screen.id);
-      setIsAuthenticated(true);
-      setIsPairing(false);
       
+      // In development mode, wait for explicit pairing through the admin dashboard
+      // This ensures the app doesn't automatically transition to the display screen
+      if (isDevelopment) {
+        console.log('Development mode: Waiting for explicit pairing through admin dashboard');
+        // Only set authenticated if we're using a real API response, not the mock
+        if (screen.id.indexOf('mock') === -1) {
+          setIsAuthenticated(true);
+        } else {
+          console.log('Using mock API response - not setting authenticated state');
+          // Keep isPairing true to indicate we're still waiting for pairing
+          setIsPairing(false);
+          return false;
+        }
+      } else {
+        setIsAuthenticated(true);
+      }
+      
+      setIsPairing(false);
       return true;
     } catch (error: any) {
       console.error('Error pairing screen:', error);

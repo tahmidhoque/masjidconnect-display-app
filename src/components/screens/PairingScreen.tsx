@@ -49,7 +49,11 @@ const PairingScreen: React.FC = () => {
   
   // Generate a random 6-digit pairing code and initiate pairing
   useEffect(() => {
+    let isMounted = true;
+    
     const generatePairingCode = async () => {
+      if (!isMounted) return;
+      
       // Generate a random 6-digit code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setPairingCode(code);
@@ -64,7 +68,7 @@ const PairingScreen: React.FC = () => {
         console.log('Pairing result:', result);
         
         // If pairing was successful, we don't need to refresh the code
-        if (result) {
+        if (result && isMounted) {
           console.log('Pairing successful! Transitioning to DisplayScreen.');
           return;
         }
@@ -78,7 +82,7 @@ const PairingScreen: React.FC = () => {
     
     // Set up polling to check pairing status every 30 seconds
     const pollingInterval = setInterval(() => {
-      if (!isPairing) {
+      if (!isPairing && isMounted) {
         console.log('Checking pairing status...');
         generatePairingCode();
       }
@@ -86,19 +90,24 @@ const PairingScreen: React.FC = () => {
     
     // Refresh the code every 5 minutes if not paired
     const refreshInterval = setInterval(() => {
-      generatePairingCode();
+      if (isMounted) {
+        generatePairingCode();
+      }
     }, 5 * 60 * 1000);
 
     // Animate elements
     setTimeout(() => {
-      setFadeIn(true);
+      if (isMounted) {
+        setFadeIn(true);
+      }
     }, 300);
     
     return () => {
+      isMounted = false;
       clearInterval(pollingInterval);
       clearInterval(refreshInterval);
     };
-  }, []);
+  }, [isPairing, pairScreen, pairingAttempts]);
 
   // Simulate pairing steps to provide visual feedback
   useEffect(() => {

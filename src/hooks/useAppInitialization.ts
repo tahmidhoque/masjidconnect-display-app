@@ -82,14 +82,14 @@ export const useAppInitialization = () => {
 
     initialize();
 
-    // Force completion after 3 seconds maximum
+    // Force completion after 5 seconds maximum
     const forceCompleteTimer = setTimeout(() => {
       if (isMounted) {
         console.log("useAppInitialization: Force completing initialization after timeout");
         setLoadingMessage('Ready');
         setIsInitializing(false);
       }
-    }, 3000);
+    }, 5000);
 
     return () => {
       isMounted = false;
