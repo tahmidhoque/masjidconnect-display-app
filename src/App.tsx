@@ -13,19 +13,27 @@ import useAppInitialization from './hooks/useAppInitialization';
  * Main application container that wraps all providers and screens
  */
 const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isPairing } = useAuth();
   const { isInitializing } = useAppInitialization();
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [showPairingScreen, setShowPairingScreen] = useState<boolean>(false);
 
   // Log state changes for debugging
   useEffect(() => {
-    console.log("App state:", { isInitializing, isAuthenticated, isLoading });
-  }, [isInitializing, isAuthenticated, isLoading]);
+    console.log("App state:", { 
+      isInitializing, 
+      isAuthenticated, 
+      isPairing,
+      isLoading, 
+      showPairingScreen 
+    });
+  }, [isInitializing, isAuthenticated, isPairing, isLoading, showPairingScreen]);
 
   // Handle completion of loading screen
   const handleLoadingComplete = () => {
     console.log("App: Loading complete, transitioning to next screen");
     setIsLoading(false);
+    setShowPairingScreen(true);
   };
 
   // Determine which screen to show
@@ -34,6 +42,7 @@ const AppContent: React.FC = () => {
   }
 
   // Show the appropriate screen based on authentication state
+  // Only show DisplayScreen when authenticated, otherwise show PairingScreen
   return (
     <Fade in={!isLoading} timeout={800}>
       <div>

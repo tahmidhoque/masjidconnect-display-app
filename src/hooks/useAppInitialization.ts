@@ -19,7 +19,7 @@ export const useAppInitialization = () => {
 
   useEffect(() => {
     let isMounted = true;
-    console.log("useAppInitialization: Starting initialization");
+    console.log("useAppInitialization: Starting initialization with auth state:", isAuthenticated);
 
     const initialize = async () => {
       try {
@@ -31,22 +31,43 @@ export const useAppInitialization = () => {
           console.log("useAppInitialization: Not authenticated, preparing pairing screen");
           if (isMounted) setLoadingMessage('Checking pairing status...');
           await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // For unpaired devices, we're ready to show the pairing screen
+          if (isMounted) {
+            setLoadingMessage('Ready');
+            console.log("useAppInitialization: Ready to show pairing screen");
+          }
         } else {
-          console.log("useAppInitialization: Authenticated, fetching content");
+          console.log("useAppInitialization: Authenticated with screenId:", screenId);
           if (isMounted) setLoadingMessage('Fetching content...');
+          
+          // Refresh content if authenticated
           await refreshContent();
+          
+          // Get screen orientation from the server
+          try {
+            const response = await apiClient.getScreenContent();
+            if (response.success && response.data?.screen?.orientation) {
+              setOrientation(response.data.screen.orientation as Orientation);
+            }
+          } catch (error) {
+            console.error('Failed to get screen orientation:', error);
+          }
+          
+          // For authenticated devices, we're ready to show the display screen
+          if (isMounted) {
+            setLoadingMessage('Ready');
+            console.log("useAppInitialization: Ready to show display screen");
+          }
         }
         
         // Step 3: Complete initialization
         if (isMounted) {
-          console.log("useAppInitialization: Initialization complete");
-          setLoadingMessage('Ready');
-          
           // Short delay before completing
           setTimeout(() => {
             if (isMounted) {
               setIsInitializing(false);
-              console.log("useAppInitialization: Set isInitializing to false");
+              console.log("useAppInitialization: Set isInitializing to false, auth state:", isAuthenticated);
             }
           }, 500);
         }
@@ -74,7 +95,7 @@ export const useAppInitialization = () => {
       isMounted = false;
       clearTimeout(forceCompleteTimer);
     };
-  }, [isAuthenticated, refreshContent]);
+  }, [isAuthenticated, screenId, refreshContent]);
 
   return {
     isInitializing,
