@@ -94,7 +94,14 @@ const PairingScreen: React.FC = () => {
   }, [pairingStep]);
 
   // Generate the QR code URL
-  const qrCodeUrl = `https://dashboard.masjidconnect.com/pair/${pairingCode}`;
+  const qrCodeUrl = isDevelopment 
+    ? `http://localhost:3000/pair/${pairingCode}`
+    : `https://dashboard.masjidconnect.com/pair/${pairingCode}`;
+
+  useEffect(() => {
+    // Log the QR code URL for debugging
+    console.log('QR Code URL:', qrCodeUrl);
+  }, [qrCodeUrl]);
 
   // Pairing steps display
   const PairingSteps = ({ currentStep }: { currentStep: number }) => (
@@ -118,7 +125,10 @@ const PairingScreen: React.FC = () => {
             primary="Go to MasjidConnect Dashboard" 
             secondary={
               <Typography component="span" variant="body2" color="rgba(255, 255, 255, 0.7)">
-                Visit dashboard.masjidconnect.com
+                {isDevelopment 
+                  ? 'Visit http://localhost:3000'
+                  : 'Visit dashboard.masjidconnect.com'
+                }
               </Typography>
             }
           />
@@ -208,6 +218,17 @@ const PairingScreen: React.FC = () => {
             </Typography>
             
             <PairingSteps currentStep={pairingStep} />
+            
+            {isDevelopment && (
+              <Alert severity="info" sx={{ mt: 2, width: '100%' }}>
+                <Typography variant="body2">
+                  Development mode: Connecting to <strong>http://localhost:3000</strong>
+                </Typography>
+                <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                  Make sure the admin dashboard is running on this URL
+                </Typography>
+              </Alert>
+            )}
             
             {isPairing && (
               <Alert severity="info" sx={{ mt: 2, width: '100%' }}>
@@ -306,8 +327,12 @@ const PairingScreen: React.FC = () => {
             
             <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
               Scan this QR code with the MasjidConnect app or visit{' '}
-              <Link href={`https://masjidconnect.com/pair`} target="_blank" rel="noopener">
-                masjidconnect.com/pair
+              <Link 
+                href={isDevelopment ? 'http://localhost:3000/pair' : 'https://masjidconnect.com/pair'} 
+                target="_blank" 
+                rel="noopener"
+              >
+                {isDevelopment ? 'localhost:3000/pair' : 'masjidconnect.com/pair'}
               </Link>
             </Typography>
           </Box>

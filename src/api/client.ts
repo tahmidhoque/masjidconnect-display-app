@@ -19,20 +19,26 @@ export interface ApiCredentials {
 class ApiClient {
   private client: AxiosInstance;
   private credentials: ApiCredentials | null = null;
-  private baseURL: string = process.env.REACT_APP_API_URL || 'https://api.masjidconnect.com';
+  private baseURL: string = process.env.REACT_APP_API_URL || 'http://localhost:3000';
   private isDevelopment: boolean = process.env.NODE_ENV === 'development';
 
   constructor() {
+    console.log('ApiClient initialized with baseURL:', this.baseURL);
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
       },
+      // Allow cross-origin requests in development
+      withCredentials: false
     });
 
     // Add request interceptor to include authentication headers
     this.client.interceptors.request.use((config) => {
+      console.log(`Making ${config.method?.toUpperCase()} request to: ${config.url}`);
+      
       if (this.credentials) {
         config.headers = config.headers || {};
         config.headers['Authorization'] = `Bearer ${this.credentials.apiKey}`;
@@ -40,6 +46,18 @@ class ApiClient {
       }
       return config;
     });
+
+    // Add response interceptor for debugging
+    this.client.interceptors.response.use(
+      (response) => {
+        console.log('API Response:', response.status, response.data);
+        return response;
+      },
+      (error) => {
+        console.error('API Error:', error);
+        return Promise.reject(error);
+      }
+    );
 
     // Load credentials from localStorage if available
     this.loadCredentials();
@@ -77,27 +95,39 @@ class ApiClient {
   }
 
   public async pairScreen(pairingData: PairingRequest): Promise<ApiResponse<PairingResponse>> {
-    // In development mode, use a mock response
+    // In development mode, we can still try to connect to the local server first
     if (this.isDevelopment) {
-      console.log('DEV MODE: Using mock pairing response for code:', pairingData.pairingCode);
+      console.log('DEV MODE: Attempting to connect to local server with code:', pairingData.pairingCode);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Log the request for debugging
-      console.log('Pairing request:', pairingData);
-      
-      // Return a mock successful response
-      return {
-        success: true,
-        data: {
-          screen: {
-            id: 'mock-screen-id-' + Date.now(),
-            name: 'Development Screen',
-            apiKey: 'mock-api-key-' + Math.random().toString(36).substring(2, 15),
+      try {
+        // Try to connect to the local server first
+        const endpoint = '/api/screens/pair';
+        console.log(`Making pairing request to: ${this.baseURL}${endpoint}`);
+        
+        const response = await this.client.post<ApiResponse<PairingResponse>>(endpoint, pairingData);
+        console.log('Pairing response from local server:', response.data);
+        return response.data;
+      } catch (error) {
+        console.warn('Failed to connect to local server, using mock response instead:', error);
+        
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Log the request for debugging
+        console.log('Using mock response for pairing request:', pairingData);
+        
+        // Return a mock successful response
+        return {
+          success: true,
+          data: {
+            screen: {
+              id: 'mock-screen-id-' + Date.now(),
+              name: 'Development Screen',
+              apiKey: 'mock-api-key-' + Math.random().toString(36).substring(2, 15),
+            }
           }
-        }
-      };
+        };
+      }
     }
     
     // In production, make the actual API call

@@ -42,6 +42,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsPairing(true);
     setPairingError(null);
     
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    console.log(`Pairing screen in ${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
+    
     try {
       // Get screen orientation
       const orientation = window.matchMedia('(orientation: portrait)').matches ? 'PORTRAIT' : 'LANDSCAPE';
@@ -98,6 +101,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // The request was made but no response was received
           errorMessage = 'No response from server: The server may be down or unreachable';
         }
+      }
+      
+      if (isDevelopment) {
+        errorMessage += ' (Development mode: Check if localhost:3000 is running)';
       }
       
       setPairingError(errorMessage);
