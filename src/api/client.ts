@@ -95,6 +95,9 @@ class ApiClient {
   }
 
   public async pairScreen(pairingData: PairingRequest): Promise<ApiResponse<PairingResponse>> {
+    // Add a small delay to prevent too many requests
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // In development mode, we can still try to connect to the local server first
     if (this.isDevelopment) {
       console.log('DEV MODE: Attempting to connect to local server with code:', pairingData.pairingCode);
@@ -110,8 +113,8 @@ class ApiClient {
       } catch (error) {
         console.warn('Failed to connect to local server, using mock response instead:', error);
         
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Simulate network delay - increased to reduce frequency
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Log the request for debugging
         console.log('Using mock response for pairing request:', pairingData);

@@ -39,6 +39,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const pairScreen = async (pairingCode: string): Promise<boolean> => {
+    // If already pairing, don't start another pairing process
+    if (isPairing) {
+      console.log('Already in pairing process, ignoring new request');
+      return false;
+    }
+    
     setIsPairing(true);
     setPairingError(null);
     
@@ -65,6 +71,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const errorMessage = response.error || 'Failed to pair screen';
         console.error('Pairing failed:', errorMessage);
         setPairingError(errorMessage);
+        
+        // Add a small delay before setting isPairing to false to prevent rapid re-attempts
+        await new Promise(resolve => setTimeout(resolve, 2000));
         setIsPairing(false);
         return false;
       }
@@ -90,7 +99,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         } else {
           console.log('Using mock API response - not setting authenticated state');
-          // Keep isPairing true to indicate we're still waiting for pairing
+          // Add a delay before setting isPairing to false
+          await new Promise(resolve => setTimeout(resolve, 2000));
           setIsPairing(false);
           return false;
         }

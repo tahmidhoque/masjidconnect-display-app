@@ -50,6 +50,7 @@ const PairingScreen: React.FC = () => {
   // Generate a random 6-digit pairing code and initiate pairing
   useEffect(() => {
     let isMounted = true;
+    let initialPairingDone = false;
     
     const generatePairingCode = async () => {
       if (!isMounted) return;
@@ -59,38 +60,47 @@ const PairingScreen: React.FC = () => {
       setPairingCode(code);
       setPairingAttempts(prev => prev + 1);
       
-      console.log(`Initiating pairing with code: ${code} (Attempt #${pairingAttempts + 1})`);
+      console.log(`Generated pairing code: ${code} (Attempt #${pairingAttempts + 1})`);
       
-      // After generating the code, initiate pairing with the backend
-      // This will start listening for pairing requests with this code
-      try {
-        const result = await pairScreen(code);
-        console.log('Pairing result:', result);
+      // Only initiate pairing if we're not already in the process of pairing
+      if (!isPairing) {
+        console.log(`Initiating pairing with code: ${code}`);
         
-        // If pairing was successful, we don't need to refresh the code
-        if (result && isMounted) {
-          console.log('Pairing successful! Transitioning to DisplayScreen.');
-          return;
+        try {
+          const result = await pairScreen(code);
+          console.log('Pairing result:', result);
+          
+          // If pairing was successful, we don't need to refresh the code
+          if (result && isMounted) {
+            console.log('Pairing successful! Transitioning to DisplayScreen.');
+            return;
+          }
+        } catch (error) {
+          console.error('Error in pairing process:', error);
         }
-      } catch (error) {
-        console.error('Error in pairing process:', error);
+      } else {
+        console.log('Already in pairing process, not initiating a new request');
       }
     };
     
-    // Generate initial pairing code
-    generatePairingCode();
+    // Generate initial pairing code only once
+    if (!initialPairingDone) {
+      generatePairingCode();
+      initialPairingDone = true;
+    }
     
-    // Set up polling to check pairing status every 30 seconds
+    // Set up polling to check pairing status every 60 seconds (reduced frequency)
     const pollingInterval = setInterval(() => {
       if (!isPairing && isMounted) {
         console.log('Checking pairing status...');
         generatePairingCode();
       }
-    }, 30 * 1000); // 30 seconds
+    }, 60 * 1000); // 60 seconds
     
     // Refresh the code every 5 minutes if not paired
     const refreshInterval = setInterval(() => {
-      if (isMounted) {
+      if (isMounted && !isPairing) {
+        console.log('Refreshing pairing code after 5 minutes');
         generatePairingCode();
       }
     }, 5 * 60 * 1000);
