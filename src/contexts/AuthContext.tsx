@@ -54,15 +54,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       };
       
+      console.log('Sending pairing request with data:', pairingData);
+      
       const response = await apiClient.pairScreen(pairingData);
       
       if (!response.success || !response.data) {
-        setPairingError(response.error || 'Failed to pair screen');
+        const errorMessage = response.error || 'Failed to pair screen';
+        console.error('Pairing failed:', errorMessage);
+        setPairingError(errorMessage);
         setIsPairing(false);
         return false;
       }
       
       const { screen } = response.data;
+      console.log('Pairing successful, received screen data:', screen);
       
       // Save credentials
       const credentials: ApiCredentials = {
@@ -76,9 +81,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsPairing(false);
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error pairing screen:', error);
-      setPairingError('Failed to connect to server');
+      
+      // Provide more detailed error messages based on the error type
+      let errorMessage = 'Failed to connect to server';
+      
+      if (error.message) {
+        if (error.message.includes('Network Error')) {
+          errorMessage = 'Network error: Please check your internet connection';
+        } else if (error.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+        } else if (error.request) {
+          // The request was made but no response was received
+          errorMessage = 'No response from server: The server may be down or unreachable';
+        }
+      }
+      
+      setPairingError(errorMessage);
       setIsPairing(false);
       return false;
     }

@@ -20,6 +20,7 @@ class ApiClient {
   private client: AxiosInstance;
   private credentials: ApiCredentials | null = null;
   private baseURL: string = process.env.REACT_APP_API_URL || 'https://api.masjidconnect.com';
+  private isDevelopment: boolean = process.env.NODE_ENV === 'development';
 
   constructor() {
     this.client = axios.create({
@@ -76,8 +77,40 @@ class ApiClient {
   }
 
   public async pairScreen(pairingData: PairingRequest): Promise<ApiResponse<PairingResponse>> {
-    const response = await this.client.post<ApiResponse<PairingResponse>>('/api/screens/pair', pairingData);
-    return response.data;
+    // In development mode, use a mock response
+    if (this.isDevelopment) {
+      console.log('DEV MODE: Using mock pairing response for code:', pairingData.pairingCode);
+      
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Log the request for debugging
+      console.log('Pairing request:', pairingData);
+      
+      // Return a mock successful response
+      return {
+        success: true,
+        data: {
+          screen: {
+            id: 'mock-screen-id-' + Date.now(),
+            name: 'Development Screen',
+            apiKey: 'mock-api-key-' + Math.random().toString(36).substring(2, 15),
+          }
+        }
+      };
+    }
+    
+    // In production, make the actual API call
+    try {
+      const response = await this.client.post<ApiResponse<PairingResponse>>('/api/screens/pair', pairingData);
+      return response.data;
+    } catch (error) {
+      console.error('API Error in pairScreen:', error);
+      return {
+        success: false,
+        error: 'Failed to connect to the server. Please check your internet connection.'
+      };
+    }
   }
 
   public async sendHeartbeat(status: HeartbeatRequest): Promise<ApiResponse<HeartbeatResponse>> {

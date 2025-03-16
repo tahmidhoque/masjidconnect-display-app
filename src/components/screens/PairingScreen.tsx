@@ -13,7 +13,9 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Fade
+  Fade,
+  Alert,
+  Link
 } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,17 +44,27 @@ const PairingScreen: React.FC = () => {
   const [pairingCode, setPairingCode] = useState<string>('');
   const [pairingStep, setPairingStep] = useState<number>(1);
   const [fadeIn, setFadeIn] = useState<boolean>(false);
+  const [pairingAttempts, setPairingAttempts] = useState<number>(0);
+  const isDevelopment = process.env.NODE_ENV === 'development';
   
-  // Generate a random 6-digit pairing code
+  // Generate a random 6-digit pairing code and initiate pairing
   useEffect(() => {
-    const generatePairingCode = () => {
+    const generatePairingCode = async () => {
       // Generate a random 6-digit code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setPairingCode(code);
+      setPairingAttempts(prev => prev + 1);
+      
+      console.log(`Initiating pairing with code: ${code} (Attempt #${pairingAttempts + 1})`);
       
       // After generating the code, initiate pairing with the backend
       // This will start listening for pairing requests with this code
-      pairScreen(code);
+      try {
+        const result = await pairScreen(code);
+        console.log('Pairing result:', result);
+      } catch (error) {
+        console.error('Error in pairing process:', error);
+      }
     };
     
     generatePairingCode();
@@ -68,64 +80,24 @@ const PairingScreen: React.FC = () => {
     }, 300);
     
     return () => clearInterval(interval);
-  }, [pairScreen]);
+  }, []);
 
   // Simulate pairing steps to provide visual feedback
   useEffect(() => {
-    if (isPairing) {
-      // Move through the pairing steps for visual feedback
-      const stepInterval = setInterval(() => {
-        setPairingStep(current => {
-          if (current < 3) return current + 1;
-          clearInterval(stepInterval);
-          return current;
-        });
-      }, 3000);
-      
-      return () => clearInterval(stepInterval);
-    } else {
-      setPairingStep(1);
-    }
-  }, [isPairing]);
+    const timer = setTimeout(() => {
+      if (pairingStep < 3) {
+        setPairingStep(prev => prev + 1);
+      }
+    }, 8000);
+    
+    return () => clearTimeout(timer);
+  }, [pairingStep]);
 
   // Generate the QR code URL
   const qrCodeUrl = `https://dashboard.masjidconnect.com/pair/${pairingCode}`;
 
-  // Custom QR code with logo in the center
-  const QRCodeWithLogo = () => (
-    <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', marginY: 2 }}>
-      <Box sx={{ 
-        backgroundColor: 'white', 
-        padding: 2, 
-        borderRadius: 2,
-        width: 200,
-        height: 200,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}>
-        <QRCodeSVG
-          value={qrCodeUrl}
-          size={200}
-          bgColor={"#ffffff"}
-          fgColor={"#0A2647"}
-          level={"H"}
-          includeMargin={false}
-          imageSettings={{
-            src: logoNoTextGold,
-            x: undefined,
-            y: undefined,
-            height: 40,
-            width: 40,
-            excavate: true,
-          }}
-        />
-      </Box>
-    </Box>
-  );
-
   // Pairing steps display
-  const PairingSteps = () => (
+  const PairingSteps = ({ currentStep }: { currentStep: number }) => (
     <Card elevation={4} sx={{ 
       backgroundColor: 'rgba(255, 255, 255, 0.1)', 
       py: 2, 
@@ -138,9 +110,9 @@ const PairingScreen: React.FC = () => {
         How to Pair Your Display
       </Typography>
       <List>
-        <ListItem sx={{ opacity: 1, color: 'white' }}>
-          <ListItemIcon sx={{ color: pairingStep >= 1 ? theme.palette.warning.main : 'white' }}>
-            {pairingStep > 1 ? <CheckCircleOutlineIcon /> : <DevicesIcon />}
+        <ListItem sx={{ opacity: currentStep >= 1 ? 1 : 0.6, color: 'white' }}>
+          <ListItemIcon sx={{ color: currentStep > 1 ? theme.palette.warning.main : 'white' }}>
+            {currentStep > 1 ? <CheckCircleOutlineIcon /> : <DevicesIcon />}
           </ListItemIcon>
           <ListItemText 
             primary="Go to MasjidConnect Dashboard" 
@@ -152,9 +124,9 @@ const PairingScreen: React.FC = () => {
           />
         </ListItem>
         
-        <ListItem sx={{ opacity: pairingStep >= 2 ? 1 : 0.6, color: 'white' }}>
-          <ListItemIcon sx={{ color: pairingStep >= 2 ? theme.palette.warning.main : 'white' }}>
-            {pairingStep > 2 ? <CheckCircleOutlineIcon /> : <QrCodeIcon />}
+        <ListItem sx={{ opacity: currentStep >= 2 ? 1 : 0.6, color: 'white' }}>
+          <ListItemIcon sx={{ color: currentStep > 2 ? theme.palette.warning.main : 'white' }}>
+            {currentStep > 2 ? <CheckCircleOutlineIcon /> : <QrCodeIcon />}
           </ListItemIcon>
           <ListItemText 
             primary="Enter the Pairing Code or Scan QR" 
@@ -166,9 +138,9 @@ const PairingScreen: React.FC = () => {
           />
         </ListItem>
         
-        <ListItem sx={{ opacity: pairingStep >= 3 ? 1 : 0.6, color: 'white' }}>
-          <ListItemIcon sx={{ color: pairingStep >= 3 ? theme.palette.warning.main : 'white' }}>
-            {pairingStep > 3 ? <CheckCircleOutlineIcon /> : <SettingsIcon />}
+        <ListItem sx={{ opacity: currentStep >= 3 ? 1 : 0.6, color: 'white' }}>
+          <ListItemIcon sx={{ color: currentStep > 3 ? theme.palette.warning.main : 'white' }}>
+            {currentStep > 3 ? <CheckCircleOutlineIcon /> : <SettingsIcon />}
           </ListItemIcon>
           <ListItemText 
             primary="Configure Display Settings" 
@@ -183,168 +155,164 @@ const PairingScreen: React.FC = () => {
     </Card>
   );
 
-  // Full-screen container
+  // Get orientation style
+  const getOrientationStyle = () => {
+    return {
+      transform: orientation === 'LANDSCAPE' ? 'none' : 'rotate(90deg)',
+      transformOrigin: 'center center',
+      height: orientation === 'LANDSCAPE' ? '100vh' : '100vw',
+      width: orientation === 'LANDSCAPE' ? '100vw' : '100vh',
+    };
+  };
+
   return (
     <Box
       sx={{
-        height: '100vh',
-        width: '100vw',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: theme.palette.primary.main, // Midnight Blue background
+        justifyContent: 'center',
         overflow: 'hidden',
         position: 'relative',
+        ...getOrientationStyle(),
+        backgroundColor: theme.palette.background.default,
       }}
     >
-      {/* Logo at the top */}
       <Fade in={fadeIn} timeout={1000}>
-        <Box 
-          sx={{ 
-            position: 'absolute',
-            top: '2rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '180px'
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            width: '100%',
+            height: '100%',
+            padding: 4,
           }}
         >
-          <img 
-            src={logoGold} 
-            alt="MasjidConnect Logo" 
-            style={{ width: '100%', height: 'auto' }} 
-          />
-        </Box>
-      </Fade>
-
-      <Container maxWidth="lg">
-        <Grid 
-          container 
-          spacing={4} 
-          direction={orientation === 'PORTRAIT' ? 'column' : 'row'}
-          justifyContent="center"
-          alignItems="center"
-          sx={{ pt: orientation === 'PORTRAIT' ? 10 : 0 }}
-        >
-          <Grid item xs={12} md={6}>
-            <Fade in={fadeIn} timeout={1200}>
-              <Box>
-                <Typography 
-                  variant="h4" 
-                  color="white" 
-                  gutterBottom 
-                  sx={{ 
-                    fontWeight: 'bold',
-                    textAlign: orientation === 'PORTRAIT' ? 'center' : 'left',
-                    mb: 3,
-                  }}
-                >
-                  Connect Your Display
-                </Typography>
-                
-                <PairingSteps />
-                
-                {pairingError && (
-                  <Paper 
-                    elevation={0} 
-                    sx={{ 
-                      p: 2, 
-                      mt: 3, 
-                      backgroundColor: 'rgba(231, 111, 81, 0.2)', 
-                      borderRadius: 2,
-                      borderLeft: '4px solid #E76F51',
-                    }}
-                  >
-                    <Typography color="#E76F51" variant="body2">
-                      Error: {pairingError}. The code will refresh in 5 minutes.
-                    </Typography>
-                  </Paper>
-                )}
-              </Box>
-            </Fade>
-          </Grid>
-          
-          <Grid item xs={12} md={6} 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'center', 
-              alignItems: 'center',
+          {/* Left side - Instructions */}
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              pr: 4,
             }}
           >
-            <Fade in={fadeIn} timeout={1400}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography 
-                  variant="h6" 
-                  color="white" 
-                  gutterBottom
-                  sx={{ opacity: 0.9 }}
-                >
-                  Scan this QR code or enter the pairing code
-                </Typography>
-                
-                <QRCodeWithLogo />
-                
-                <Box sx={{ mt: 3 }}>
-                  <Paper
-                    elevation={4}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2,
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(5px)',
-                      width: '100%',
-                      maxWidth: 300,
-                      mx: 'auto',
-                    }}
-                  >
-                    {isPairing && pairingStep > 1 ? (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60px' }}>
-                        <CircularProgress size={40} sx={{ color: theme.palette.warning.main }} />
-                        <Typography 
-                          variant="body1" 
-                          sx={{ color: 'white', ml: 2, fontWeight: 'light' }}
-                        >
-                          Pairing...
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography 
-                        variant="h3" 
-                        sx={{ 
-                          color: theme.palette.warning.main, 
-                          letterSpacing: 8, 
-                          fontWeight: 'bold',
-                          textAlign: 'center',
-                        }}
-                      >
-                        {pairingCode}
-                      </Typography>
-                    )}
-                  </Paper>
-                  
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      mt: 2, 
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    This code will refresh in 5 minutes if not paired
+            <Typography variant="h3" gutterBottom>
+              Pair Your Display
+            </Typography>
+            
+            <Typography variant="body1" paragraph>
+              Follow these steps to connect this display to your MasjidConnect account:
+            </Typography>
+            
+            <PairingSteps currentStep={pairingStep} />
+            
+            {isPairing && (
+              <Alert severity="info" sx={{ mt: 2, width: '100%' }}>
+                Waiting for pairing... This display will automatically connect once paired.
+              </Alert>
+            )}
+            
+            {pairingError && (
+              <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
+                {pairingError}
+                {isDevelopment && (
+                  <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                    Development mode: Using mock API responses. Check console for details.
                   </Typography>
-                </Box>
-              </Box>
-            </Fade>
-          </Grid>
-        </Grid>
-      </Container>
-      
-      <Box sx={{ position: 'fixed', bottom: 16, width: '100%', textAlign: 'center' }}>
-        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-          MasjidConnect Display v1.0.0 • {orientation} Mode
-        </Typography>
-      </Box>
+                )}
+              </Alert>
+            )}
+            
+            {pairingAttempts > 1 && (
+              <Alert severity="warning" sx={{ mt: 2, width: '100%' }}>
+                Pairing code refreshed. Attempt #{pairingAttempts}
+              </Alert>
+            )}
+            
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="body2" color="text.secondary">
+                Need help? Visit <Link href="https://masjidconnect.com/support" target="_blank" rel="noopener">masjidconnect.com/support</Link>
+              </Typography>
+            </Box>
+          </Box>
+          
+          {/* Right side - QR Code */}
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: theme.palette.background.paper,
+              borderRadius: 4,
+              p: 4,
+              boxShadow: 3,
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                mb: 3,
+              }}
+            >
+              <Typography variant="h4" gutterBottom align="center">
+                Pairing Code
+              </Typography>
+              <Typography
+                variant="h2"
+                sx={{
+                  fontWeight: 'bold',
+                  letterSpacing: 4,
+                  color: theme.palette.primary.main,
+                }}
+              >
+                {pairingCode}
+              </Typography>
+            </Box>
+            
+            <Box
+              sx={{
+                position: 'relative',
+                width: 280,
+                height: 280,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <QRCodeSVG
+                value={qrCodeUrl}
+                size={250}
+                bgColor={"#ffffff"}
+                fgColor={"#0A2647"}
+                level={"H"}
+                includeMargin={false}
+                imageSettings={{
+                  src: logoNoTextGold,
+                  x: undefined,
+                  y: undefined,
+                  height: 50,
+                  width: 50,
+                  excavate: true,
+                }}
+              />
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
+              Scan this QR code with the MasjidConnect app or visit{' '}
+              <Link href={`https://masjidconnect.com/pair`} target="_blank" rel="noopener">
+                masjidconnect.com/pair
+              </Link>
+            </Typography>
+          </Box>
+        </Box>
+      </Fade>
     </Box>
   );
 };
