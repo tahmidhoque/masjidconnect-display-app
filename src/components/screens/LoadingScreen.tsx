@@ -49,12 +49,9 @@ const LoadingScreen: React.FC = () => {
         const completeTimer = setTimeout(() => {
           setLoadingStage('complete');
           
-          // Start fade out animation after a brief pause
-          const fadeOutTimer = setTimeout(() => {
-            setFadeOut(true);
-          }, 1200);
+          // Note: We no longer need to set fadeOut here as the App component
+          // will handle the transition to the next screen
           
-          return () => clearTimeout(fadeOutTimer);
         }, 1800);
         
         return () => clearTimeout(completeTimer);

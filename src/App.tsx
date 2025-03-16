@@ -1,10 +1,12 @@
-import React from 'react';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { ThemeProvider, CssBaseline, Fade } from '@mui/material';
 import theme from './theme/theme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { OrientationProvider } from './contexts/OrientationContext';
 import { ContentProvider } from './contexts/ContentContext';
 import LoadingScreen from './components/screens/LoadingScreen';
+import PairingScreen from './components/screens/PairingScreen';
+import DisplayScreen from './components/screens/DisplayScreen';
 import useAppInitialization from './hooks/useAppInitialization';
 
 /**
@@ -12,22 +14,43 @@ import useAppInitialization from './hooks/useAppInitialization';
  */
 const AppContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { isInitializing } = useAppInitialization();
+  const { isInitializing, loadingMessage } = useAppInitialization();
+  const [showLoading, setShowLoading] = useState<boolean>(true);
+  const [showContent, setShowContent] = useState<boolean>(false);
+
+  // Handle transitions between screens
+  useEffect(() => {
+    let transitionTimer: NodeJS.Timeout;
+
+    // If initialization is complete, schedule the transition
+    if (!isInitializing && loadingMessage === 'Ready') {
+      transitionTimer = setTimeout(() => {
+        setShowLoading(false);
+        
+        // Small delay before showing the next screen
+        setTimeout(() => {
+          setShowContent(true);
+        }, 500);
+      }, 3000); // Wait for the loading screen animations to complete
+    }
+
+    return () => {
+      if (transitionTimer) clearTimeout(transitionTimer);
+    };
+  }, [isInitializing, loadingMessage]);
 
   // Always show loading screen initially
-  if (isInitializing) {
+  if (showLoading) {
     return <LoadingScreen />;
   }
 
-  // TODO: Replace with actual screen content based on authentication state
+  // Show the appropriate screen based on authentication state
   return (
-    <>
-      {isAuthenticated ? (
-        <div>Main Content Screen</div>
-      ) : (
-        <div>Pairing Screen</div>
-      )}
-    </>
+    <Fade in={showContent} timeout={800}>
+      <div>
+        {isAuthenticated ? <DisplayScreen /> : <PairingScreen />}
+      </div>
+    </Fade>
   );
 };
 
