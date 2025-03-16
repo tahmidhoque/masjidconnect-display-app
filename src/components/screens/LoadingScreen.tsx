@@ -22,7 +22,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const [rotationAngle, setRotationAngle] = useState(0);
   const [showContent, setShowContent] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
-  const [fadeOut, setFadeOut] = useState(false);
 
   // Animation effect for the custom loader
   useEffect(() => {
@@ -33,59 +32,47 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     return () => clearInterval(animationInterval);
   }, []);
 
-  // Enhanced loading stage management with premium transitions
+  // Simplified loading stage management
   useEffect(() => {
+    console.log("LoadingScreen: Current loading message:", loadingMessage);
+    
     // Initial fade-in animation
-    const initialTimer = setTimeout(() => {
+    setTimeout(() => {
       setShowContent(true);
-      setLoadingStage('setting-up');
-    }, 800);
+    }, 500);
 
-    // Process loading messages to determine stage
+    // Simplified loading stages
     if (loadingMessage.includes("check") || loadingMessage.includes("fetch")) {
       setLoadingStage('setting-up');
     } else if (loadingMessage === "Ready" || loadingMessage.includes("Complete")) {
-      // When actual loading is complete, wait a bit then show "Ready to Connect"
-      const readyTimer = setTimeout(() => {
-        setLoadingStage('ready');
-        
-        // After showing "Ready to Connect", wait and then fade out
-        const completeTimer = setTimeout(() => {
-          setLoadingStage('complete');
-          
-          // Call onComplete after showing the complete message for a moment
-          if (onComplete) {
-            const finalTimer = setTimeout(() => {
-              console.log("LoadingScreen: Calling onComplete callback");
-              onComplete();
-            }, 1500);
-            
-            return () => clearTimeout(finalTimer);
-          }
-        }, 1800);
-        
-        return () => clearTimeout(completeTimer);
-      }, 1000);
+      setLoadingStage('ready');
       
-      return () => clearTimeout(readyTimer);
+      // Show "Welcome to MasjidConnect" message briefly
+      setTimeout(() => {
+        setLoadingStage('complete');
+        
+        // Call onComplete after a short delay
+        if (onComplete) {
+          console.log("LoadingScreen: Will call onComplete in 1.5 seconds");
+          setTimeout(() => {
+            console.log("LoadingScreen: Calling onComplete callback NOW");
+            onComplete();
+          }, 1500);
+        }
+      }, 1000);
     }
-
-    return () => {
-      clearTimeout(initialTimer);
-    };
   }, [loadingMessage, onComplete]);
 
-  // Add a safety timeout to ensure we always transition after a maximum time
+  // Guaranteed transition after a maximum time
   useEffect(() => {
-    // Force transition after 10 seconds maximum, regardless of loading state
-    const safetyTimer = setTimeout(() => {
+    const forceTransitionTimer = setTimeout(() => {
       if (onComplete) {
-        console.log("LoadingScreen: Safety timeout reached, forcing transition");
+        console.log("LoadingScreen: Force transition timer triggered after 5 seconds");
         onComplete();
       }
-    }, 10000);
+    }, 5000);
     
-    return () => clearTimeout(safetyTimer);
+    return () => clearTimeout(forceTransitionTimer);
   }, [onComplete]);
 
   // Get display message based on loading stage
@@ -190,7 +177,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   };
 
   return (
-    <Fade in={!fadeOut} timeout={800}>
+    <Fade in={showContent} timeout={800}>
       <Box
         sx={{
           height: '100vh',

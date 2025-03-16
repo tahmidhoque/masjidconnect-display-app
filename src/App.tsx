@@ -15,33 +15,27 @@ import useAppInitialization from './hooks/useAppInitialization';
 const AppContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { isInitializing } = useAppInitialization();
-  const [showLoading, setShowLoading] = useState<boolean>(true);
-  const [showContent, setShowContent] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log("App state:", { isInitializing, isAuthenticated, isLoading });
+  }, [isInitializing, isAuthenticated, isLoading]);
 
   // Handle completion of loading screen
   const handleLoadingComplete = () => {
     console.log("App: Loading complete, transitioning to next screen");
-    setShowLoading(false);
-    // Small delay before showing the next screen
-    setTimeout(() => {
-      setShowContent(true);
-      console.log("App: Showing content screen:", isAuthenticated ? "DisplayScreen" : "PairingScreen");
-    }, 500);
+    setIsLoading(false);
   };
 
-  // Log initial state
-  useEffect(() => {
-    console.log("App: Initial state - isInitializing:", isInitializing, "isAuthenticated:", isAuthenticated);
-  }, [isInitializing, isAuthenticated]);
-
-  // Always show loading screen initially
-  if (isInitializing || showLoading) {
+  // Determine which screen to show
+  if (isInitializing || isLoading) {
     return <LoadingScreen onComplete={handleLoadingComplete} />;
   }
 
   // Show the appropriate screen based on authentication state
   return (
-    <Fade in={showContent} timeout={800}>
+    <Fade in={!isLoading} timeout={800}>
       <div>
         {isAuthenticated ? <DisplayScreen /> : <PairingScreen />}
       </div>

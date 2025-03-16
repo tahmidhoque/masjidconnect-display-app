@@ -23,43 +23,26 @@ export const useAppInitialization = () => {
 
     const initialize = async () => {
       try {
-        // Update loading message based on auth status
+        // Step 1: Initial delay for UX
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Step 2: Check authentication status
         if (!isAuthenticated) {
-          console.log("useAppInitialization: Not authenticated, checking pairing status");
+          console.log("useAppInitialization: Not authenticated, preparing pairing screen");
           if (isMounted) setLoadingMessage('Checking pairing status...');
-          
-          // Wait a moment before updating message again
-          // This is for UX - allowing user to see the loading process
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          if (isMounted) setLoadingMessage('Requesting pairing code...');
-        } else if (isAuthenticated && screenId) {
-          console.log("useAppInitialization: Authenticated with screenId:", screenId);
-          if (isMounted) setLoadingMessage('Fetching content...');
-          
-          // Refresh content if authenticated
-          await refreshContent();
-          
-          // Get screen orientation from the server
-          try {
-            const response = await apiClient.getScreenContent();
-            if (response.success && response.data?.screen?.orientation) {
-              setOrientation(response.data.screen.orientation as Orientation);
-            }
-          } catch (error) {
-            console.error('Failed to get screen orientation:', error);
-          }
-          
-          // Give a bit more time before completing initialization
           await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          console.log("useAppInitialization: Authenticated, fetching content");
+          if (isMounted) setLoadingMessage('Fetching content...');
+          await refreshContent();
         }
-
-        // Complete initialization
+        
+        // Step 3: Complete initialization
         if (isMounted) {
           console.log("useAppInitialization: Initialization complete");
           setLoadingMessage('Ready');
           
-          // Ensure we set isInitializing to false after a short delay
+          // Short delay before completing
           setTimeout(() => {
             if (isMounted) {
               setIsInitializing(false);
@@ -78,23 +61,23 @@ export const useAppInitialization = () => {
 
     initialize();
 
-    // Add a safety timeout to ensure initialization completes
-    const safetyTimer = setTimeout(() => {
-      if (isMounted && isInitializing) {
-        console.log("useAppInitialization: Safety timeout reached, forcing completion");
+    // Force completion after 3 seconds maximum
+    const forceCompleteTimer = setTimeout(() => {
+      if (isMounted) {
+        console.log("useAppInitialization: Force completing initialization after timeout");
         setLoadingMessage('Ready');
         setIsInitializing(false);
       }
-    }, 8000);
+    }, 3000);
 
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimer);
+      clearTimeout(forceCompleteTimer);
     };
-  }, [isAuthenticated, screenId, refreshContent, isInitializing]);
+  }, [isAuthenticated, refreshContent]);
 
   return {
-    isInitializing: isInitializing || isContentLoading,
+    isInitializing,
     loadingMessage,
     orientation,
   };
