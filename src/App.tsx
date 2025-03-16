@@ -14,34 +14,29 @@ import useAppInitialization from './hooks/useAppInitialization';
  */
 const AppContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const { isInitializing, loadingMessage } = useAppInitialization();
+  const { isInitializing } = useAppInitialization();
   const [showLoading, setShowLoading] = useState<boolean>(true);
   const [showContent, setShowContent] = useState<boolean>(false);
 
-  // Handle transitions between screens
+  // Handle completion of loading screen
+  const handleLoadingComplete = () => {
+    console.log("App: Loading complete, transitioning to next screen");
+    setShowLoading(false);
+    // Small delay before showing the next screen
+    setTimeout(() => {
+      setShowContent(true);
+      console.log("App: Showing content screen:", isAuthenticated ? "DisplayScreen" : "PairingScreen");
+    }, 500);
+  };
+
+  // Log initial state
   useEffect(() => {
-    let transitionTimer: NodeJS.Timeout;
-
-    // If initialization is complete, schedule the transition
-    if (!isInitializing && loadingMessage === 'Ready') {
-      transitionTimer = setTimeout(() => {
-        setShowLoading(false);
-        
-        // Small delay before showing the next screen
-        setTimeout(() => {
-          setShowContent(true);
-        }, 500);
-      }, 3000); // Wait for the loading screen animations to complete
-    }
-
-    return () => {
-      if (transitionTimer) clearTimeout(transitionTimer);
-    };
-  }, [isInitializing, loadingMessage]);
+    console.log("App: Initial state - isInitializing:", isInitializing, "isAuthenticated:", isAuthenticated);
+  }, [isInitializing, isAuthenticated]);
 
   // Always show loading screen initially
-  if (showLoading) {
-    return <LoadingScreen />;
+  if (isInitializing || showLoading) {
+    return <LoadingScreen onComplete={handleLoadingComplete} />;
   }
 
   // Show the appropriate screen based on authentication state

@@ -5,13 +5,17 @@ import { Orientation } from '../../contexts/OrientationContext';
 import useAppInitialization from '../../hooks/useAppInitialization';
 import logoGold from '../../assets/logos/logo-gold.svg';
 
+interface LoadingScreenProps {
+  onComplete?: () => void;
+}
+
 /**
  * LoadingScreen component
  * 
  * Displays a loading screen with the MasjidConnect logo and a loading animation
  * while the app checks pairing status and fetches content.
  */
-const LoadingScreen: React.FC = () => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
   const { loadingMessage, orientation } = useAppInitialization();
@@ -49,9 +53,15 @@ const LoadingScreen: React.FC = () => {
         const completeTimer = setTimeout(() => {
           setLoadingStage('complete');
           
-          // Note: We no longer need to set fadeOut here as the App component
-          // will handle the transition to the next screen
-          
+          // Call onComplete after showing the complete message for a moment
+          if (onComplete) {
+            const finalTimer = setTimeout(() => {
+              console.log("LoadingScreen: Calling onComplete callback");
+              onComplete();
+            }, 1500);
+            
+            return () => clearTimeout(finalTimer);
+          }
         }, 1800);
         
         return () => clearTimeout(completeTimer);
@@ -63,7 +73,20 @@ const LoadingScreen: React.FC = () => {
     return () => {
       clearTimeout(initialTimer);
     };
-  }, [loadingMessage]);
+  }, [loadingMessage, onComplete]);
+
+  // Add a safety timeout to ensure we always transition after a maximum time
+  useEffect(() => {
+    // Force transition after 10 seconds maximum, regardless of loading state
+    const safetyTimer = setTimeout(() => {
+      if (onComplete) {
+        console.log("LoadingScreen: Safety timeout reached, forcing transition");
+        onComplete();
+      }
+    }, 10000);
+    
+    return () => clearTimeout(safetyTimer);
+  }, [onComplete]);
 
   // Get display message based on loading stage
   const getDisplayMessage = () => {

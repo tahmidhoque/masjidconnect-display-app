@@ -19,11 +19,13 @@ export const useAppInitialization = () => {
 
   useEffect(() => {
     let isMounted = true;
+    console.log("useAppInitialization: Starting initialization");
 
     const initialize = async () => {
       try {
         // Update loading message based on auth status
         if (!isAuthenticated) {
+          console.log("useAppInitialization: Not authenticated, checking pairing status");
           if (isMounted) setLoadingMessage('Checking pairing status...');
           
           // Wait a moment before updating message again
@@ -32,6 +34,7 @@ export const useAppInitialization = () => {
           
           if (isMounted) setLoadingMessage('Requesting pairing code...');
         } else if (isAuthenticated && screenId) {
+          console.log("useAppInitialization: Authenticated with screenId:", screenId);
           if (isMounted) setLoadingMessage('Fetching content...');
           
           // Refresh content if authenticated
@@ -53,8 +56,16 @@ export const useAppInitialization = () => {
 
         // Complete initialization
         if (isMounted) {
+          console.log("useAppInitialization: Initialization complete");
           setLoadingMessage('Ready');
-          setIsInitializing(false);
+          
+          // Ensure we set isInitializing to false after a short delay
+          setTimeout(() => {
+            if (isMounted) {
+              setIsInitializing(false);
+              console.log("useAppInitialization: Set isInitializing to false");
+            }
+          }, 500);
         }
       } catch (error) {
         console.error('Initialization error:', error);
@@ -67,10 +78,20 @@ export const useAppInitialization = () => {
 
     initialize();
 
+    // Add a safety timeout to ensure initialization completes
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && isInitializing) {
+        console.log("useAppInitialization: Safety timeout reached, forcing completion");
+        setLoadingMessage('Ready');
+        setIsInitializing(false);
+      }
+    }, 8000);
+
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
     };
-  }, [isAuthenticated, screenId, refreshContent]);
+  }, [isAuthenticated, screenId, refreshContent, isInitializing]);
 
   return {
     isInitializing: isInitializing || isContentLoading,
