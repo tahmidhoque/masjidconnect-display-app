@@ -30,6 +30,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [pairingCodeExpiresAt, setPairingCodeExpiresAt] = useState<string | null>(null);
   const [isPairingCodeExpired, setIsPairingCodeExpired] = useState<boolean>(false);
   const [pollingTimer, setPollingTimer] = useState<NodeJS.Timeout | null>(null);
+  const [lastPairingCodeRequestTime, setLastPairingCodeRequestTime] = useState<number | null>(null);
 
   useEffect(() => {
     // Check if we have stored credentials
@@ -43,6 +44,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Failed to parse stored credentials', error);
         localStorage.removeItem('masjidconnect_credentials');
       }
+    }
+
+    // Check if we have a stored pairing code and expiration time
+    const storedPairingCode = localStorage.getItem('pairingCode');
+    const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
+    const storedLastRequestTime = localStorage.getItem('lastPairingCodeRequestTime');
+    
+    if (storedPairingCode && storedPairingCodeExpiresAt) {
+      const expiresAt = new Date(storedPairingCodeExpiresAt);
+      const now = new Date();
+      
+      // Only restore the pairing code if it hasn't expired
+      if (expiresAt > now) {
+        console.log('Restoring saved pairing code:', storedPairingCode);
+        setPairingCode(storedPairingCode);
+        setPairingCodeExpiresAt(storedPairingCodeExpiresAt);
+      } else {
+        // Clear expired pairing code
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
+      }
+    }
+    
+    if (storedLastRequestTime) {
+      setLastPairingCodeRequestTime(parseInt(storedLastRequestTime, 10));
     }
 
     // Clean up polling timer on unmount
@@ -59,7 +85,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const checkExpiration = () => {
         const now = new Date();
         const expiresAt = new Date(pairingCodeExpiresAt);
-        setIsPairingCodeExpired(now > expiresAt);
+        const isExpired = now > expiresAt;
+        setIsPairingCodeExpired(isExpired);
+        
+        if (isExpired) {
+          console.log('Pairing code has expired');
+          // Clear stored pairing code if expired
+          localStorage.removeItem('pairingCode');
+          localStorage.removeItem('pairingCodeExpiresAt');
+        }
       };
 
       // Check immediately
@@ -79,14 +113,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // If already pairing, don't start another pairing process
     if (isPairing) {
       console.log('Already in pairing process, ignoring new request');
-      return null;
+      return pairingCode;
+    }
+    
+    // Check if we've requested a code recently (within the last 15 minutes)
+    // unless it's a manual refresh or the code has expired
+    const now = Date.now();
+    const fifteenMinutesInMs = 15 * 60 * 1000;
+    
+    if (lastPairingCodeRequestTime && (now - lastPairingCodeRequestTime < fifteenMinutesInMs) && pairingCode && !isPairingCodeExpired) {
+      console.log('Pairing code was requested recently and is still valid. Reusing existing code.');
+      return pairingCode;
     }
     
     setIsPairing(true);
     setPairingError(null);
-    setPairingCode(null);
-    setPairingCodeExpiresAt(null);
-    setIsPairingCodeExpired(false);
     
     // Check if we're in development mode
     // First try the NODE_ENV environment variable
@@ -129,8 +170,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { pairingCode, expiresAt } = response.data;
       console.log('Pairing code received:', pairingCode, 'Expires at:', expiresAt);
       
+      // Store the pairing code and expiration time
       setPairingCode(pairingCode);
       setPairingCodeExpiresAt(expiresAt);
+      setIsPairingCodeExpired(false);
+      
+      // Store the request time
+      setLastPairingCodeRequestTime(now);
+      localStorage.setItem('lastPairingCodeRequestTime', now.toString());
+      
+      // Store in localStorage for persistence across refreshes
+      localStorage.setItem('pairingCode', pairingCode);
+      localStorage.setItem('pairingCodeExpiresAt', expiresAt);
+      
       setIsPairing(false);
       
       return pairingCode;
@@ -178,7 +230,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     }
     
-    setIsPairing(true);
+    // Don't set isPairing to true if we're just polling
+    if (!isPairing) {
+      setIsPairing(true);
+    }
     
     try {
       console.log('Checking pairing status for code:', pairingCode);
@@ -187,6 +242,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (!isPaired) {
         console.log('Device not yet paired');
+        
+        // Schedule next check based on the polling interval from the API client
+        if (pollingTimer) {
+          clearTimeout(pollingTimer);
+        }
+        
+        const pollingInterval = apiClient.getPollingInterval();
+        console.log(`Will check again in ${pollingInterval / 1000} seconds`);
+        
+        const timer = setTimeout(() => {
+          checkPairingStatus(pairingCode);
+        }, pollingInterval);
+        
+        setPollingTimer(timer);
         setIsPairing(false);
         return false;
       }
@@ -204,12 +273,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Update state
         setIsAuthenticated(true);
         setScreenId(screenId);
+        
+        // Clear pairing state
         setPairingCode(null);
         setPairingCodeExpiresAt(null);
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
+        localStorage.removeItem('lastPairingCodeRequestTime');
         
         // Store in localStorage
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('screenId', screenId);
+        
+        // Clear polling timer
+        if (pollingTimer) {
+          clearTimeout(pollingTimer);
+          setPollingTimer(null);
+        }
         
         setIsPairing(false);
         return true;

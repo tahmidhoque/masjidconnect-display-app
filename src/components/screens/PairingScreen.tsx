@@ -73,6 +73,9 @@ const PairingScreen: React.FC = () => {
           setIsPolling(false);
         } else {
           console.log('Device not yet paired, continuing to poll...');
+          
+          // Set up polling at the interval recommended by the API
+          // This is handled by the AuthContext, so we don't need to set up a timer here
         }
       })
       .catch(error => {
@@ -88,8 +91,9 @@ const PairingScreen: React.FC = () => {
     const initiatePairing = async () => {
       if (!isMounted) return;
       
-      // Only request a pairing code if we don't already have one
-      if (!pairingCode && !isPairing && !isPolling) {
+      // Only request a pairing code if we don't already have one and it's not expired
+      // and we're not already in the process of pairing or polling
+      if (!pairingCode && !isPairing && !isPolling && !isPairingCodeExpired) {
         console.log('Initiating pairing process...');
         setPairingAttempts(prev => prev + 1);
         
@@ -107,7 +111,14 @@ const PairingScreen: React.FC = () => {
       }
     };
     
-    initiatePairing();
+    // Only initiate pairing if we don't have a valid pairing code
+    if (!pairingCode || isPairingCodeExpired) {
+      initiatePairing();
+    } else if (pairingCode && !isPolling && !isPairing) {
+      // If we already have a valid code but aren't polling, restart polling
+      console.log('Restarting polling with existing code:', pairingCode);
+      startPolling(pairingCode);
+    }
     
     // Animate elements
     setTimeout(() => {
@@ -119,7 +130,7 @@ const PairingScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [pairingCode, isPairing, isPolling, requestPairingCode, startPolling]);
+  }, [pairingCode, isPairing, isPolling, isPairingCodeExpired, requestPairingCode, startPolling]);
   
   // Handle refresh button click
   const handleRefresh = async () => {

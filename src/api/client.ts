@@ -122,6 +122,9 @@ class ApiClient {
   public async requestPairingCode(deviceInfo: { deviceType: string, orientation: string }): Promise<ApiResponse<RequestPairingCodeResponse>> {
     console.log('Requesting pairing code with device info:', deviceInfo);
     
+    // Add a delay to prevent too many requests
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     try {
       const request: RequestPairingCodeRequest = {
         deviceType: deviceInfo.deviceType,
@@ -143,7 +146,7 @@ class ApiClient {
           console.warn('Failed to request pairing code from local server, using mock response instead:', error);
           
           // Simulate network delay
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Return a mock successful response
           const mockResponse: ApiResponse<RequestPairingCodeResponse> = {
@@ -151,7 +154,7 @@ class ApiClient {
             data: {
               pairingCode: Math.floor(100000 + Math.random() * 900000).toString(),
               expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now
-              checkInterval: 5000
+              checkInterval: 60000 // Check every 60 seconds
             }
           };
           
@@ -222,6 +225,11 @@ class ApiClient {
             return true;
           }
           
+          // Update polling interval if provided
+          if (response.data.data?.checkAgainIn) {
+            this.pollingInterval = response.data.data.checkAgainIn * 1000;
+          }
+          
           return false;
         } catch (error) {
           console.log('[API] Could not connect to local server, using mock response');
@@ -233,9 +241,9 @@ class ApiClient {
           const mockResponse: ApiResponse<CheckPairingStatusResponse> = {
             success: true,
             data: {
-              paired: Math.random() > 0.8, // 20% chance of being paired
-              apiKey: Math.random() > 0.8 ? 'mock-api-key-' + Date.now() : undefined,
-              screenId: Math.random() > 0.8 ? 'mock-screen-id-' + Date.now() : undefined,
+              paired: Math.random() > 0.95, // 5% chance of being paired (reduced to prevent frequent pairing)
+              apiKey: Math.random() > 0.95 ? 'mock-api-key-' + Date.now() : undefined,
+              screenId: Math.random() > 0.95 ? 'mock-screen-id-' + Date.now() : undefined,
               checkAgainIn: 60 // Check every 60 seconds
             }
           };
@@ -255,6 +263,11 @@ class ApiClient {
             }
             
             return true;
+          }
+          
+          // Update polling interval if provided
+          if (mockResponse.data && mockResponse.data.checkAgainIn) {
+            this.pollingInterval = mockResponse.data.checkAgainIn * 1000;
           }
           
           return false;
@@ -278,6 +291,11 @@ class ApiClient {
           }
           
           return true;
+        }
+        
+        // Update polling interval if provided
+        if (response.data.data?.checkAgainIn) {
+          this.pollingInterval = response.data.data.checkAgainIn * 1000;
         }
         
         return false;
