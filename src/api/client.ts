@@ -26,6 +26,8 @@ class ApiClient {
   private baseURL: string = process.env.REACT_APP_API_URL || 'https://api.masjidconnect.com';
   private isDevelopment: boolean = false;
   private pollingInterval: number = 5000; // Default polling interval in ms
+  private lastRequestTime: Record<string, number> = {}; // Track last request time for each endpoint
+  private requestInProgress: Record<string, boolean> = {}; // Track if a request is in progress
 
   constructor() {
     // Check if we're in development mode
@@ -122,6 +124,34 @@ class ApiClient {
   public async requestPairingCode(deviceInfo: { deviceType: string, orientation: string }): Promise<ApiResponse<RequestPairingCodeResponse>> {
     console.log('Requesting pairing code with device info:', deviceInfo);
     
+    const endpoint = '/api/screens/unpaired';
+    
+    // Check if we've made this request recently (within the last 5 seconds)
+    const now = Date.now();
+    const minRequestInterval = 5000; // 5 seconds
+    
+    if (this.lastRequestTime[endpoint] && (now - this.lastRequestTime[endpoint] < minRequestInterval)) {
+      console.log(`Request to ${endpoint} was made recently, debouncing...`);
+      await new Promise(resolve => setTimeout(resolve, minRequestInterval));
+    }
+    
+    // Check if a request is already in progress
+    if (this.requestInProgress[endpoint]) {
+      console.log(`Request to ${endpoint} is already in progress, waiting...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // If it's still in progress after waiting, return an error
+      if (this.requestInProgress[endpoint]) {
+        return {
+          success: false,
+          error: 'Another request is already in progress'
+        };
+      }
+    }
+    
+    // Mark this request as in progress
+    this.requestInProgress[endpoint] = true;
+    
     // Add a delay to prevent too many requests
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -130,6 +160,9 @@ class ApiClient {
         deviceType: deviceInfo.deviceType,
         orientation: deviceInfo.orientation
       };
+      
+      // Update the last request time
+      this.lastRequestTime[endpoint] = now;
       
       // In development mode, we can simulate a successful response
       if (this.isDevelopment) {
@@ -141,6 +174,8 @@ class ApiClient {
             this.pollingInterval = response.data.data.checkInterval;
           }
           
+          // Mark request as complete
+          this.requestInProgress[endpoint] = false;
           return response.data;
         } catch (error) {
           console.warn('Failed to request pairing code from local server, using mock response instead:', error);
@@ -162,6 +197,9 @@ class ApiClient {
           if (mockResponse.data) {
             this.pollingInterval = mockResponse.data.checkInterval;
           }
+          
+          // Mark request as complete
+          this.requestInProgress[endpoint] = false;
           return mockResponse;
         }
       }
@@ -174,9 +212,15 @@ class ApiClient {
         this.pollingInterval = response.data.data.checkInterval;
       }
       
+      // Mark request as complete
+      this.requestInProgress[endpoint] = false;
       return response.data;
     } catch (error) {
       console.error('Error requesting pairing code:', error);
+      
+      // Mark request as complete even if it failed
+      this.requestInProgress[endpoint] = false;
+      
       return {
         success: false,
         error: 'Failed to request pairing code'
@@ -191,6 +235,34 @@ class ApiClient {
   public async checkPairingStatus(pairingCode: string): Promise<boolean> {
     console.log(`[API] Checking pairing status for code: ${pairingCode}`);
     console.log(`[API] Using isDevelopment: ${this.isDevelopment}`);
+    
+    const endpoint = `/api/screens/check-pairing-status/${pairingCode}`;
+    
+    // Check if we've made this request recently (within the last 2 seconds)
+    const now = Date.now();
+    const minRequestInterval = 2000; // 2 seconds
+    
+    if (this.lastRequestTime[endpoint] && (now - this.lastRequestTime[endpoint] < minRequestInterval)) {
+      console.log(`Request to ${endpoint} was made recently, debouncing...`);
+      await new Promise(resolve => setTimeout(resolve, minRequestInterval));
+    }
+    
+    // Check if a request is already in progress
+    if (this.requestInProgress[endpoint]) {
+      console.log(`Request to ${endpoint} is already in progress, waiting...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // If it's still in progress after waiting, return false
+      if (this.requestInProgress[endpoint]) {
+        return false;
+      }
+    }
+    
+    // Mark this request as in progress
+    this.requestInProgress[endpoint] = true;
+    
+    // Update the last request time
+    this.lastRequestTime[endpoint] = now;
     
     // Add a small delay to prevent too many requests
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -222,6 +294,8 @@ class ApiClient {
               this.pollingInterval = response.data.data.checkAgainIn * 1000;
             }
             
+            // Mark request as complete
+            this.requestInProgress[endpoint] = false;
             return true;
           }
           
@@ -230,6 +304,8 @@ class ApiClient {
             this.pollingInterval = response.data.data.checkAgainIn * 1000;
           }
           
+          // Mark request as complete
+          this.requestInProgress[endpoint] = false;
           return false;
         } catch (error) {
           console.log('[API] Could not connect to local server, using mock response');
@@ -262,6 +338,8 @@ class ApiClient {
               this.pollingInterval = mockResponse.data.checkAgainIn * 1000;
             }
             
+            // Mark request as complete
+            this.requestInProgress[endpoint] = false;
             return true;
           }
           
@@ -270,6 +348,8 @@ class ApiClient {
             this.pollingInterval = mockResponse.data.checkAgainIn * 1000;
           }
           
+          // Mark request as complete
+          this.requestInProgress[endpoint] = false;
           return false;
         }
       } else {
@@ -290,6 +370,8 @@ class ApiClient {
             this.pollingInterval = response.data.data.checkAgainIn * 1000;
           }
           
+          // Mark request as complete
+          this.requestInProgress[endpoint] = false;
           return true;
         }
         
@@ -298,10 +380,15 @@ class ApiClient {
           this.pollingInterval = response.data.data.checkAgainIn * 1000;
         }
         
+        // Mark request as complete
+        this.requestInProgress[endpoint] = false;
         return false;
       }
     } catch (error) {
       console.error('[API] Error checking pairing status:', error);
+      
+      // Mark request as complete even if it failed
+      this.requestInProgress[endpoint] = false;
       return false;
     }
   }

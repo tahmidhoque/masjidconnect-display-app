@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Box, 
   Typography, 
@@ -44,6 +44,7 @@ const PairingScreen: React.FC = () => {
   const [fadeIn, setFadeIn] = useState<boolean>(false);
   const [pairingAttempts, setPairingAttempts] = useState<number>(0);
   const [isPolling, setIsPolling] = useState<boolean>(false);
+  const requestInProgress = useRef<boolean>(false);
   
   // Check if we're in development mode
   // First try the NODE_ENV environment variable
@@ -60,7 +61,7 @@ const PairingScreen: React.FC = () => {
   
   // Start polling for pairing status
   const startPolling = useCallback((code: string) => {
-    if (isPolling) return;
+    if (isPolling || !code) return;
     
     setIsPolling(true);
     console.log('Starting to poll for pairing status...');
@@ -91,6 +92,12 @@ const PairingScreen: React.FC = () => {
     const initiatePairing = async () => {
       if (!isMounted) return;
       
+      // Prevent multiple simultaneous requests
+      if (requestInProgress.current) {
+        console.log('Request already in progress, skipping');
+        return;
+      }
+      
       // Only request a pairing code if we don't already have one and it's not expired
       // and we're not already in the process of pairing or polling
       if (!pairingCode && !isPairing && !isPolling && !isPairingCodeExpired) {
@@ -98,7 +105,10 @@ const PairingScreen: React.FC = () => {
         setPairingAttempts(prev => prev + 1);
         
         try {
+          requestInProgress.current = true;
           const code = await requestPairingCode();
+          requestInProgress.current = false;
+          
           console.log('Pairing code received:', code);
           
           if (code && isMounted) {
@@ -107,6 +117,7 @@ const PairingScreen: React.FC = () => {
           }
         } catch (error) {
           console.error('Error in pairing process:', error);
+          requestInProgress.current = false;
         }
       }
     };
@@ -134,11 +145,20 @@ const PairingScreen: React.FC = () => {
   
   // Handle refresh button click
   const handleRefresh = async () => {
+    // Prevent multiple simultaneous requests
+    if (requestInProgress.current || isPairing) {
+      console.log('Request already in progress, skipping refresh');
+      return;
+    }
+    
     console.log('Refreshing pairing code...');
     setPairingAttempts(prev => prev + 1);
     
     try {
+      requestInProgress.current = true;
       const code = await requestPairingCode();
+      requestInProgress.current = false;
+      
       console.log('New pairing code received:', code);
       
       if (code) {
@@ -147,6 +167,7 @@ const PairingScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error refreshing pairing code:', error);
+      requestInProgress.current = false;
     }
   };
 

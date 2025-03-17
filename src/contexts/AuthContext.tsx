@@ -122,10 +122,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const fifteenMinutesInMs = 15 * 60 * 1000;
     
     if (lastPairingCodeRequestTime && (now - lastPairingCodeRequestTime < fifteenMinutesInMs) && pairingCode && !isPairingCodeExpired) {
-      console.log('Pairing code was requested recently and is still valid. Reusing existing code.');
+      console.log('Pairing code was requested recently and is still valid. Reusing existing code:', pairingCode);
       return pairingCode;
     }
     
+    // Set isPairing to true to prevent duplicate requests
     setIsPairing(true);
     setPairingError(null);
     
@@ -154,6 +155,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('Requesting pairing code with device info:', deviceInfo);
       
+      // Check if we already have a valid pairing code in localStorage
+      const storedPairingCode = localStorage.getItem('pairingCode');
+      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
+      
+      if (storedPairingCode && storedPairingCodeExpiresAt) {
+        const expiresAt = new Date(storedPairingCodeExpiresAt);
+        const now = new Date();
+        
+        // If the stored code is still valid, use it instead of making a new request
+        if (expiresAt > now) {
+          console.log('Using stored pairing code:', storedPairingCode);
+          setPairingCode(storedPairingCode);
+          setPairingCodeExpiresAt(storedPairingCodeExpiresAt);
+          setIsPairingCodeExpired(false);
+          setLastPairingCodeRequestTime(Date.now());
+          setIsPairing(false);
+          return storedPairingCode;
+        } else {
+          // Clear expired pairing code
+          localStorage.removeItem('pairingCode');
+          localStorage.removeItem('pairingCodeExpiresAt');
+        }
+      }
+      
       const response = await apiClient.requestPairingCode(deviceInfo);
       
       if (!response.success || !response.data) {
@@ -176,8 +201,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsPairingCodeExpired(false);
       
       // Store the request time
-      setLastPairingCodeRequestTime(now);
-      localStorage.setItem('lastPairingCodeRequestTime', now.toString());
+      const requestTime = now;
+      setLastPairingCodeRequestTime(requestTime);
+      localStorage.setItem('lastPairingCodeRequestTime', requestTime.toString());
       
       // Store in localStorage for persistence across refreshes
       localStorage.setItem('pairingCode', pairingCode);
@@ -210,6 +236,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       setPairingError(errorMessage);
+      
+      // Add a small delay before setting isPairing to false to prevent rapid re-attempts
+      await new Promise(resolve => setTimeout(resolve, 2000));
       setIsPairing(false);
       return null;
     }
@@ -252,7 +281,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log(`Will check again in ${pollingInterval / 1000} seconds`);
         
         const timer = setTimeout(() => {
-          checkPairingStatus(pairingCode);
+          // Only check again if we still have the same pairing code
+          if (pairingCode === getPairingCode()) {
+            checkPairingStatus(pairingCode);
+          } else {
+            console.log('Pairing code has changed, stopping polling');
+          }
         }, pollingInterval);
         
         setPollingTimer(timer);
@@ -337,6 +371,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setPollingTimer(null);
     }
   };
+
+  // Helper function to get the current pairing code
+  const getPairingCode = () => pairingCode;
 
   return (
     <AuthContext.Provider
