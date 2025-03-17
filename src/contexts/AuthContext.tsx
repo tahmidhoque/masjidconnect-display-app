@@ -1,14 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import apiClient, { ApiCredentials } from '../api/client';
-import { PairingRequest, PairingResponse, ApiResponse } from '../api/models';
+import { PairingRequest, ApiResponse, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../api/models';
 
-interface AuthContextType {
+export interface AuthContextType {
   isAuthenticated: boolean;
   isPairing: boolean;
-  screenId: string | null;
   pairingError: string | null;
-  pairScreen: (pairingCode: string) => Promise<boolean>;
-  unpairScreen: () => void;
+  screenId: string | null;
+  requestPairingCode: () => Promise<string | null>;
+  checkPairingStatus: (pairingCode: string) => Promise<boolean>;
+  logout: () => void;
+  pairingCode: string | null;
+  pairingCodeExpiresAt: string | null;
+  isPairingCodeExpired: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +26,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isPairing, setIsPairing] = useState<boolean>(false);
   const [screenId, setScreenId] = useState<string | null>(null);
   const [pairingError, setPairingError] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [pairingCodeExpiresAt, setPairingCodeExpiresAt] = useState<string | null>(null);
+  const [isPairingCodeExpired, setIsPairingCodeExpired] = useState<boolean>(false);
+  const [pollingTimer, setPollingTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Check if we have stored credentials
@@ -36,82 +44,98 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.removeItem('masjidconnect_credentials');
       }
     }
+
+    // Clean up polling timer on unmount
+    return () => {
+      if (pollingTimer) {
+        clearTimeout(pollingTimer);
+      }
+    };
   }, []);
 
-  const pairScreen = async (pairingCode: string): Promise<boolean> => {
+  // Check if pairing code is expired
+  useEffect(() => {
+    if (pairingCodeExpiresAt) {
+      const checkExpiration = () => {
+        const now = new Date();
+        const expiresAt = new Date(pairingCodeExpiresAt);
+        setIsPairingCodeExpired(now > expiresAt);
+      };
+
+      // Check immediately
+      checkExpiration();
+
+      // Set up interval to check every minute
+      const interval = setInterval(checkExpiration, 60 * 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [pairingCodeExpiresAt]);
+
+  /**
+   * Step 1: Request a pairing code from the server
+   */
+  const requestPairingCode = async (): Promise<string | null> => {
     // If already pairing, don't start another pairing process
     if (isPairing) {
       console.log('Already in pairing process, ignoring new request');
-      return false;
+      return null;
     }
     
     setIsPairing(true);
     setPairingError(null);
+    setPairingCode(null);
+    setPairingCodeExpiresAt(null);
+    setIsPairingCodeExpired(false);
     
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    console.log(`Pairing screen in ${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
+    // Check if we're in development mode
+    // First try the NODE_ENV environment variable
+    let isDevelopment = process.env.NODE_ENV === 'development';
+    // If NODE_ENV is not set, check if we're using localhost
+    if (!isDevelopment && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      isDevelopment = false;
+      console.log('Detected localhost, but not setting development mode');
+    }
+    
+    console.log(`AuthContext - Current NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`AuthContext - isDevelopment: ${isDevelopment}`);
+    console.log(`AuthContext - window.location.hostname: ${window.location.hostname}`);
+    console.log(`Requesting pairing code in ${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
     
     try {
       // Get screen orientation
       const orientation = window.matchMedia('(orientation: portrait)').matches ? 'PORTRAIT' : 'LANDSCAPE';
       
-      const pairingData: PairingRequest = {
-        pairingCode,
-        deviceInfo: {
-          deviceType: 'WEB',
-          orientation,
-        }
+      const deviceInfo = {
+        deviceType: 'WEB',
+        orientation,
       };
       
-      console.log('Sending pairing request with data:', pairingData);
+      console.log('Requesting pairing code with device info:', deviceInfo);
       
-      const response = await apiClient.pairScreen(pairingData);
+      const response = await apiClient.requestPairingCode(deviceInfo);
       
       if (!response.success || !response.data) {
-        const errorMessage = response.error || 'Failed to pair screen';
-        console.error('Pairing failed:', errorMessage);
+        const errorMessage = response.error || 'Failed to request pairing code';
+        console.error('Pairing code request failed:', errorMessage);
         setPairingError(errorMessage);
         
         // Add a small delay before setting isPairing to false to prevent rapid re-attempts
         await new Promise(resolve => setTimeout(resolve, 2000));
         setIsPairing(false);
-        return false;
+        return null;
       }
       
-      const { screen } = response.data;
-      console.log('Pairing successful, received screen data:', screen);
+      const { pairingCode, expiresAt } = response.data;
+      console.log('Pairing code received:', pairingCode, 'Expires at:', expiresAt);
       
-      // Save credentials
-      const credentials: ApiCredentials = {
-        apiKey: screen.apiKey,
-        screenId: screen.id,
-      };
-      
-      apiClient.setCredentials(credentials);
-      setScreenId(screen.id);
-      
-      // In development mode, wait for explicit pairing through the admin dashboard
-      // This ensures the app doesn't automatically transition to the display screen
-      if (isDevelopment) {
-        console.log('Development mode: Waiting for explicit pairing through admin dashboard');
-        // Only set authenticated if we're using a real API response, not the mock
-        if (screen.id.indexOf('mock') === -1) {
-          setIsAuthenticated(true);
-        } else {
-          console.log('Using mock API response - not setting authenticated state');
-          // Add a delay before setting isPairing to false
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          setIsPairing(false);
-          return false;
-        }
-      } else {
-        setIsAuthenticated(true);
-      }
-      
+      setPairingCode(pairingCode);
+      setPairingCodeExpiresAt(expiresAt);
       setIsPairing(false);
-      return true;
+      
+      return pairingCode;
     } catch (error: any) {
-      console.error('Error pairing screen:', error);
+      console.error('Error requesting pairing code:', error);
       
       // Provide more detailed error messages based on the error type
       let errorMessage = 'Failed to connect to server';
@@ -135,14 +159,103 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       setPairingError(errorMessage);
       setIsPairing(false);
+      return null;
+    }
+  };
+
+  /**
+   * Step 3: Poll for pairing status
+   */
+  const checkPairingStatus = async (pairingCode: string): Promise<boolean> => {
+    if (!pairingCode) {
+      console.error('No pairing code provided');
+      return false;
+    }
+    
+    if (isPairingCodeExpired) {
+      console.error('Pairing code has expired');
+      setPairingError('Pairing code has expired. Please request a new code.');
+      return false;
+    }
+    
+    setIsPairing(true);
+    
+    try {
+      console.log('Checking pairing status for code:', pairingCode);
+      
+      const isPaired = await apiClient.checkPairingStatus(pairingCode);
+      
+      if (!isPaired) {
+        console.log('Device not yet paired');
+        setIsPairing(false);
+        return false;
+      }
+      
+      console.log('Device has been paired successfully!');
+      
+      // Get the credentials from localStorage (set by the API client)
+      const apiKey = localStorage.getItem('apiKey');
+      const screenId = localStorage.getItem('screenId');
+      
+      if (apiKey && screenId) {
+        // Set the credentials in the API client
+        apiClient.setCredentials({ apiKey, screenId });
+        
+        // Update state
+        setIsAuthenticated(true);
+        setScreenId(screenId);
+        setPairingCode(null);
+        setPairingCodeExpiresAt(null);
+        
+        // Store in localStorage
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('screenId', screenId);
+        
+        setIsPairing(false);
+        return true;
+      } else {
+        console.error('Missing API key or screen ID after successful pairing');
+        setPairingError('Authentication failed: Missing credentials');
+        setIsPairing(false);
+        return false;
+      }
+    } catch (error: any) {
+      console.error('Error checking pairing status:', error);
+      
+      // Provide more detailed error messages
+      let errorMessage = 'Failed to connect to server';
+      
+      if (error.message) {
+        if (error.message.includes('Network Error')) {
+          errorMessage = 'Network error: Please check your internet connection';
+        } else if (error.response) {
+          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+        } else if (error.request) {
+          errorMessage = 'No response from server: The server may be down or unreachable';
+        }
+      }
+      
+      setPairingError(errorMessage);
+      setIsPairing(false);
       return false;
     }
   };
 
-  const unpairScreen = (): void => {
+  const logout = () => {
     apiClient.clearCredentials();
     setIsAuthenticated(false);
     setScreenId(null);
+    
+    // Clear pairing state
+    setPairingCode(null);
+    setPairingCodeExpiresAt(null);
+    setIsPairingCodeExpired(false);
+    
+    // Clear polling timer
+    if (pollingTimer) {
+      clearTimeout(pollingTimer);
+      setPollingTimer(null);
+    }
   };
 
   return (
@@ -150,10 +263,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       value={{
         isAuthenticated,
         isPairing,
-        screenId,
         pairingError,
-        pairScreen,
-        unpairScreen,
+        screenId,
+        requestPairingCode,
+        checkPairingStatus,
+        logout,
+        pairingCode,
+        pairingCodeExpiresAt,
+        isPairingCodeExpired,
       }}
     >
       {children}

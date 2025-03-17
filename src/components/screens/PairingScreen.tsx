@@ -1,32 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
-  Paper, 
   CircularProgress, 
-  Container, 
-  Grid, 
-  Divider,
   useTheme,
   Card,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Fade,
   Alert,
-  Link
+  Link,
+  Stepper,
+  Step,
+  StepLabel,
+  Button
 } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrientation } from '../../contexts/OrientationContext';
 import logoNoTextGold from '../../assets/logos/logo-notext-gold.svg';
-import logoGold from '../../assets/logos/logo-gold.svg';
-import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import DevicesIcon from '@mui/icons-material/Devices';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import SettingsIcon from '@mui/icons-material/Settings';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 /**
  * The Pairing Screen component
@@ -38,73 +29,86 @@ import SettingsIcon from '@mui/icons-material/Settings';
  * Note: This is a non-interactive display, so the pairing is done through another device.
  */
 const PairingScreen: React.FC = () => {
-  const { pairScreen, isPairing, pairingError } = useAuth();
+  const { 
+    requestPairingCode, 
+    checkPairingStatus, 
+    isPairing, 
+    pairingError, 
+    pairingCode, 
+    pairingCodeExpiresAt,
+    isPairingCodeExpired
+  } = useAuth();
   const { orientation } = useOrientation();
   const theme = useTheme();
-  const [pairingCode, setPairingCode] = useState<string>('');
   const [pairingStep, setPairingStep] = useState<number>(1);
   const [fadeIn, setFadeIn] = useState<boolean>(false);
   const [pairingAttempts, setPairingAttempts] = useState<number>(0);
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const [isPolling, setIsPolling] = useState<boolean>(false);
   
-  // Generate a random 6-digit pairing code and initiate pairing
+  // Check if we're in development mode
+  // First try the NODE_ENV environment variable
+  let isDevelopment = process.env.NODE_ENV === 'development';
+  // If NODE_ENV is not set, check if we're using localhost
+  if (!isDevelopment && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    isDevelopment = false;
+    console.log('Detected localhost, but not setting development mode');
+  }
+  
+  console.log('PairingScreen - Current NODE_ENV:', process.env.NODE_ENV);
+  console.log('PairingScreen - isDevelopment:', isDevelopment);
+  console.log('PairingScreen - window.location.hostname:', window.location.hostname);
+  
+  // Start polling for pairing status
+  const startPolling = useCallback((code: string) => {
+    if (isPolling) return;
+    
+    setIsPolling(true);
+    console.log('Starting to poll for pairing status...');
+    
+    // Initial check
+    checkPairingStatus(code)
+      .then(isPaired => {
+        if (isPaired) {
+          console.log('Device paired successfully!');
+          setIsPolling(false);
+        } else {
+          console.log('Device not yet paired, continuing to poll...');
+        }
+      })
+      .catch(error => {
+        console.error('Error checking pairing status:', error);
+        setIsPolling(false);
+      });
+  }, [isPolling, checkPairingStatus]);
+  
+  // Step 1: Request a pairing code when the component mounts
   useEffect(() => {
     let isMounted = true;
-    let initialPairingDone = false;
     
-    const generatePairingCode = async () => {
+    const initiatePairing = async () => {
       if (!isMounted) return;
       
-      // Generate a random 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setPairingCode(code);
-      setPairingAttempts(prev => prev + 1);
-      
-      console.log(`Generated pairing code: ${code} (Attempt #${pairingAttempts + 1})`);
-      
-      // Only initiate pairing if we're not already in the process of pairing
-      if (!isPairing) {
-        console.log(`Initiating pairing with code: ${code}`);
+      // Only request a pairing code if we don't already have one
+      if (!pairingCode && !isPairing && !isPolling) {
+        console.log('Initiating pairing process...');
+        setPairingAttempts(prev => prev + 1);
         
         try {
-          const result = await pairScreen(code);
-          console.log('Pairing result:', result);
+          const code = await requestPairingCode();
+          console.log('Pairing code received:', code);
           
-          // If pairing was successful, we don't need to refresh the code
-          if (result && isMounted) {
-            console.log('Pairing successful! Transitioning to DisplayScreen.');
-            return;
+          if (code && isMounted) {
+            // Start polling for pairing status
+            startPolling(code);
           }
         } catch (error) {
           console.error('Error in pairing process:', error);
         }
-      } else {
-        console.log('Already in pairing process, not initiating a new request');
       }
     };
     
-    // Generate initial pairing code only once
-    if (!initialPairingDone) {
-      generatePairingCode();
-      initialPairingDone = true;
-    }
+    initiatePairing();
     
-    // Set up polling to check pairing status every 60 seconds (reduced frequency)
-    const pollingInterval = setInterval(() => {
-      if (!isPairing && isMounted) {
-        console.log('Checking pairing status...');
-        generatePairingCode();
-      }
-    }, 60 * 1000); // 60 seconds
-    
-    // Refresh the code every 5 minutes if not paired
-    const refreshInterval = setInterval(() => {
-      if (isMounted && !isPairing) {
-        console.log('Refreshing pairing code after 5 minutes');
-        generatePairingCode();
-      }
-    }, 5 * 60 * 1000);
-
     // Animate elements
     setTimeout(() => {
       if (isMounted) {
@@ -114,10 +118,26 @@ const PairingScreen: React.FC = () => {
     
     return () => {
       isMounted = false;
-      clearInterval(pollingInterval);
-      clearInterval(refreshInterval);
     };
-  }, [isPairing, pairScreen, pairingAttempts]);
+  }, [pairingCode, isPairing, isPolling, requestPairingCode, startPolling]);
+  
+  // Handle refresh button click
+  const handleRefresh = async () => {
+    console.log('Refreshing pairing code...');
+    setPairingAttempts(prev => prev + 1);
+    
+    try {
+      const code = await requestPairingCode();
+      console.log('New pairing code received:', code);
+      
+      if (code) {
+        // Start polling for pairing status
+        startPolling(code);
+      }
+    } catch (error) {
+      console.error('Error refreshing pairing code:', error);
+    }
+  };
 
   // Simulate pairing steps to provide visual feedback
   useEffect(() => {
@@ -137,8 +157,18 @@ const PairingScreen: React.FC = () => {
 
   useEffect(() => {
     // Log the QR code URL for debugging
-    console.log('QR Code URL:', qrCodeUrl);
-  }, [qrCodeUrl]);
+    if (pairingCode) {
+      console.log('QR Code URL:', qrCodeUrl);
+    }
+  }, [qrCodeUrl, pairingCode]);
+
+  // Format expiration time
+  const formatExpirationTime = () => {
+    if (!pairingCodeExpiresAt) return null;
+    
+    const expiresAt = new Date(pairingCodeExpiresAt);
+    return expiresAt.toLocaleTimeString();
+  };
 
   // Pairing steps display
   const PairingSteps = ({ currentStep }: { currentStep: number }) => (
@@ -153,52 +183,50 @@ const PairingScreen: React.FC = () => {
       <Typography variant="h6" color="white" gutterBottom>
         How to Pair Your Display
       </Typography>
-      <List>
-        <ListItem sx={{ opacity: currentStep >= 1 ? 1 : 0.6, color: 'white' }}>
-          <ListItemIcon sx={{ color: currentStep > 1 ? theme.palette.warning.main : 'white' }}>
-            {currentStep > 1 ? <CheckCircleOutlineIcon /> : <DevicesIcon />}
-          </ListItemIcon>
-          <ListItemText 
-            primary="Go to MasjidConnect Dashboard" 
-            secondary={
-              <Typography component="span" variant="body2" color="rgba(255, 255, 255, 0.7)">
-                {isDevelopment 
-                  ? 'Visit http://localhost:3000'
-                  : 'Visit dashboard.masjidconnect.com'
-                }
-              </Typography>
-            }
-          />
-        </ListItem>
+      
+      <Stepper activeStep={currentStep - 1} orientation="vertical" sx={{ mt: 2 }}>
+        <Step completed={currentStep > 1}>
+          <StepLabel 
+            StepIconProps={{ 
+              sx: { color: currentStep > 1 ? theme.palette.warning.main : 'white' } 
+            }}
+          >
+            <Typography color="white">Go to MasjidConnect Dashboard</Typography>
+            <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
+              {isDevelopment 
+                ? 'Visit http://localhost:3000'
+                : 'Visit dashboard.masjidconnect.com'
+              }
+            </Typography>
+          </StepLabel>
+        </Step>
         
-        <ListItem sx={{ opacity: currentStep >= 2 ? 1 : 0.6, color: 'white' }}>
-          <ListItemIcon sx={{ color: currentStep > 2 ? theme.palette.warning.main : 'white' }}>
-            {currentStep > 2 ? <CheckCircleOutlineIcon /> : <QrCodeIcon />}
-          </ListItemIcon>
-          <ListItemText 
-            primary="Enter the Pairing Code or Scan QR" 
-            secondary={
-              <Typography component="span" variant="body2" color="rgba(255, 255, 255, 0.7)">
-                Use the code shown below or scan the QR code
-              </Typography>
-            }
-          />
-        </ListItem>
+        <Step completed={currentStep > 2}>
+          <StepLabel 
+            StepIconProps={{ 
+              sx: { color: currentStep > 2 ? theme.palette.warning.main : 'white' } 
+            }}
+          >
+            <Typography color="white">Enter the Pairing Code or Scan QR</Typography>
+            <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
+              Use the code shown below or scan the QR code
+            </Typography>
+          </StepLabel>
+        </Step>
         
-        <ListItem sx={{ opacity: currentStep >= 3 ? 1 : 0.6, color: 'white' }}>
-          <ListItemIcon sx={{ color: currentStep > 3 ? theme.palette.warning.main : 'white' }}>
-            {currentStep > 3 ? <CheckCircleOutlineIcon /> : <SettingsIcon />}
-          </ListItemIcon>
-          <ListItemText 
-            primary="Configure Display Settings" 
-            secondary={
-              <Typography component="span" variant="body2" color="rgba(255, 255, 255, 0.7)">
-                Set the display name, orientation and other options
-              </Typography>
-            }
-          />
-        </ListItem>
-      </List>
+        <Step completed={currentStep > 3}>
+          <StepLabel 
+            StepIconProps={{ 
+              sx: { color: currentStep > 3 ? theme.palette.warning.main : 'white' } 
+            }}
+          >
+            <Typography color="white">Configure Display Settings</Typography>
+            <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
+              Set the display name, orientation and other options
+            </Typography>
+          </StepLabel>
+        </Step>
+      </Stepper>
     </Card>
   );
 
@@ -212,6 +240,61 @@ const PairingScreen: React.FC = () => {
     };
   };
 
+  // Get pairing status message
+  const getPairingStatusMessage = () => {
+    if (isPairing) {
+      return (
+        <Alert severity="info" sx={{ mt: 2, width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <CircularProgress size={20} sx={{ mr: 2 }} />
+            <Typography>
+              {!pairingCode ? 'Requesting pairing code...' : 'Checking pairing status...'}
+            </Typography>
+          </Box>
+        </Alert>
+      );
+    }
+    
+    if (isPolling) {
+      return (
+        <Alert severity="info" sx={{ mt: 2, width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <CircularProgress size={20} sx={{ mr: 2 }} />
+            <Typography>Waiting for pairing... This display will automatically connect once paired.</Typography>
+          </Box>
+        </Alert>
+      );
+    }
+    
+    if (isPairingCodeExpired) {
+      return (
+        <Alert severity="warning" sx={{ mt: 2, width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography>Pairing code has expired. Please request a new code.</Typography>
+            <Button 
+              variant="outlined" 
+              size="small" 
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={isPairing}
+              sx={{ ml: 2 }}
+            >
+              Refresh
+            </Button>
+          </Box>
+        </Alert>
+      );
+    }
+    
+    return null;
+  };
+
+  // Blue background style to match loading screen
+  const backgroundStyle = {
+    background: 'linear-gradient(135deg, #0A2647 0%, #144272 100%)',
+    color: 'white',
+  };
+
   return (
     <Box
       sx={{
@@ -222,7 +305,7 @@ const PairingScreen: React.FC = () => {
         overflow: 'hidden',
         position: 'relative',
         ...getOrientationStyle(),
-        backgroundColor: theme.palette.background.default,
+        ...backgroundStyle,
       }}
     >
       <Fade in={fadeIn} timeout={1000}>
@@ -244,13 +327,14 @@ const PairingScreen: React.FC = () => {
               justifyContent: 'center',
               alignItems: 'flex-start',
               pr: 4,
+              color: 'white',
             }}
           >
-            <Typography variant="h3" gutterBottom>
+            <Typography variant="h3" gutterBottom color="white">
               Pair Your Display
             </Typography>
             
-            <Typography variant="body1" paragraph>
+            <Typography variant="body1" paragraph color="white">
               Follow these steps to connect this display to your MasjidConnect account:
             </Typography>
             
@@ -267,15 +351,25 @@ const PairingScreen: React.FC = () => {
               </Alert>
             )}
             
-            {isPairing && (
-              <Alert severity="info" sx={{ mt: 2, width: '100%' }}>
-                Waiting for pairing... This display will automatically connect once paired.
-              </Alert>
-            )}
+            {getPairingStatusMessage()}
             
             {pairingError && (
               <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
-                {pairingError}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography>{pairingError}</Typography>
+                  {pairingError.includes('expired') && (
+                    <Button 
+                      variant="outlined" 
+                      size="small" 
+                      startIcon={<RefreshIcon />}
+                      onClick={handleRefresh}
+                      disabled={isPairing}
+                      sx={{ ml: 2 }}
+                    >
+                      Refresh
+                    </Button>
+                  )}
+                </Box>
                 {isDevelopment && (
                   <Typography variant="caption" display="block" sx={{ mt: 1 }}>
                     Development mode: Using mock API responses. Check console for details.
@@ -284,15 +378,15 @@ const PairingScreen: React.FC = () => {
               </Alert>
             )}
             
-            {pairingAttempts > 1 && (
+            {pairingAttempts > 1 && !isPairing && !isPolling && (
               <Alert severity="warning" sx={{ mt: 2, width: '100%' }}>
                 Pairing code refreshed. Attempt #{pairingAttempts}
               </Alert>
             )}
             
             <Box sx={{ mt: 4 }}>
-              <Typography variant="body2" color="text.secondary">
-                Need help? Visit <Link href="https://masjidconnect.com/support" target="_blank" rel="noopener">masjidconnect.com/support</Link>
+              <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
+                Need help? Visit <Link href="https://masjidconnect.com/support" target="_blank" rel="noopener" sx={{ color: theme.palette.warning.main }}>masjidconnect.com/support</Link>
               </Typography>
             </Box>
           </Box>
@@ -305,10 +399,11 @@ const PairingScreen: React.FC = () => {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              backgroundColor: theme.palette.background.paper,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
               borderRadius: 4,
               p: 4,
               boxShadow: 3,
+              backdropFilter: 'blur(10px)',
             }}
           >
             <Box
@@ -319,19 +414,44 @@ const PairingScreen: React.FC = () => {
                 mb: 3,
               }}
             >
-              <Typography variant="h4" gutterBottom align="center">
+              <Typography variant="h4" gutterBottom align="center" color="white">
                 Pairing Code
               </Typography>
-              <Typography
-                variant="h2"
-                sx={{
-                  fontWeight: 'bold',
-                  letterSpacing: 4,
-                  color: theme.palette.primary.main,
-                }}
-              >
-                {pairingCode}
-              </Typography>
+              {pairingCode ? (
+                <>
+                  <Typography
+                    variant="h2"
+                    sx={{
+                      fontWeight: 'bold',
+                      letterSpacing: 4,
+                      color: theme.palette.warning.main,
+                    }}
+                  >
+                    {pairingCode}
+                  </Typography>
+                  {pairingCodeExpiresAt && (
+                    <Typography variant="body2" color="rgba(255, 255, 255, 0.7)" sx={{ mt: 1 }}>
+                      Expires at {formatExpirationTime()}
+                      {isPairingCodeExpired && (
+                        <Button 
+                          variant="text" 
+                          size="small" 
+                          startIcon={<RefreshIcon />}
+                          onClick={handleRefresh}
+                          disabled={isPairing}
+                          sx={{ ml: 2, color: theme.palette.warning.main }}
+                        >
+                          Refresh
+                        </Button>
+                      )}
+                    </Typography>
+                  )}
+                </>
+              ) : (
+                <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+                  <CircularProgress size={40} />
+                </Box>
+              )}
             </Box>
             
             <Box
@@ -342,32 +462,47 @@ const PairingScreen: React.FC = () => {
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
+                backgroundColor: 'white',
+                borderRadius: 2,
+                p: 2,
               }}
             >
-              <QRCodeSVG
-                value={qrCodeUrl}
-                size={250}
-                bgColor={"#ffffff"}
-                fgColor={"#0A2647"}
-                level={"H"}
-                includeMargin={false}
-                imageSettings={{
-                  src: logoNoTextGold,
-                  x: undefined,
-                  y: undefined,
-                  height: 50,
-                  width: 50,
-                  excavate: true,
-                }}
-              />
+              {(isPairing || !pairingCode) ? (
+                <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 2 }}>
+                  <CircularProgress size={60} />
+                </Box>
+              ) : null}
+              {pairingCode ? (
+                <QRCodeSVG
+                  value={qrCodeUrl}
+                  size={250}
+                  bgColor={"#ffffff"}
+                  fgColor={"#0A2647"}
+                  level={"H"}
+                  includeMargin={false}
+                  imageSettings={{
+                    src: logoNoTextGold,
+                    x: undefined,
+                    y: undefined,
+                    height: 50,
+                    width: 50,
+                    excavate: true,
+                  }}
+                />
+              ) : (
+                <Typography variant="body1" color="text.secondary" align="center">
+                  Generating QR code...
+                </Typography>
+              )}
             </Box>
             
-            <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
+            <Typography variant="body2" color="rgba(255, 255, 255, 0.7)" align="center" sx={{ mt: 3 }}>
               Scan this QR code with the MasjidConnect app or visit{' '}
               <Link 
                 href={isDevelopment ? 'http://localhost:3000/pair' : 'https://masjidconnect.com/pair'} 
                 target="_blank" 
                 rel="noopener"
+                sx={{ color: theme.palette.warning.main }}
               >
                 {isDevelopment ? 'localhost:3000/pair' : 'masjidconnect.com/pair'}
               </Link>
