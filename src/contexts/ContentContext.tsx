@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScreenContent, PrayerTimes, PrayerStatus, Event, Schedule } from '../api/models';
-import apiClient from '../api/client';
+import masjidDisplayClient from '../api/masjidDisplayClient';
 import storageService from '../services/storageService';
 import dataSyncService from '../services/dataSyncService';
 import { useAuth } from './AuthContext';
+import logger from '../utils/logger';
 
 interface ContentContextType {
   isLoading: boolean;
@@ -76,18 +77,37 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     if (!isAuthenticated) return;
 
     try {
-      await dataSyncService.syncData();
+      logger.info("ContentContext: Starting content refresh");
+      
+      // Ensure we're syncing all data from the server
+      await dataSyncService.syncAllData();
       
       // Load updated content from storage
       const updatedContent = await storageService.getScreenContent();
       if (updatedContent) {
+        logger.info("ContentContext: Processing updated screen content");
         processScreenContent(updatedContent);
+      } else {
+        logger.warn("ContentContext: No updated content found in storage after sync");
+      }
+      
+      // Also refresh prayer status and events
+      const updatedPrayerStatus = await storageService.getPrayerStatus();
+      if (updatedPrayerStatus) {
+        setPrayerStatus(updatedPrayerStatus);
+      }
+      
+      const updatedEvents = await storageService.getEvents();
+      if (updatedEvents) {
+        setEvents(updatedEvents);
       }
       
       // Update last updated time
       setLastUpdated(new Date());
+      logger.info("ContentContext: Content refresh completed successfully");
     } catch (error) {
       console.error('Error refreshing content:', error);
+      logger.error("ContentContext: Error refreshing content", { error });
     }
   };
 

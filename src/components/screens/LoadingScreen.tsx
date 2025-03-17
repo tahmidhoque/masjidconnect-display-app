@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, useTheme, Fade } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { Orientation } from '../../contexts/OrientationContext';
@@ -18,10 +18,13 @@ interface LoadingScreenProps {
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
-  const { loadingMessage, orientation } = useAppInitialization();
+  const { loadingMessage, orientation, isInitializing } = useAppInitialization();
   const [rotationAngle, setRotationAngle] = useState(0);
   const [showContent, setShowContent] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
+  
+  // Use a ref to track if transition has been triggered to prevent multiple calls
+  const transitionTriggeredRef = useRef<boolean>(false);
 
   // Animation effect for the custom loader
   useEffect(() => {
@@ -32,6 +35,31 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     return () => clearInterval(animationInterval);
   }, []);
 
+  // Handle transition to next screen
+  const triggerTransition = () => {
+    if (transitionTriggeredRef.current || !onComplete) return;
+    
+    console.log("LoadingScreen: Triggering transition to next screen");
+    transitionTriggeredRef.current = true;
+    
+    // Call onComplete with a short delay
+    setTimeout(() => {
+      if (onComplete) {
+        console.log("LoadingScreen: Calling onComplete callback NOW");
+        onComplete();
+      }
+    }, 500);
+  };
+
+  // Watch for initialization completion
+  useEffect(() => {
+    if (!isInitializing && !transitionTriggeredRef.current) {
+      console.log("LoadingScreen: Detected initialization complete");
+      setLoadingStage('complete');
+      triggerTransition();
+    }
+  }, [isInitializing]);
+
   // Simplified loading stage management
   useEffect(() => {
     console.log("LoadingScreen: Current loading message:", loadingMessage);
@@ -39,9 +67,9 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     // Initial fade-in animation
     setTimeout(() => {
       setShowContent(true);
-    }, 500);
+    }, 300);
 
-    // Simplified loading stages
+    // Update loading stage based on message
     if (loadingMessage.includes("check") || loadingMessage.includes("fetch")) {
       setLoadingStage('setting-up');
     } else if (loadingMessage === "Ready" || loadingMessage.includes("Complete")) {
@@ -50,30 +78,22 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       // Show "Welcome to MasjidConnect" message briefly
       setTimeout(() => {
         setLoadingStage('complete');
-        
-        // Call onComplete after a longer delay to ensure initialization is complete
-        if (onComplete) {
-          console.log("LoadingScreen: Will call onComplete in 3 seconds");
-          setTimeout(() => {
-            console.log("LoadingScreen: Calling onComplete callback NOW");
-            onComplete();
-          }, 3000);
-        }
-      }, 2000);
+        triggerTransition();
+      }, 800);
     }
-  }, [loadingMessage, onComplete]);
+  }, [loadingMessage]);
 
-  // Guaranteed transition after a maximum time - increased to 10 seconds
+  // Guaranteed transition after a maximum time - reduced to 4 seconds
   useEffect(() => {
     const forceTransitionTimer = setTimeout(() => {
-      if (onComplete) {
-        console.log("LoadingScreen: Force transition timer triggered after 10 seconds");
-        onComplete();
+      if (!transitionTriggeredRef.current) {
+        console.log("LoadingScreen: Force transition timer triggered after 4 seconds");
+        triggerTransition();
       }
-    }, 10000);
+    }, 4000);
     
     return () => clearTimeout(forceTransitionTimer);
-  }, [onComplete]);
+  }, []);
 
   // Get display message based on loading stage
   const getDisplayMessage = () => {

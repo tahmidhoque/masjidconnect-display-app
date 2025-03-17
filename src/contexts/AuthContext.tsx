@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import apiClient, { ApiCredentials } from '../api/client';
-import { PairingRequest, ApiResponse, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../api/models';
+import masjidDisplayClient from '../api/masjidDisplayClient';
+import { ApiCredentials, PairingRequest, ApiResponse, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../api/models';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
+  isPaired: boolean;
+  setIsPaired: (isPaired: boolean) => void;
   isPairing: boolean;
   pairingError: string | null;
   screenId: string | null;
@@ -23,6 +25,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isPaired, setIsPaired] = useState<boolean>(false);
   const [isPairing, setIsPairing] = useState<boolean>(false);
   const [screenId, setScreenId] = useState<string | null>(null);
   const [pairingError, setPairingError] = useState<string | null>(null);
@@ -31,18 +34,49 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isPairingCodeExpired, setIsPairingCodeExpired] = useState<boolean>(false);
   const [pollingTimer, setPollingTimer] = useState<NodeJS.Timeout | null>(null);
   const [lastPairingCodeRequestTime, setLastPairingCodeRequestTime] = useState<number | null>(null);
+  const [isPolling, setIsPolling] = useState<boolean>(false);
 
   useEffect(() => {
     // Check if we have stored credentials
-    const storedCredentials = localStorage.getItem('masjidconnect_credentials');
-    if (storedCredentials) {
+    const apiKey = localStorage.getItem('masjid_api_key');
+    const screenId = localStorage.getItem('masjid_screen_id');
+    
+    console.log('[AuthContext] Checking stored credentials:', { 
+      hasApiKey: !!apiKey, 
+      hasScreenId: !!screenId,
+      apiKeyLength: apiKey?.length || 0,
+      screenIdLength: screenId?.length || 0
+    });
+    
+    if (apiKey && screenId) {
       try {
-        const credentials: ApiCredentials = JSON.parse(storedCredentials);
-        setScreenId(credentials.screenId);
+        setScreenId(screenId);
         setIsAuthenticated(true);
+        setIsPaired(true);
+        
+        // Ensure the API client has the credentials
+        masjidDisplayClient.setCredentials({ apiKey, screenId })
+          .then(() => {
+            console.log('[AuthContext] Credentials set successfully in client');
+          })
+          .catch(error => {
+            console.error('[AuthContext] Error setting credentials in client:', error);
+            // If setting credentials fails, reset auth state
+            setIsAuthenticated(false);
+            setIsPaired(false);
+            setScreenId(null);
+            localStorage.removeItem('masjid_api_key');
+            localStorage.removeItem('masjid_screen_id');
+          });
+        
+        // Log credentials status for debugging
+        setTimeout(() => {
+          masjidDisplayClient.logCredentialsStatus();
+        }, 1000);
       } catch (error) {
-        console.error('Failed to parse stored credentials', error);
-        localStorage.removeItem('masjidconnect_credentials');
+        console.error('[AuthContext] Failed to set credentials', error);
+        localStorage.removeItem('masjid_api_key');
+        localStorage.removeItem('masjid_screen_id');
       }
     }
 
@@ -106,23 +140,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [pairingCodeExpiresAt]);
 
+  // Effect to update isAuthenticated when isPaired changes
+  useEffect(() => {
+    if (isPaired) {
+      setIsAuthenticated(true);
+    }
+  }, [isPaired]);
+
   /**
    * Step 1: Request a pairing code from the server
    */
   const requestPairingCode = async (): Promise<string | null> => {
     // If already pairing, don't start another pairing process
     if (isPairing) {
-      console.log('Already in pairing process, ignoring new request');
+      console.log('[AuthContext] Already in pairing process, ignoring new request');
       return pairingCode;
     }
     
-    // Check if we've requested a code recently (within the last 15 minutes)
-    // unless it's a manual refresh or the code has expired
-    const now = Date.now();
-    const fifteenMinutesInMs = 15 * 60 * 1000;
-    
-    if (lastPairingCodeRequestTime && (now - lastPairingCodeRequestTime < fifteenMinutesInMs) && pairingCode && !isPairingCodeExpired) {
-      console.log('Pairing code was requested recently and is still valid. Reusing existing code:', pairingCode);
+    // Check if we have a valid, non-expired code that we can reuse
+    if (pairingCode && !isPairingCodeExpired) {
+      console.log('[AuthContext] Reusing existing pairing code:', pairingCode);
       return pairingCode;
     }
     
@@ -130,19 +167,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsPairing(true);
     setPairingError(null);
     
-    // Check if we're in development mode
-    // First try the NODE_ENV environment variable
-    let isDevelopment = process.env.NODE_ENV === 'development';
-    // If NODE_ENV is not set, check if we're using localhost
-    if (!isDevelopment && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      isDevelopment = false;
-      console.log('Detected localhost, but not setting development mode');
-    }
-    
-    console.log(`AuthContext - Current NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`AuthContext - isDevelopment: ${isDevelopment}`);
-    console.log(`AuthContext - window.location.hostname: ${window.location.hostname}`);
-    console.log(`Requesting pairing code in ${isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
+    console.log('[AuthContext] Requesting pairing code');
     
     try {
       // Get screen orientation
@@ -153,37 +178,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         orientation,
       };
       
-      console.log('Requesting pairing code with device info:', deviceInfo);
+      console.log('[AuthContext] Requesting pairing code with device info:', deviceInfo);
       
-      // Check if we already have a valid pairing code in localStorage
-      const storedPairingCode = localStorage.getItem('pairingCode');
-      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
-      
-      if (storedPairingCode && storedPairingCodeExpiresAt) {
-        const expiresAt = new Date(storedPairingCodeExpiresAt);
-        const now = new Date();
-        
-        // If the stored code is still valid, use it instead of making a new request
-        if (expiresAt > now) {
-          console.log('Using stored pairing code:', storedPairingCode);
-          setPairingCode(storedPairingCode);
-          setPairingCodeExpiresAt(storedPairingCodeExpiresAt);
-          setIsPairingCodeExpired(false);
-          setLastPairingCodeRequestTime(Date.now());
-          setIsPairing(false);
-          return storedPairingCode;
-        } else {
-          // Clear expired pairing code
-          localStorage.removeItem('pairingCode');
-          localStorage.removeItem('pairingCodeExpiresAt');
-        }
-      }
-      
-      const response = await apiClient.requestPairingCode(deviceInfo);
+      const response = await masjidDisplayClient.requestPairingCode(deviceInfo);
+      console.log('[AuthContext] Received response from API client:', JSON.stringify(response, null, 2));
       
       if (!response.success || !response.data) {
         const errorMessage = response.error || 'Failed to request pairing code';
-        console.error('Pairing code request failed:', errorMessage);
+        console.error('[AuthContext] Pairing code request failed:', errorMessage, response);
         setPairingError(errorMessage);
         
         // Add a small delay before setting isPairing to false to prevent rapid re-attempts
@@ -192,16 +194,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return null;
       }
       
+      console.log('[AuthContext] Response data:', response.data);
+      
       const { pairingCode, expiresAt } = response.data;
-      console.log('Pairing code received:', pairingCode, 'Expires at:', expiresAt);
+      console.log('[AuthContext] Extracted values - pairingCode:', pairingCode, 'expiresAt:', expiresAt);
+      console.log('[AuthContext] Before setting state - current pairingCode state:', pairingCode);
+      
+      if (!pairingCode || !expiresAt) {
+        console.error('[AuthContext] Missing pairing code or expiration time in response:', response.data);
+        setPairingError('Invalid server response: Missing pairing code or expiration time');
+        setIsPairing(false);
+        return null;
+      }
       
       // Store the pairing code and expiration time
+      console.log('[AuthContext] Setting pairing code state:', pairingCode);
       setPairingCode(pairingCode);
       setPairingCodeExpiresAt(expiresAt);
       setIsPairingCodeExpired(false);
       
       // Store the request time
-      const requestTime = now;
+      const requestTime = Date.now();
       setLastPairingCodeRequestTime(requestTime);
       localStorage.setItem('lastPairingCodeRequestTime', requestTime.toString());
       
@@ -209,11 +222,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('pairingCode', pairingCode);
       localStorage.setItem('pairingCodeExpiresAt', expiresAt);
       
+      console.log('[AuthContext] Pairing code successfully stored, returning:', pairingCode);
       setIsPairing(false);
       
       return pairingCode;
     } catch (error: any) {
-      console.error('Error requesting pairing code:', error);
+      console.error('[AuthContext] Error requesting pairing code:', error);
       
       // Provide more detailed error messages based on the error type
       let errorMessage = 'Failed to connect to server';
@@ -222,17 +236,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error.message.includes('Network Error')) {
           errorMessage = 'Network error: Please check your internet connection';
         } else if (error.response) {
-          // The request was made and the server responded with a status code
-          // that falls out of the range of 2xx
+          console.error('[AuthContext] Error response data:', error.response.data);
           errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
         } else if (error.request) {
-          // The request was made but no response was received
+          console.error('[AuthContext] No response received for request:', error.request);
           errorMessage = 'No response from server: The server may be down or unreachable';
         }
-      }
-      
-      if (isDevelopment) {
-        errorMessage += ' (Development mode: Check if localhost:3000 is running)';
       }
       
       setPairingError(errorMessage);
@@ -246,65 +255,93 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Step 3: Poll for pairing status
+   * According to the Screen Pairing Guide, we should poll every 5 seconds until paired
    */
   const checkPairingStatus = async (pairingCode: string): Promise<boolean> => {
     if (!pairingCode) {
-      console.error('No pairing code provided');
+      console.error('[AuthContext] No pairing code provided');
       return false;
     }
     
     if (isPairingCodeExpired) {
-      console.error('Pairing code has expired');
+      console.error('[AuthContext] Pairing code has expired');
       setPairingError('Pairing code has expired. Please request a new code.');
       return false;
     }
     
     // Don't set isPairing to true if we're just polling
-    if (!isPairing) {
+    const wasPolling = isPolling;
+    if (!isPairing && !isPolling) {
       setIsPairing(true);
     }
     
     try {
-      console.log('Checking pairing status for code:', pairingCode);
+      console.log('[AuthContext] Checking pairing status for code:', pairingCode);
       
-      const isPaired = await apiClient.checkPairingStatus(pairingCode);
+      const isPaired = await masjidDisplayClient.checkPairingStatus(pairingCode);
       
       if (!isPaired) {
-        console.log('Device not yet paired');
+        console.log('[AuthContext] Device not yet paired');
+        
+        // Check if the pairing code is still valid in localStorage
+        // It might have been removed by the API client if it was invalid
+        const storedPairingCode = localStorage.getItem('pairingCode');
+        if (!storedPairingCode || storedPairingCode !== pairingCode) {
+          console.log('[AuthContext] Pairing code was invalidated by the API client');
+          setPairingCode(null);
+          setPairingCodeExpiresAt(null);
+          setIsPairingCodeExpired(true);
+          setPairingError('Pairing code is invalid or expired. Please request a new code.');
+          setIsPairing(false);
+          setIsPolling(false);
+          return false;
+        }
         
         // Schedule next check based on the polling interval from the API client
         if (pollingTimer) {
           clearTimeout(pollingTimer);
         }
         
-        const pollingInterval = apiClient.getPollingInterval();
-        console.log(`Will check again in ${pollingInterval / 1000} seconds`);
+        // Use the polling interval from the API client (defaults to 5 seconds)
+        const pollingInterval = masjidDisplayClient.getPollingInterval();
+        console.log(`[AuthContext] Will check again in ${pollingInterval / 1000} seconds`);
         
         const timer = setTimeout(() => {
-          // Only check again if we still have the same pairing code
-          if (pairingCode === getPairingCode()) {
+          // Only check again if we still have the same pairing code and it's not expired
+          if (pairingCode === getPairingCode() && !isPairingCodeExpired) {
+            console.log('[AuthContext] Checking pairing status again...');
             checkPairingStatus(pairingCode);
           } else {
-            console.log('Pairing code has changed, stopping polling');
+            console.log('[AuthContext] Pairing code has changed or expired, stopping polling');
+            setIsPolling(false);
           }
         }, pollingInterval);
         
         setPollingTimer(timer);
-        setIsPairing(false);
+        
+        // Reset the isPairing state but keep isPolling true
+        if (!wasPolling) {
+          setIsPairing(false);
+          setIsPolling(true);
+        }
+        
         return false;
       }
       
-      console.log('Device has been paired successfully!');
+      console.log('[AuthContext] Device has been paired successfully!');
       
       // Get the credentials from localStorage (set by the API client)
-      const apiKey = localStorage.getItem('apiKey');
-      const screenId = localStorage.getItem('screenId');
+      const apiKey = localStorage.getItem('masjid_api_key');
+      const screenId = localStorage.getItem('masjid_screen_id');
       
       if (apiKey && screenId) {
-        // Set the credentials in the API client
-        apiClient.setCredentials({ apiKey, screenId });
+        console.log('[AuthContext] Credentials found, finalizing pairing...');
         
-        // Update state
+        // Set the credentials in the API client
+        masjidDisplayClient.setCredentials({ apiKey, screenId });
+        
+        // Update state - set isPaired first to trigger App re-render
+        setIsPaired(true);
         setIsAuthenticated(true);
         setScreenId(screenId);
         
@@ -315,9 +352,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.removeItem('pairingCodeExpiresAt');
         localStorage.removeItem('lastPairingCodeRequestTime');
         
-        // Store in localStorage
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('screenId', screenId);
+        // No need to store credentials in localStorage again as they're already stored by the API client
         
         // Clear polling timer
         if (pollingTimer) {
@@ -326,38 +361,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         setIsPairing(false);
+        setIsPolling(false);
+        
+        console.log('[AuthContext] Pairing completed successfully, App should now redirect');
         return true;
       } else {
-        console.error('Missing API key or screen ID after successful pairing');
+        console.error('[AuthContext] Missing API key or screen ID after successful pairing');
         setPairingError('Authentication failed: Missing credentials');
         setIsPairing(false);
+        setIsPolling(false);
         return false;
       }
     } catch (error: any) {
-      console.error('Error checking pairing status:', error);
+      console.error('[AuthContext] Error checking pairing status:', error);
       
-      // Provide more detailed error messages
-      let errorMessage = 'Failed to connect to server';
-      
-      if (error.message) {
-        if (error.message.includes('Network Error')) {
-          errorMessage = 'Network error: Please check your internet connection';
-        } else if (error.response) {
-          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
-        } else if (error.request) {
-          errorMessage = 'No response from server: The server may be down or unreachable';
+      // Check if the error is due to an invalid or expired pairing code
+      if (error.response && error.response.status === 404) {
+        console.log('[AuthContext] Received 404 error during pairing status check');
+        
+        // Don't automatically invalidate the code or trigger a new request
+        // This was causing a loop of new code requests
+        setPairingError('Error checking pairing status. Please try again later.');
+        
+        // Don't clear the pairing code or set it as expired
+        // Let the user manually refresh if needed
+      } else {
+        // Provide more detailed error messages
+        let errorMessage = 'Failed to connect to server';
+        
+        if (error.message) {
+          if (error.message.includes('Network Error')) {
+            errorMessage = 'Network error: Please check your internet connection';
+          } else if (error.response) {
+            errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+          } else if (error.request) {
+            errorMessage = 'No response from server: The server may be down or unreachable';
+          }
         }
+        
+        setPairingError(errorMessage);
       }
       
-      setPairingError(errorMessage);
       setIsPairing(false);
+      setIsPolling(false);
       return false;
     }
   };
 
   const logout = () => {
-    apiClient.clearCredentials();
+    masjidDisplayClient.clearCredentials();
     setIsAuthenticated(false);
+    setIsPaired(false);
     setScreenId(null);
     
     // Clear pairing state
@@ -379,6 +433,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     <AuthContext.Provider
       value={{
         isAuthenticated,
+        isPaired,
+        setIsPaired,
         isPairing,
         pairingError,
         screenId,

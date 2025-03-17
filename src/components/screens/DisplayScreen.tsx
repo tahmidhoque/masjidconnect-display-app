@@ -24,18 +24,6 @@ const DisplayScreen: React.FC = () => {
   } = useContent();
   const { orientation } = useOrientation();
 
-  // Refresh content on mount
-  useEffect(() => {
-    refreshContent();
-    
-    // Set up periodic refresh (every 5 minutes)
-    const refreshInterval = setInterval(() => {
-      refreshContent();
-    }, 5 * 60 * 1000);
-    
-    return () => clearInterval(refreshInterval);
-  }, []);
-
   if (isLoading) {
     return <LoadingScreen />;
   }

@@ -1,10 +1,39 @@
 // Authentication Types
+export interface ApiCredentials {
+  apiKey: string;
+  screenId: string;
+}
+
 export interface PairingRequest {
   pairingCode: string;
   deviceInfo: {
     deviceType: string;
     orientation: 'LANDSCAPE' | 'PORTRAIT';
   };
+}
+
+// Step 1: Request a pairing code
+export interface RequestPairingCodeRequest {
+  deviceType: string;
+  orientation: string;
+}
+
+export interface RequestPairingCodeResponse {
+  pairingCode: string;
+  expiresAt: string;
+  checkInterval: number;
+}
+
+// Step 3: Check pairing status
+export interface CheckPairingStatusRequest {
+  pairingCode: string;
+}
+
+export interface CheckPairingStatusResponse {
+  paired: boolean;
+  apiKey?: string;
+  screenId?: string;
+  checkAgainIn?: number;
 }
 
 export interface PairingResponse {
@@ -137,4 +166,5 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+  status?: number; // HTTP status code for error responses
 } 
