@@ -4,6 +4,64 @@
 
 This document outlines the APIs available for the display screen application that will connect to the masjid management system. The display screen will show prayer times, announcements, events, and other content configured through the management system.
 
+## CORS Configuration for Display Screen
+
+The display screen application running on a different origin (e.g., localhost:3001) needs proper CORS configuration to communicate with the management system API (e.g., localhost:3000).
+
+### Required Headers for Cross-Origin Requests
+
+All API requests from the display screen should include:
+
+1. **Origin Header**: This is automatically set by the browser
+2. **Content-Type**: For POST/PUT requests, set to `application/json`
+3. **Authorization**: For authenticated endpoints, set to `Bearer {apiKey}`
+4. **X-Screen-ID**: For authenticated endpoints, set to the screen's ID
+
+### Example Fetch Request
+
+```javascript
+// Example of a properly configured fetch request
+async function fetchContent(apiKey, screenId) {
+  try {
+    const response = await fetch('http://localhost:3000/api/screen/content', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'X-Screen-ID': screenId
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching content:', error);
+    throw error;
+  }
+}
+```
+
+### Resolving CORS Issues
+
+If you're experiencing CORS issues:
+
+1. **Check the Network Tab**: In browser developer tools, look for the request that's failing with a CORS error
+   - Verify the request includes the correct `Origin` header
+   - Check if the response includes the `Access-Control-Allow-Origin` header matching your origin
+
+2. **For Preflight Failures**: 
+   - Ensure OPTIONS requests are handled properly
+   - The server must respond with appropriate `Access-Control-Allow-*` headers
+   - Status code should be 204 (No Content) for successful preflight
+
+3. **Common Solutions**:
+   - Make sure your display app's origin (http://localhost:3001) is in the allowed origins list
+   - Ensure all API endpoints consistently apply CORS headers to responses
+   - For development, you can temporarily set the server to allow all origins
+
 ## Authentication
 
 ### Screen Authentication
@@ -23,7 +81,35 @@ GET /api/screens/unpaired
 ```
 Returns a list of screens that are in the PAIRING state.
 
-#### B. Pair a Screen
+#### B. Validate Pairing Code
+```
+POST /api/screens/unpaired/check
+```
+**Request Body:**
+```json
+{
+  "pairingCode": "string"
+}
+```
+**Response (if code is valid but screen not yet paired):**
+```json
+{
+  "paired": false,
+  "checkAgainIn": 5000
+}
+```
+**Response (if code is valid and screen already paired):**
+```json
+{
+  "paired": true,
+  "apiKey": "string",
+  "screenId": "string",
+  "masjidId": "string"
+}
+```
+This endpoint allows the display to check if a pairing code is valid and to poll for pairing status. If the code is valid but the screen is not yet paired, it suggests checking again in 5 seconds. If the screen is already paired, it returns the credentials needed for API authentication.
+
+#### C. Pair a Screen
 ```
 POST /api/screens/pair
 ```
@@ -40,11 +126,8 @@ POST /api/screens/pair
 **Response:**
 ```json
 {
-  "screen": {
-    "id": "string",
-    "name": "string",
-    "apiKey": "string"
-  }
+  "screenId": "string",
+  "apiKey": "string"
 }
 ```
 
