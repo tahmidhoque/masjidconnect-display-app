@@ -1,5 +1,5 @@
 import localforage from 'localforage';
-import { ScreenContent, PrayerTimes, PrayerStatus, Event } from '../api/models';
+import { ScreenContent, PrayerTimes, PrayerStatus, Event, ApiCredentials } from '../api/models';
 
 // Initialize DB
 localforage.config({
@@ -15,6 +15,8 @@ enum StorageKeys {
   PRAYER_STATUS = 'prayerStatus',
   EVENTS = 'events',
   LAST_UPDATED = 'lastUpdated',
+  API_KEY = 'masjid_api_key',
+  SCREEN_ID = 'masjid_screen_id',
 }
 
 // Storage Service
@@ -59,6 +61,28 @@ class StorageService {
     return localforage.getItem<Event[]>(StorageKeys.EVENTS);
   }
 
+  // Credentials
+  async saveCredentials(credentials: ApiCredentials): Promise<void> {
+    await localStorage.setItem(StorageKeys.API_KEY, credentials.apiKey);
+    await localStorage.setItem(StorageKeys.SCREEN_ID, credentials.screenId);
+  }
+
+  async getCredentials(): Promise<ApiCredentials | null> {
+    const apiKey = localStorage.getItem(StorageKeys.API_KEY);
+    const screenId = localStorage.getItem(StorageKeys.SCREEN_ID);
+    
+    if (apiKey && screenId) {
+      return { apiKey, screenId };
+    }
+    
+    return null;
+  }
+
+  async clearCredentials(): Promise<void> {
+    localStorage.removeItem(StorageKeys.API_KEY);
+    localStorage.removeItem(StorageKeys.SCREEN_ID);
+  }
+
   // Last Updated Timestamps
   private async updateLastUpdated(key: string): Promise<void> {
     const lastUpdated = await this.getLastUpdated() || {};
@@ -73,6 +97,8 @@ class StorageService {
   // Clear all data
   async clearAll(): Promise<void> {
     await localforage.clear();
+    localStorage.removeItem(StorageKeys.API_KEY);
+    localStorage.removeItem(StorageKeys.SCREEN_ID);
   }
 
   // Check if storage is empty (first run)
@@ -82,4 +108,5 @@ class StorageService {
   }
 }
 
-export default new StorageService(); 
+const storageService = new StorageService();
+export default storageService; 

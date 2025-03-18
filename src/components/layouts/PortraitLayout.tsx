@@ -18,8 +18,8 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({ children }) => {
 
   return (
     <Box sx={{ 
-      height: '100vh', 
-      width: '100vw', 
+      height: '100%', 
+      width: '100%', 
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column'
@@ -32,7 +32,7 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({ children }) => {
         boxShadow: 1,
         zIndex: 10
       }}>
-        <Container maxWidth={false}>
+        <Container maxWidth={false} disableGutters>
           <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
             {masjidName || 'MasjidConnect Display'}
           </Typography>

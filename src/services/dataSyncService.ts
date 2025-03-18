@@ -1,6 +1,5 @@
 import masjidDisplayClient, { POLLING_INTERVALS } from '../api/masjidDisplayClient';
 import storageService from './storageService';
-import { ScreenContent, PrayerTimes, PrayerStatus, Event } from '../api/models';
 import logger, { getLastError } from '../utils/logger';
 
 class DataSyncService {

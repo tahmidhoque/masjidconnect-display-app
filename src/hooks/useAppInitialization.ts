@@ -1,169 +1,142 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useOrientation } from '../contexts/OrientationContext';
 import { useContent } from '../contexts/ContentContext';
-import apiClient from '../api/client';
-import masjidDisplayClient from '../api/masjidDisplayClient';
-import { Orientation } from '../contexts/OrientationContext';
-import logger from '../utils/logger';
 
 /**
- * Hook for handling app initialization
- * 
- * Manages the loading state while the app checks authentication status,
- * fetches initial content, and prepares for display.
+ * Custom hook to handle application initialization
+ * Manages loading state and initializes contexts with premium loading experience
  */
-export const useAppInitialization = () => {
-  const { isAuthenticated, screenId } = useAuth();
-  const { refreshContent, isLoading: isContentLoading } = useContent();
+const useAppInitialization = () => {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [loadingMessage, setLoadingMessage] = useState<string>('Initializing...');
-  const [orientation, setOrientation] = useState<Orientation>('LANDSCAPE');
-  const [lastInitializationError, setLastInitializationError] = useState<string | null>(null);
-  
-  // Use refs to track initialization state to prevent loops
-  const initializationStartedRef = useRef<boolean>(false);
-  const initializationCompletedRef = useRef<boolean>(false);
+  const [initializationStage, setInitializationStage] = useState<string>('start');
+  const { isAuthenticated, screenId } = useAuth();
+  const { orientation } = useOrientation();
+  const { refreshContent } = useContent();
 
-  useEffect(() => {
-    // Prevent re-initializing if already started or completed
-    if (initializationStartedRef.current) {
-      return;
+  // Initialize auth context
+  const initAuth = useCallback(async () => {
+    try {
+      setLoadingMessage('Checking authentication...');
+      setInitializationStage('auth');
+      // Auth context initializes automatically
+      
+      // Add a slight delay for a more premium feel
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      return true;
+    } catch (error) {
+      console.error('Error initializing auth:', error);
+      return false;
+    }
+  }, []);
+
+  // Initialize orientation context
+  const initOrientation = useCallback(async () => {
+    try {
+      if (isAuthenticated) {
+        setLoadingMessage('Loading screen settings...');
+        setInitializationStage('orientation');
+        // Orientation is loaded from API when authenticated
+        
+        // Add a slight delay for a more premium feel
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+      return true;
+    } catch (error) {
+      console.error('Error initializing orientation:', error);
+      return false;
+    }
+  }, [isAuthenticated]);
+
+  // Initialize content context
+  const initContent = useCallback(async () => {
+    try {
+      if (isAuthenticated) {
+        setLoadingMessage('Loading content...');
+        setInitializationStage('content');
+        await refreshContent();
+        
+        // Add a slight delay after content loads for a more premium feel
+        await new Promise(resolve => setTimeout(resolve, 700));
+      }
+      return true;
+    } catch (error) {
+      console.error('Error initializing content:', error);
+      return false;
+    }
+  }, [refreshContent, isAuthenticated]);
+
+  // Main initialization function
+  const initialize = useCallback(async () => {
+    console.log('Starting app initialization...');
+    
+    // Track start time to ensure minimum loading time for better UX
+    const startTime = Date.now();
+    
+    // Initialize all contexts
+    const authSuccess = await initAuth();
+    
+    // If authenticated, update loading message to be more specific
+    if (authSuccess && isAuthenticated) {
+      setLoadingMessage('Preparing your dashboard...');
+      // Add a slight delay for a more premium feel
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    // Mark initialization as started
-    initializationStartedRef.current = true;
+    const orientationSuccess = await initOrientation();
+    const contentSuccess = await initContent();
     
-    let isMounted = true;
-    logger.info("Starting initialization with auth state", { isAuthenticated, screenId });
-
-    const initialize = async () => {
-      try {
-        // Step 1: Initial delay for UX
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Step 2: Check authentication status
-        if (!isAuthenticated) {
-          logger.info("Not authenticated, preparing pairing screen");
-          if (isMounted) setLoadingMessage('Checking pairing status...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // For unpaired devices, we're ready to show the pairing screen
-          if (isMounted) {
-            setLoadingMessage('Ready');
-            logger.info("Ready to show pairing screen");
-            completeInitialization();
-          }
-        } else {
-          logger.info("Authenticated with screenId", { screenId });
-          
-          // Verify auth state is properly initialized in the client
-          if (!masjidDisplayClient.isAuthenticated()) {
-            logger.warn("Auth state mismatch between context and client");
-            
-            // Wait for the client to finish initialization (max 3 seconds)
-            if (isMounted) setLoadingMessage('Waiting for auth initialization...');
-            let authInitialized = false;
-            
-            for (let i = 0; i < 30; i++) {
-              // Check every 100ms if auth is ready
-              if (masjidDisplayClient.isAuthenticated()) {
-                logger.info("Auth initialization completed in client");
-                authInitialized = true;
-                break;
-              }
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            // If still not authenticated in client, log the credentials status
-            if (!authInitialized) {
-              masjidDisplayClient.logCredentialsStatus();
-              setLastInitializationError("Auth initialization failed in client");
-              logger.error("Auth initialization timed out");
-              // Continue anyway - we'll try to work with what we have
-            }
-          }
-          
-          if (isMounted) setLoadingMessage('Fetching content...');
-          
-          // For already paired displays, explicitly refresh content to ensure we're in sync with the server
-          try {
-            if (navigator.onLine) {
-              logger.info("Explicitly refreshing content for already paired display");
-              await refreshContent();
-              logger.info("Content refresh completed");
+    // Calculate elapsed time
+    const elapsedTime = Date.now() - startTime;
+    const minLoadTime = isAuthenticated ? 2500 : 1500; // Longer min time for authenticated users
+    
+    // Ensure minimum loading time for better UX
+    if (elapsedTime < minLoadTime) {
+      if (isAuthenticated) {
+        setLoadingMessage('Almost ready...');
             } else {
-              logger.warn("Device is offline, using cached content");
-            }
-            
-            // For authenticated devices, we're ready to show the display screen
-            if (isMounted) {
-              setLoadingMessage('Ready');
-              logger.info("Ready to show display screen");
-              completeInitialization();
-            }
-          } catch (error) {
-            logger.error("Error during content refresh", { error });
-            setLastInitializationError("Content refresh error");
-            
-            // Even if there's an error, we should still complete initialization
-            if (isMounted) {
-              setLoadingMessage('Ready');
-              logger.info("Ready to show display screen despite content refresh error");
-              completeInitialization();
-            }
-          }
-        }
-      } catch (error) {
-        logger.error('Initialization error', { error });
-        setLastInitializationError(error instanceof Error ? error.message : "Unknown error");
-        
-        if (isMounted) {
-          setLoadingMessage('Failed to initialize');
-          completeInitialization();
-        }
+        setLoadingMessage('Ready to pair...');
       }
-    };
+      
+      // Add a slight delay before the final message for a more premium feel
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Calculate remaining time to meet minimum loading time
+      const remainingTime = minLoadTime - elapsedTime - 500;
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+    }
     
-    // Helper function to complete initialization
-    const completeInitialization = () => {
-      if (!isMounted || initializationCompletedRef.current) return;
-      
-      // Mark initialization as completed to prevent multiple completions
-      initializationCompletedRef.current = true;
-      
-      // Short delay before completing
+    // Set final loading message
+    setLoadingMessage(isAuthenticated ? 'Loading complete!' : 'Ready to pair!');
+    setInitializationStage('complete');
+    
+    // Complete initialization
+    console.log('App initialization complete!', {
+      authSuccess,
+      orientationSuccess,
+      contentSuccess,
+      isAuthenticated,
+      screenId,
+      orientation,
+      totalLoadTime: Date.now() - startTime
+    });
+    
+    // Small delay before setting isInitializing to false for smoother transition
       setTimeout(() => {
-        if (isMounted) {
-          logger.info("Set isInitializing to false", { isAuthenticated });
           setIsInitializing(false);
-        }
-      }, 500);
-    };
+    }, 800); // Longer delay for a more premium feel
+  }, [initAuth, initOrientation, initContent, isAuthenticated, screenId, orientation]);
 
+  // Run initialization on component mount
+  useEffect(() => {
     initialize();
+  }, [initialize]);
 
-    // Force completion after 5 seconds maximum
-    const forceCompleteTimer = setTimeout(() => {
-      if (isMounted && !initializationCompletedRef.current) {
-        logger.warn("Force completing initialization after timeout");
-        setLoadingMessage('Ready');
-        initializationCompletedRef.current = true;
-        setIsInitializing(false);
-      }
-    }, 5000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(forceCompleteTimer);
-    };
-  }, [isAuthenticated, screenId, refreshContent]);
-
-  return {
-    isInitializing,
-    loadingMessage,
-    orientation,
-    lastError: lastInitializationError
-  };
+  return { isInitializing, loadingMessage, initializationStage };
 };
 
 export default useAppInitialization; 

@@ -114,9 +114,17 @@ const PairingScreen: React.FC = () => {
       return;
     }
     
-    // Request a new pairing code
-    await requestPairingCode();
-  }, [isPairing, requestPairingCode]);
+    try {
+      // Request a new pairing code
+      await requestPairingCode(orientation);
+    } catch (error) {
+      console.error('Error requesting pairing code:', error);
+      enqueueSnackbar('Failed to request pairing code. Please try again.', { 
+        variant: 'error',
+        autoHideDuration: 5000
+      });
+    }
+  }, [isPairing, requestPairingCode, orientation, enqueueSnackbar]);
   
   // Separate useEffect to handle code expiration and restart pairing if needed
   useEffect(() => {
@@ -169,8 +177,8 @@ const PairingScreen: React.FC = () => {
         
         try {
           requestInProgress.current = true;
-          console.log('[PairingScreen] Requesting pairing code...');
-          const code = await requestPairingCode();
+          console.log('[PairingScreen] Requesting pairing code with orientation:', orientation);
+          const code = await requestPairingCode(orientation);
           requestInProgress.current = false;
           
           if (code && isMounted) {

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import masjidDisplayClient from '../api/masjidDisplayClient';
 import { ApiCredentials, PairingRequest, ApiResponse, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../api/models';
+import { Orientation } from './OrientationContext';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
@@ -9,7 +10,7 @@ export interface AuthContextType {
   isPairing: boolean;
   pairingError: string | null;
   screenId: string | null;
-  requestPairingCode: () => Promise<string | null>;
+  requestPairingCode: (orientation: Orientation) => Promise<string | null>;
   checkPairingStatus: (pairingCode: string) => Promise<boolean>;
   logout: () => void;
   pairingCode: string | null;
@@ -73,6 +74,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setTimeout(() => {
           masjidDisplayClient.logCredentialsStatus();
         }, 1000);
+        
       } catch (error) {
         console.error('[AuthContext] Failed to set credentials', error);
         localStorage.removeItem('masjid_api_key');
@@ -129,13 +131,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('pairingCodeExpiresAt');
         }
       };
-
-      // Check immediately
+      
       checkExpiration();
-
+      
       // Set up interval to check every minute
       const interval = setInterval(checkExpiration, 60 * 1000);
-
+      
       return () => clearInterval(interval);
     }
   }, [pairingCodeExpiresAt]);
@@ -150,7 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Step 1: Request a pairing code from the server
    */
-  const requestPairingCode = async (): Promise<string | null> => {
+  const requestPairingCode = async (orientation: Orientation): Promise<string | null> => {
     // If already pairing, don't start another pairing process
     if (isPairing) {
       console.log('[AuthContext] Already in pairing process, ignoring new request');
@@ -170,9 +171,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('[AuthContext] Requesting pairing code');
     
     try {
-      // Get screen orientation
-      const orientation = window.matchMedia('(orientation: portrait)').matches ? 'PORTRAIT' : 'LANDSCAPE';
-      
       const deviceInfo = {
         deviceType: 'WEB',
         orientation,
