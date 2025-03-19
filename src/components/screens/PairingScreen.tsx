@@ -609,6 +609,35 @@ const PairingScreen: React.FC = () => {
     );
   }, [pairingCode, pairingCodeExpiresAt, isPairingCodeExpired, isPairing, theme, handleRefresh, QRCodeComponent, formatExpirationTime]);
 
+  // Force authentication if credentials already exist in localStorage
+  useEffect(() => {
+    const alreadyChecked = localStorage.getItem('credentials_check_done');
+    if (alreadyChecked === 'true') {
+      return; // Skip if we've already done this check in this session
+    }
+    
+    console.log('[PairingScreen] Checking if credentials already exist in localStorage');
+    
+    // Check for credentials in any format
+    const apiKey = localStorage.getItem('masjid_api_key') || 
+                  localStorage.getItem('apiKey');
+    const screenId = localStorage.getItem('masjid_screen_id') || 
+                    localStorage.getItem('screenId');
+    
+    if (apiKey && screenId) {
+      console.log('[PairingScreen] Found existing credentials, forcing authentication');
+      
+      // Force immediate authentication by calling setIsPaired(true)
+      setIsPaired(true);
+      
+      // Mark that we've done this check to avoid loops
+      localStorage.setItem('credentials_check_done', 'true');
+    } else {
+      console.log('[PairingScreen] No existing credentials found');
+      localStorage.setItem('credentials_check_done', 'true');
+    }
+  }, [setIsPaired]);
+
   return (
     <Box
       sx={{

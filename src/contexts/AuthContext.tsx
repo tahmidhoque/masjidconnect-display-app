@@ -37,76 +37,126 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [lastPairingCodeRequestTime, setLastPairingCodeRequestTime] = useState<number | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(false);
 
+  // Load credentials and authenticate on initial load
   useEffect(() => {
-    // Check if we have stored credentials
-    const apiKey = localStorage.getItem('masjid_api_key');
-    const screenId = localStorage.getItem('masjid_screen_id');
+    console.log('[AuthContext] 🚀 Initial load - checking for credentials...');
     
-    console.log('[AuthContext] Checking stored credentials:', { 
-      hasApiKey: !!apiKey, 
-      hasScreenId: !!screenId,
-      apiKeyLength: apiKey?.length || 0,
-      screenIdLength: screenId?.length || 0
-    });
-    
-    if (apiKey && screenId) {
-      try {
-        setScreenId(screenId);
-        setIsAuthenticated(true);
-        setIsPaired(true);
-        
-        // Ensure the API client has the credentials
-        masjidDisplayClient.setCredentials({ apiKey, screenId })
-          .then(() => {
-            console.log('[AuthContext] Credentials set successfully in client');
-          })
-          .catch(error => {
-            console.error('[AuthContext] Error setting credentials in client:', error);
-            // If setting credentials fails, reset auth state
-            setIsAuthenticated(false);
-            setIsPaired(false);
-            setScreenId(null);
-            localStorage.removeItem('masjid_api_key');
-            localStorage.removeItem('masjid_screen_id');
-          });
-        
-        // Log credentials status for debugging
-        setTimeout(() => {
-          masjidDisplayClient.logCredentialsStatus();
-        }, 1000);
-        
-      } catch (error) {
-        console.error('[AuthContext] Failed to set credentials', error);
-        localStorage.removeItem('masjid_api_key');
-        localStorage.removeItem('masjid_screen_id');
-      }
-    }
-
-    // Check if we have a stored pairing code and expiration time
-    const storedPairingCode = localStorage.getItem('pairingCode');
-    const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
-    const storedLastRequestTime = localStorage.getItem('lastPairingCodeRequestTime');
-    
-    if (storedPairingCode && storedPairingCodeExpiresAt) {
-      const expiresAt = new Date(storedPairingCodeExpiresAt);
-      const now = new Date();
+    // Check for credentials in ALL possible formats - be very thorough
+    const checkAllCredentialFormats = () => {
+      // 1. Direct API key and screenId checks in different formats
+      const formats = [
+        { apiKey: localStorage.getItem('masjid_api_key'), screenId: localStorage.getItem('masjid_screen_id') },
+        { apiKey: localStorage.getItem('apiKey'), screenId: localStorage.getItem('screenId') }
+      ];
       
-      // Only restore the pairing code if it hasn't expired
-      if (expiresAt > now) {
-        console.log('Restoring saved pairing code:', storedPairingCode);
-        setPairingCode(storedPairingCode);
-        setPairingCodeExpiresAt(storedPairingCodeExpiresAt);
-      } else {
-        // Clear expired pairing code
-        localStorage.removeItem('pairingCode');
-        localStorage.removeItem('pairingCodeExpiresAt');
+      // 2. JSON format
+      try {
+        const jsonStr = localStorage.getItem('masjidconnect_credentials');
+        if (jsonStr) {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && parsed.apiKey && parsed.screenId) {
+            formats.push(parsed);
+          }
+        }
+      } catch (e) {
+        console.error('[AuthContext] Error parsing JSON credentials', e);
+      }
+      
+      // 3. Last API response (emergency fallback)
+      try {
+        const lastResponseStr = localStorage.getItem('lastApiResponse');
+        if (lastResponseStr) {
+          const lastResponse = JSON.parse(lastResponseStr);
+          if (lastResponse && lastResponse.apiKey && lastResponse.screenId) {
+            formats.push(lastResponse);
+          }
+        }
+      } catch (e) {
+        console.error('[AuthContext] Error parsing last API response', e);
+      }
+      
+      // Find the first valid credential set
+      for (const format of formats) {
+        if (format.apiKey && format.screenId) {
+          console.log('[AuthContext] ✅ FOUND VALID CREDENTIALS:', {
+            source: format === formats[0] ? 'masjid_api_key format' : 
+                    format === formats[1] ? 'apiKey format' : 'JSON or lastResponse format',
+            apiKeyPrefix: format.apiKey.substring(0, 5) + '...',
+            screenId: format.screenId
+          });
+          
+          return {
+            apiKey: format.apiKey,
+            screenId: format.screenId,
+            found: true
+          };
+        }
+      }
+      
+      console.log('[AuthContext] ❌ No valid credentials found in any format');
+      return { apiKey: null, screenId: null, found: false };
+    };
+    
+    // Execute the check
+    const { apiKey, screenId, found } = checkAllCredentialFormats();
+    
+    if (found && apiKey && screenId) {
+      console.log('[AuthContext] 🔐 Initializing with valid credentials');
+      
+      // Ensure consistent localStorage state
+      localStorage.setItem('masjid_api_key', apiKey);
+      localStorage.setItem('masjid_screen_id', screenId);
+      localStorage.setItem('apiKey', apiKey);
+      localStorage.setItem('screenId', screenId);
+      localStorage.setItem('masjidconnect_credentials', JSON.stringify({
+        apiKey, screenId
+      }));
+      
+      // Set state values for immediate effect
+      setScreenId(screenId);
+      setIsAuthenticated(true);
+      setIsPaired(true);
+      
+      // Initialize the API client
+      masjidDisplayClient.setCredentials({ apiKey, screenId });
+      
+      // Clear any pairing state
+      setPairingCode(null);
+      setPairingCodeExpiresAt(null);
+      setIsPairingCodeExpired(false);
+      setIsPairing(false);
+      setIsPolling(false);
+      
+      // Clean up localStorage pairing items
+      localStorage.removeItem('pairingCode');
+      localStorage.removeItem('pairingCodeExpiresAt');
+      localStorage.removeItem('lastPairingCodeRequestTime');
+      
+      console.log('[AuthContext] 🎉 Successfully authenticated from stored credentials');
+    } else {
+      console.log('[AuthContext] No valid credentials found, will need to pair');
+      
+      // Check if we have a stored pairing code and expiration time
+      const storedPairingCode = localStorage.getItem('pairingCode');
+      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
+      
+      if (storedPairingCode && storedPairingCodeExpiresAt) {
+        const expiresAt = new Date(storedPairingCodeExpiresAt);
+        const now = new Date();
+        
+        // Only restore the pairing code if it hasn't expired
+        if (expiresAt > now) {
+          console.log('[AuthContext] Restoring saved pairing code:', storedPairingCode);
+          setPairingCode(storedPairingCode);
+          setPairingCodeExpiresAt(storedPairingCodeExpiresAt);
+        } else {
+          // Clear expired pairing code
+          localStorage.removeItem('pairingCode');
+          localStorage.removeItem('pairingCodeExpiresAt');
+        }
       }
     }
     
-    if (storedLastRequestTime) {
-      setLastPairingCodeRequestTime(parseInt(storedLastRequestTime, 10));
-    }
-
     // Clean up polling timer on unmount
     return () => {
       if (pollingTimer) {
@@ -147,6 +197,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(true);
     }
   }, [isPaired]);
+
+  // Check for changes in isPaired flag in localStorage
+  useEffect(() => {
+    // Create a function to check for the isPaired flag
+    const checkPairedStatus = () => {
+      const isPairedFlag = localStorage.getItem('isPaired');
+      const apiKey = localStorage.getItem('masjid_api_key');
+      const screenId = localStorage.getItem('masjid_screen_id');
+      
+      console.log('[AuthContext] Checking paired status from localStorage:', { 
+        isPairedFlag, 
+        hasApiKey: !!apiKey, 
+        hasScreenId: !!screenId 
+      });
+      
+      if (isPairedFlag === 'true' && apiKey && screenId) {
+        console.log('[AuthContext] Device is paired according to localStorage flags');
+        
+        // Set the credentials in the client
+        masjidDisplayClient.setCredentials({ apiKey, screenId });
+        
+        // Update state
+        setIsPaired(true);
+        setIsAuthenticated(true);
+        setScreenId(screenId);
+        
+        // Clear pairing state
+        setPairingCode(null);
+        setPairingCodeExpiresAt(null);
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
+        
+        // Clear the isPaired flag to avoid repeated processing
+        localStorage.removeItem('isPaired');
+        
+        // Clear polling timer
+        if (pollingTimer) {
+          clearTimeout(pollingTimer);
+          setPollingTimer(null);
+        }
+        
+        setIsPairing(false);
+        setIsPolling(false);
+      }
+    };
+    
+    // Check immediately
+    checkPairedStatus();
+    
+    // Also set up an interval to check regularly
+    const intervalId = setInterval(checkPairedStatus, 1000);
+    
+    // Clean up
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);  // Empty dependency array means this runs once on mount
 
   /**
    * Step 1: Request a pairing code from the server
@@ -274,115 +381,116 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     
     try {
-      console.log('[AuthContext] Checking pairing status for code:', pairingCode);
+      console.log('[AuthContext] 📊 Checking pairing status for code:', pairingCode);
       
+      // Call API client's checkPairingStatus method
       const isPaired = await masjidDisplayClient.checkPairingStatus(pairingCode);
+      console.log('[AuthContext] 📊 API client returned isPaired:', isPaired);
       
-      if (!isPaired) {
-        console.log('[AuthContext] Device not yet paired');
+      // IMPORTANT: At this point if isPaired=true, the API client already:
+      // 1. Set credentials in localStorage
+      // 2. Triggered a page reload
+      // So this code might not even execute if pairing was successful
+      
+      // But in case it does continue, check if we have credentials now:
+      if (isPaired) {
+        console.log('[AuthContext] 🎉 Device has been paired successfully!');
         
-        // Check if the pairing code is still valid in localStorage
-        // It might have been removed by the API client if it was invalid
-        const storedPairingCode = localStorage.getItem('pairingCode');
-        if (!storedPairingCode || storedPairingCode !== pairingCode) {
-          console.log('[AuthContext] Pairing code was invalidated by the API client');
-          setPairingCode(null);
-          setPairingCodeExpiresAt(null);
-          setIsPairingCodeExpired(true);
-          setPairingError('Pairing code is invalid or expired. Please request a new code.');
+        // Get the credentials from all possible storage locations
+        const apiKey = localStorage.getItem('masjid_api_key') || 
+                     localStorage.getItem('apiKey');
+        const screenId = localStorage.getItem('masjid_screen_id') || 
+                       localStorage.getItem('screenId');
+        
+        if (apiKey && screenId) {
+          console.log('[AuthContext] 🔑 Found credentials, finalizing authentication...');
+          
+          // Set the in-memory state
+          setIsPaired(true);  
+          setIsAuthenticated(true);
+          setScreenId(screenId);
+          
+          // Update state - do this synchronously to ensure it takes effect
           setIsPairing(false);
           setIsPolling(false);
+          
+          // Clear pairing state
+          setPairingCode(null);
+          setPairingCodeExpiresAt(null);
+          
+          // Clear localStorage pairing items
+          localStorage.removeItem('pairingCode');
+          localStorage.removeItem('pairingCodeExpiresAt');
+          localStorage.removeItem('lastPairingCodeRequestTime');
+          
+          // Stop any polling timer
+          if (pollingTimer) {
+            clearTimeout(pollingTimer);
+            setPollingTimer(null);
+          }
+          
+          console.log('[AuthContext] 🏁 Pairing completed successfully!');
+          return true;
+        } else {
+          console.error('[AuthContext] ❌ Missing credentials after pairing! Will force reload');
+          // Force reload as a last resort - the credentials might be there after reload
+          window.location.reload();
           return false;
         }
-        
-        // Schedule next check based on the polling interval from the API client
-        if (pollingTimer) {
-          clearTimeout(pollingTimer);
-        }
-        
-        // Use the polling interval from the API client (defaults to 5 seconds)
-        const pollingInterval = masjidDisplayClient.getPollingInterval();
-        console.log(`[AuthContext] Will check again in ${pollingInterval / 1000} seconds`);
-        
-        const timer = setTimeout(() => {
-          // Only check again if we still have the same pairing code and it's not expired
-          if (pairingCode === getPairingCode() && !isPairingCodeExpired) {
-            console.log('[AuthContext] Checking pairing status again...');
-            checkPairingStatus(pairingCode);
-          } else {
-            console.log('[AuthContext] Pairing code has changed or expired, stopping polling');
-            setIsPolling(false);
-          }
-        }, pollingInterval);
-        
-        setPollingTimer(timer);
-        
-        // Reset the isPairing state but keep isPolling true
-        if (!wasPolling) {
-          setIsPairing(false);
-          setIsPolling(true);
-        }
-        
-        return false;
       }
       
-      console.log('[AuthContext] Device has been paired successfully!');
+      // If we get here, the device is not paired yet
+      console.log('[AuthContext] Device not yet paired, continuing to poll...');
       
-      // Get the credentials from localStorage (set by the API client)
-      const apiKey = localStorage.getItem('masjid_api_key');
-      const screenId = localStorage.getItem('masjid_screen_id');
-      
-      if (apiKey && screenId) {
-        console.log('[AuthContext] Credentials found, finalizing pairing...');
-        
-        // Set the credentials in the API client
-        masjidDisplayClient.setCredentials({ apiKey, screenId });
-        
-        // Update state - set isPaired first to trigger App re-render
-        setIsPaired(true);
-        setIsAuthenticated(true);
-        setScreenId(screenId);
-        
-        // Clear pairing state
+      // Check if the pairing code is still valid in localStorage
+      const storedPairingCode = localStorage.getItem('pairingCode');
+      if (!storedPairingCode || storedPairingCode !== pairingCode) {
+        console.log('[AuthContext] Pairing code was invalidated, stopping poll');
         setPairingCode(null);
         setPairingCodeExpiresAt(null);
-        localStorage.removeItem('pairingCode');
-        localStorage.removeItem('pairingCodeExpiresAt');
-        localStorage.removeItem('lastPairingCodeRequestTime');
-        
-        // No need to store credentials in localStorage again as they're already stored by the API client
-        
-        // Clear polling timer
-        if (pollingTimer) {
-          clearTimeout(pollingTimer);
-          setPollingTimer(null);
-        }
-        
-        setIsPairing(false);
-        setIsPolling(false);
-        
-        console.log('[AuthContext] Pairing completed successfully, App should now redirect');
-        return true;
-      } else {
-        console.error('[AuthContext] Missing API key or screen ID after successful pairing');
-        setPairingError('Authentication failed: Missing credentials');
+        setIsPairingCodeExpired(true);
+        setPairingError('Pairing code is invalid or expired. Please request a new code.');
         setIsPairing(false);
         setIsPolling(false);
         return false;
       }
+      
+      // Schedule next poll
+      if (pollingTimer) {
+        clearTimeout(pollingTimer);
+      }
+      
+      // Use polling interval from API client (defaults to 5 seconds)
+      const pollingInterval = masjidDisplayClient.getPollingInterval();
+      console.log(`[AuthContext] Will check again in ${pollingInterval / 1000} seconds`);
+      
+      const timer = setTimeout(() => {
+        // Only check again if we still have the same pairing code and it's not expired
+        if (pairingCode === getPairingCode() && !isPairingCodeExpired) {
+          console.log('[AuthContext] Polling - checking pairing status again...');
+          checkPairingStatus(pairingCode);
+        } else {
+          console.log('[AuthContext] Pairing code has changed or expired, stopping polling');
+          setIsPolling(false);
+        }
+      }, pollingInterval);
+      
+      setPollingTimer(timer);
+      
+      // Reset the isPairing state but keep isPolling true
+      if (!wasPolling) {
+        setIsPairing(false);
+        setIsPolling(true);
+      }
+      
+      return false;
     } catch (error: any) {
       console.error('[AuthContext] Error checking pairing status:', error);
       
-      // Check if the error is due to an invalid or expired pairing code
+      // Handle specific error cases
       if (error.response && error.response.status === 404) {
         console.log('[AuthContext] Received 404 error during pairing status check');
-        
-        // Don't automatically invalidate the code or trigger a new request
-        // This was causing a loop of new code requests
         setPairingError('Error checking pairing status. Please try again later.');
-        
-        // Don't clear the pairing code or set it as expired
-        // Let the user manually refresh if needed
       } else {
         // Provide more detailed error messages
         let errorMessage = 'Failed to connect to server';
@@ -427,12 +535,93 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Helper function to get the current pairing code
   const getPairingCode = () => pairingCode;
 
+  // Update setIsPaired to handle explicit authentication
+  const handleSetIsPaired = (newIsPaired: boolean) => {
+    if (newIsPaired) {
+      // Check if we have the credentials needed to authenticate
+      const apiKey = localStorage.getItem('masjid_api_key') || 
+                    localStorage.getItem('apiKey');
+      const screenId = localStorage.getItem('masjid_screen_id') || 
+                     localStorage.getItem('screenId');
+      
+      console.log('[AuthContext] setIsPaired(true) called, checking credentials:', {
+        hasApiKey: !!apiKey,
+        hasScreenId: !!screenId
+      });
+      
+      if (apiKey && screenId) {
+        // We have credentials, so fully authenticate
+        setIsPaired(true);
+        setIsAuthenticated(true);
+        setScreenId(screenId);
+        
+        // Make sure the API client is authenticated
+        masjidDisplayClient.setCredentials({ apiKey, screenId });
+        
+        console.log('[AuthContext] Authentication forced by setIsPaired call');
+      } else {
+        console.error('[AuthContext] Cannot authenticate - missing credentials');
+        setIsPaired(false);
+      }
+    } else {
+      // Just set to false as normal
+      setIsPaired(false);
+    }
+  };
+
+  // Listen for direct auth events from the API client
+  useEffect(() => {
+    const handleAuthEvent = (event: Event) => {
+      try {
+        console.log('[AuthContext] Received authentication event');
+        const customEvent = event as CustomEvent<{apiKey: string, screenId: string}>;
+        const { apiKey, screenId } = customEvent.detail;
+        
+        if (apiKey && screenId) {
+          console.log('[AuthContext] Event contains valid credentials');
+          
+          // Update auth state
+          setScreenId(screenId);
+          setIsAuthenticated(true);
+          setIsPaired(true);
+          
+          // Clear pairing state
+          setPairingCode(null);
+          setPairingCodeExpiresAt(null);
+          setIsPairingCodeExpired(false);
+          setIsPairing(false);
+          setIsPolling(false);
+          
+          // Clear polling timer
+          if (pollingTimer) {
+            clearTimeout(pollingTimer);
+            setPollingTimer(null);
+          }
+          
+          console.log('[AuthContext] Authentication completed via direct event');
+        }
+      } catch (error) {
+        console.error('[AuthContext] Error handling auth event:', error);
+      }
+    };
+    
+    // Add the event listener
+    console.log('[AuthContext] Setting up auth event listener');
+    window.addEventListener('masjidconnect:authenticated', handleAuthEvent);
+    
+    // Clean up
+    return () => {
+      console.log('[AuthContext] Removing auth event listener');
+      window.removeEventListener('masjidconnect:authenticated', handleAuthEvent);
+    };
+  }, [pollingTimer]);
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated,
         isPaired,
-        setIsPaired,
+        setIsPaired: handleSetIsPaired,
         isPairing,
         pairingError,
         screenId,

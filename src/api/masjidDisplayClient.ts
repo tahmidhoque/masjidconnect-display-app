@@ -10,24 +10,28 @@ import {
   EventsResponse,
   ApiResponse,
   RequestPairingCodeResponse,
-  CheckPairingStatusResponse
+  CheckPairingStatusResponse,
+  RequestPairingCodeRequest,
+  CheckPairingStatusRequest,
+  PairedCredentialsRequest,
+  PairedCredentialsResponse
 } from './models';
 import logger, { setLastError } from '../utils/logger';
 
 // Cache expiration times (in milliseconds)
 const CACHE_EXPIRATION = {
-  PRAYER_TIMES: 24 * 60 * 60 * 1000, // 24 hours
+  PRAYER_TIMES: 10 * 60 * 1000, // 10 minutes (was 1 hour)
   CONTENT: 5 * 60 * 1000, // 5 minutes
   EVENTS: 30 * 60 * 1000, // 30 minutes
-  PRAYER_STATUS: 30 * 1000, // 30 seconds
+  PRAYER_STATUS: 60 * 1000, // 60 seconds (was 15 seconds)
 };
 
 // Polling intervals (in milliseconds)
 export const POLLING_INTERVALS = {
-  HEARTBEAT: 60 * 1000, // 60 seconds
-  CONTENT: 5 * 60 * 1000, // 5 minutes
-  PRAYER_STATUS: 30 * 1000, // 30 seconds
-  PRAYER_TIMES: 24 * 60 * 60 * 1000, // 24 hours
+  HEARTBEAT: 2 * 60 * 1000, // 2 minutes (was 60 seconds)
+  CONTENT: 10 * 60 * 1000, // 10 minutes (was 5 minutes)
+  PRAYER_STATUS: 60 * 1000, // 60 seconds (was 15 seconds)
+  PRAYER_TIMES: 10 * 60 * 1000, // 10 minutes (was 1 hour)
   EVENTS: 30 * 60 * 1000, // 30 minutes
 };
 
@@ -56,6 +60,21 @@ const STORAGE_KEYS = {
 interface CacheItem<T> {
   data: T;
   expiry: number;
+}
+
+// Add debounce helper
+const debounceMap = new Map<string, number>();
+function shouldDebounceLog(key: string, intervalMs: number = 10000): boolean {
+  const now = Date.now();
+  const lastTime = debounceMap.get(key) || 0;
+  
+  if (now - lastTime < intervalMs) {
+    return true; // Debounce this log
+  }
+  
+  // Update last time
+  debounceMap.set(key, now);
+  return false; // Don't debounce
 }
 
 class MasjidDisplayClient {
@@ -325,11 +344,19 @@ class MasjidDisplayClient {
       await localforage.setItem(STORAGE_KEYS.API_KEY, credentials.apiKey);
       await localforage.setItem(STORAGE_KEYS.SCREEN_ID, credentials.screenId);
       
-      // Also store in localStorage for compatibility with AuthContext
+      // Store in ALL possible formats used by different parts of the application
+      // 1. Original format used by AuthContext
       localStorage.setItem(STORAGE_KEYS.API_KEY, credentials.apiKey);
       localStorage.setItem(STORAGE_KEYS.SCREEN_ID, credentials.screenId);
       
-      logger.info('Credentials saved to storage', { 
+      // 2. Alternative formats used by other components
+      localStorage.setItem('apiKey', credentials.apiKey);
+      localStorage.setItem('screenId', credentials.screenId);
+      
+      // 3. JSON format for additional compatibility
+      localStorage.setItem('masjidconnect_credentials', JSON.stringify(credentials));
+      
+      logger.info('Credentials saved to storage in all formats', { 
         apiKeyLength: credentials.apiKey.length, 
         screenIdLength: credentials.screenId.length 
       });
@@ -347,11 +374,22 @@ class MasjidDisplayClient {
       await localforage.removeItem(STORAGE_KEYS.API_KEY);
       await localforage.removeItem(STORAGE_KEYS.SCREEN_ID);
       
-      // Also clear from localStorage
+      // Clear ALL formats from localStorage
+      // 1. Original format used by AuthContext
       localStorage.removeItem(STORAGE_KEYS.API_KEY);
       localStorage.removeItem(STORAGE_KEYS.SCREEN_ID);
       
-      logger.info('Credentials cleared from storage');
+      // 2. Alternative formats used by other components
+      localStorage.removeItem('apiKey');
+      localStorage.removeItem('screenId');
+      
+      // 3. JSON format
+      localStorage.removeItem('masjidconnect_credentials');
+      
+      // 4. Authentication state flags
+      localStorage.removeItem('isPaired');
+      
+      logger.info('Credentials cleared from all storage');
     } catch (error) {
       logger.error('Error clearing credentials', { error });
     }
@@ -392,7 +430,7 @@ class MasjidDisplayClient {
     });
   }
 
-  // Generic fetch with cache and retry
+  // Fetch with cache
   private async fetchWithCache<T>(
     endpoint: string, 
     options: AxiosRequestConfig = {}, 
@@ -400,9 +438,19 @@ class MasjidDisplayClient {
   ): Promise<ApiResponse<T>> {
     const cacheKey = `${endpoint}-${JSON.stringify(options)}`;
     
+    // Skip cache if cacheTime is 0 (force refresh)
+    if (cacheTime <= 0) {
+      if (!shouldDebounceLog(`skip-cache-${endpoint}`)) {
+        logger.debug(`Skipping cache for ${endpoint} (forced refresh)`);
+      }
+      return this.fetchWithRetry<T>(endpoint, options);
+    }
+    
     // Check if a request to this endpoint is already in progress
     if (this.isLoading.get(endpoint)) {
-      logger.debug(`Request to ${endpoint} already in progress, using cache if available`);
+      if (!shouldDebounceLog(`loading-${endpoint}`)) {
+        logger.debug(`Request to ${endpoint} already in progress, using cache if available`);
+      }
       
       // Return cached data if available
       const cached = this.cache.get(cacheKey);
@@ -434,7 +482,9 @@ class MasjidDisplayClient {
     // Return cached data if valid and available
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
-      logger.debug(`Using cached data for ${endpoint}`);
+      if (!shouldDebounceLog(`use-cache-${endpoint}`)) {
+        logger.debug(`Using cached data for ${endpoint}`);
+      }
       return cached.data;
     }
     
@@ -477,23 +527,27 @@ class MasjidDisplayClient {
     this.isLoading.set(endpoint, true);
     
     try {
-      logger.debug(`Making request to ${endpoint}`, { 
-        method: options.method, 
-        hasData: !!options.data,
-        hasAuth: this.isAuthenticated(),
-        withCredentials: options.withCredentials,
-        url: this.baseURL + endpoint
-      });
+      if (!shouldDebounceLog(`request-${endpoint}`)) {
+        logger.debug(`Making request to ${endpoint}`, { 
+          method: options.method, 
+          hasData: !!options.data,
+          hasAuth: this.isAuthenticated(),
+          withCredentials: options.withCredentials,
+          url: this.baseURL + endpoint
+        });
+      }
       
       const response = await this.client.request<any, AxiosResponse<T>>({
         url: endpoint,
         ...options,
       });
       
-      logger.debug(`Response from ${endpoint}:`, {
-        status: response.status,
-        hasData: !!response.data
-      });
+      if (!shouldDebounceLog(`response-${endpoint}`)) {
+        logger.debug(`Response from ${endpoint}:`, {
+          status: response.status,
+          hasData: !!response.data
+        });
+      }
       
       const result: ApiResponse<T> = {
         success: true,
@@ -516,13 +570,16 @@ class MasjidDisplayClient {
       
       return result;
     } catch (error: any) {
-      logger.error(`Error fetching ${endpoint}:`, {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        config: error.config,
-        isCorsError: error.message?.includes('CORS')
-      });
+      // Only log errors that aren't debounced
+      if (!shouldDebounceLog(`error-${endpoint}`)) {
+        logger.error(`Error fetching ${endpoint}:`, {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+          config: error.config,
+          isCorsError: error.message?.includes('CORS')
+        });
+      }
       
       // Mark this endpoint as no longer loading
       this.isLoading.set(endpoint, false);
@@ -608,152 +665,288 @@ class MasjidDisplayClient {
 
   // Send heartbeat to server
   public async sendHeartbeat(status: HeartbeatRequest): Promise<ApiResponse<HeartbeatResponse>> {
+    // Check if we're authenticated
     if (!this.isAuthenticated()) {
-      logger.warn('Heartbeat called without authentication');
+      logger.warn('sendHeartbeat called without authentication');
       return { success: false, error: 'Not authenticated' };
     }
-    
-    // Update metrics with current data
-    const metrics = {
-      ...status.metrics,
-      uptime: Math.floor((Date.now() - this.startTime) / 1000),
-      lastError: this.lastError || status.metrics.lastError,
-    };
-    
-    return this.fetchWithCache<HeartbeatResponse>(
-      '/api/screen/heartbeat',
-      {
+
+    try {
+      // Use the correct endpoint from the integration guide
+      const endpoint = '/api/screen/heartbeat';
+      
+      const payload = {
+        screenId: this.credentials!.screenId,
+        status: status.status,
+        deviceInfo: status.metrics
+      };
+
+      const options = {
         method: 'POST',
-        data: {
-          status: status.status,
-          metrics,
-        },
-        withCredentials: false // Disable credentials for all requests
-      },
-      0 // No caching for heartbeat
-    );
+        data: payload
+      };
+
+      const result = await this.fetchWithRetry<HeartbeatResponse>(endpoint, options);
+      return result;
+    } catch (error) {
+      logger.error('Error sending heartbeat', { error });
+      return { success: false, error: 'Failed to send heartbeat' };
+    }
   }
 
   // Get screen content
-  public async getScreenContent(): Promise<ApiResponse<ScreenContent>> {
+  public async getScreenContent(forceRefresh: boolean = false): Promise<ApiResponse<ScreenContent>> {
     if (!this.isAuthenticated()) {
       logger.warn('getScreenContent called without authentication');
       return { success: false, error: 'Not authenticated' };
     }
-    
-    return this.fetchWithCache<ScreenContent>(
-      '/api/screen/content',
-      { 
-        method: 'GET',
-        withCredentials: false // Disable credentials for all requests
-      },
-      CACHE_EXPIRATION.CONTENT
-    );
+
+    try {
+      // Use the correct endpoint from the integration guide
+      const endpoint = `/api/screen/content?screenId=${this.credentials!.screenId}`;
+      
+      return this.fetchWithCache<ScreenContent>(
+        endpoint, 
+        {}, 
+        forceRefresh ? 0 : CACHE_EXPIRATION.CONTENT
+      );
+    } catch (error) {
+      logger.error('Error fetching screen content', { error });
+      return { success: false, error: 'Failed to fetch screen content' };
+    }
   }
 
   // Get prayer times
-  public async getPrayerTimes(startDate?: string, endDate?: string): Promise<ApiResponse<PrayerTimes[]>> {
+  public async getPrayerTimes(startDate?: string, endDate?: string, forceRefresh: boolean = false): Promise<ApiResponse<PrayerTimes[]>> {
     if (!this.isAuthenticated()) {
       logger.warn('getPrayerTimes called without authentication');
       return { success: false, error: 'Not authenticated' };
     }
-    
-    let url = '/api/screen/prayer-times';
-    const params = new URLSearchParams();
-    
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    
-    if (params.toString()) {
-      url += `?${params.toString()}`;
+
+    try {
+      // Use the correct endpoint from the integration guide
+      const endpoint = `/api/screen/prayer-times?screenId=${this.credentials!.screenId}`;
+      
+      return this.fetchWithCache<PrayerTimes[]>(
+        endpoint, 
+        {}, 
+        forceRefresh ? 0 : CACHE_EXPIRATION.PRAYER_TIMES
+      );
+    } catch (error) {
+      logger.error('Error fetching prayer times', { error });
+      return { success: false, error: 'Failed to fetch prayer times' };
     }
-    
-    return this.fetchWithCache<PrayerTimes[]>(
-      url,
-      { 
-        method: 'GET',
-        withCredentials: false // Disable credentials for all requests
-      },
-      CACHE_EXPIRATION.PRAYER_TIMES
-    );
   }
 
   // Get prayer status
-  public async getPrayerStatus(): Promise<ApiResponse<PrayerStatus>> {
+  public async getPrayerStatus(forceRefresh: boolean = false): Promise<ApiResponse<PrayerStatus>> {
     if (!this.isAuthenticated()) {
       logger.warn('getPrayerStatus called without authentication');
       return { success: false, error: 'Not authenticated' };
     }
-    
-    return this.fetchWithCache<PrayerStatus>(
-      '/api/screen/prayer-status',
-      { 
-        method: 'GET',
-        withCredentials: false // Disable credentials for all requests
-      },
-      CACHE_EXPIRATION.PRAYER_STATUS
-    );
+
+    try {
+      // Use the correct endpoint from the integration guide
+      const endpoint = `/api/screen/prayer-status?screenId=${this.credentials!.screenId}`;
+      
+      return this.fetchWithCache<PrayerStatus>(
+        endpoint, 
+        {}, 
+        forceRefresh ? 0 : CACHE_EXPIRATION.PRAYER_STATUS
+      );
+    } catch (error) {
+      logger.error('Error fetching prayer status', { error });
+      return { success: false, error: 'Failed to fetch prayer status' };
+    }
   }
 
   // Get events
-  public async getEvents(count: number = 5): Promise<ApiResponse<EventsResponse>> {
+  public async getEvents(count: number = 5, forceRefresh: boolean = false): Promise<ApiResponse<EventsResponse>> {
     if (!this.isAuthenticated()) {
       logger.warn('getEvents called without authentication');
       return { success: false, error: 'Not authenticated' };
     }
-    
-    return this.fetchWithCache<EventsResponse>(
-      `/api/screen/events?count=${count}`,
-      { 
-        method: 'GET',
-        withCredentials: false // Disable credentials for all requests
-      },
-      CACHE_EXPIRATION.EVENTS
-    );
+
+    try {
+      // Use the correct endpoint from the integration guide
+      const endpoint = `/api/screen/events?screenId=${this.credentials!.screenId}`;
+      
+      return this.fetchWithCache<EventsResponse>(
+        endpoint, 
+        {}, 
+        forceRefresh ? 0 : CACHE_EXPIRATION.EVENTS
+      );
+    } catch (error) {
+      logger.error('Error fetching events', { error });
+      return { success: false, error: 'Failed to fetch events' };
+    }
   }
 
   // Request a pairing code
   public async requestPairingCode(deviceInfo: { deviceType: string, orientation: string }): Promise<ApiResponse<RequestPairingCodeResponse>> {
-    return this.fetchWithCache<RequestPairingCodeResponse>(
-      '/api/screens/unpaired',
-      {
+    try {
+      // Use the correct endpoint from the integration guide
+      const endpoint = '/api/screens/unpaired';
+      
+      const payload: RequestPairingCodeRequest = {
+        deviceInfo: {
+          deviceId: this.generateDeviceId(),
+          model: deviceInfo.deviceType,
+          platform: 'Web'
+        }
+      };
+
+      const options = {
         method: 'POST',
-        data: deviceInfo,
-        withCredentials: false // Disable credentials for pairing requests
-      },
-      0 // No caching for pairing code
-    );
+        data: payload,
+        withCredentials: false
+      };
+
+      const result = await this.fetchWithRetry<RequestPairingCodeResponse>(endpoint, options);
+      return result;
+    } catch (error) {
+      logger.error('Error requesting pairing code', { error });
+      return { success: false, error: 'Failed to request pairing code' };
+    }
+  }
+
+  // Generate a consistent device ID
+  private generateDeviceId(): string {
+    // Use a stored ID if we have one
+    const storedId = localStorage.getItem('device_id');
+    if (storedId) return storedId;
+    
+    // Generate a new one if we don't
+    const newId = 'web-' + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('device_id', newId);
+    return newId;
   }
 
   // Check pairing status
   public async checkPairingStatus(pairingCode: string): Promise<boolean> {
     try {
-      const response = await this.fetchWithCache<CheckPairingStatusResponse>(
-        '/api/screens/unpaired/check',
-        {
-          method: 'POST',
-          data: { pairingCode },
-          withCredentials: false // Disable credentials for pairing requests
-        },
-        0 // No caching for pairing status
-      );
+      // Use the correct endpoint from the integration guide
+      const endpoint = '/api/screens/check-simple';
+      
+      const payload: CheckPairingStatusRequest = {
+        pairingCode: pairingCode
+      };
 
-      logger.debug('Pairing status check response', { response });
+      const options = {
+        method: 'POST',
+        data: payload,
+        withCredentials: false
+      };
 
-      if (response.success && response.data) {
-        if (response.data.paired && response.data.apiKey && response.data.screenId) {
-          // If paired, set the credentials
-          await this.setCredentials({
-            apiKey: response.data.apiKey,
-            screenId: response.data.screenId,
-          });
-          return true;
+      const result = await this.fetchWithRetry<CheckPairingStatusResponse>(endpoint, options);
+      
+      // Log the full response for debugging
+      logger.info('Received check-simple response', { 
+        data: result.data, 
+        success: result.success 
+      });
+      
+      if (result.success && result.data) {
+        // Check for both paired and isPaired properties (API returns "paired" but our interface expects "isPaired")
+        const isPaired = result.data.isPaired === true || result.data.paired === true;
+        const screenId = result.data.screenId;
+        const apiKey = result.data.apiKey;
+        const masjidId = result.data.masjidId;
+        
+        logger.info('Extracted pairing info from response', { 
+          isPaired, 
+          hasScreenId: !!screenId, 
+          hasApiKey: !!apiKey 
+        });
+        
+        if (isPaired && screenId) {
+          // If the API response includes the apiKey directly, use it
+          if (apiKey) {
+            logger.info('API key included in check-simple response, setting credentials directly');
+            
+            const credentials: ApiCredentials = {
+              apiKey: apiKey,
+              screenId: screenId
+            };
+            
+            // Set the credentials immediately
+            await this.setCredentials(credentials);
+            
+            // Set isPaired flag in localStorage for other components to detect
+            localStorage.setItem('isPaired', 'true');
+            
+            // Also store masjidId if available
+            if (masjidId) {
+              localStorage.setItem('masjid_id', masjidId);
+            }
+            
+            // Dispatch a custom event to notify components about authentication
+            logger.info('Dispatching auth event for components to detect');
+            try {
+              const authEvent = new CustomEvent('masjidconnect:authenticated', {
+                detail: { apiKey, screenId }
+              });
+              window.dispatchEvent(authEvent);
+            } catch (error) {
+              logger.error('Error dispatching auth event', { error });
+            }
+            
+            return true;
+          } else {
+            // Otherwise, get the full credentials using the paired-credentials endpoint
+            logger.info('Pairing successful, fetching credentials from paired-credentials endpoint');
+            await this.fetchPairedCredentials(pairingCode);
+            
+            // Set isPaired flag in localStorage for other components to detect
+            localStorage.setItem('isPaired', 'true');
+            
+            return true;
+          }
         }
       }
+      
       return false;
     } catch (error) {
       logger.error('Error checking pairing status', { error });
       return false;
+    }
+  }
+
+  // Get credentials after successful pairing
+  private async fetchPairedCredentials(pairingCode: string): Promise<void> {
+    try {
+      const endpoint = '/api/screens/paired-credentials';
+      
+      const payload: PairedCredentialsRequest = {
+        pairingCode: pairingCode,
+        deviceInfo: {
+          deviceId: this.generateDeviceId(),
+          model: navigator.userAgent,
+          platform: 'Web'
+        }
+      };
+
+      const options = {
+        method: 'POST',
+        data: payload,
+        withCredentials: false
+      };
+
+      const result = await this.fetchWithRetry<PairedCredentialsResponse>(endpoint, options);
+      
+      if (result.success && result.data) {
+        const credentials: ApiCredentials = {
+          apiKey: result.data.apiKey,
+          screenId: result.data.screenId
+        };
+        
+        await this.setCredentials(credentials);
+        logger.info('Successfully set credentials after pairing');
+      } else {
+        logger.error('Failed to fetch credentials after pairing', { result });
+      }
+    } catch (error) {
+      logger.error('Error fetching paired credentials', { error });
     }
   }
 
@@ -766,6 +959,24 @@ class MasjidDisplayClient {
   public cleanup(): void {
     window.removeEventListener('online', this.handleOnline);
     window.removeEventListener('offline', this.handleOffline);
+  }
+
+  // Invalidate all caches
+  public invalidateAllCaches(): void {
+    logger.info('Invalidating all caches');
+    this.cache.clear();
+  }
+  
+  // Invalidate specific endpoint cache
+  public invalidateCache(endpoint: string): void {
+    logger.info(`Invalidating cache for ${endpoint}`);
+    
+    // Find and remove all cache entries that start with this endpoint
+    for (const cacheKey of Array.from(this.cache.keys())) {
+      if (cacheKey.startsWith(endpoint)) {
+        this.cache.delete(cacheKey);
+      }
+    }
   }
 }
 
