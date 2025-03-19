@@ -42,9 +42,11 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
               <Box sx={{ 
                 p: 1, 
                 textAlign: 'center',
-                bgcolor: prayer.isNext ? 'primary.main' : prayer.isCurrent ? 'secondary.main' : 'background.paper',
+                bgcolor: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'background.paper',
                 color: (prayer.isNext || prayer.isCurrent) ? 'white' : 'inherit',
-                borderRadius: 1
+                borderRadius: 1,
+                transform: prayer.isNext ? 'scale(1.05)' : 'none',
+                transition: 'transform 0.2s ease-in-out'
               }}>
                 <Typography variant="caption" component="div">
                   {prayer.name}
@@ -108,8 +110,8 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                   p: 2, 
                   mb: 2, 
                   textAlign: 'center', 
-                  bgcolor: 'primary.main', 
-                  color: 'primary.contrastText' 
+                  bgcolor: 'success.main', 
+                  color: 'success.contrastText' 
                 }}
               >
                 <Typography variant="subtitle1">
@@ -124,6 +126,31 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                 {nextPrayer.displayJamaat && (
                   <Typography variant="body2">
                     Jamaat: {nextPrayer.displayJamaat}
+                  </Typography>
+                )}
+              </Paper>
+            )}
+            
+            {currentPrayer && (
+              <Paper 
+                elevation={1} 
+                sx={{ 
+                  p: 1, 
+                  mb: 2, 
+                  textAlign: 'center', 
+                  bgcolor: 'primary.main', 
+                  color: 'primary.contrastText' 
+                }}
+              >
+                <Typography variant="subtitle2">
+                  Current Prayer: {currentPrayer.name}
+                </Typography>
+                <Typography variant="h6">
+                  {currentPrayer.displayTime}
+                </Typography>
+                {currentPrayer.displayJamaat && (
+                  <Typography variant="body2">
+                    Jamaat: {currentPrayer.displayJamaat}
                   </Typography>
                 )}
               </Paper>
@@ -152,7 +179,7 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                       variant="body2" 
                       sx={{ 
                         fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
-                        color: prayer.isNext ? 'primary.main' : prayer.isCurrent ? 'secondary.main' : 'inherit'
+                        color: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'inherit'
                       }}
                     >
                       {prayer.name}
@@ -163,7 +190,7 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                       variant="body2"
                       sx={{ 
                         fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
-                        color: prayer.isNext ? 'primary.main' : prayer.isCurrent ? 'secondary.main' : 'inherit'
+                        color: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'inherit'
                       }}
                     >
                       {prayer.displayTime}
@@ -174,7 +201,7 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                       variant="body2"
                       sx={{ 
                         fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
-                        color: prayer.isNext ? 'primary.main' : prayer.isCurrent ? 'secondary.main' : 'inherit'
+                        color: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'inherit'
                       }}
                     >
                       {prayer.displayJamaat || '-'}
