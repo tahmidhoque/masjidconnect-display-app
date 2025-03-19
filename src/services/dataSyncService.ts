@@ -10,12 +10,62 @@ class DataSyncService {
     events: null,
     heartbeat: null
   };
-  private lastSyncTime: Record<string, number> = {};
+  
+  private lastSyncTime: Record<string, number> = {
+    content: 0,
+    prayerStatus: 0,
+    prayerTimes: 0,
+    events: 0,
+    heartbeat: 0
+  };
+  
   private startTime: number = Date.now();
   // Flag to prevent multiple initialization calls
   private isInitialized: boolean = false;
+  private lastHeartbeatTime: number = 0;
+  private readonly MIN_HEARTBEAT_INTERVAL: number = 30000; // 30 seconds minimum between heartbeats
+  
+  // Track backoff status for APIs
+  private backoffStatus: Record<string, { inBackoff: boolean, nextTry: number }> = {
+    heartbeat: { inBackoff: false, nextTry: 0 },
+    content: { inBackoff: false, nextTry: 0 },
+    prayerStatus: { inBackoff: false, nextTry: 0 },
+    prayerTimes: { inBackoff: false, nextTry: 0 },
+    events: { inBackoff: false, nextTry: 0 }
+  };
 
-  constructor() {}
+  // Add throttling mechanism
+  private lastSyncAttempts: Record<string, number> = {
+    content: 0,
+    prayerStatus: 0,
+    prayerTimes: 0,
+    events: 0,
+    heartbeat: 0
+  };
+  
+  private readonly MIN_SYNC_INTERVAL: Record<string, number> = {
+    content: 30 * 1000, // 30 seconds
+    prayerStatus: 30 * 1000, // 30 seconds
+    prayerTimes: 60 * 1000, // 1 minute
+    events: 60 * 1000, // 1 minute
+    heartbeat: 60 * 1000 // 1 minute
+  };
+  
+  // Helper method to check if a sync should be throttled
+  private shouldThrottleSync(syncType: string): boolean {
+    const now = Date.now();
+    const lastAttempt = this.lastSyncAttempts[syncType] || 0;
+    const minInterval = this.MIN_SYNC_INTERVAL[syncType] || 30000;
+    
+    // If it's too soon since the last attempt, throttle
+    if (now - lastAttempt < minInterval) {
+      return true;
+    }
+    
+    // Update last attempt time
+    this.lastSyncAttempts[syncType] = now;
+    return false;
+  }
 
   // Initialize the service
   public initialize(): void {
@@ -105,7 +155,7 @@ class DataSyncService {
   }
 
   // Sync all data immediately
-  public async syncAllData(): Promise<void> {
+  public async syncAllData(forceRefresh: boolean = false): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) {
       logger.warn('Cannot sync data - offline or not authenticated', {
         online: navigator.onLine,
@@ -114,26 +164,53 @@ class DataSyncService {
       return;
     }
     
-    logger.info('Syncing all data immediately');
+    // Prevent excessive syncs with throttle mechanism
+    const now = Date.now();
+    const syncKey = 'syncAllData';
+    const lastSyncAll = this.lastSyncAttempts[syncKey] || 0;
+    const minSyncAllInterval = 5000; // 5 seconds
+    
+    if (now - lastSyncAll < minSyncAllInterval && !forceRefresh) {
+      logger.debug('Throttling syncAllData - too frequent calls');
+      return;
+    }
+    
+    this.lastSyncAttempts[syncKey] = now;
+    
+    logger.info('Syncing all data immediately', { forceRefresh });
+    
+    // Only include heartbeat if we haven't sent one recently
+    const includeHeartbeat = (now - this.lastHeartbeatTime) > this.MIN_HEARTBEAT_INTERVAL;
+    
+    const syncPromises = [
+      this.syncContent(forceRefresh),
+      this.syncPrayerStatus(forceRefresh),
+      this.syncPrayerTimes(forceRefresh),
+      this.syncEvents(forceRefresh)
+    ];
+    
+    // Only add heartbeat if it's been long enough since the last one
+    if (includeHeartbeat) {
+      syncPromises.push(this.sendHeartbeat());
+    } else {
+      logger.debug('Skipping heartbeat in syncAllData - too soon since last heartbeat');
+    }
     
     // Use Promise.allSettled to ensure all sync attempts run even if some fail
     try {
-      const results = await Promise.allSettled([
-        this.syncContent(),
-        this.syncPrayerStatus(),
-        this.syncPrayerTimes(),
-        this.syncEvents(),
-        this.sendHeartbeat()
-      ]);
+      const results = await Promise.allSettled(syncPromises);
       
       // Log results of each sync operation
-      const syncResults = {
+      const syncResults: Record<string, string> = {
         content: results[0].status,
         prayerStatus: results[1].status,
         prayerTimes: results[2].status,
-        events: results[3].status,
-        heartbeat: results[4].status
+        events: results[3].status
       };
+      
+      if (includeHeartbeat) {
+        syncResults.heartbeat = results[4].status;
+      }
       
       // Check if any syncs failed
       const failedSyncs = results.filter(result => result.status === 'rejected');
@@ -144,7 +221,10 @@ class DataSyncService {
         // Log detailed errors for each failed sync
         failedSyncs.forEach((result, index) => {
           if (result.status === 'rejected') {
-            const syncType = ['content', 'prayerStatus', 'prayerTimes', 'events', 'heartbeat'][index];
+            const syncTypes = ['content', 'prayerStatus', 'prayerTimes', 'events'];
+            if (includeHeartbeat) syncTypes.push('heartbeat');
+            
+            const syncType = index < syncTypes.length ? syncTypes[index] : 'unknown';
             logger.error(`Failed to sync ${syncType}`, { error: result.reason });
           }
         });
@@ -178,22 +258,64 @@ class DataSyncService {
     }
   }
 
-  private async syncContent(): Promise<void> {
+  private async syncContent(forceRefresh: boolean = false): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
 
+    // Apply throttling unless it's a force refresh
+    if (!forceRefresh && this.shouldThrottleSync('content')) {
+      logger.debug('Throttling content sync - too frequent calls');
+      return;
+    }
+
+    // Skip backoff check if force refresh
+    if (!forceRefresh && this.backoffStatus.content.inBackoff) {
+      const now = Date.now();
+      if (now < this.backoffStatus.content.nextTry) {
+        logger.debug(`Content sync in backoff until ${new Date(this.backoffStatus.content.nextTry).toISOString()}, skipping`);
+        return;
+      } else {
+        // Reset backoff since we passed the backoff time
+        this.backoffStatus.content.inBackoff = false;
+        logger.debug('Content sync backoff period ended, retrying');
+      }
+    }
+
     try {
-      logger.debug('Syncing content...');
+      logger.debug('Syncing content...', { forceRefresh });
       this.lastSyncTime.content = Date.now();
 
       // Fetch screen content
-      const contentResponse = await masjidDisplayClient.getScreenContent();
+      const contentResponse = await masjidDisplayClient.getScreenContent(forceRefresh);
       if (contentResponse.success && contentResponse.data) {
         await storageService.saveScreenContent(contentResponse.data);
+        logger.debug('Content sync completed successfully');
+      } else {
+        // Don't enter backoff mode if force refresh
+        if (!forceRefresh) {
+          // If server has an error, implement backoff
+          this.backoffStatus.content.inBackoff = true;
+          this.backoffStatus.content.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
+          logger.warn('Content sync failed, entering backoff mode', { 
+            error: contentResponse.error, 
+            backoffUntil: new Date(this.backoffStatus.content.nextTry).toISOString() 
+          });
+        } else {
+          logger.warn('Force content sync failed', { error: contentResponse.error });
+        }
       }
-
-      logger.debug('Content sync completed successfully');
     } catch (error) {
-      logger.error('Error syncing content', { error });
+      // Don't enter backoff mode if force refresh
+      if (!forceRefresh) {
+        // Error occurred, implement backoff
+        this.backoffStatus.content.inBackoff = true;
+        this.backoffStatus.content.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
+        logger.error('Error syncing content, entering backoff mode', { 
+          error, 
+          backoffUntil: new Date(this.backoffStatus.content.nextTry).toISOString() 
+        });
+      } else {
+        logger.error('Error during forced content sync', { error });
+      }
     }
   }
 
@@ -219,22 +341,64 @@ class DataSyncService {
     }
   }
 
-  private async syncPrayerStatus(): Promise<void> {
+  public async syncPrayerStatus(forceRefresh: boolean = false): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
 
+    // Apply throttling unless it's a force refresh
+    if (!forceRefresh && this.shouldThrottleSync('prayerStatus')) {
+      logger.debug('Throttling prayer status sync - too frequent calls');
+      return;
+    }
+
+    // Skip backoff check if force refresh
+    if (!forceRefresh && this.backoffStatus.prayerStatus.inBackoff) {
+      const now = Date.now();
+      if (now < this.backoffStatus.prayerStatus.nextTry) {
+        logger.debug(`Prayer status sync in backoff until ${new Date(this.backoffStatus.prayerStatus.nextTry).toISOString()}, skipping`);
+        return;
+      } else {
+        // Reset backoff since we passed the backoff time
+        this.backoffStatus.prayerStatus.inBackoff = false;
+        logger.debug('Prayer status sync backoff period ended, retrying');
+      }
+    }
+
     try {
-      logger.debug('Syncing prayer status...');
+      logger.debug('Syncing prayer status...', { forceRefresh });
       this.lastSyncTime.prayerStatus = Date.now();
 
       // Fetch prayer status
-      const prayerStatusResponse = await masjidDisplayClient.getPrayerStatus();
+      const prayerStatusResponse = await masjidDisplayClient.getPrayerStatus(forceRefresh);
       if (prayerStatusResponse.success && prayerStatusResponse.data) {
         await storageService.savePrayerStatus(prayerStatusResponse.data);
+        logger.debug('Prayer status sync completed successfully');
+      } else {
+        // Don't enter backoff mode if force refresh
+        if (!forceRefresh) {
+          // If server has an error, implement backoff
+          this.backoffStatus.prayerStatus.inBackoff = true;
+          this.backoffStatus.prayerStatus.nextTry = Date.now() + (2 * 60 * 1000); // Wait 2 minutes before next try
+          logger.warn('Prayer status sync failed, entering backoff mode', { 
+            error: prayerStatusResponse.error, 
+            backoffUntil: new Date(this.backoffStatus.prayerStatus.nextTry).toISOString() 
+          });
+        } else {
+          logger.warn('Force prayer status sync failed', { error: prayerStatusResponse.error });
+        }
       }
-
-      logger.debug('Prayer status sync completed successfully');
     } catch (error) {
-      logger.error('Error syncing prayer status', { error });
+      // Don't enter backoff mode if force refresh
+      if (!forceRefresh) {
+        // Error occurred, implement backoff
+        this.backoffStatus.prayerStatus.inBackoff = true;
+        this.backoffStatus.prayerStatus.nextTry = Date.now() + (2 * 60 * 1000); // Wait 2 minutes before next try
+        logger.error('Error syncing prayer status, entering backoff mode', { 
+          error, 
+          backoffUntil: new Date(this.backoffStatus.prayerStatus.nextTry).toISOString() 
+        });
+      } else {
+        logger.error('Error during forced prayer status sync', { error });
+      }
     }
   }
 
@@ -260,29 +424,73 @@ class DataSyncService {
     }
   }
 
-  private async syncPrayerTimes(): Promise<void> {
+  public async syncPrayerTimes(forceRefresh: boolean = false): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
 
+    // Apply throttling unless it's a force refresh
+    if (!forceRefresh && this.shouldThrottleSync('prayerTimes')) {
+      logger.debug('Throttling prayer times sync - too frequent calls');
+      return;
+    }
+
+    // Skip backoff check if force refresh
+    if (!forceRefresh && this.backoffStatus.prayerTimes.inBackoff) {
+      const now = Date.now();
+      if (now < this.backoffStatus.prayerTimes.nextTry) {
+        logger.debug(`Prayer times sync in backoff until ${new Date(this.backoffStatus.prayerTimes.nextTry).toISOString()}, skipping`);
+        return;
+      } else {
+        // Reset backoff since we passed the backoff time
+        this.backoffStatus.prayerTimes.inBackoff = false;
+        logger.debug('Prayer times backoff period ended, retrying');
+      }
+    }
+
     try {
-      logger.debug('Syncing prayer times...');
+      logger.debug('Syncing prayer times...', { forceRefresh });
       this.lastSyncTime.prayerTimes = Date.now();
 
-      // Fetch prayer times for the next 7 days
+      // Get current date
       const today = new Date();
-      const nextWeek = new Date();
-      nextWeek.setDate(today.getDate() + 7);
-
       const startDate = today.toISOString().split('T')[0];
-      const endDate = nextWeek.toISOString().split('T')[0];
+      
+      // Get date 7 days from now
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + 7);
+      const endDateString = endDate.toISOString().split('T')[0];
 
-      const prayerTimesResponse = await masjidDisplayClient.getPrayerTimes(startDate, endDate);
+      // Fetch prayer times
+      const prayerTimesResponse = await masjidDisplayClient.getPrayerTimes(startDate, endDateString, forceRefresh);
       if (prayerTimesResponse.success && prayerTimesResponse.data) {
         await storageService.savePrayerTimes(prayerTimesResponse.data);
+        logger.debug('Prayer times sync completed successfully');
+      } else {
+        // Don't enter backoff mode if force refresh
+        if (!forceRefresh) {
+          // If server has an error, implement backoff
+          this.backoffStatus.prayerTimes.inBackoff = true;
+          this.backoffStatus.prayerTimes.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
+          logger.warn('Prayer times sync failed, entering backoff mode', { 
+            error: prayerTimesResponse.error, 
+            backoffUntil: new Date(this.backoffStatus.prayerTimes.nextTry).toISOString() 
+          });
+        } else {
+          logger.warn('Force prayer times sync failed', { error: prayerTimesResponse.error });
+        }
       }
-
-      logger.debug('Prayer times sync completed successfully');
     } catch (error) {
-      logger.error('Error syncing prayer times', { error });
+      // Don't enter backoff mode if force refresh
+      if (!forceRefresh) {
+        // Error occurred, implement backoff
+        this.backoffStatus.prayerTimes.inBackoff = true;
+        this.backoffStatus.prayerTimes.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
+        logger.error('Error syncing prayer times, entering backoff mode', { 
+          error, 
+          backoffUntil: new Date(this.backoffStatus.prayerTimes.nextTry).toISOString() 
+        });
+      } else {
+        logger.error('Error during forced prayer times sync', { error });
+      }
     }
   }
 
@@ -308,37 +516,86 @@ class DataSyncService {
     }
   }
 
-  private async syncEvents(): Promise<void> {
+  private async syncEvents(forceRefresh: boolean = false): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
 
+    // Apply throttling unless it's a force refresh
+    if (!forceRefresh && this.shouldThrottleSync('events')) {
+      logger.debug('Throttling events sync - too frequent calls');
+      return;
+    }
+
+    // Skip backoff check if force refresh
+    if (!forceRefresh && this.backoffStatus.events.inBackoff) {
+      const now = Date.now();
+      if (now < this.backoffStatus.events.nextTry) {
+        logger.debug(`Events sync in backoff until ${new Date(this.backoffStatus.events.nextTry).toISOString()}, skipping`);
+        return;
+      } else {
+        // Reset backoff since we passed the backoff time
+        this.backoffStatus.events.inBackoff = false;
+        logger.debug('Events sync backoff period ended, retrying');
+      }
+    }
+
     try {
-      logger.debug('Syncing events...');
+      logger.debug('Syncing events...', { forceRefresh });
       this.lastSyncTime.events = Date.now();
 
       // Fetch events
-      const eventsResponse = await masjidDisplayClient.getEvents(10);
+      const eventsResponse = await masjidDisplayClient.getEvents(10, forceRefresh);
       if (eventsResponse.success && eventsResponse.data) {
         await storageService.saveEvents(eventsResponse.data.events);
+        logger.debug('Events sync completed successfully');
+      } else {
+        // Don't enter backoff mode if force refresh
+        if (!forceRefresh) {
+          // If server has an error, implement backoff
+          this.backoffStatus.events.inBackoff = true;
+          this.backoffStatus.events.nextTry = Date.now() + (30 * 60 * 1000); // Wait 30 minutes before next try
+          logger.warn('Events sync failed, entering backoff mode', { 
+            error: eventsResponse.error, 
+            backoffUntil: new Date(this.backoffStatus.events.nextTry).toISOString() 
+          });
+        } else {
+          logger.warn('Force events sync failed', { error: eventsResponse.error });
+        }
       }
-
-      logger.debug('Events sync completed successfully');
     } catch (error) {
-      logger.error('Error syncing events', { error });
+      // Don't enter backoff mode if force refresh
+      if (!forceRefresh) {
+        // Error occurred, implement backoff
+        this.backoffStatus.events.inBackoff = true;
+        this.backoffStatus.events.nextTry = Date.now() + (30 * 60 * 1000); // Wait 30 minutes before next try
+        logger.error('Error syncing events, entering backoff mode', { 
+          error, 
+          backoffUntil: new Date(this.backoffStatus.events.nextTry).toISOString() 
+        });
+      } else {
+        logger.error('Error during forced events sync', { error });
+      }
     }
   }
 
   // Heartbeat methods
   private startHeartbeat(): void {
-    if (this.syncIntervals.heartbeat !== null) return;
+    if (this.syncIntervals.heartbeat !== null) {
+      // Don't start again if already running
+      logger.debug('Heartbeat timer already running, skipping');
+      return;
+    }
 
     logger.debug('Starting heartbeat with interval', { 
       interval: `${POLLING_INTERVALS.HEARTBEAT / 1000} seconds` 
     });
     
-    // Schedule periodic heartbeat - don't send immediately as it will be done in syncAllData
+    // Use a more reliable interval mechanism
+    const heartbeatInterval = POLLING_INTERVALS.HEARTBEAT;
+    
+    // Schedule periodic heartbeat
     this.syncIntervals.heartbeat = window.setInterval(() => {
       this.sendHeartbeat();
-    }, POLLING_INTERVALS.HEARTBEAT);
+    }, heartbeatInterval);
   }
 
   private stopHeartbeat(): void {
@@ -352,25 +609,75 @@ class DataSyncService {
   private async sendHeartbeat(): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
 
+    // Apply throttling for heartbeat
+    if (this.shouldThrottleSync('heartbeat')) {
+      logger.debug('Throttling heartbeat - too frequent calls');
+      return;
+    }
+    
+    // Check if we're in backoff mode for heartbeat
+    if (this.backoffStatus.heartbeat.inBackoff) {
+      const now = Date.now();
+      if (now < this.backoffStatus.heartbeat.nextTry) {
+        logger.debug(`Heartbeat in backoff until ${new Date(this.backoffStatus.heartbeat.nextTry).toISOString()}, skipping`);
+        return;
+      } else {
+        // Reset backoff since we passed the backoff time
+        this.backoffStatus.heartbeat.inBackoff = false;
+        logger.debug('Heartbeat backoff period ended, retrying');
+      }
+    }
+    
+    // Record time to prevent too frequent heartbeats
+    const now = Date.now();
+    if (now - this.lastHeartbeatTime < this.MIN_HEARTBEAT_INTERVAL) {
+      logger.debug('Skipping heartbeat - too soon since last heartbeat');
+      return;
+    }
+    
     try {
-      this.lastSyncTime.heartbeat = Date.now();
+      logger.debug('Sending heartbeat...');
+      this.lastHeartbeatTime = now;
+      this.lastSyncTime.heartbeat = now;
       
-      // Calculate uptime in seconds
-      const uptime = Math.floor((Date.now() - this.startTime) / 1000);
+      // Calculate uptime
+      const uptime = Math.floor((now - this.startTime) / 1000);
       
-      // Send heartbeat
-      await masjidDisplayClient.sendHeartbeat({
-        status: 'ONLINE',
+      // Get last error from logger if available
+      const lastError = getLastError() || '';
+      
+      // Prepare heartbeat request according to the API guide
+      const heartbeatRequest = {
+        status: navigator.onLine ? 'ONLINE' as const : 'OFFLINE' as const,
         metrics: {
-          uptime,
+          uptime: uptime,
           memoryUsage: this.getMemoryUsage(),
-          lastError: getLastError() || '',
-        },
-      });
+          lastError: lastError
+        }
+      };
       
-      logger.debug('Heartbeat sent successfully');
+      // Send heartbeat to server
+      const response = await masjidDisplayClient.sendHeartbeat(heartbeatRequest);
+      
+      if (response.success) {
+        logger.debug('Heartbeat sent successfully');
+      } else {
+        // Implement backoff if heartbeat fails
+        this.backoffStatus.heartbeat.inBackoff = true;
+        this.backoffStatus.heartbeat.nextTry = now + (60 * 1000); // Wait 1 minute before next try
+        logger.warn('Heartbeat failed, entering backoff mode', { 
+          error: response.error, 
+          backoffUntil: new Date(this.backoffStatus.heartbeat.nextTry).toISOString() 
+        });
+      }
     } catch (error) {
-      logger.error('Error sending heartbeat', { error });
+      // Implement backoff on error
+      this.backoffStatus.heartbeat.inBackoff = true;
+      this.backoffStatus.heartbeat.nextTry = now + (60 * 1000); // Wait 1 minute before next try
+      logger.error('Error sending heartbeat, entering backoff mode', { 
+        error, 
+        backoffUntil: new Date(this.backoffStatus.heartbeat.nextTry).toISOString() 
+      });
     }
   }
 
@@ -390,4 +697,5 @@ class DataSyncService {
   }
 }
 
-export default new DataSyncService(); 
+const dataSyncService = new DataSyncService();
+export default dataSyncService; 

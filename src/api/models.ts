@@ -14,26 +14,53 @@ export interface PairingRequest {
 
 // Step 1: Request a pairing code
 export interface RequestPairingCodeRequest {
-  deviceType: string;
-  orientation: string;
+  deviceInfo: {
+    deviceId: string;
+    model: string;
+    platform: string;
+  }
 }
 
 export interface RequestPairingCodeResponse {
   pairingCode: string;
   expiresAt: string;
-  checkInterval: number;
 }
 
-// Step 3: Check pairing status
+// Step 2: Check pairing status
 export interface CheckPairingStatusRequest {
   pairingCode: string;
 }
 
 export interface CheckPairingStatusResponse {
-  paired: boolean;
-  apiKey?: string;
+  isPaired?: boolean;   // Keep for backward compatibility
+  paired?: boolean;     // This is what the API actually returns
   screenId?: string;
-  checkAgainIn?: number;
+  apiKey?: string;
+  masjidId?: string;
+}
+
+// Make these more explicit for when we receive `paired: true`
+export interface PairedCheckResponse {
+  paired: boolean;     // API returns this format with explicit paired: true
+  apiKey: string;
+  screenId: string;
+  masjidId: string;
+}
+
+// Step 3: Complete pairing & get credentials
+export interface PairedCredentialsRequest {
+  pairingCode: string;
+  deviceInfo: {
+    deviceId: string;
+    model: string;
+    platform: string;
+  }
+}
+
+export interface PairedCredentialsResponse {
+  apiKey: string;
+  screenId: string;
+  masjidId: string;
 }
 
 export interface PairingResponse {
@@ -55,17 +82,6 @@ export interface HeartbeatRequest {
 
 export interface HeartbeatResponse {
   success: boolean;
-  screen: {
-    id: string;
-    name: string;
-    orientation: 'LANDSCAPE' | 'PORTRAIT';
-    schedule: any; // This will be defined more specifically as needed
-    masjid: {
-      id: string;
-      name: string;
-      timezone: string;
-    };
-  };
 }
 
 // Content Types
@@ -136,11 +152,11 @@ export type PrayerName = 'FAJR' | 'SUNRISE' | 'ZUHR' | 'ASR' | 'MAGHRIB' | 'ISHA
 
 export interface PrayerStatus {
   currentPrayer: PrayerName;
-  currentPrayerTime: string;
-  currentPrayerJamaat: string;
   nextPrayer: PrayerName;
+  currentPrayerTime: string;
+  currentJamaatTime: string;
   nextPrayerTime: string;
-  nextPrayerJamaat: string;
+  nextJamaatTime: string;
   timeUntilNextPrayer: string; // Duration in format HH:MM:SS
   timeUntilNextJamaat: string; // Duration in format HH:MM:SS
 }
