@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PrayerTimes, PrayerStatus } from '../api/models';
 import { useContent } from '../contexts/ContentContext';
+import moment from 'moment';
 import { 
   formatTimeToDisplay, 
   getNextPrayerTime, 
@@ -41,16 +42,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [currentPrayer, setCurrentPrayer] = useState<FormattedPrayerTime | null>(null);
   const [currentDate, setCurrentDate] = useState<string>('');
   const [hijriDate, setHijriDate] = useState<string | null>(null);
-  const [isJumuahToday, setIsJumuahToday] = useState<boolean>(false);
+  const [isJumuahToday, setIsJumuahToday] = useState<boolean>(true);
   const [jumuahTime, setJumuahTime] = useState<string | null>(null);
   const [jumuahDisplayTime, setJumuahDisplayTime] = useState<string | null>(null);
-  const [currentDay, setCurrentDay] = useState<number>(new Date().getDate());
+  const [currentDay, setCurrentDay] = useState<number>(moment().date());
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
 
   // Get and update Hijri date
   const fetchHijriDate = useCallback(async () => {
     try {
-      const response = await fetch(`https://api.aladhan.com/v1/gToH?date=${new Date().toISOString().split('T')[0]}`);
+      console.log('Fetching Hijri date', moment().format('DD-MM-YYYY'));
+      const response = await fetch(`https://api.aladhan.com/v1/gToH?date=${moment().format('YYYY-MM-DD')}`);
       const data = await response.json();
       
       if (data.code === 200 && data.data) {
@@ -64,8 +66,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
   // Force refresh prayer data if needed, especially at midnight
   const checkForDayChange = useCallback(() => {
-    const now = new Date();
-    const newDay = now.getDate();
+    const now = moment();
+    const newDay = now.date();
     
     // If the day has changed, force refresh the prayer data
     if (newDay !== currentDay) {
@@ -86,16 +88,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       
       // Update date information
       setCurrentDate(
-        now.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+        now.format('dddd, MMMM D, YYYY')
       );
       
       // Check if today is Friday (5)
-      setIsJumuahToday(now.getDay() === 5);
+      setIsJumuahToday(now.day() === 5);
       
       // Refresh Hijri date
       fetchHijriDate();
@@ -105,19 +102,14 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Update current date and check for day change
   useEffect(() => {
     try {
-      const date = new Date();
+      const date = moment();
       
       setCurrentDate(
-        date.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+        date.format('dddd, MMMM D, YYYY')
       );
 
       // Check if today is Friday (5)
-      setIsJumuahToday(date.getDay() === 5);
+      setIsJumuahToday(date.day() === 5);
 
       // Initial force refresh on component mount to ensure fresh data
       if (!initialLoadComplete) {
@@ -167,7 +159,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
     
     try {
-      const now = new Date();
+      const now = moment();
       const prayers: FormattedPrayerTime[] = [];
       
       // Check if we need to refresh data (e.g., if day has changed)
@@ -194,7 +186,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           isha: prayerTimes.isha || '',
         };
         
-        const { name } = getNextPrayerTime(now, prayerRecord);
+        const { name } = getNextPrayerTime(now.toDate(), prayerRecord);
         nextPrayerName = name.toUpperCase();
         logger.debug('Calculated next prayer locally', { nextPrayer: nextPrayerName });
       }

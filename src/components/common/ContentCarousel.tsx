@@ -204,9 +204,8 @@ const ContentCarousel: React.FC = () => {
     
     console.log(`Displaying content: ${currentItem?.contentItem?.title} for ${duration} seconds`);
     
-    let fadeOutTimer: number;
-    let nextItemTimer: number;
-    let fadeInTimer: number;
+    // Initially show content
+    setShowContent(true);
     
     // Set timeout for current content duration
     const timer = setTimeout(() => {
@@ -214,47 +213,25 @@ const ContentCarousel: React.FC = () => {
       setShowContent(false);
       
       // After fade out, move to next item
-      fadeOutTimer = window.setTimeout(() => {
+      const fadeOutTimer = window.setTimeout(() => {
         setCurrentItemIndex((prevIndex) => 
           prevIndex === contentItems.length - 1 ? 0 : prevIndex + 1
         );
         
-        // Fade in new content
-        nextItemTimer = window.setTimeout(() => {
+        // Fade in new content after a brief delay
+        const fadeInTimer = window.setTimeout(() => {
           setShowContent(true);
-          
-          fadeInTimer = 0;
-        }, 300);
+        }, 100); // Very small delay to ensure state updates properly
         
-        nextItemTimer = 0;
-      }, 500);
+        return () => clearTimeout(fadeInTimer);
+      }, 400); // Slightly longer fade-out for smoother transitions
       
-      fadeOutTimer = 0;
+      return () => clearTimeout(fadeOutTimer);
     }, duration * 1000);
     
-    // Cleanup all timers on unmount or when dependencies change
-    return () => {
-      clearTimeout(timer);
-      if (fadeOutTimer) clearTimeout(fadeOutTimer);
-      if (nextItemTimer) clearTimeout(nextItemTimer);
-      if (fadeInTimer) clearTimeout(fadeInTimer);
-    };
+    // Cleanup timer on unmount or when dependencies change
+    return () => clearTimeout(timer);
   }, [currentItemIndex, contentItems]);
-  
-  // Memoize the dot indicators - moved outside of the conditional return
-  const renderDotIndicators = useCallback(() => {
-    return contentItems.map((_, index) => (
-      <Box
-        key={index}
-        sx={{
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          bgcolor: index === currentItemIndex ? 'primary.main' : 'grey.300'
-        }}
-      />
-    ));
-  }, [contentItems, currentItemIndex]);
   
   // Render different content based on content type
   const renderContent = () => {
@@ -274,69 +251,94 @@ const ContentCarousel: React.FC = () => {
     try {
       // For EVENT type
       if (contentType === 'EVENT') {
+        let eventText = '';
+        
+        // Parse content based on its format
+        if (typeof content.content === 'string') {
+          eventText = content.content;
+        } else if (content.content?.text) {
+          eventText = content.content.text;
+        } else if (typeof content.content === 'object') {
+          eventText = JSON.stringify(content.content);
+        }
+        
+        // Calculate font size based on content length to prevent overflow
+        const textLength = eventText.length;
+        const dynamicFontSize = textLength > 200 ? 
+          fontSizes.h5 : (textLength > 100 ? fontSizes.h4 : fontSizes.h3);
+        
         return (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'center' }}>
             <Typography 
               sx={{ 
-                fontSize: fontSizes.h4,
+                fontSize: dynamicFontSize,
                 mb: 1,
                 textAlign: 'center',
                 fontWeight: 'medium'
               }}
             >
-              {typeof content.content === 'string' 
-                ? content.content 
-                : content.content?.text || JSON.stringify(content.content)}
+              {eventText}
             </Typography>
             
             <Box 
               sx={{ 
                 display: 'flex', 
-                justifyContent: 'space-between', 
+                justifyContent: 'space-around', 
+                flexWrap: 'wrap',
+                gap: 2,
                 mt: 2,
                 bgcolor: 'background.paper',
                 p: 2,
-                borderRadius: 2
+                borderRadius: 2,
+                mx: 'auto',
+                maxWidth: '90%'
               }}
             >
-              <Box>
-                <Typography 
-                  sx={{ 
-                    fontSize: fontSizes.h6,
-                    fontWeight: 'bold',
-                    color: 'text.secondary'
-                  }}
-                >
-                  Date
-                </Typography>
-                <Typography sx={{ fontSize: fontSizes.h5 }}>
-                  {currentItem.startDate && new Date(currentItem.startDate).toLocaleDateString(undefined, {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography 
-                  sx={{ 
-                    fontSize: fontSizes.h6,
-                    fontWeight: 'bold',
-                    color: 'text.secondary'
-                  }}
-                >
-                  {currentItem.location ? 'Location' : 'Time'}
-                </Typography>
-                <Typography sx={{ fontSize: fontSizes.h5 }}>
-                  {currentItem.location || (
-                    currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                  )}
-                </Typography>
-              </Box>
+              {currentItem.startDate && (
+                <Box>
+                  <Typography 
+                    sx={{ 
+                      fontSize: fontSizes.h6,
+                      fontWeight: 'bold',
+                      color: 'text.secondary',
+                      textAlign: 'center'
+                    }}
+                  >
+                    Date
+                  </Typography>
+                  <Typography sx={{ fontSize: fontSizes.h5, textAlign: 'center' }}>
+                    {new Date(currentItem.startDate).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </Typography>
+                </Box>
+              )}
+              
+              {(currentItem.location || currentItem.startDate) && (
+                <Box>
+                  <Typography 
+                    sx={{ 
+                      fontSize: fontSizes.h6,
+                      fontWeight: 'bold',
+                      color: 'text.secondary',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {currentItem.location ? 'Location' : 'Time'}
+                  </Typography>
+                  <Typography sx={{ fontSize: fontSizes.h5, textAlign: 'center' }}>
+                    {currentItem.location || (
+                      currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    )}
+                  </Typography>
+                </Box>
+              )}
             </Box>
           </Box>
         );
@@ -344,6 +346,21 @@ const ContentCarousel: React.FC = () => {
       
       // For ASMA_AL_HUSNA type
       if (contentType === 'ASMA_AL_HUSNA') {
+        let displayContent = content.content;
+        let nameToDisplay = null;
+        
+        // Handle the structure shown in the screenshot
+        if (displayContent?.nameDetails && Array.isArray(displayContent.nameDetails) && displayContent.nameDetails.length > 0) {
+          // If we have nameDetails array, use that data
+          const nameIndex = 0; // Default to first item, could be made random
+          nameToDisplay = displayContent.nameDetails[nameIndex];
+        } 
+        // Legacy handler for different format
+        else if (Array.isArray(displayContent)) {
+          const randomIndex = Math.floor(Math.random() * displayContent.length);
+          nameToDisplay = displayContent[randomIndex];
+        }
+        
         return (
           <Box sx={{ textAlign: 'center', mt: 2 }}>
             <Typography 
@@ -351,10 +368,11 @@ const ContentCarousel: React.FC = () => {
                 fontSize: fontSizes.h2,
                 mb: 2,
                 textAlign: 'center',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                fontFamily: 'Scheherazade New, Arial'
               }}
             >
-              {content.content?.arabic || ''}
+              {nameToDisplay?.arabic || displayContent?.arabic || ''}
             </Typography>
             <Typography 
               sx={{ 
@@ -364,7 +382,7 @@ const ContentCarousel: React.FC = () => {
                 fontWeight: 'medium'
               }}
             >
-              {content.content?.transliteration || ''}
+              {nameToDisplay?.transliteration || displayContent?.transliteration || ''}
             </Typography>
             <Typography 
               sx={{ 
@@ -372,7 +390,7 @@ const ContentCarousel: React.FC = () => {
                 textAlign: 'center'
               }}
             >
-              {content.content?.meaning || ''}
+              {nameToDisplay?.meaning || displayContent?.meaning || ''}
             </Typography>
           </Box>
         );
@@ -380,34 +398,79 @@ const ContentCarousel: React.FC = () => {
       
       // For VERSE_HADITH type
       if (contentType === 'VERSE_HADITH') {
+        let textContent;
+        let arabicText = '';
+        let englishText = '';
+        let reference = content.content?.reference || content.reference || '';
+        let grade = content.content?.grade || '';
+        
+        // Parse content based on its format
+        if (typeof content.content === 'string') {
+          englishText = content.content;
+        } else if (content.content?.text) {
+          englishText = content.content.text;
+        } else if (content.content?.arabic && content.content?.translation) {
+          arabicText = content.content.arabic;
+          englishText = content.content.translation;
+        } else if (typeof content.content === 'object') {
+          // Handle JSON format
+          try {
+            const contentObj = content.content;
+            arabicText = contentObj.arabicText || contentObj.arabic || '';
+            englishText = contentObj.translation || contentObj.text || JSON.stringify(contentObj);
+            grade = contentObj.grade || grade;
+            reference = contentObj.reference || reference;
+          } catch (e) {
+            console.error('Error parsing VERSE_HADITH content:', e);
+            englishText = JSON.stringify(content.content);
+          }
+        }
+        
+        // Calculate font size based on content length to prevent overflow
+        const arabicFontSize = arabicText.length > 150 ? 
+          fontSizes.h4 : (arabicText.length > 80 ? fontSizes.h3 : fontSizes.h2);
+        
+        const englishFontSize = englishText.length > 300 ? 
+          fontSizes.h5 : (englishText.length > 150 ? fontSizes.h4 : fontSizes.h3);
+        
         return (
           <Box sx={{ textAlign: 'center', mt: 3, mb: 3 }}>
+            {arabicText && (
+              <Typography 
+                sx={{ 
+                  fontSize: arabicFontSize,
+                  mb: 3,
+                  textAlign: 'center',
+                  fontFamily: 'Scheherazade New, Arial',
+                  direction: 'rtl',
+                  lineHeight: 1.8
+                }}
+              >
+                {arabicText}
+              </Typography>
+            )}
+            
             <Typography 
               sx={{ 
-                fontSize: fontSizes.h3,
-                fontStyle: 'italic',
+                fontSize: englishFontSize,
                 lineHeight: 1.5,
                 mb: 4,
-                py: 3,
-                px: 5,
-                borderLeft: '3px solid',
-                borderRight: '3px solid',
-                borderColor: 'primary.light',
-                borderRadius: 1
+                textAlign: 'center'
               }}
             >
-              {typeof content.content === 'string' 
-                ? content.content 
-                : content.content?.text || JSON.stringify(content.content)}
+              {englishText}
             </Typography>
+            
             <Typography 
               sx={{ 
-                fontSize: fontSizes.h5,
+                fontSize: fontSizes.h6,
                 color: 'text.secondary',
-                mt: 2
+                mt: 2,
+                fontStyle: 'italic',
+                textAlign: 'center'
               }}
             >
-              {content.content?.reference || content.reference || ''}
+              {reference}{grade ? ` - ${grade}` : ''}
             </Typography>
           </Box>
         );
@@ -415,18 +478,33 @@ const ContentCarousel: React.FC = () => {
       
       // For ANNOUNCEMENT type
       if (contentType === 'ANNOUNCEMENT') {
+        let announcementText = '';
+        
+        // Parse content based on its format
+        if (typeof content.content === 'string') {
+          announcementText = content.content;
+        } else if (content.content?.text) {
+          announcementText = content.content.text;
+        } else if (typeof content.content === 'object') {
+          announcementText = JSON.stringify(content.content);
+        }
+        
+        // Calculate font size based on content length to prevent overflow
+        const textLength = announcementText.length;
+        const dynamicFontSize = textLength > 300 ? 
+          fontSizes.h5 : (textLength > 150 ? fontSizes.h4 : fontSizes.h3);
+        
         return (
           <Box sx={{ textAlign: 'center', mt: 2 }}>
             <Typography 
               sx={{ 
-                fontSize: fontSizes.h4,
+                fontSize: dynamicFontSize,
                 lineHeight: 1.6,
-                textAlign: 'center'
+                textAlign: 'center',
+                fontWeight: textLength > 150 ? 'normal' : 'bold'
               }}
             >
-              {typeof content.content === 'string' 
-                ? content.content 
-                : content.content?.text || JSON.stringify(content.content)}
+              {announcementText}
             </Typography>
           </Box>
         );
@@ -465,79 +543,110 @@ const ContentCarousel: React.FC = () => {
   }
   
   return (
-    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* Background pattern */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}>
-        <IslamicPatternBackground variant="subtle" opacity={0.15} />
-      </Box>
+    <Box sx={{ 
+      width: '100%', 
+      height: '100%', 
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
       
-      {/* Content Card */}
-      <Fade in={showContent} timeout={800}>
-        <Box
+      {/* Content Card - Not animated, remains static */}
+      <Box
+        sx={{ 
+          width: '85%',
+          height: '85%',
+          maxWidth: screenSize.isLargeScreen ? '1100px' : '900px', 
+          maxHeight: '80vh',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderRadius: 4,
+          p: screenSize.isLargeScreen ? 5 : 4,
+          bgcolor: 'rgba(255, 255, 255, 0.7)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(218, 165, 32, 0.2)',
+          position: 'relative',
+          zIndex: 1,
+          mx: 'auto',
+          my: 'auto' // Add vertical margin auto to center
+        }}
+      >
+        <Box 
           sx={{ 
-            width: '95%',
-            maxWidth: screenSize.isLargeScreen ? '1100px' : '900px', 
-            maxHeight: '80vh',
-            overflow: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            borderRadius: 4,
-            p: screenSize.isLargeScreen ? 5 : 4,
-            bgcolor: 'rgba(255, 255, 255, 0.95)',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-            border: '1px solid rgba(218, 165, 32, 0.2)',
-            position: 'relative',
-            zIndex: 1,
-            mx: 'auto',
+            gap: 3,
+            width: '100%',
+            justifyContent: 'center',
+            flex: 1
           }}
         >
-          <Box 
-            sx={{ 
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3,
-              width: '100%'
-            }}
-          >
-            {/* Content Header */}
-            <Box
-              sx={{
-                borderBottom: '3px solid',
-                borderColor: 'primary.main',
-                pb: 2,
-                mb: 1
+          {/* Content based on type - Only this part is animated */}
+          <Box sx={{ 
+            flex: 1, 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            width: '100%',
+            minHeight: '300px', // Taller min-height to ensure content fits
+            position: 'relative' // Position relative for absolute positioning of Fade component
+          }}>
+            <Fade 
+              in={showContent} 
+              timeout={{ enter: 800, exit: 400 }}
+              style={{ 
+                position: 'absolute', // Position absolute to prevent layout shifts
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
-              <Typography 
-                sx={{ 
-                  fontWeight: 'bold',
-                  fontSize: fontSizes.h2,
-                  textAlign: 'center',
-                  color: 'primary.main'
-                }}
-              >
-                {contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
-              </Typography>
-            </Box>
-            
-            {/* Content based on type */}
-            {renderContent()}
-          </Box>
-          
-          {/* Progress indicator */}
-          <Box 
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 1,
-              mt: 'auto',
-              pt: 3
-            }}
-          >
-            {renderDotIndicators()}
+              <Box sx={{ 
+                width: '100%',
+                height: '100%',
+                padding: 2,
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center',
+                overflow: 'visible' // Allow content to be visible
+              }}>
+                {/* Move Content Header inside the Fade component */}
+                <Box
+                  sx={{
+                    borderBottom: '3px solid',
+                    borderColor: 'primary.main',
+                    pb: 2,
+                    mb: 3,
+                    width: '100%'
+                  }}
+                >
+                  <Typography 
+                    sx={{ 
+                      fontWeight: 'bold',
+                      fontSize: fontSizes.h2,
+                      textAlign: 'center',
+                      color: 'primary.main'
+                    }}
+                  >
+                    {contentItems[currentItemIndex]?.contentItem?.type === 'ASMA_AL_HUSNA' 
+                      ? 'Asma ul Husna' 
+                      : contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
+                  </Typography>
+                </Box>
+                
+                {renderContent()}
+              </Box>
+            </Fade>
           </Box>
         </Box>
-      </Fade>
+      </Box>
     </Box>
   );
 };
