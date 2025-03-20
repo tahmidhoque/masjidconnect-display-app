@@ -22,7 +22,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
   const { isInitializing, initializationStage } = useAppInitialization();
-  const { orientation } = useOrientation();
+  const { orientation, setAdminOrientation } = useOrientation();
   const { masjidName, screenContent } = useContent();
   const [rotationAngle, setRotationAngle] = useState(0);
   const [showContent, setShowContent] = useState(false);
@@ -158,6 +158,21 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     
     return () => clearTimeout(forceTransitionTimer);
   }, [isAuthenticated, triggerTransition]);
+
+  // Update orientation from screen content when it changes
+  useEffect(() => {
+    // Check for orientation in both the new data structure and legacy location
+    if (screenContent?.data && 'screen' in screenContent.data && 
+        screenContent.data.screen && 'orientation' in screenContent.data.screen) {
+      // Use orientation from the new data structure  
+      setAdminOrientation(screenContent.data.screen.orientation);
+      console.log("LoadingScreen: Setting orientation from screenContent data:", screenContent.data.screen.orientation);
+    } else if (screenContent?.screen?.orientation) {
+      // Fallback to legacy location
+      setAdminOrientation(screenContent.screen.orientation);
+      console.log("LoadingScreen: Setting orientation from legacy screenContent:", screenContent.screen.orientation);
+    }
+  }, [screenContent, setAdminOrientation]);
 
   // Get display message based on loading stage and authentication status
   const getDisplayMessage = () => {

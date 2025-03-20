@@ -17,6 +17,11 @@ import {
   PairedCredentialsResponse
 } from './models';
 import logger, { setLastError } from '../utils/logger';
+import { createErrorResponse, normalizeApiResponse, validateApiResponse } from '../utils/apiErrorHandler';
+
+// CORS proxy configuration for development
+const USE_CORS_PROXY = process.env.REACT_APP_USE_CORS_PROXY === 'true';
+const CORS_PROXY_URL = process.env.REACT_APP_CORS_PROXY_URL || 'https://cors-anywhere.herokuapp.com/';
 
 // Cache expiration times (in milliseconds)
 const CACHE_EXPIRATION = {
@@ -92,7 +97,15 @@ class MasjidDisplayClient {
 
   constructor() {
     // Set the baseURL from environment or use default
-    this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    let baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    
+    // Apply CORS proxy in development if enabled
+    if (USE_CORS_PROXY && process.env.NODE_ENV === 'development') {
+      logger.info(`Using CORS proxy: ${CORS_PROXY_URL}${baseURL}`);
+      baseURL = `${CORS_PROXY_URL}${baseURL}`;
+    }
+    
+    this.baseURL = baseURL;
     
     // Log the baseURL for debugging using console directly to avoid circular dependency
     console.log('Initializing MasjidDisplayClient with baseURL:', this.baseURL);
@@ -101,7 +114,11 @@ class MasjidDisplayClient {
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 10000,
-      withCredentials: false // Default to false for all requests
+      withCredentials: false, // Do not send cookies for cross-site requests
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
     });
 
     // Set up request interceptor
@@ -112,10 +129,9 @@ class MasjidDisplayClient {
         config.headers['Authorization'] = `Bearer ${this.credentials.apiKey}`;
         config.headers['X-Screen-ID'] = this.credentials.screenId;
         
-        // Set Content-Type header only for POST/PUT requests
-        if (config.method?.toLowerCase() === 'post' || config.method?.toLowerCase() === 'put') {
-          config.headers['Content-Type'] = 'application/json';
-        }
+        // Always set Content-Type header to ensure consistency
+        config.headers['Content-Type'] = 'application/json';
+        config.headers['Accept'] = 'application/json';
         
         // Log authentication headers for debugging
         logger.debug('Request with auth headers', { 
@@ -192,101 +208,66 @@ class MasjidDisplayClient {
 
   // Handle API errors and implement backoff for specific endpoints
   private handleApiError(error: any): void {
-    if (!error || !error.config) {
-      logger.error('Unknown error without config', { error: error?.message });
-      this.lastError = 'Unknown error';
-      setLastError(this.lastError);
+    // Extract error details
+    const status = error.response?.status;
+    const message = error.message || 'Unknown error';
+    const url = error.config?.url || 'unknown endpoint';
+    const endpoint = url.replace(this.baseURL, '').replace(CORS_PROXY_URL, '');
+    
+    // Check if this is a CORS error
+    const isCorsError = message.includes('CORS') || 
+                        message.includes('NetworkError') ||
+                        message.includes('Network Error') ||
+                        error.name === 'TypeError' && message.includes('Network') ||
+                        !status && !navigator.onLine;
+    
+    if (isCorsError) {
+      logger.error(`CORS error accessing ${url}`, {
+        message,
+        config: error.config,
+        solution: 'Backend needs to enable CORS headers',
+        corsProxyEnabled: USE_CORS_PROXY,
+        baseUrl: this.baseURL,
+        headers: error.config?.headers
+      });
+      
+      // Store the CORS error for UI display
+      setLastError(`CORS policy error: The API server (${this.baseURL}) does not allow requests from this application. Backend CORS configuration needs to be updated.`);
+      
+      // Emit an event for the UI to handle with more details
+      const corsErrorEvent = new CustomEvent('api:corserror', {
+        detail: { 
+          endpoint: endpoint, 
+          message,
+          baseUrl: this.baseURL,
+          fullUrl: url,
+          timestamp: new Date().toISOString()
+        }
+      });
+      window.dispatchEvent(corsErrorEvent);
+      
+      // Try to fall back to cached data
       return;
     }
-
-    const endpoint = error.config.url || 'unknown';
     
-    // Track consecutive failures for this endpoint
-    const backoff = this.endpointBackoffs.get(endpoint) || { 
-      failCount: 0, 
-      nextRetry: 0,
-      inBackoff: false
-    };
-    
-    backoff.failCount++;
-    
-    if (error.response) {
-      const status = error.response.status;
-      
-      // Calculate backoff time based on failure count (exponential backoff)
-      if (status === 429 || status >= 500) {
-        const retryAfter = error.response.headers?.['retry-after'];
-        if (retryAfter) {
-          // Use server's retry-after if available
-          backoff.nextRetry = Date.now() + (parseInt(retryAfter, 10) * 1000);
-        } else {
-          // Calculate exponential backoff
-          const delay = Math.min(
-            ERROR_RETRY.INITIAL_DELAY * Math.pow(2, backoff.failCount - 1),
-            ERROR_RETRY.MAX_DELAY
-          );
-          
-          // Add jitter
-          const jitter = 1 + (Math.random() * ERROR_RETRY.JITTER_FACTOR * 2 - ERROR_RETRY.JITTER_FACTOR);
-          backoff.nextRetry = Date.now() + (delay * jitter);
-        }
-        
-        backoff.inBackoff = true;
-        logger.warn(`Endpoint ${endpoint} in backoff until ${new Date(backoff.nextRetry).toISOString()}`, { 
-          status, 
-          failCount: backoff.failCount 
-        });
-      }
-      
-      // Handle specific status codes
-      switch (status) {
-        case 401:
-          logger.error('Authentication error. Need to re-authenticate.', { status });
-          this.clearCredentials();
-          break;
-        case 429:
-          logger.warn('Rate limit exceeded. Implementing backoff.', { status, nextRetry: backoff.nextRetry });
-          break;
-        default:
-          logger.error(`API error: ${status}`, { status, data: error.response.data });
-      }
-      
-      // Store last error for heartbeat
-      this.lastError = `API error ${status}: ${error.response.data?.message || 'Unknown error'}`;
-      setLastError(this.lastError);
-    } else if (error.request) {
-      // Network or timeout error
-      backoff.failCount = Math.min(backoff.failCount, ERROR_RETRY.MAX_RETRIES); // Cap at max retries
-      const delay = Math.min(
-        ERROR_RETRY.INITIAL_DELAY * Math.pow(2, backoff.failCount - 1),
-        ERROR_RETRY.MAX_DELAY
-      );
-      backoff.nextRetry = Date.now() + delay;
-      backoff.inBackoff = true;
-      
-      logger.error('No response received', { 
-        request: error.request,
-        failCount: backoff.failCount,
-        nextRetry: new Date(backoff.nextRetry).toISOString()
+    // Handle other types of errors
+    if (status === 401) {
+      logger.warn(`Authentication error: ${message}`);
+      // Dispatch auth error event
+      const authErrorEvent = new CustomEvent('api:autherror', { 
+        detail: { status, message } 
       });
-      this.lastError = 'Network error: No response received';
-      setLastError(this.lastError);
+      window.dispatchEvent(authErrorEvent);
+    } else if (status === 404) {
+      logger.warn(`Resource not found: ${url}`);
+    } else if (status >= 500) {
+      logger.error(`Server error (${status}): ${message}`);
     } else {
-      logger.error('Request setup error', { message: error.message });
-      this.lastError = `Request error: ${error.message}`;
-      setLastError(this.lastError);
+      logger.error(`API error: ${message}`, { status, url });
     }
     
-    // Update the backoff for this endpoint
-    this.endpointBackoffs.set(endpoint, backoff);
-    
-    // Reset backoff if we hit the max retries
-    if (backoff.failCount > ERROR_RETRY.MAX_RETRIES) {
-      logger.warn(`Max retries reached for ${endpoint}, resetting backoff but will use longer intervals`);
-      backoff.failCount = ERROR_RETRY.MAX_RETRIES; // Keep at max for longer delays
-      backoff.inBackoff = false; // Allow requests but they'll still use longer delays
-      this.endpointBackoffs.set(endpoint, backoff);
-    }
+    // Store the most recent error
+    setLastError(`${message} (${status || 'network error'})`);
   }
 
   // Check if an endpoint is in backoff
@@ -436,80 +417,89 @@ class MasjidDisplayClient {
     options: AxiosRequestConfig = {}, 
     cacheTime: number = 0
   ): Promise<ApiResponse<T>> {
-    const cacheKey = `${endpoint}-${JSON.stringify(options)}`;
+    const cacheKey = `${endpoint}:${JSON.stringify(options)}`;
+    const now = Date.now();
     
-    // Skip cache if cacheTime is 0 (force refresh)
-    if (cacheTime <= 0) {
-      if (!shouldDebounceLog(`skip-cache-${endpoint}`)) {
-        logger.debug(`Skipping cache for ${endpoint} (forced refresh)`);
-      }
-      return this.fetchWithRetry<T>(endpoint, options);
+    // Check if we have a valid cache entry
+    const cachedItem = this.cache.get(cacheKey);
+    const isExpired = !cachedItem || (now > cachedItem.expiry);
+    
+    // If offline, always use cache regardless of expiration
+    if (!navigator.onLine && cachedItem) {
+      logger.info(`Using cached data for ${endpoint} because device is offline`, {
+        cached: true,
+        expired: isExpired,
+        offlineMode: true
+      });
+      return normalizeApiResponse({
+        data: cachedItem.data,
+        success: true,
+        cached: true,
+        offlineFallback: true
+      });
     }
-    
-    // Check if a request to this endpoint is already in progress
-    if (this.isLoading.get(endpoint)) {
-      if (!shouldDebounceLog(`loading-${endpoint}`)) {
-        logger.debug(`Request to ${endpoint} already in progress, using cache if available`);
-      }
-      
-      // Return cached data if available
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return cached.data;
-      }
-      
-      // Wait for a brief moment and then retry
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return this.fetchWithCache<T>(endpoint, options, cacheTime);
-    }
-    
-    // Check if endpoint is in backoff
-    if (this.isInBackoff(endpoint)) {
-      logger.warn(`Endpoint ${endpoint} is in backoff, using cache instead`);
-      
-      // Return cached data if available
-      const cached = this.cache.get(cacheKey);
-      if (cached) {
-        return cached.data;
-      }
-      
-      return {
-        success: false,
-        error: 'Service temporarily unavailable, in backoff mode'
-      };
-    }
-    
-    // Return cached data if valid and available
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiry > Date.now()) {
-      if (!shouldDebounceLog(`use-cache-${endpoint}`)) {
-        logger.debug(`Using cached data for ${endpoint}`);
-      }
-      return cached.data;
-    }
-    
-    // If offline, return expired cache as fallback if available
-    if (!this.online) {
-      if (cached) {
-        logger.info(`Offline: Using expired cache for ${endpoint}`);
-        return cached.data;
-      }
-      
-      // Queue the request for when we're back online
-      return new Promise((resolve, reject) => {
-        this.requestQueue.push(async () => {
-          try {
-            const result = await this.fetchWithCache<T>(endpoint, options, cacheTime);
-            resolve(result);
-          } catch (error) {
-            reject(error);
-          }
-        });
+
+    // If we have a non-expired cache entry, use it
+    if (cachedItem && !isExpired) {
+      logger.debug(`Using cached data for ${endpoint}`, { 
+        cached: true, 
+        expiry: new Date(cachedItem.expiry).toISOString(),
+        timeLeft: Math.floor((cachedItem.expiry - now) / 1000) + 's'
+      });
+      return normalizeApiResponse({
+        data: cachedItem.data,
+        success: true,
+        cached: true
       });
     }
     
-    // Fetch with retry
-    return this.fetchWithRetry<T>(endpoint, options, cacheTime);
+    // Otherwise, fetch from network
+    try {
+      // Mark this endpoint as loading
+      this.isLoading.set(endpoint, true);
+      
+      const response = await this.fetchWithRetry<T>(endpoint, options, cacheTime);
+      
+      // If success, update cache
+      if (response.success && response.data) {
+        this.cache.set(cacheKey, {
+          data: response.data,
+          expiry: now + cacheTime
+        });
+        
+        // Reset backoff for this endpoint
+        this.resetBackoff(endpoint);
+      }
+      
+      return validateApiResponse(response);
+    } catch (error: any) {
+      // Handle error
+      const errorMessage = `Failed to fetch ${endpoint}: ${error.message || 'Unknown error'}`;
+      logger.error(errorMessage, { error });
+      
+      // If we have a cached item, return it even if expired as a fallback
+      if (cachedItem) {
+        logger.info(`Falling back to cached data for ${endpoint} due to fetch error`, {
+          cached: true,
+          expired: isExpired,
+          error: error.message || 'Unknown error'
+        });
+        
+        return normalizeApiResponse({
+          data: cachedItem.data,
+          success: true,
+          cached: true,
+          offlineFallback: true
+        });
+      }
+      
+      // No cached data available, return error
+      setLastError(errorMessage);
+      return createErrorResponse(errorMessage);
+    } finally {
+      // Mark this endpoint as no longer loading
+      this.isLoading.set(endpoint, false);
+    }
   }
   
   // Fetch with exponential backoff retry
@@ -549,10 +539,10 @@ class MasjidDisplayClient {
         });
       }
       
-      const result: ApiResponse<T> = {
+      const result: ApiResponse<T> = normalizeApiResponse({
         success: true,
         data: response.data,
-      };
+      });
       
       // Cache the response if cacheTime > 0
       if (cacheTime > 0) {
@@ -597,11 +587,7 @@ class MasjidDisplayClient {
           // clear credentials as they appear to be invalid
           await this.clearCredentials();
           
-          return {
-            success: false,
-            error: 'Authentication failed. Please re-authenticate.',
-            status: 401
-          };
+          return createErrorResponse('Authentication failed. Please re-authenticate.');
         }
       }
       
@@ -616,18 +602,10 @@ class MasjidDisplayClient {
         
         // If this is a network error and we're offline, return a more specific error
         if (!navigator.onLine) {
-          return {
-            success: false,
-            error: 'Device is offline. Please check your internet connection.',
-            status: 0
-          };
+          return createErrorResponse('Device is offline. Please check your internet connection.');
         }
         
-        return {
-          success: false,
-          error: error.message || 'Unknown error',
-          status: error.response?.status
-        };
+        return createErrorResponse(error.message || 'Unknown error');
       }
       
       // If rate limited (429) or server error (5xx), retry with backoff
@@ -655,11 +633,7 @@ class MasjidDisplayClient {
         return cached.data;
       }
       
-      return {
-        success: false,
-        error: error.message || 'Unknown error',
-        status: error.response?.status
-      };
+      return createErrorResponse(error.message || 'Unknown error');
     }
   }
 
@@ -668,7 +642,7 @@ class MasjidDisplayClient {
     // Check if we're authenticated
     if (!this.isAuthenticated()) {
       logger.warn('sendHeartbeat called without authentication');
-      return { success: false, error: 'Not authenticated' };
+      return createErrorResponse('Not authenticated');
     }
 
     try {
@@ -687,99 +661,210 @@ class MasjidDisplayClient {
       };
 
       const result = await this.fetchWithRetry<HeartbeatResponse>(endpoint, options);
-      return result;
+      return validateApiResponse(result);
     } catch (error) {
       logger.error('Error sending heartbeat', { error });
-      return { success: false, error: 'Failed to send heartbeat' };
+      return createErrorResponse('Failed to send heartbeat');
     }
   }
 
   // Get screen content
   public async getScreenContent(forceRefresh: boolean = false): Promise<ApiResponse<ScreenContent>> {
-    if (!this.isAuthenticated()) {
-      logger.warn('getScreenContent called without authentication');
-      return { success: false, error: 'Not authenticated' };
+    // If offline and no force refresh, first try to get from storage
+    if (!navigator.onLine && !forceRefresh) {
+      try {
+        const storedContent = await localforage.getItem<ScreenContent>('screenContent');
+        if (storedContent) {
+          logger.info('Using stored screen content from localforage while offline');
+          return normalizeApiResponse({
+            data: storedContent,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          });
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored screen content', { error });
+      }
     }
-
+    
+    // Either online or no stored content found
     try {
-      // Use the correct endpoint from the integration guide
-      const endpoint = `/api/screen/content?screenId=${this.credentials!.screenId}`;
-      
-      return this.fetchWithCache<ScreenContent>(
-        endpoint, 
-        {}, 
-        forceRefresh ? 0 : CACHE_EXPIRATION.CONTENT
+      const result = await this.fetchWithCache<ScreenContent>(
+        '/api/screens/content',
+        { method: 'GET' },
+        CACHE_EXPIRATION.CONTENT
       );
+      
+      // If successful, store in localforage for offline use
+      if (result.success && result.data) {
+        try {
+          await localforage.setItem('screenContent', result.data);
+          logger.debug('Stored screen content in localforage for offline use');
+        } catch (error) {
+          logger.error('Failed to store screen content in localforage', { error });
+        }
+      }
+      
+      return validateApiResponse(result);
     } catch (error) {
       logger.error('Error fetching screen content', { error });
-      return { success: false, error: 'Failed to fetch screen content' };
+      return createErrorResponse('Failed to fetch screen content');
     }
   }
 
   // Get prayer times
   public async getPrayerTimes(startDate?: string, endDate?: string, forceRefresh: boolean = false): Promise<ApiResponse<PrayerTimes[]>> {
-    if (!this.isAuthenticated()) {
-      logger.warn('getPrayerTimes called without authentication');
-      return { success: false, error: 'Not authenticated' };
+    // If offline and no force refresh, first try to get from storage
+    if (!navigator.onLine && !forceRefresh) {
+      try {
+        const storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        if (storedTimes) {
+          logger.info('Using stored prayer times from localforage while offline');
+          return {
+            data: storedTimes,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored prayer times', { error });
+      }
     }
-
-    try {
-      // Use the correct endpoint from the integration guide
-      const endpoint = `/api/screen/prayer-times?screenId=${this.credentials!.screenId}`;
-      
-      return this.fetchWithCache<PrayerTimes[]>(
-        endpoint, 
-        {}, 
-        forceRefresh ? 0 : CACHE_EXPIRATION.PRAYER_TIMES
-      );
-    } catch (error) {
-      logger.error('Error fetching prayer times', { error });
-      return { success: false, error: 'Failed to fetch prayer times' };
+    
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    
+    // Either online or no stored times found
+    const result = await this.fetchWithCache<PrayerTimes[]>(
+      `/api/prayer-times?${params.toString()}`,
+      { method: 'GET' },
+      CACHE_EXPIRATION.PRAYER_TIMES
+    );
+    
+    // If successful, store in localforage for offline use
+    if (result.success && result.data) {
+      try {
+        await localforage.setItem('prayerTimes', result.data);
+        logger.debug('Stored prayer times in localforage for offline use');
+      } catch (error) {
+        logger.error('Failed to store prayer times in localforage', { error });
+      }
     }
+    
+    return result;
   }
 
   // Get prayer status
   public async getPrayerStatus(forceRefresh: boolean = false): Promise<ApiResponse<PrayerStatus>> {
-    if (!this.isAuthenticated()) {
-      logger.warn('getPrayerStatus called without authentication');
-      return { success: false, error: 'Not authenticated' };
+    // If offline and no force refresh, first try to get from storage
+    if (!navigator.onLine && !forceRefresh) {
+      try {
+        const storedStatus = await localforage.getItem<PrayerStatus>('prayerStatus');
+        if (storedStatus) {
+          // If offline, calculate current prayer status from stored data
+          const calculatedStatus = this.calculateCurrentPrayerStatus(storedStatus);
+          logger.info('Using calculated prayer status from stored data while offline');
+          return {
+            data: calculatedStatus,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored prayer status', { error });
+      }
     }
-
-    try {
-      // Use the correct endpoint from the integration guide
-      const endpoint = `/api/screen/prayer-status?screenId=${this.credentials!.screenId}`;
+    
+    // Either online or no stored status found
+    const result = await this.fetchWithCache<PrayerStatus>(
+      '/api/prayer-status',
+      { method: 'GET' },
+      CACHE_EXPIRATION.PRAYER_STATUS
+    );
+    
+    // If successful, store in localforage for offline use
+    if (result.success && result.data) {
+      try {
+        await localforage.setItem('prayerStatus', result.data);
+        logger.debug('Stored prayer status in localforage for offline use');
+      } catch (error) {
+        logger.error('Failed to store prayer status in localforage', { error });
+      }
+    }
+    
+    return result;
+  }
+  
+  // Calculate current prayer status from stored data when offline
+  private calculateCurrentPrayerStatus(storedStatus: PrayerStatus): PrayerStatus {
+    // Create a new object so we don't modify the stored one
+    const calculatedStatus = { ...storedStatus };
+    
+    // Update the timestamp to current time
+    calculatedStatus.timestamp = new Date().toISOString();
+    
+    // Check if we need to update the current prayer based on time
+    if (calculatedStatus.nextPrayer) {
+      const now = new Date();
+      const nextPrayerTime = new Date(calculatedStatus.nextPrayer.time);
       
-      return this.fetchWithCache<PrayerStatus>(
-        endpoint, 
-        {}, 
-        forceRefresh ? 0 : CACHE_EXPIRATION.PRAYER_STATUS
-      );
-    } catch (error) {
-      logger.error('Error fetching prayer status', { error });
-      return { success: false, error: 'Failed to fetch prayer status' };
+      // If next prayer time has passed, we need to update the status
+      if (now > nextPrayerTime) {
+        // Logic to update to next prayer (simplified)
+        // In a real implementation, this would be more sophisticated
+        // using the full prayer times for the day
+        calculatedStatus.currentPrayer = calculatedStatus.nextPrayer;
+        calculatedStatus.nextPrayer = null; // Would need actual next prayer
+        calculatedStatus.isAfterIsha = calculatedStatus.currentPrayer.name === 'ISHA';
+      }
     }
+    
+    return calculatedStatus;
   }
 
   // Get events
   public async getEvents(count: number = 5, forceRefresh: boolean = false): Promise<ApiResponse<EventsResponse>> {
-    if (!this.isAuthenticated()) {
-      logger.warn('getEvents called without authentication');
-      return { success: false, error: 'Not authenticated' };
+    // If offline and no force refresh, first try to get from storage
+    if (!navigator.onLine && !forceRefresh) {
+      try {
+        const storedEvents = await localforage.getItem<EventsResponse>('events');
+        if (storedEvents) {
+          logger.info('Using stored events from localforage while offline');
+          return {
+            data: storedEvents,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored events', { error });
+      }
     }
-
-    try {
-      // Use the correct endpoint from the integration guide
-      const endpoint = `/api/screen/events?screenId=${this.credentials!.screenId}`;
-      
-      return this.fetchWithCache<EventsResponse>(
-        endpoint, 
-        {}, 
-        forceRefresh ? 0 : CACHE_EXPIRATION.EVENTS
-      );
-    } catch (error) {
-      logger.error('Error fetching events', { error });
-      return { success: false, error: 'Failed to fetch events' };
+    
+    // Either online or no stored events found
+    const result = await this.fetchWithCache<EventsResponse>(
+      `/api/events?count=${count}`,
+      { method: 'GET' },
+      CACHE_EXPIRATION.EVENTS
+    );
+    
+    // If successful, store in localforage for offline use
+    if (result.success && result.data) {
+      try {
+        await localforage.setItem('events', result.data);
+        logger.debug('Stored events in localforage for offline use');
+      } catch (error) {
+        logger.error('Failed to store events in localforage', { error });
+      }
     }
+    
+    return result;
   }
 
   // Request a pairing code
@@ -803,10 +888,10 @@ class MasjidDisplayClient {
       };
 
       const result = await this.fetchWithRetry<RequestPairingCodeResponse>(endpoint, options);
-      return result;
+      return validateApiResponse(result);
     } catch (error) {
       logger.error('Error requesting pairing code', { error });
-      return { success: false, error: 'Failed to request pairing code' };
+      return createErrorResponse('Failed to request pairing code');
     }
   }
 

@@ -26,6 +26,11 @@ const LandscapeDisplay: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showMobileSilenceReminder, setShowMobileSilenceReminder] = useState(false);
 
+  // Log masjid name for debugging
+  useEffect(() => {
+    console.log("LandscapeDisplay: Masjid name =", masjidName);
+  }, [masjidName]);
+
   // Update current time every second
   useEffect(() => {
     const timer = setInterval(() => {

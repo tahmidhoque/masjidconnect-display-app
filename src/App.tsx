@@ -6,10 +6,14 @@ import { SnackbarProvider } from 'notistack';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { OrientationProvider } from './contexts/OrientationContext';
 import { ContentProvider } from './contexts/ContentContext';
+import { OfflineProvider } from './contexts/OfflineContext';
 import DisplayScreen from './components/screens/DisplayScreen';
 import PairingScreen from './components/screens/PairingScreen';
 import LoadingScreen from './components/screens/LoadingScreen';
 import AuthErrorDetector from './components/common/AuthErrorDetector';
+import OfflineNotification from './components/OfflineNotification';
+import ApiErrorBoundary from './components/common/ApiErrorBoundary';
+import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
 
@@ -109,20 +113,27 @@ const AppContent: React.FC = () => {
  */
 const App: React.FC = () => {
   return (
-    <Router>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <SnackbarProvider maxSnack={3}>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <SnackbarProvider maxSnack={3}>
+        <Router>
           <AuthProvider>
             <OrientationProvider>
-              <ContentProvider>
-                <AppContent />
-              </ContentProvider>
+              <OfflineProvider>
+                <ContentProvider>
+                  <ApiErrorBoundary>
+                    <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
+                    <CorsErrorNotification />
+                    <AuthErrorDetector />
+                    <AppContent />
+                  </ApiErrorBoundary>
+                </ContentProvider>
+              </OfflineProvider>
             </OrientationProvider>
           </AuthProvider>
-        </SnackbarProvider>
-      </ThemeProvider>
-    </Router>
+        </Router>
+      </SnackbarProvider>
+    </ThemeProvider>
   );
 };
 

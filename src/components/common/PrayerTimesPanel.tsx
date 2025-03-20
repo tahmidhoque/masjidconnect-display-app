@@ -26,19 +26,24 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     isJumuahToday,
     jumuahDisplayTime,
   } = usePrayerTimes();
-  
+
+
+  console.log("PrayerTimesPanel", todaysPrayerTimes,
+    nextPrayer,
+    isJumuahToday,
+    jumuahDisplayTime)
   const { fontSizes, screenSize } = useResponsiveFontSize();
 
   const isLandscape = variant === 'landscape';
 
-  // Keyframes for smooth animation
+  // Keyframes for smooth animation - less aggressive
   const pulseKeyframes = `
     @keyframes pulseShadow {
       0% {
         box-shadow: 0 0 10px rgba(33, 140, 116, 0.4);
       }
       50% {
-        box-shadow: 0 0 20px rgba(33, 140, 116, 0.7);
+        box-shadow: 0 0 15px rgba(33, 140, 116, 0.6);
       }
       100% {
         box-shadow: 0 0 10px rgba(33, 140, 116, 0.4);
@@ -50,7 +55,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         transform: scale(1.01);
       }
       50% {
-        transform: scale(1.025);
+        transform: scale(1.05);
       }
       100% {
         transform: scale(1.01);
@@ -59,13 +64,76 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     
     @keyframes pulseGlow {
       0% {
-        border-color: rgba(46, 204, 113, 0.6);
+        border-color: rgba(46, 204, 113, 0.7);
+        box-shadow: 0 0 8px rgba(46, 204, 113, 0.5), 0 0 15px rgba(46, 204, 113, 0.3);
       }
       50% {
-        border-color: rgba(46, 204, 113, 0.9);
+        border-color: rgba(46, 204, 113, 1);
+        box-shadow: 0 0 15px rgba(46, 204, 113, 0.8), 0 0 25px rgba(46, 204, 113, 0.5);
       }
       100% {
-        border-color: rgba(46, 204, 113, 0.6);
+        border-color: rgba(46, 204, 113, 0.7);
+        box-shadow: 0 0 8px rgba(46, 204, 113, 0.5), 0 0 15px rgba(46, 204, 113, 0.3);
+      }
+    }
+    
+    @keyframes currentPrayerGlow {
+      0% {
+        border-color: rgba(20, 66, 114, 0.6);
+      }
+      50% {
+        border-color: rgba(20, 66, 114, 0.9);
+      }
+      100% {
+        border-color: rgba(20, 66, 114, 0.6);
+      }
+    }
+    
+    @keyframes pulseBackground {
+      0% {
+        background-color: rgba(33, 140, 116, 0.8);
+      }
+      50% {
+        background-color: rgba(46, 204, 113, 0.9);
+      }
+      100% {
+        background-color: rgba(33, 140, 116, 0.8);
+      }
+    }
+    
+    @keyframes nextPrayerShine {
+      0% {
+        background-position: -100% 0;
+      }
+      100% {
+        background-position: 200% 0;
+      }
+    }
+    
+    @keyframes headerGlow {
+      0% {
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+      50% {
+        text-shadow: 0 1px 12px rgba(241, 196, 15, 0.7), 0 0 20px rgba(241, 196, 15, 0.4);
+      }
+      100% {
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+    }
+    
+    @keyframes headerBorderGlow {
+      0% {
+        border-image: linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      }
+      50% {
+        border-image: linear-gradient(90deg, #F1C40F 0%, #FFD700 100%) 1;
+        box-shadow: 0 4px 20px rgba(241, 196, 15, 0.3), 0 8px 25px rgba(0,0,0,0.2);
+      }
+      100% {
+        border-image: linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       }
     }
   `;
@@ -82,31 +150,48 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           sx={{ 
             background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
             color: 'white',
-            py: 2,
-            px: 2.5,
+            py: 2.5,
+            px: 3,
             textAlign: 'center',
-            borderBottom: '2px solid',
+            borderBottom: '3px solid',
             borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
             position: 'relative',
             zIndex: 1,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            animation: 'headerBorderGlow 2.5s infinite ease-in-out',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '200%',
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
+              animation: 'nextPrayerShine 3s infinite linear',
+              zIndex: 0
+            }
           }}
         >
           <Typography sx={{ 
-            fontSize: fontSizes.h5,
+            fontSize: fontSizes.h4,
             fontFamily: "'Poppins', sans-serif",
-            fontWeight: 600,
+            fontWeight: 700,
             mb: 1,
             color: '#F1C40F',
-            textShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
             letterSpacing: '0.5px',
+            // animation: 'headerGlow 2.5s infinite ease-in-out',
+            position: 'relative',
+            zIndex: 1
           }}>
             Next Prayer: <strong>{nextPrayer.name}</strong>
           </Typography>
           <PrayerCountdown 
             prayerName={nextPrayer.name}
             prayerTime={nextPrayer.time}
+            timeUntilNextPrayer={nextPrayer.timeUntil}
             onCountdownComplete={onCountdownComplete}
+            key={`${nextPrayer.name}-${nextPrayer.time}`}
           />
           {nextPrayer.displayJamaat && (
             <Typography sx={{ 
@@ -250,193 +335,265 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             gap: 1.5,
           }}
         >
-          {todaysPrayerTimes.map((prayer, index) => (
-            <Box
-              key={prayer.name}
-              sx={{ 
-                p: isLandscape ? 1.25 : 1.1, 
-                borderRadius: 1.5,
-                background: 'transparent',
-                color: (prayer.isNext || prayer.isCurrent) ? 'white' : 'text.primary',
-                boxShadow: prayer.isNext 
-                  ? 'none' // Remove direct shadow, will be applied via animation
-                  : prayer.isCurrent
-                    ? '0 3px 8px rgba(10, 38, 71, 0.15)'
-                    : index % 2 === 0 ? 'rgba(0, 0, 0, 0.02) 0px 1px 3px 0px' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                transition: 'all 0.3s ease-in-out',
-                animation: prayer.isNext 
-                  ? 'pulseShadow 3s infinite ease-in-out, pulseScale 3s infinite ease-in-out, pulseGlow 3s infinite ease-in-out' 
-                  : 'none',
-                border: prayer.isNext 
-                  ? '2px solid rgba(46, 204, 113, 0.8)' 
-                  : prayer.isCurrent 
-                    ? '1px solid rgba(33, 150, 243, 0.5)' 
-                    : '1px solid rgba(0, 0, 0, 0.03)',
-                height: isLandscape ? '70px' : '60px',
-                minHeight: isLandscape ? '70px' : '60px',
-                position: 'relative',
-                overflow: 'hidden',
-                mx: prayer.isNext ? 0.5 : 0,
-                backgroundColor: !prayer.isNext && !prayer.isCurrent 
-                  ? (index % 2 === 0 ? 'rgba(250, 250, 250, 0.9)' : 'rgba(255, 255, 255, 0.9)')
-                  : 'transparent',
-              }}
-            >
-              {(prayer.isCurrent || prayer.isNext) && (
-                <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-                  <IslamicPatternBackground 
-                    variant={prayer.isNext ? "dark" : "default"}
-                  >
-                    <Box sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      background: prayer.isCurrent 
-                        ? 'linear-gradient(90deg, #144272 0%, #0A2647 100%)' 
-                        : 'linear-gradient(90deg, #218c74 0%, #1e8c68 100%)',
-                      opacity: 0.85,
-                      zIndex: -1
-                    }} />
-                  </IslamicPatternBackground>
-                </Box>
-              )}
-              
-              {isLandscape ? (
-                <>
-                  {/* Time - Landscape */}
-                  <Typography 
+          {todaysPrayerTimes.length > 0 ? (
+            todaysPrayerTimes.map((prayer, index) => (
+              <Box
+                key={prayer.name}
+                data-prayer-name={prayer.name}
+                data-prayer-time={prayer.time}
+                data-is-current={prayer.isCurrent}
+                data-is-next={prayer.isNext}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  height: isLandscape ? '60px' : '48px',
+                  pl: isLandscape ? 3 : 1.5,
+                  pr: isLandscape ? 3 : 1.5,
+                  position: 'relative',
+                  borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '0px',
+                  borderBottom: index < todaysPrayerTimes.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+                  border: prayer.isNext 
+                    ? '3px solid rgba(46, 204, 113, 0.9)'
+                    : prayer.isCurrent
+                      ? '2px solid rgba(20, 66, 114, 0.9)'
+                      : 'none',
+                  transition: 'all 0.3s ease',
+                  transform: prayer.isNext 
+                    ? 'scale(1.05)' 
+                    : prayer.isCurrent
+                      ? 'scale(1.01)'
+                      : 'scale(1)',
+                  boxShadow: prayer.isNext 
+                    ? '0 6px 16px rgba(33, 140, 116, 0.4), 0 0 15px rgba(46, 204, 113, 0.4)' 
+                    : prayer.isCurrent
+                      ? '0 2px 8px rgba(20, 66, 114, 0.3)'
+                      : 'none',
+                  overflow: 'hidden',
+                  mx: prayer.isNext ? 1 : 0,
+                  my: prayer.isNext ? 0.9 : 0,
+                  backgroundColor: prayer.isNext 
+                    ? 'rgba(46, 204, 113, 0.8)'
+                    : prayer.isCurrent
+                      ? 'rgba(20, 66, 114, 0.8)'
+                      : index % 2 === 0 
+                        ? 'rgba(246, 248, 250, 0.5)' 
+                        : 'transparent',
+                  zIndex: prayer.isNext || prayer.isCurrent ? 2 : 1,
+                  animation: prayer.isNext 
+                    ? 'pulseBackground 2s infinite ease-in-out, pulseGlow 2s infinite ease-in-out, pulseScale 3s infinite ease-in-out' 
+                    : prayer.isCurrent
+                      ? 'currentPrayerGlow 3s infinite ease-in-out'
+                      : 'none',
+                  '&::before': prayer.isNext ? {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '200%',
+                    height: '100%',
+                    background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
+                    animation: 'nextPrayerShine 2.5s infinite linear',
+                    zIndex: 0
+                  } : {},
+                }}
+              >
+                {(prayer.isCurrent || prayer.isNext) && (
+                  <Box 
                     sx={{ 
-                      fontWeight: 'bold',
-                      fontSize: prayer.isNext ? fontSizes.h4 : fontSizes.h5,
-                      width: '33%',
-                      textAlign: 'left',
-                      pl: 1.5,
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: prayer.isCurrent 
-                        ? '#FFFFFF' 
-                        : prayer.isNext 
-                          ? '#FFFFFF' 
-                          : '#144272',
+                      position: 'absolute', 
+                      top: 0, 
+                      left: 0, 
+                      right: 0, 
+                      bottom: 0, 
+                      zIndex: 0,
+                      overflow: 'hidden',
+                      backgroundColor: prayer.isCurrent 
+                        ? 'rgba(20, 66, 114, 0.95)' 
+                        : 'rgba(46, 204, 113, 0.95)',
                     }}
                   >
-                    {prayer.displayTime}
-                  </Typography>
-                  
-                  {/* Prayer Name - Landscape */}
-                  <Typography 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      fontSize: prayer.isNext ? fontSizes.h4 : fontSizes.h5,
-                      width: '33%',
-                      textAlign: 'center',
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: prayer.isCurrent 
-                        ? '#FFFFFF' 
-                        : prayer.isNext 
+                    <IslamicPatternBackground 
+                      variant="custom"
+                      width="100%"
+                      height="100%"
+                      patternColor={prayer.isCurrent ? '#0A2647' : '#27ae60'}
+                      backgroundColor="transparent"
+                      opacity={prayer.isNext ? 0.4 : 0.3}
+                      patternSize={prayer.isNext ? 70 : 80}
+                      embossStrength={prayer.isNext ? "medium" : "light"}
+                    />
+                  </Box>
+                )}
+                
+                {isLandscape ? (
+                  <>
+                    {/* Time - Landscape */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: prayer.isNext ? fontSizes.h4 : fontSizes.h5,
+                        width: '33%',
+                        textAlign: 'left',
+                        pl: 1.5,
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
                           ? '#FFFFFF' 
-                          : '#0A2647',
-                    }}
-                  >
-                    {prayer.name}
-                  </Typography>
-                  
-                  {/* Jamaat Time - Landscape */}
-                  <Typography 
-                    sx={{ 
-                      fontWeight: prayer.displayJamaat ? 'bold' : 'normal',
-                      fontSize: prayer.displayJamaat 
-                        ? (prayer.isNext ? fontSizes.h4 : fontSizes.h5) 
-                        : fontSizes.body1,
-                      width: '33%',
-                      textAlign: 'right',
-                      pr: 1.5,
-                      fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
-                      opacity: prayer.displayJamaat ? 1 : 0.7,
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: prayer.isCurrent 
-                        ? '#FFFFFF' 
-                        : prayer.isNext 
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#144272',
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                      }}
+                    >
+                      {prayer.displayTime}
+                    </Typography>
+                    
+                    {/* Prayer Name - Landscape */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: prayer.isNext ? fontSizes.h4 : fontSizes.h5,
+                        width: '33%',
+                        textAlign: 'center',
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
                           ? '#FFFFFF' 
-                          : '#144272',
-                    }}
-                  >
-                    {prayer.displayJamaat || 'N/A'}
-                  </Typography>
-                </>
-              ) : (
-                <>
-                  {/* Prayer Name - Portrait */}
-                  <Typography 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      fontSize: fontSizes.body1,
-                      width: '30%',
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: prayer.isCurrent 
-                        ? '#FFFFFF' 
-                        : prayer.isNext 
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#0A2647',
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                      }}
+                    >
+                      {prayer.name}
+                    </Typography>
+                    
+                    {/* Jamaat Time - Landscape */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: prayer.displayJamaat ? 'bold' : 'normal',
+                        fontSize: prayer.displayJamaat 
+                          ? (prayer.isNext ? fontSizes.h4 : fontSizes.h5) 
+                          : fontSizes.body1,
+                        width: '33%',
+                        textAlign: 'right',
+                        pr: 1.5,
+                        fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
+                        opacity: prayer.displayJamaat ? 1 : 0.7,
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
                           ? '#FFFFFF' 
-                          : '#0A2647',
-                      pl: 0.5,
-                    }}
-                  >
-                    {prayer.name}
-                  </Typography>
-                  
-                  {/* Time - Portrait */}
-                  <Typography 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      fontSize: fontSizes.h5,
-                      width: '35%',
-                      textAlign: 'center',
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: prayer.isCurrent 
-                        ? '#FFFFFF' 
-                        : prayer.isNext 
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#144272',
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                      }}
+                    >
+                      {prayer.displayJamaat || 'N/A'}
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    {/* Prayer Name - Portrait */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: fontSizes.body1,
+                        width: '30%',
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
                           ? '#FFFFFF' 
-                          : '#144272',
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {prayer.displayTime}
-                  </Typography>
-                  
-                  {/* Jamaat - Portrait */}
-                  <Typography 
-                    sx={{ 
-                      fontWeight: prayer.displayJamaat ? 'medium' : 'normal',
-                      fontSize: prayer.displayJamaat ? fontSizes.body1 : fontSizes.caption,
-                      width: '35%',
-                      textAlign: 'right',
-                      fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
-                      opacity: prayer.displayJamaat ? 1 : 0.7,
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: prayer.isCurrent 
-                        ? '#FFFFFF' 
-                        : prayer.isNext 
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#0A2647',
+                        pl: 0.5,
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                      }}
+                    >
+                      {prayer.name}
+                    </Typography>
+                    
+                    {/* Time - Portrait */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: fontSizes.h5,
+                        width: '35%',
+                        textAlign: 'center',
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
                           ? '#FFFFFF' 
-                          : '#144272',
-                      pr: 0.5,
-                    }}
-                  >
-                    {prayer.displayJamaat || 'N/A'}
-                  </Typography>
-                </>
-              )}
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#144272',
+                        letterSpacing: 0.5,
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                      }}
+                    >
+                      {prayer.displayTime}
+                    </Typography>
+                    
+                    {/* Jamaat - Portrait */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: prayer.displayJamaat ? 'medium' : 'normal',
+                        fontSize: prayer.displayJamaat ? fontSizes.body1 : fontSizes.caption,
+                        width: '35%',
+                        textAlign: 'right',
+                        fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
+                        opacity: prayer.displayJamaat ? 1 : 0.7,
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
+                          ? '#FFFFFF' 
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#144272',
+                        pr: 0.5,
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                      }}
+                    >
+                      {prayer.displayJamaat || 'N/A'}
+                    </Typography>
+                  </>
+                )}
+              </Box>
+            ))
+          ) : (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              height: '100%',
+              p: 4,
+              textAlign: 'center'
+            }}>
+              <Typography 
+                sx={{ 
+                  fontSize: fontSizes.h4,
+                  fontWeight: 'medium',
+                  color: 'text.secondary',
+                  mb: 2
+                }}
+              >
+                Prayer times not available
+              </Typography>
+              <Typography
+                sx={{ 
+                  fontSize: fontSizes.body1,
+                  color: 'text.secondary',
+                }}
+              >
+                Please check your internet connection or try again later.
+              </Typography>
             </Box>
-          ))}
+          )}
           
           {isJumuahToday && (
             <Box

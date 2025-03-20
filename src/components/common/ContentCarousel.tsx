@@ -23,46 +23,6 @@ interface ScheduleItem {
   order: number;
 }
 
-// Mock data for testing
-const mockData = [
-  {
-    id: 'mock-1',
-    contentItem: {
-      id: 'mock-item-1',
-      title: 'Upcoming Event: Community Iftar',
-      content: 'Join us for our community iftar this Saturday after Maghrib prayer.',
-      type: 'EVENT' as ContentItemType,
-      duration: 15
-    },
-    order: 1,
-    startDate: new Date().toISOString(),
-    location: 'Main Hall'
-  },
-  {
-    id: 'mock-2',
-    contentItem: {
-      id: 'mock-item-2',
-      title: 'Verse of the Day',
-      content: 'Indeed, Allah is with the patient.',
-      type: 'VERSE_HADITH' as ContentItemType,
-      duration: 15,
-      reference: 'Quran 2:153'
-    },
-    order: 2
-  },
-  {
-    id: 'mock-3',
-    contentItem: {
-      id: 'mock-item-3',
-      title: 'Announcement',
-      content: 'The masjid will be open for Tahajjud prayers every Friday night starting at 3:00 AM.',
-      type: 'ANNOUNCEMENT' as ContentItemType,
-      duration: 15
-    },
-    order: 3
-  }
-];
-
 /**
  * ContentCarousel component
  * 
@@ -70,7 +30,8 @@ const mockData = [
  * Automatically rotates through items based on their specified duration.
  */
 const ContentCarousel: React.FC = () => {
-  const { schedule, events, refreshContent } = useContent();
+  const { schedule, events, refreshContent, refreshSchedule } = useContent();
+  console.log('ContentCarousel: schedule', schedule);
   const { fontSizes, screenSize } = useResponsiveFontSize();
   
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
@@ -84,42 +45,144 @@ const ContentCarousel: React.FC = () => {
   // Memoize refreshContent to prevent unnecessary re-renders
   const refreshContentOnce = useCallback(() => {
     if (!hasRefreshedRef.current) {
-      console.log('ContentCarousel: Refreshing content...');
-      refreshContent()
+      console.log('ContentCarousel: Refreshing content and schedule...');
+      // First try to refresh the schedule specifically
+      refreshSchedule()
+        .then(() => {
+          console.log('ContentCarousel: Schedule refresh attempt completed');
+          // Then do the general content refresh as a backup
+          return refreshContent();
+        })
         .then(() => {
           console.log('ContentCarousel: Content refreshed successfully');
           hasRefreshedRef.current = true;
         })
         .catch(err => console.error('Error refreshing content:', err));
     }
-  }, [refreshContent]);
+  }, [refreshContent, refreshSchedule]);
   
-  // Refresh content when component mounts
+  // Refresh content when component mounts - with safeguard against infinite refreshes
   useEffect(() => {
-    refreshContentOnce();
-  }, [refreshContentOnce]);
+    // Create stable function references to avoid dependency changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const doRefreshSchedule = refreshSchedule;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const doRefreshContent = refreshContent;
+
+    // Only refresh if we haven't already refreshed (using the existing ref)
+    if (!hasRefreshedRef.current) {
+      console.log('ContentCarousel: First mount, refreshing content once...');
+      
+      // Do a single refresh of schedule and content
+      doRefreshSchedule()
+        .then(() => {
+          console.log('ContentCarousel: Initial schedule refresh completed');
+          return doRefreshContent(true);
+        })
+        .then(() => {
+          console.log('ContentCarousel: Initial content refresh completed');
+          hasRefreshedRef.current = true; // Mark as refreshed to prevent future refreshes
+        })
+        .catch(err => {
+          console.error('Error during initial refresh:', err);
+          // Still mark as refreshed to prevent infinite retry loops
+          hasRefreshedRef.current = true;
+        });
+    } else {
+      console.log('ContentCarousel: Skipping refresh as content was already refreshed');
+    }
+    
+    // Cleanup function to help prevent memory leaks
+    return () => {
+      console.log('ContentCarousel: Component unmounting');
+    };
+  }, []); // Empty dependency array - run only on mount
   
   // Debug output for schedule and events
   useEffect(() => {
     console.log('ContentCarousel: Current schedule:', schedule);
     console.log('ContentCarousel: Current events:', events);
+    
+    // More detailed debugging of schedule structure
+    if (schedule) {
+      console.log('ContentCarousel: Schedule ID:', schedule.id);
+      console.log('ContentCarousel: Schedule name:', schedule.name);
+      console.log('ContentCarousel: Schedule items array exists:', !!schedule.items);
+      console.log('ContentCarousel: Schedule items length:', schedule.items?.length || 0);
+      
+      // Check the first item if available
+      if (schedule.items && schedule.items.length > 0) {
+        console.log('ContentCarousel: First item:', schedule.items[0]);
+        console.log('ContentCarousel: First item has contentItem:', !!schedule.items[0].contentItem);
+      }
+    }
+    
+    // Check if we're using fallback schedule
+    if (schedule?.id === 'fallback-schedule') {
+      console.log('WARNING: Using fallback schedule! API data retrieval may have failed.');
+    } else if (schedule?.id === 'normalized-schedule') {
+      console.log('INFO: Using normalized schedule from API data.');
+    }
   }, [schedule, events]);
   
   // Prepare content items for carousel
   useEffect(() => {
+    console.log('ContentCarousel: Beginning content preparation with schedule:', schedule);
     let items = [];
     
     // Add schedule items if available
     if (schedule?.items && schedule.items.length > 0) {
-      console.log('Schedule items found:', schedule.items);
+      console.log('ContentCarousel: Schedule items found:', schedule.items.length);
+      console.log('ContentCarousel: First raw schedule item:', JSON.stringify(schedule.items[0], null, 2));
       
       // Map schedule items to the expected format
-      items.push(...schedule.items.map(item => {
-        // Ensure content item has the required properties
+      const mappedItems = schedule.items.map((item, index) => {
+        // Log item structure more extensively
+        console.log(`ContentCarousel: Item ${index} structure:`, {
+          id: item.id,
+          hasContentItem: !!item.contentItem,
+          topLevelProps: {
+            hasType: 'type' in item,
+            hasTitle: 'title' in item,
+            hasContent: 'content' in item,
+            hasDuration: 'duration' in item,
+            hasOrder: 'order' in item
+          },
+          allKeys: Object.keys(item)
+        });
+        
+        // If item doesn't have contentItem property, create it from the item's properties
         if (!item.contentItem) {
-          console.error('Schedule item missing contentItem property:', item);
-          return null;
+          console.log(`ContentCarousel: Item at index ${index} missing contentItem, creating from top-level properties:`, item);
+          
+          // Use type assertion to handle API format with top-level properties
+          const apiItem = item as unknown as { 
+            id: string; 
+            type?: string; 
+            title?: string; 
+            content?: any; 
+            duration?: number; 
+            order?: number;
+          };
+          
+          return {
+            id: apiItem.id || `item-${index}`,
+            order: typeof apiItem.order === 'number' ? apiItem.order : index,
+            contentItem: {
+              id: `${apiItem.id}-content`,
+              type: apiItem.type || 'CUSTOM',
+              title: apiItem.title || 'No Title',
+              content: apiItem.content || 'No Content',
+              duration: typeof apiItem.duration === 'number' ? apiItem.duration : 30
+            }
+          };
         }
+        
+        console.log(`ContentCarousel: Processing item ${index} with existing contentItem:`, {
+          id: item.id,
+          hasContentItem: true,
+          contentItemType: item.contentItem.type
+        });
         
         const contentItem = item.contentItem;
         return {
@@ -135,9 +198,18 @@ const ContentCarousel: React.FC = () => {
             duration: contentItem.duration || 30
           }
         };
-      }).filter(Boolean)); // Filter out null items
+      }).filter(Boolean);
+      
+      console.log('ContentCarousel: Mapped items count:', mappedItems.length);
+      
+      if (mappedItems.length > 0) {
+        console.log('ContentCarousel: First mapped item:', JSON.stringify(mappedItems[0], null, 2));
+        items.push(...mappedItems);
+      } else {
+        console.warn('ContentCarousel: No valid items found after mapping schedule items');
+      }
     } else {
-      console.warn('No schedule items found');
+      console.warn('ContentCarousel: No schedule items found - schedule.items:', schedule?.items ? schedule.items.length : 'undefined');
     }
     
     // Add upcoming events if available
@@ -168,10 +240,9 @@ const ContentCarousel: React.FC = () => {
       return ((a as any).order || 999) - ((b as any).order || 999);
     });
     
-    // If no content from API, use mock data
+    // Remove the mock data fallback
     if (items.length === 0) {
-      console.log('No content found from API, using mock data');
-      items = [...mockData];
+      console.log('No content found from API or storage');
     }
     
     console.log('Content items prepared:', items);
@@ -348,50 +419,89 @@ const ContentCarousel: React.FC = () => {
       if (contentType === 'ASMA_AL_HUSNA') {
         let displayContent = content.content;
         let nameToDisplay = null;
+        let arabicText = '';
+        let transliteration = '';
+        let meaning = '';
         
-        // Handle the structure shown in the screenshot
-        if (displayContent?.nameDetails && Array.isArray(displayContent.nameDetails) && displayContent.nameDetails.length > 0) {
-          // If we have nameDetails array, use that data
-          const nameIndex = 0; // Default to first item, could be made random
-          nameToDisplay = displayContent.nameDetails[nameIndex];
-        } 
-        // Legacy handler for different format
-        else if (Array.isArray(displayContent)) {
-          const randomIndex = Math.floor(Math.random() * displayContent.length);
-          nameToDisplay = displayContent[randomIndex];
+        // Enhanced structure handling for different API formats
+        // Case 1: selectedNames array format (new format)
+        if (displayContent?.selectedNames && Array.isArray(displayContent.selectedNames) && displayContent.selectedNames.length > 0) {
+          const nameIndex = 0; // Default to first item
+          nameToDisplay = displayContent.selectedNames[nameIndex];
+          arabicText = nameToDisplay?.arabic || '';
+          transliteration = nameToDisplay?.transliteration || '';
+          meaning = nameToDisplay?.meaning || nameToDisplay?.translation || '';
         }
+        // Case 2: nameDetails array format (old format) 
+        else if (displayContent?.nameDetails && Array.isArray(displayContent.nameDetails) && displayContent.nameDetails.length > 0) {
+          const nameIndex = 0; // Default to first item
+          nameToDisplay = displayContent.nameDetails[nameIndex];
+          arabicText = nameToDisplay?.arabic || '';
+          transliteration = nameToDisplay?.transliteration || '';
+          meaning = nameToDisplay?.meaning || nameToDisplay?.translation || '';
+        } 
+        // Case 3: Direct array format
+        else if (Array.isArray(displayContent)) {
+          const nameIndex = 0; // Use first item instead of random for consistency
+          nameToDisplay = displayContent[nameIndex];
+          arabicText = nameToDisplay?.arabic || '';
+          transliteration = nameToDisplay?.transliteration || '';
+          meaning = nameToDisplay?.meaning || nameToDisplay?.translation || '';
+        }
+        // Case 4: Direct object format
+        else if (typeof displayContent === 'object' && displayContent !== null) {
+          arabicText = displayContent.arabic || displayContent.arabicText || '';
+          transliteration = displayContent.transliteration || '';
+          meaning = displayContent.meaning || displayContent.translation || '';
+        }
+        
+        // Log the processed content for debugging
+        console.log('ASMA_AL_HUSNA content:', {
+          arabicText,
+          transliteration,
+          meaning,
+          originalStructure: displayContent
+        });
         
         return (
           <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Typography 
-              sx={{ 
-                fontSize: fontSizes.h2,
-                mb: 2,
-                textAlign: 'center',
-                fontWeight: 'bold',
-                fontFamily: 'Scheherazade New, Arial'
-              }}
-            >
-              {nameToDisplay?.arabic || displayContent?.arabic || ''}
-            </Typography>
-            <Typography 
-              sx={{ 
-                fontSize: fontSizes.h3,
-                mb: 3,
-                textAlign: 'center',
-                fontWeight: 'medium'
-              }}
-            >
-              {nameToDisplay?.transliteration || displayContent?.transliteration || ''}
-            </Typography>
-            <Typography 
-              sx={{ 
-                fontSize: fontSizes.h4,
-                textAlign: 'center'
-              }}
-            >
-              {nameToDisplay?.meaning || displayContent?.meaning || ''}
-            </Typography>
+            {arabicText && (
+              <Typography 
+                sx={{ 
+                  fontSize: fontSizes.h1,
+                  mb: 2,
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  fontFamily: 'Scheherazade New, Arial'
+                }}
+              >
+                {arabicText}
+              </Typography>
+            )}
+            
+            {transliteration && (
+              <Typography 
+                sx={{ 
+                  fontSize: fontSizes.h3,
+                  mb: 3,
+                  textAlign: 'center',
+                  fontWeight: 'medium'
+                }}
+              >
+                {transliteration}
+              </Typography>
+            )}
+            
+            {meaning && (
+              <Typography 
+                sx={{ 
+                  fontSize: fontSizes.h4,
+                  textAlign: 'center'
+                }}
+              >
+                {meaning}
+              </Typography>
+            )}
           </Box>
         );
       }
@@ -536,8 +646,52 @@ const ContentCarousel: React.FC = () => {
   
   if (contentItems.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', p: 3, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography sx={{ fontSize: fontSizes.h5 }}>Loading content...</Typography>
+      <Box sx={{ textAlign: 'center', p: 3, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography sx={{ fontSize: fontSizes.h5, mb: 2 }}>No content available</Typography>
+        
+        {schedule?.id === 'fallback-schedule' && (
+          <Typography sx={{ fontSize: fontSizes.h6, color: 'warning.main', mb: 2 }}>
+            Using default content. The API connection may be unavailable.
+          </Typography>
+        )}
+        
+        {/* More detailed debug message */}
+        <Typography sx={{ fontSize: fontSizes.body2, color: 'text.secondary', mb: 2 }}>
+          Schedule ID: {schedule?.id || 'none'}<br/>
+          Schedule Name: {schedule?.name || 'none'}<br/>
+          Items Count: {schedule?.items?.length || 0}<br/>
+          Has ContentItems: {schedule?.items?.some(item => !!item.contentItem) ? 'Yes' : 'No'}<br/>
+        </Typography>
+        
+        {/* Debug output to see raw schedule */}
+        {schedule && (
+          <Box sx={{ mb: 2, maxWidth: '80%', overflow: 'auto', textAlign: 'left', 
+                     border: '1px solid #ccc', p: 2, borderRadius: 1 }}>
+            <Typography sx={{ fontSize: fontSizes.h6, color: 'info.main', mb: 1, textAlign: 'center' }}>
+              Debug: Raw Schedule Format
+            </Typography>
+            <pre style={{ fontSize: '12px', overflow: 'auto', maxHeight: '200px' }}>
+              {JSON.stringify(schedule, null, 2)}
+            </pre>
+          </Box>
+        )}
+        
+        <Typography 
+          sx={{ 
+            fontSize: fontSizes.body1, 
+            mt: 2, 
+            color: 'text.secondary',
+            cursor: 'pointer',
+            '&:hover': { textDecoration: 'underline' }
+          }}
+          onClick={() => {
+            console.log('Manual refresh requested by user');
+            hasRefreshedRef.current = false; // Reset to allow refresh again
+            refreshSchedule().then(() => refreshContent(true));
+          }}
+        >
+          Click to refresh content
+        </Typography>
       </Box>
     );
   }

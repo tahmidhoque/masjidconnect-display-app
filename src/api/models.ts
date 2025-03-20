@@ -105,10 +105,15 @@ export interface Schedule {
   id: string;
   name: string;
   items: ScheduleItem[];
+  data?: Schedule[]; // For new API format that returns a wrapped data array
+  success?: boolean;
+  error?: null | string;
+  timestamp?: string;
+  cacheControl?: { maxAge?: number, staleWhileRevalidate?: number };
 }
 
 export interface PrayerTimes {
-  date: string;
+  date?: string;
   fajr: string;
   sunrise: string;
   zuhr: string;
@@ -122,6 +127,11 @@ export interface PrayerTimes {
   ishaJamaat: string;
   jummahKhutbah?: string;
   jummahJamaat?: string;
+  data?: PrayerTimes[]; // For new API format that returns an array of days
+  success?: boolean;
+  error?: null | string;
+  timestamp?: string;
+  cacheControl?: { maxAge?: number, staleWhileRevalidate?: number };
 }
 
 export interface ContentOverride {
@@ -145,20 +155,62 @@ export interface ScreenContent {
   prayerTimes: PrayerTimes;
   contentOverrides: ContentOverride[];
   lastUpdated: string;
+  // New fields for the updated API format
+  data?: {
+    masjid?: {
+      name: string;
+      timezone: string;
+      coordinates?: {
+        latitude: number;
+        longitude: number;
+      }
+    };
+    screen?: {
+      id: string;
+      name: string;
+      orientation: 'LANDSCAPE' | 'PORTRAIT';
+      contentConfig?: any;
+    };
+    events?: Event[] | { data: Event[] };
+  };
+  events?: Event[] | { data: Event[] };
 }
 
 // Prayer Status Types
 export type PrayerName = 'FAJR' | 'SUNRISE' | 'ZUHR' | 'ASR' | 'MAGHRIB' | 'ISHA' | 'JUMMAH';
 
+export interface Prayer {
+  name: PrayerName;
+  time: string;
+}
+
 export interface PrayerStatus {
-  currentPrayer: PrayerName;
-  nextPrayer: PrayerName;
-  currentPrayerTime: string;
-  currentJamaatTime: string;
-  nextPrayerTime: string;
-  nextJamaatTime: string;
+  currentPrayer: Prayer;
+  nextPrayer: Prayer | null;
+  currentPrayerTime?: string; // May be deprecated in new format
+  currentJamaatTime?: string; // May be deprecated in new format
+  nextPrayerTime?: string;    // May be deprecated in new format
+  nextJamaatTime?: string;    // May be deprecated in new format
   timeUntilNextPrayer: string; // Duration in format HH:MM:SS
   timeUntilNextJamaat: string; // Duration in format HH:MM:SS
+  timestamp?: string;         // ISO date string of when status was generated
+  isAfterIsha?: boolean;      // Whether it's after Isha and before Fajr
+  success?: boolean;          // New API response format
+  data?: {                    // New API response format may include nested data
+    currentJamaatTime?: string;
+    currentPrayer?: Prayer;
+    currentPrayerTime?: string;
+    error?: null | string;
+    isAfterIsha?: boolean;
+    nextJamaatTime?: string;
+    nextPrayer?: Prayer;
+    nextPrayerTime?: string;
+    success?: boolean;
+    timeUntilNextJamaat?: string;
+    timeUntilNextPrayer?: string;
+    timestamp?: string;
+  };
+  error?: null | string;      // New API response format
 }
 
 // Event Types
@@ -178,9 +230,10 @@ export interface EventsResponse {
 
 // Generic API Response
 export interface ApiResponse<T> {
+  data: T | null;
   success: boolean;
-  data?: T;
   error?: string;
-  message?: string;
-  status?: number; // HTTP status code for error responses
+  cached?: boolean;
+  offlineFallback?: boolean;
+  status?: number; // Add status code property for error responses
 } 

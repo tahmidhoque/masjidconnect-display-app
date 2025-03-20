@@ -8,7 +8,8 @@ class DataSyncService {
     prayerStatus: null,
     prayerTimes: null,
     events: null,
-    heartbeat: null
+    heartbeat: null,
+    schedule: null
   };
   
   private lastSyncTime: Record<string, number> = {
@@ -16,7 +17,8 @@ class DataSyncService {
     prayerStatus: 0,
     prayerTimes: 0,
     events: 0,
-    heartbeat: 0
+    heartbeat: 0,
+    schedule: 0
   };
   
   private startTime: number = Date.now();
@@ -31,7 +33,8 @@ class DataSyncService {
     content: { inBackoff: false, nextTry: 0 },
     prayerStatus: { inBackoff: false, nextTry: 0 },
     prayerTimes: { inBackoff: false, nextTry: 0 },
-    events: { inBackoff: false, nextTry: 0 }
+    events: { inBackoff: false, nextTry: 0 },
+    schedule: { inBackoff: false, nextTry: 0 }
   };
 
   // Add throttling mechanism
@@ -40,13 +43,15 @@ class DataSyncService {
     prayerStatus: 0,
     prayerTimes: 0,
     events: 0,
-    heartbeat: 0
+    heartbeat: 0,
+    schedule: 0
   };
   
   private readonly MIN_SYNC_INTERVAL: Record<string, number> = {
     content: 30 * 1000, // 30 seconds
     prayerStatus: 30 * 1000, // 30 seconds
     prayerTimes: 60 * 1000, // 1 minute
+    schedule: 60 * 1000, // 1 minute
     events: 60 * 1000, // 1 minute
     heartbeat: 60 * 1000 // 1 minute
   };
@@ -118,6 +123,7 @@ class DataSyncService {
       content: `${POLLING_INTERVALS.CONTENT / (60 * 1000)} minutes`,
       prayerStatus: `${POLLING_INTERVALS.PRAYER_STATUS / 1000} seconds`,
       prayerTimes: `${POLLING_INTERVALS.PRAYER_TIMES / (60 * 60 * 1000)} hours`,
+      schedule: `${POLLING_INTERVALS.CONTENT / (60 * 1000)} minutes`, // Use same interval as content
       events: `${POLLING_INTERVALS.EVENTS / (60 * 1000)} minutes`,
       heartbeat: `${POLLING_INTERVALS.HEARTBEAT / 1000} seconds`
     });
@@ -135,6 +141,10 @@ class DataSyncService {
       this.startPrayerTimesSync();
     }
     
+    if (this.syncIntervals.schedule === null) {
+      this.startScheduleSync();
+    }
+    
     if (this.syncIntervals.events === null) {
       this.startEventsSync();
     }
@@ -150,6 +160,7 @@ class DataSyncService {
     this.stopContentSync();
     this.stopPrayerStatusSync();
     this.stopPrayerTimesSync();
+    this.stopScheduleSync();
     this.stopEventsSync();
     this.stopHeartbeat();
   }
@@ -186,7 +197,8 @@ class DataSyncService {
       this.syncContent(forceRefresh),
       this.syncPrayerStatus(forceRefresh),
       this.syncPrayerTimes(forceRefresh),
-      this.syncEvents(forceRefresh)
+      this.syncEvents(forceRefresh),
+      this.syncSchedule(forceRefresh)
     ];
     
     // Only add heartbeat if it's been long enough since the last one
@@ -205,11 +217,12 @@ class DataSyncService {
         content: results[0].status,
         prayerStatus: results[1].status,
         prayerTimes: results[2].status,
-        events: results[3].status
+        events: results[3].status,
+        schedule: results[4].status
       };
       
       if (includeHeartbeat) {
-        syncResults.heartbeat = results[4].status;
+        syncResults.heartbeat = results[5].status;
       }
       
       // Check if any syncs failed
@@ -221,7 +234,7 @@ class DataSyncService {
         // Log detailed errors for each failed sync
         failedSyncs.forEach((result, index) => {
           if (result.status === 'rejected') {
-            const syncTypes = ['content', 'prayerStatus', 'prayerTimes', 'events'];
+            const syncTypes = ['content', 'prayerStatus', 'prayerTimes', 'events', 'schedule'];
             if (includeHeartbeat) syncTypes.push('heartbeat');
             
             const syncType = index < syncTypes.length ? syncTypes[index] : 'unknown';
@@ -461,8 +474,32 @@ class DataSyncService {
 
       // Fetch prayer times
       const prayerTimesResponse = await masjidDisplayClient.getPrayerTimes(startDate, endDateString, forceRefresh);
+      
       if (prayerTimesResponse.success && prayerTimesResponse.data) {
-        await storageService.savePrayerTimes(prayerTimesResponse.data);
+        // Check if the data is in the new format
+        const prayerTimesData = prayerTimesResponse.data;
+        
+        console.log('Prayer times data received:', prayerTimesData);
+        
+        // Determine if this is a single object with data array or already an array
+        if (!Array.isArray(prayerTimesData) && 
+            typeof prayerTimesData === 'object' && 
+            prayerTimesData !== null && 
+            'data' in prayerTimesData && 
+            Array.isArray((prayerTimesData as any).data)) {
+          // This is the new format - object with a data array
+          console.log('Detected new prayer times format (object with data array)');
+          await storageService.savePrayerTimes(prayerTimesData);
+        } else if (Array.isArray(prayerTimesData)) {
+          // This is the legacy format - just an array of prayer times
+          console.log('Detected legacy prayer times format (array)');
+          await storageService.savePrayerTimes(prayerTimesData);
+        } else {
+          // This is a single object without a data array - wrap it in an array
+          console.log('Detected single prayer time object - wrapping in array');
+          await storageService.savePrayerTimes([prayerTimesData]);
+        }
+        
         logger.debug('Prayer times sync completed successfully');
       } else {
         // Don't enter backoff mode if force refresh
@@ -687,6 +724,155 @@ class DataSyncService {
       return (window.performance as any).memory.usedJSHeapSize || 0;
     }
     return 0;
+  }
+
+  // Schedule sync methods
+  private startScheduleSync(): void {
+    if (this.syncIntervals.schedule !== null) return;
+
+    logger.debug('Starting schedule sync with interval', { 
+      interval: `${POLLING_INTERVALS.CONTENT / (60 * 1000)} minutes` // Use same interval as content
+    });
+    
+    // Schedule periodic sync - don't sync immediately as it will be done in syncAllData
+    this.syncIntervals.schedule = window.setInterval(() => {
+      this.syncSchedule();
+    }, POLLING_INTERVALS.CONTENT);
+  }
+
+  private stopScheduleSync(): void {
+    if (this.syncIntervals.schedule !== null) {
+      window.clearInterval(this.syncIntervals.schedule);
+      this.syncIntervals.schedule = null;
+      logger.debug('Stopped schedule sync');
+    }
+  }
+
+  public async syncSchedule(forceRefresh: boolean = false): Promise<void> {
+    // Check if we should throttle this sync request
+    if (this.shouldThrottleSync('schedule') && !forceRefresh) {
+      logger.debug('dataSyncService: Throttling schedule sync due to minimum interval');
+      return;
+    }
+    
+    // Skip sync if offline
+    if (!navigator.onLine) {
+      logger.debug('dataSyncService: Skipping schedule sync while offline');
+      return;
+    }
+    
+    // Check authentication
+    const isAuthenticated = masjidDisplayClient.isAuthenticated();
+    if (!isAuthenticated) {
+      logger.debug('dataSyncService: Skipping schedule sync, not authenticated');
+      return;
+    }
+    
+    try {
+      // Track sync attempt
+      this.lastSyncAttempts.schedule = Date.now();
+      
+      logger.info('dataSyncService: Syncing schedule data', { forceRefresh });
+      console.log('DEBUG dataSyncService: Syncing schedule data', { 
+        forceRefresh, 
+        online: navigator.onLine,
+        authenticated: isAuthenticated
+      });
+      
+      // Check if we're in backoff
+      if (this.backoffStatus.schedule.inBackoff) {
+        const now = Date.now();
+        if (now < this.backoffStatus.schedule.nextTry) {
+          const waitTime = Math.ceil((this.backoffStatus.schedule.nextTry - now) / 1000);
+          logger.debug(`dataSyncService: In backoff for schedule, waiting ${waitTime}s before retry`);
+          return;
+        } else {
+          // Exit backoff state
+          this.backoffStatus.schedule.inBackoff = false;
+          logger.debug('dataSyncService: Exiting backoff for schedule sync');
+        }
+      }
+      
+      // Fetch screen content which includes schedule
+      console.log('DEBUG dataSyncService: Calling getScreenContent');
+      const response = await masjidDisplayClient.getScreenContent(forceRefresh);
+      console.log('DEBUG dataSyncService: getScreenContent response', { 
+        success: response.success,
+        hasData: !!response.data,
+        status: response.status,
+        error: response.error
+      });
+      
+      if (response.success && response.data) {
+        console.log('DEBUG dataSyncService: Response data keys:', Object.keys(response.data));
+        
+        // Check for schedule in response - could be directly in data or in a nested structure
+        const schedule = response.data.schedule;
+        const nestedData = (response.data as any).data;
+        
+        console.log('DEBUG dataSyncService: Schedule structure check:', { 
+          hasScheduleDirectly: !!schedule,
+          hasNestedData: !!nestedData,
+          nestedDataHasSchedule: nestedData ? !!nestedData.schedule : false
+        });
+        
+        // If we have a schedule directly or in the nested data
+        if (schedule || (nestedData && nestedData.schedule)) {
+          const scheduleData = schedule || nestedData.schedule;
+          
+          // Log the structure of the schedule data we found
+          console.log('DEBUG dataSyncService: Schedule data found:', {
+            type: typeof scheduleData,
+            isObject: typeof scheduleData === 'object',
+            hasItems: !!scheduleData.items,
+            itemsCount: scheduleData.items?.length || 0,
+            keys: Object.keys(scheduleData)
+          });
+          
+          // If we have items, check the first one to understand its structure
+          if (scheduleData.items && scheduleData.items.length > 0) {
+            const firstItem = scheduleData.items[0];
+            console.log('DEBUG dataSyncService: First schedule item:', {
+              keys: Object.keys(firstItem),
+              hasContentItem: 'contentItem' in firstItem,
+              hasType: 'type' in firstItem,
+              hasTitle: 'title' in firstItem,
+            });
+          }
+          
+          // Save schedule data to storage
+          await storageService.saveSchedule(scheduleData);
+          logger.info('dataSyncService: Schedule data saved successfully');
+          console.log('DEBUG dataSyncService: Schedule data saved successfully');
+          
+          // Update last sync time
+          this.lastSyncTime.schedule = Date.now();
+        } else {
+          logger.warn('dataSyncService: No schedule data found in response');
+          console.log('DEBUG dataSyncService: No schedule data found in response');
+        }
+      } else {
+        logger.error('dataSyncService: Failed to fetch schedule data', { 
+          error: response.error 
+        });
+        console.log('DEBUG dataSyncService: Failed to fetch schedule data', { 
+          error: response.error 
+        });
+        
+        // Set backoff for failed requests
+        const now = Date.now();
+        this.backoffStatus.schedule.inBackoff = true;
+        this.backoffStatus.schedule.nextTry = now + 60000; // Try again in 1 minute
+      }
+    } catch (error) {
+      console.error('Error in syncSchedule:', error);
+      logger.error('dataSyncService: Error syncing schedule data', { error });
+      
+      // Set backoff for errors
+      const now = Date.now();
+      this.backoffStatus.schedule.inBackoff = true;
+      this.backoffStatus.schedule.nextTry = now + 60000; // Try again in 1 minute
+    }
   }
 
   // Clean up resources

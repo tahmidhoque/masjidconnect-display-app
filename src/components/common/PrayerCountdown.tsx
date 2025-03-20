@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
+import { parseTimeString } from '../../utils/dateUtils';
 
 interface PrayerCountdownProps {
   prayerName: string;
   prayerTime: string;
+  timeUntilNextPrayer?: string; // Optional pre-calculated time from API (used only for initial setup)
   onCountdownComplete?: () => void;
 }
 
@@ -12,11 +14,13 @@ interface PrayerCountdownProps {
  * PrayerCountdown component
  * 
  * Displays a live countdown to the next prayer time.
+ * Can use either direct calculation or pre-calculated value from API.
  * Triggers onCountdownComplete when countdown reaches zero.
  */
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ 
   prayerName, 
   prayerTime, 
+  timeUntilNextPrayer,
   onCountdownComplete 
 }) => {
   const [hours, setHours] = useState<number>(0);
@@ -24,15 +28,54 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const [seconds, setSeconds] = useState<number>(0);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const { fontSizes } = useResponsiveFontSize();
+  const initializingRef = useRef<boolean>(true);
   
   // Calculate remaining time and update countdown
   useEffect(() => {
+    if (!prayerTime) {
+      console.error('No prayer time provided for countdown');
+      return;
+    }
+    
+    // Set up initial time using pre-calculated value if available
+    if (initializingRef.current && timeUntilNextPrayer) {
+      console.log("Initializing countdown with pre-calculated value:", timeUntilNextPrayer);
+      
+      try {
+        if (timeUntilNextPrayer.includes('hr') || timeUntilNextPrayer.includes('min')) {
+          const hourMatch = timeUntilNextPrayer.match(/(\d+)\s*hr/);
+          const minuteMatch = timeUntilNextPrayer.match(/(\d+)\s*min/);
+          
+          const h = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+          const m = minuteMatch ? parseInt(minuteMatch[1], 10) : 0;
+          
+          setHours(h);
+          setMinutes(m);
+          setSeconds(0);
+        }
+      } catch (e) {
+        console.error("Error parsing pre-calculated time", e);
+      }
+      
+      initializingRef.current = false;
+    }
+    
     const calculateRemainingTime = () => {
       try {
         // Parse prayer time
         const [timeHoursStr, timeMinutesStr] = prayerTime.split(':');
+        if (!timeHoursStr || !timeMinutesStr) {
+          console.error('Invalid prayer time format:', prayerTime);
+          return;
+        }
+        
         const timeHours = parseInt(timeHoursStr, 10);
         const timeMinutes = parseInt(timeMinutesStr, 10);
+        
+        if (isNaN(timeHours) || isNaN(timeMinutes)) {
+          console.error('Invalid prayer time values:', prayerTime);
+          return;
+        }
         
         // Create date objects
         const now = new Date();
@@ -80,14 +123,14 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       }
     };
     
-    // Initial calculation
+    // Calculate initially
     calculateRemainingTime();
     
     // Update every second
     const timer = setInterval(calculateRemainingTime, 1000);
     
     return () => clearInterval(timer);
-  }, [prayerTime, onCountdownComplete, isCompleted]);
+  }, [prayerTime, onCountdownComplete, isCompleted, timeUntilNextPrayer]);
   
   return (
     <Box sx={{ 

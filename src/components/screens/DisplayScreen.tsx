@@ -25,10 +25,16 @@ const DisplayScreen: React.FC = () => {
   
   // Update orientation from screen content when it changes
   useEffect(() => {
-    if (screenContent?.screen?.orientation) {
-      // Always set orientation directly when first loaded 
+    // Check for orientation in both the new data structure and legacy location
+    if (screenContent?.data && 'screen' in screenContent.data && 
+        screenContent.data.screen && 'orientation' in screenContent.data.screen) {
+      // Use orientation from the new data structure
+      setAdminOrientation(screenContent.data.screen.orientation);
+      console.log("DisplayScreen: Setting orientation from screenContent data:", screenContent.data.screen.orientation);
+    } else if (screenContent?.screen?.orientation) {
+      // Fallback to legacy location
       setAdminOrientation(screenContent.screen.orientation);
-      console.log("DisplayScreen: Setting orientation from screenContent:", screenContent.screen.orientation);
+      console.log("DisplayScreen: Setting orientation from legacy screenContent:", screenContent.screen.orientation);
     }
   }, [screenContent, setAdminOrientation]);
   
