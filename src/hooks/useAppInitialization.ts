@@ -70,7 +70,7 @@ const useAppInitialization = () => {
 
   // Main initialization function
   const initialize = useCallback(async () => {
-    console.log('Starting app initialization...');
+    // Removed excessive logging
     
     // Track start time to ensure minimum loading time for better UX
     const startTime = Date.now();
@@ -90,7 +90,7 @@ const useAppInitialization = () => {
     
     // Calculate elapsed time
     const elapsedTime = Date.now() - startTime;
-    const minLoadTime = isAuthenticated ? 2500 : 1500; // Longer min time for authenticated users
+    const minLoadTime = isAuthenticated ? 2500 : 1500;
     
     // Ensure minimum loading time for better UX
     if (elapsedTime < minLoadTime) {
@@ -114,22 +114,12 @@ const useAppInitialization = () => {
     setLoadingMessage(isAuthenticated ? 'Loading complete!' : 'Ready to pair!');
     setInitializationStage('complete');
     
-    // Complete initialization
-    console.log('App initialization complete!', {
-      authSuccess,
-      orientationSuccess,
-      contentSuccess,
-      isAuthenticated,
-      screenId,
-      orientation,
-      totalLoadTime: Date.now() - startTime
-    });
-    
-    // Small delay before setting isInitializing to false for smoother transition
-      setTimeout(() => {
-          setIsInitializing(false);
-    }, 800); // Longer delay for a more premium feel
-  }, [initAuth, initOrientation, initContent, isAuthenticated, screenId, orientation]);
+    // Complete initialization - remove verbose logging
+    // Use a longer delay to ensure the welcome screen is visible
+    setTimeout(() => {
+      setIsInitializing(false);
+    }, 1200); // Increased from 800ms for a more premium feel and to ensure welcome screen visibility
+  }, [initAuth, initOrientation, initContent, isAuthenticated]);
 
   // Run initialization on component mount
   useEffect(() => {

@@ -29,6 +29,12 @@ const AppContent: React.FC = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [authChecked, setAuthChecked] = useState(false); // Track if we've already done the auth check
   
+  // Handle when loading is complete
+  const handleLoadingComplete = () => {
+    console.log('Loading complete callback received, transitioning...');
+    setIsInitialLoad(false);
+  };
+  
   // Emergency authentication check on mount - run only once
   useEffect(() => {
     // Skip if we've already run the check
@@ -73,19 +79,16 @@ const AppContent: React.FC = () => {
   // Start loading sequence
   useEffect(() => {
     if (isInitialLoad) {
-      // Simulate loading time for a more natural app startup experience
+      console.log('Starting app loading sequence');
+      // Increase loading time to ensure loading screen completes its sequence
       const timer = setTimeout(() => {
+        console.log('App loading timeout completed, calling handleLoadingComplete');
         handleLoadingComplete();
-      }, 2000);
+      }, 12000); // Increased from 2000ms to 12000ms to ensure LoadingScreen completes
       
       return () => clearTimeout(timer);
     }
-  }, [isInitialLoad]);
-  
-  // Handle when loading is complete
-  const handleLoadingComplete = () => {
-    setIsInitialLoad(false);
-  };
+  }, [isInitialLoad, handleLoadingComplete]);
   
   if (isInitialLoad || isInitializing) {
     return <LoadingScreen onComplete={handleLoadingComplete} />;
@@ -123,7 +126,7 @@ const App: React.FC = () => {
                 <ContentProvider>
                   <ApiErrorBoundary>
                     <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
-                    <CorsErrorNotification />
+                    {/* <CorsErrorNotification /> */}
                     <AuthErrorDetector />
                     <AppContent />
                   </ApiErrorBoundary>

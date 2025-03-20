@@ -47,11 +47,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [jumuahDisplayTime, setJumuahDisplayTime] = useState<string | null>(null);
   const [currentDay, setCurrentDay] = useState<number>(moment().date());
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
+  const [lastProcessTime, setLastProcessTime] = useState<number>(0);
+  const MIN_PROCESS_INTERVAL = 5000; // Only process every 5 seconds
 
   // Get and update Hijri date
   const fetchHijriDate = useCallback(async () => {
     try {
-      console.log('Fetching Hijri date', moment().format('DD-MM-YYYY'));
       const response = await fetch(`https://api.aladhan.com/v1/gToH?date=${moment().format('DD-MM-YYYY')}`);
       const data = await response.json();
       
@@ -190,7 +191,15 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       return;
     }
     
-    console.log("DEBUG: prayerTimes data structure:", prayerTimes);
+    // Add throttling to prevent excessive processing
+    const now = Date.now();
+    if (now - lastProcessTime < MIN_PROCESS_INTERVAL) {
+      return;
+    }
+    setLastProcessTime(now);
+    
+    // Replace verbose console.log with single debug line
+    logger.debug('Processing prayer times', { dataLength: prayerTimes.data?.length });
     
     try {
       const now = moment();
@@ -205,32 +214,22 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       
       // Check if prayerTimes has data array (new format)
       if ('data' in prayerTimes && Array.isArray(prayerTimes.data)) {
-        console.log("DEBUG: Found data array in prayerTimes with length:", prayerTimes.data.length);
-        
         // Find today's prayer times in the array
         const todayEntry = prayerTimes.data.find(entry => {
           // Match entries by date (strip time part if present)
           if (entry.date && typeof entry.date === 'string') {
-            const matches = entry.date.substring(0, 10) === todayDateStr;
-            console.log("DEBUG: Comparing date:", entry.date.substring(0, 10), "with today:", todayDateStr, "Match:", matches);
-            return matches;
+            return entry.date.substring(0, 10) === todayDateStr;
           }
           return false;
         });
         
         if (todayEntry) {
           todayData = todayEntry;
-          console.log('DEBUG: Found today\'s prayer times in data array', { date: todayEntry.date });
         } else {
           // If we can't find today's data, use the first entry as fallback
           todayData = prayerTimes.data[0];
-          console.log('DEBUG: Could not find today\'s prayer times in data array, using first entry:', todayData);
         }
-      } else {
-        console.log("DEBUG: No data array found in prayerTimes, using direct structure");
       }
-      
-      console.log("DEBUG: Today's prayer data being used:", todayData);
       
       // Use prayer status if available
       let nextPrayerName = '';
@@ -299,25 +298,25 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         prayerRecord.maghrib = extractTime('maghrib');
         prayerRecord.isha = extractTime('isha');
         
-        console.log("DEBUG: Constructed prayer record for local calculation:", prayerRecord);
+        logger.debug('Constructed prayer record for local calculation', { prayerRecord });
         
         if (Object.values(prayerRecord).some(time => time)) {
           // Only calculate if we have at least one valid time
           try {
             const { name } = getNextPrayerTime(now.toDate(), prayerRecord);
             nextPrayerName = name;
-            console.log("Calculated next prayer locally with result:", { name, nextPrayerName });
+            logger.debug('Calculated next prayer locally', { name, nextPrayerName });
             
             // If we have prayer times array, also calculate current prayer
             if (prayerTimesForCalculation.length > 0) {
               currentPrayerName = calculateCurrentPrayer(prayerTimesForCalculation) || '';
-              console.log("Calculated current prayer locally with result:", { currentPrayerName });
+              logger.debug('Calculated current prayer locally', { currentPrayerName });
             }
           } catch (error) {
-            console.error("Error calculating next prayer:", error);
+            logger.error('Error calculating next prayer', { error });
           }
         } else {
-          console.log("DEBUG: Could not calculate next prayer - no valid times available");
+          logger.debug('Could not calculate next prayer - no valid times available');
         }
       }
       
@@ -337,11 +336,16 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           // Force isNext=true for this prayer if it's the next prayer
           let forcedIsNext = isNext;
           if (name === 'Fajr' && (nextPrayerName.toUpperCase() === 'FAJR' || nextPrayerName === 'Fajr')) {
-            console.log(`Forcing isNext=true for ${name} because nextPrayerName=${nextPrayerName}`);
+            logger.debug(`Forcing isNext=true for ${name}`, { nextPrayerName });
             forcedIsNext = true;
           }
           
-          console.log(`Prayer ${name}: isNext=${forcedIsNext}, isCurrent=${isCurrent}, nextPrayerName="${nextPrayerName}", currentPrayerName="${currentPrayerName}"`);
+          logger.debug(`Prayer ${name} status`, { 
+            isNext: forcedIsNext, 
+            isCurrent, 
+            nextPrayerName, 
+            currentPrayerName 
+          });
           
           // Calculate time until prayer
           let timeUntil = '';
@@ -384,12 +388,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
               prayer.timeUntil = getTimeUntilNextPrayer(prayer.time);
             }
             
-            console.log("Setting next prayer:", prayer);
+            logger.debug('Setting next prayer', { prayer });
             setNextPrayer(prayer);
           }
           
           if (isCurrent) {
-            console.log("Setting current prayer:", prayer);
+            logger.debug('Setting current prayer', { prayer });
             setCurrentPrayer(prayer);
           }
         } catch (error) {
@@ -437,7 +441,13 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       
       if (foundNext || foundCurrent) {
         setTodaysPrayerTimes(updatedPrayers);
-        console.log("Updated prayer times with isNext and isCurrent flags:", updatedPrayers);
+        logger.debug('Updated prayer times with flags', { 
+          updatedPrayers: updatedPrayers.map(p => ({ 
+            name: p.name, 
+            isNext: p.isNext, 
+            isCurrent: p.isCurrent 
+          }))
+        });
       }
     } catch (error) {
       logger.error('Error processing prayer times', { error });

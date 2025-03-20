@@ -40,7 +40,7 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   const [masjidTimezone, setMasjidTimezone] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
-  const MIN_REFRESH_INTERVAL = 5000; // 5 seconds
+  const MIN_REFRESH_INTERVAL = 30000; // 30 seconds
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -78,7 +78,8 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       // Load prayer times directly even if they weren't in screen content
       const storedPrayerTimes = await storageService.getPrayerTimes();
       if (storedPrayerTimes && !prayerTimes) {
-        console.log("DEBUG ContentContext: Loading prayer times directly from storage:", storedPrayerTimes);
+        // Remove debug logging for performance
+        logger.debug("Loading prayer times from storage");
         
         // Create a normalized version that works with our app
         let normalizedPrayerTimes: any;
@@ -98,7 +99,7 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
           normalizedPrayerTimes = storedPrayerTimes;
         }
         
-        console.log("DEBUG ContentContext: Using normalized prayer times:", normalizedPrayerTimes);
+        // Remove debug logging for performance
         setPrayerTimes(normalizedPrayerTimes);
       }
       
@@ -382,41 +383,42 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
 
   // Add refreshPrayerTimes method
   const refreshPrayerTimes = async (): Promise<void> => {
-    if (!isAuthenticated) return;
-
-    // Implement throttling
-    const now = Date.now();
-    const lastPrayerTimesRefresh = lastRefreshTime;
-    if (now - lastPrayerTimesRefresh < MIN_REFRESH_INTERVAL) {
-      logger.debug("ContentContext: Throttling prayer times refresh - too frequent calls");
+    if (!isAuthenticated) {
+      logger.warn("ContentContext: Not authenticated, skipping prayer times refresh");
       return;
     }
 
+    // Implement throttling to prevent infinite loops
+    const now = Date.now();
+    if (now - lastRefreshTime < MIN_REFRESH_INTERVAL) {
+      logger.debug("ContentContext: Throttling prayer times refresh - too frequent calls");
+      return;
+    }
+    
+    setLastRefreshTime(now);
+
     try {
-      logger.info("ContentContext: Refreshing prayer times");
+      logger.debug("ContentContext: Starting prayer times refresh");
       
-      // Trigger prayer times sync with force refresh
+      // Use data sync service to sync prayer times
       await dataSyncService.syncPrayerTimes(true);
       
       // Get updated prayer times from storage
       const updatedPrayerTimes = await storageService.getPrayerTimes();
       if (updatedPrayerTimes) {
-        console.log("ContentContext: Retrieved updated prayer times:", updatedPrayerTimes);
+        logger.debug("ContentContext: Retrieved updated prayer times");
         
         // Create a normalized version that works with our app
         let normalizedPrayerTimes: any;
         
         if (Array.isArray(updatedPrayerTimes)) {
           // If it's an array, create an object with data property
-          normalizedPrayerTimes = { 
+          normalizedPrayerTimes = {
             data: updatedPrayerTimes,
             // Extract properties from first item for backwards compatibility
             ...(updatedPrayerTimes[0] || {})
           };
-        } else if (typeof updatedPrayerTimes === 'object' && 
-                   updatedPrayerTimes !== null && 
-                   'data' in updatedPrayerTimes && 
-                   Array.isArray((updatedPrayerTimes as any).data)) {
+        } else if ('data' in updatedPrayerTimes && Array.isArray(updatedPrayerTimes.data)) {
           // If it's already the right format, use it
           normalizedPrayerTimes = updatedPrayerTimes;
         } else {
@@ -424,14 +426,19 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
           normalizedPrayerTimes = updatedPrayerTimes;
         }
         
-        console.log("ContentContext: Using normalized prayer times:", normalizedPrayerTimes);
+        // Update state with normalized data
         setPrayerTimes(normalizedPrayerTimes);
-        logger.info("ContentContext: Prayer times refreshed successfully");
+        
+        // Update last updated time
+        setLastUpdated(new Date());
+        
+        logger.debug("ContentContext: Prayer times updated successfully");
       } else {
-        logger.warn("ContentContext: No updated prayer times found in storage after sync");
+        // Create fallback data if all else fails
+        logger.warn("ContentContext: No prayer times available, using fallback data");
+        setPrayerTimes(createFallbackPrayerTimes());
       }
     } catch (error) {
-      console.error('Error refreshing prayer times:', error);
       logger.error("ContentContext: Error refreshing prayer times", { error });
     }
   };

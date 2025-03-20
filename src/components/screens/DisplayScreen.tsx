@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Fade } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import { useOrientation } from '../../contexts/OrientationContext';
@@ -23,33 +23,36 @@ const DisplayScreen: React.FC = () => {
   
   const { orientation, setAdminOrientation } = useOrientation();
   
-  // Update orientation from screen content when it changes
+  // Update orientation from screen content when it changes - optimized to reduce unnecessary updates
   useEffect(() => {
+    if (!screenContent) return;
+    
     // Check for orientation in both the new data structure and legacy location
-    if (screenContent?.data && 'screen' in screenContent.data && 
-        screenContent.data.screen && 'orientation' in screenContent.data.screen) {
-      // Use orientation from the new data structure
-      setAdminOrientation(screenContent.data.screen.orientation);
-      console.log("DisplayScreen: Setting orientation from screenContent data:", screenContent.data.screen.orientation);
+    let newOrientation;
+    
+    if (screenContent?.data?.screen?.orientation) {
+      newOrientation = screenContent.data.screen.orientation;
     } else if (screenContent?.screen?.orientation) {
-      // Fallback to legacy location
-      setAdminOrientation(screenContent.screen.orientation);
-      console.log("DisplayScreen: Setting orientation from legacy screenContent:", screenContent.screen.orientation);
+      newOrientation = screenContent.screen.orientation;
     }
-  }, [screenContent, setAdminOrientation]);
+    
+    // Only update if we found a valid orientation and it's different from current
+    if (newOrientation && newOrientation !== orientation) {
+      setAdminOrientation(newOrientation);
+    }
+  }, [screenContent, setAdminOrientation, orientation]);
   
   const [showContent, setShowContent] = useState(true);
   const [currentOrientation, setCurrentOrientation] = useState(orientation);
   const prevOrientationRef = useRef(orientation);
 
   // Use our rotation handling hook to determine if we need to rotate
-  const { shouldRotate, physicalOrientation } = useRotationHandling(currentOrientation);
+  const rotationInfo = useRotationHandling(currentOrientation);
+  const shouldRotate = rotationInfo.shouldRotate;
 
-  // Handle orientation changes with animation
+  // Handle orientation changes with animation - optimized with improved timing
   useEffect(() => {
-    console.log("DisplayScreen: Orientation context changed to:", orientation);
-    
-    // If orientation has changed
+    // Only update if orientation has changed to prevent unnecessary renders
     if (prevOrientationRef.current !== orientation) {
       // Fade out
       setShowContent(false);
@@ -69,50 +72,50 @@ const DisplayScreen: React.FC = () => {
     }
   }, [orientation]);
 
+  // Memoize the display component based on orientation to prevent unnecessary re-renders
+  // Important: This must be called unconditionally before any early returns
+  const DisplayComponent = useMemo(() => {
+    return currentOrientation === 'LANDSCAPE' ? 
+      <LandscapeDisplay /> : 
+      <PortraitDisplay />;
+  }, [currentOrientation]);
+
   // If content is still loading, show loading screen
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  console.log("DisplayScreen: Rendering with orientation:", currentOrientation, "shouldRotate:", shouldRotate);
-
   return (
-    <Box 
-      sx={{ 
-        width: '100vw', 
-        height: '100vh', 
-        overflow: 'hidden',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        backgroundColor: 'background.default',
-      }}
-    >
-      <Fade in={showContent} timeout={800}>
-        {currentOrientation === 'LANDSCAPE' || !shouldRotate ? (
-          // Landscape orientation or no rotation needed
-          <Box sx={{ width: '100%', height: '100%' }}>
-            {currentOrientation === 'LANDSCAPE' ? <LandscapeDisplay /> : <PortraitDisplay />}
-          </Box>
-        ) : (
-          // Portrait orientation with rotation transform
+    <Fade in={showContent} timeout={800}>
+      <Box 
+        sx={{ 
+          width: '100vw', 
+          height: '100vh',
+          overflow: 'hidden'
+        }}
+      >
+        {shouldRotate ? (
+          // Apply rotation transform for mismatched orientation
           <Box
             sx={{
+              width: window.innerHeight,
+              height: window.innerWidth,
               position: 'absolute',
               top: '50%',
               left: '50%',
-              width: window.innerHeight,
-              height: window.innerWidth,
               transform: 'translate(-50%, -50%) rotate(90deg)',
               transformOrigin: 'center',
             }}
           >
-            <PortraitDisplay />
+            {DisplayComponent}
           </Box>
+        ) : (
+          // No rotation needed
+          DisplayComponent
         )}
-      </Fade>
-    </Box>
+      </Box>
+    </Fade>
   );
 };
 
-export default DisplayScreen; 
+export default React.memo(DisplayScreen); 

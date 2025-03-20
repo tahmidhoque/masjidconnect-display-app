@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box, Typography, Divider } from '@mui/material';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import PrayerCountdown from './PrayerCountdown';
@@ -27,17 +27,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     jumuahDisplayTime,
   } = usePrayerTimes();
 
-
-  console.log("PrayerTimesPanel", todaysPrayerTimes,
-    nextPrayer,
-    isJumuahToday,
-    jumuahDisplayTime)
   const { fontSizes, screenSize } = useResponsiveFontSize();
 
   const isLandscape = variant === 'landscape';
 
-  // Keyframes for smooth animation - less aggressive
-  const pulseKeyframes = `
+  // Memoize the keyframes to prevent recalculation on every render
+  const pulseKeyframes = useMemo(() => `
     @keyframes pulseShadow {
       0% {
         box-shadow: 0 0 10px rgba(33, 140, 116, 0.4);
@@ -136,7 +131,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       }
     }
-  `;
+  `, []);
 
   return (
     <>
@@ -733,4 +728,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   );
 };
 
-export default PrayerTimesPanel; 
+// Export with React.memo to prevent unnecessary re-renders
+export default React.memo(PrayerTimesPanel, (
+  prevProps: PrayerTimesPanelProps, 
+  nextProps: PrayerTimesPanelProps
+): boolean => {
+  // Only re-render if props actually changed
+  return prevProps.variant === nextProps.variant;
+}); 
