@@ -215,7 +215,9 @@ const LandscapeDisplay: React.FC = () => {
         <Box 
           sx={{ 
             width: '30%', 
-            minWidth: screenSize.isLargeScreen ? '400px' : '350px',
+            minWidth: screenSize.is720p 
+              ? '300px' 
+              : (screenSize.isLargeScreen ? '400px' : '350px'),
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -231,13 +233,13 @@ const LandscapeDisplay: React.FC = () => {
         {/* Main Content */}
         <Box 
           sx={{ 
-            flexGrow: 1, 
+            flex: 1,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
             position: 'relative',
             overflow: 'hidden',
-            height: '100%',
+            minHeight: 0,
             p: 0,
           }}
         >
@@ -319,8 +321,17 @@ const LandscapeDisplay: React.FC = () => {
               </Typography>
             </Box>
           ) : (
-            <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
-            <ContentCarousel />
+            <Box sx={{ 
+              width: '100%', 
+              height: '100%', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              overflow: 'hidden',
+              position: 'relative',
+              p: screenSize.is720p ? 1 : 2,
+            }}>
+              <ContentCarousel />
             </Box>
           )}
         </Box>

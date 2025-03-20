@@ -1,4 +1,12 @@
 import { createTheme } from '@mui/material/styles';
+import { TypographyProps } from '@mui/material/Typography';
+
+// Extend Typography variant types to include our custom variants
+declare module '@mui/material/Typography' {
+  interface TypographyPropsVariantOverrides {
+    goldText: true;
+  }
+}
 
 const theme = createTheme({
   palette: {
@@ -61,6 +69,23 @@ const theme = createTheme({
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
         },
       },
+    },
+    MuiTypography: {
+      variants: [
+        {
+          props: { variant: 'goldText' },
+          style: {
+            fontWeight: 'bold',
+            background: 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)',
+            backgroundClip: 'text',
+            textFillColor: 'transparent',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            letterSpacing: '0.5px',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+          },
+        },
+      ],
     },
   },
 });

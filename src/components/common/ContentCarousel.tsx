@@ -304,13 +304,47 @@ const ContentCarousel: React.FC = () => {
     return () => clearTimeout(timer);
   }, [currentItemIndex, contentItems]);
   
-  // Render different content based on content type
+  // Add a helper function to scale down font sizes
+  const getScaledFontSize = (baseSize: string) => {
+    // Extract the numeric value and unit from the font size
+    const match = baseSize.match(/^([\d.]+)(.*)$/);
+    if (!match) return baseSize;
+    
+    const [, value, unit] = match;
+    // Scale down by 20% for 720p, 15% for larger screens
+    const scaleFactor = screenSize.is720p ? 0.8 : 0.85;
+    const scaledValue = parseFloat(value) * scaleFactor;
+    return `${scaledValue}${unit}`;
+  };
+
+  // Render content based on its type
   const renderContent = () => {
+    // Guard clauses for empty state
+    if (!contentItems || contentItems.length === 0 || currentItemIndex >= contentItems.length) {
+      return (
+        <Box sx={{ 
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          p: screenSize.is720p ? 1 : 2
+        }}>
+          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h4), mb: 1, fontWeight: 'bold' }}>
+            No Content Available
+          </Typography>
+          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.body1) }}>
+            Content will appear here once it's configured.
+          </Typography>
+        </Box>
+      );
+    }
+
     const currentItem = contentItems[currentItemIndex];
     if (!currentItem || !currentItem.contentItem) {
       console.error('Invalid content item:', currentItem);
       return (
-        <Typography sx={{ fontSize: fontSizes.h4, textAlign: 'center' }}>
+        <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h4), textAlign: 'center' }}>
           Content unavailable
         </Typography>
       );
@@ -336,10 +370,18 @@ const ContentCarousel: React.FC = () => {
         // Calculate font size based on content length to prevent overflow
         const textLength = eventText.length;
         const dynamicFontSize = textLength > 200 ? 
-          fontSizes.h5 : (textLength > 100 ? fontSizes.h4 : fontSizes.h3);
+          getScaledFontSize(fontSizes.h5) : (textLength > 100 ? getScaledFontSize(fontSizes.h4) : getScaledFontSize(fontSizes.h3));
         
         return (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'center' }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: screenSize.is720p ? 0.5 : 1, 
+            textAlign: 'center',
+            width: '100%',
+            p: screenSize.is720p ? 0.5 : 1,
+            overflow: 'auto'
+          }}>
             <Typography 
               sx={{ 
                 fontSize: dynamicFontSize,
@@ -356,20 +398,19 @@ const ContentCarousel: React.FC = () => {
                 display: 'flex', 
                 justifyContent: 'space-around', 
                 flexWrap: 'wrap',
-                gap: 2,
-                mt: 2,
+                gap: 1,
+                mt: 1,
                 bgcolor: 'background.paper',
-                p: 2,
+                p: 1,
                 borderRadius: 2,
-                mx: 'auto',
-                maxWidth: '90%'
+                width: '100%'
               }}
             >
               {currentItem.startDate && (
                 <Box>
                   <Typography 
                     sx={{ 
-                      fontSize: fontSizes.h6,
+                      fontSize: getScaledFontSize(fontSizes.h6),
                       fontWeight: 'bold',
                       color: 'text.secondary',
                       textAlign: 'center'
@@ -377,7 +418,7 @@ const ContentCarousel: React.FC = () => {
                   >
                     Date
                   </Typography>
-                  <Typography sx={{ fontSize: fontSizes.h5, textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
                     {new Date(currentItem.startDate).toLocaleDateString(undefined, {
                       weekday: 'long',
                       year: 'numeric',
@@ -392,7 +433,7 @@ const ContentCarousel: React.FC = () => {
                 <Box>
                   <Typography 
                     sx={{ 
-                      fontSize: fontSizes.h6,
+                      fontSize: getScaledFontSize(fontSizes.h6),
                       fontWeight: 'bold',
                       color: 'text.secondary',
                       textAlign: 'center'
@@ -400,7 +441,7 @@ const ContentCarousel: React.FC = () => {
                   >
                     {currentItem.location ? 'Location' : 'Time'}
                   </Typography>
-                  <Typography sx={{ fontSize: fontSizes.h5, textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
                     {currentItem.location || (
                       currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
                         hour: '2-digit',
@@ -455,21 +496,20 @@ const ContentCarousel: React.FC = () => {
           meaning = displayContent.meaning || displayContent.translation || '';
         }
         
-        // Log the processed content for debugging
-        console.log('ASMA_AL_HUSNA content:', {
-          arabicText,
-          transliteration,
-          meaning,
-          originalStructure: displayContent
-        });
-        
         return (
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Box sx={{ 
+            textAlign: 'center', 
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            p: screenSize.is720p ? 0.5 : 1
+          }}>
             {arabicText && (
               <Typography 
                 sx={{ 
-                  fontSize: fontSizes.h1,
-                  mb: 2,
+                  fontSize: getScaledFontSize(fontSizes.h1),
+                  mb: 1,
                   textAlign: 'center',
                   fontWeight: 'bold',
                   fontFamily: 'Scheherazade New, Arial'
@@ -482,8 +522,8 @@ const ContentCarousel: React.FC = () => {
             {transliteration && (
               <Typography 
                 sx={{ 
-                  fontSize: fontSizes.h3,
-                  mb: 3,
+                  fontSize: getScaledFontSize(fontSizes.h3),
+                  mb: 1,
                   textAlign: 'center',
                   fontWeight: 'medium'
                 }}
@@ -495,7 +535,7 @@ const ContentCarousel: React.FC = () => {
             {meaning && (
               <Typography 
                 sx={{ 
-                  fontSize: fontSizes.h4,
+                  fontSize: getScaledFontSize(fontSizes.h4),
                   textAlign: 'center'
                 }}
               >
@@ -538,22 +578,30 @@ const ContentCarousel: React.FC = () => {
         
         // Calculate font size based on content length to prevent overflow
         const arabicFontSize = arabicText.length > 150 ? 
-          fontSizes.h4 : (arabicText.length > 80 ? fontSizes.h3 : fontSizes.h2);
+          getScaledFontSize(fontSizes.h4) : (arabicText.length > 80 ? getScaledFontSize(fontSizes.h3) : getScaledFontSize(fontSizes.h2));
         
         const englishFontSize = englishText.length > 300 ? 
-          fontSizes.h5 : (englishText.length > 150 ? fontSizes.h4 : fontSizes.h3);
+          getScaledFontSize(fontSizes.h5) : (englishText.length > 150 ? getScaledFontSize(fontSizes.h4) : getScaledFontSize(fontSizes.h3));
         
         return (
-          <Box sx={{ textAlign: 'center', mt: 3, mb: 3 }}>
+          <Box sx={{ 
+            textAlign: 'center', 
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            p: screenSize.is720p ? 0.5 : 1,
+            overflow: 'auto'
+          }}>
             {arabicText && (
               <Typography 
                 sx={{ 
                   fontSize: arabicFontSize,
-                  mb: 3,
+                  mb: 2,
                   textAlign: 'center',
                   fontFamily: 'Scheherazade New, Arial',
                   direction: 'rtl',
-                  lineHeight: 1.8
+                  lineHeight: 1.7
                 }}
               >
                 {arabicText}
@@ -563,8 +611,8 @@ const ContentCarousel: React.FC = () => {
             <Typography 
               sx={{ 
                 fontSize: englishFontSize,
-                lineHeight: 1.5,
-                mb: 4,
+                lineHeight: 1.4,
+                mb: 2,
                 textAlign: 'center'
               }}
             >
@@ -573,9 +621,9 @@ const ContentCarousel: React.FC = () => {
             
             <Typography 
               sx={{ 
-                fontSize: fontSizes.h6,
+                fontSize: getScaledFontSize(fontSizes.h6),
                 color: 'text.secondary',
-                mt: 2,
+                mt: 1,
                 fontStyle: 'italic',
                 textAlign: 'center'
               }}
@@ -602,14 +650,21 @@ const ContentCarousel: React.FC = () => {
         // Calculate font size based on content length to prevent overflow
         const textLength = announcementText.length;
         const dynamicFontSize = textLength > 300 ? 
-          fontSizes.h5 : (textLength > 150 ? fontSizes.h4 : fontSizes.h3);
+          getScaledFontSize(fontSizes.h5) : (textLength > 150 ? getScaledFontSize(fontSizes.h4) : getScaledFontSize(fontSizes.h3));
         
         return (
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Box sx={{ 
+            textAlign: 'center', 
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            p: screenSize.is720p ? 0.5 : 1
+          }}>
             <Typography 
               sx={{ 
                 fontSize: dynamicFontSize,
-                lineHeight: 1.6,
+                lineHeight: 1.5,
                 textAlign: 'center',
                 fontWeight: textLength > 150 ? 'normal' : 'bold'
               }}
@@ -622,186 +677,161 @@ const ContentCarousel: React.FC = () => {
       
       // Default for any other content type
       return (
-        <Typography 
-          sx={{ 
-            fontSize: fontSizes.h4,
-            lineHeight: 1.6,
-            textAlign: 'center'
-          }}
-        >
-          {typeof content.content === 'string' 
-            ? content.content 
-            : content.content?.text || JSON.stringify(content.content)}
-        </Typography>
+        <Box sx={{ 
+          textAlign: 'center', 
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          p: screenSize.is720p ? 0.5 : 1
+        }}>
+          <Typography 
+            sx={{ 
+              fontSize: getScaledFontSize(fontSizes.h4),
+              lineHeight: 1.5,
+              textAlign: 'center'
+            }}
+          >
+            {typeof content.content === 'string' 
+              ? content.content 
+              : content.content?.text || JSON.stringify(content.content)}
+          </Typography>
+        </Box>
       );
     } catch (error) {
       console.error('Error rendering content:', error);
       return (
-        <Typography sx={{ fontSize: fontSizes.h4, textAlign: 'center', color: 'error.main' }}>
+        <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h4), textAlign: 'center', color: 'error.main' }}>
           Error displaying content
         </Typography>
       );
     }
   };
   
+  // Empty state display for ContentCarousel
   if (contentItems.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', p: 3, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography sx={{ fontSize: fontSizes.h5, mb: 2 }}>No content available</Typography>
-        
-        {schedule?.id === 'fallback-schedule' && (
-          <Typography sx={{ fontSize: fontSizes.h6, color: 'warning.main', mb: 2 }}>
-            Using default content. The API connection may be unavailable.
-          </Typography>
-        )}
-        
-        {/* More detailed debug message */}
-        <Typography sx={{ fontSize: fontSizes.body2, color: 'text.secondary', mb: 2 }}>
-          Schedule ID: {schedule?.id || 'none'}<br/>
-          Schedule Name: {schedule?.name || 'none'}<br/>
-          Items Count: {schedule?.items?.length || 0}<br/>
-          Has ContentItems: {schedule?.items?.some(item => !!item.contentItem) ? 'Yes' : 'No'}<br/>
-        </Typography>
-        
-        {/* Debug output to see raw schedule */}
-        {schedule && (
-          <Box sx={{ mb: 2, maxWidth: '80%', overflow: 'auto', textAlign: 'left', 
-                     border: '1px solid #ccc', p: 2, borderRadius: 1 }}>
-            <Typography sx={{ fontSize: fontSizes.h6, color: 'info.main', mb: 1, textAlign: 'center' }}>
-              Debug: Raw Schedule Format
+      <Box 
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          width: '100%',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <Box sx={{ 
+          bgcolor: 'rgba(255, 255, 255, 0.7)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(218, 165, 32, 0.2)',
+          borderRadius: 4,
+          p: screenSize.is720p ? 1 : 2,
+          width: screenSize.is720p ? '97%' : '95%',
+          height: screenSize.is720p ? '95%' : '90%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 1,
+          overflow: 'hidden',
+        }}>
+          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), mb: 2 }}>No content available</Typography>
+          
+          {schedule?.id === 'fallback-schedule' && (
+            <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h6), color: 'warning.main', mb: 2 }}>
+              Using default content. The API connection may be unavailable.
             </Typography>
-            <pre style={{ fontSize: '12px', overflow: 'auto', maxHeight: '200px' }}>
-              {JSON.stringify(schedule, null, 2)}
-            </pre>
-          </Box>
-        )}
-        
-        <Typography 
-          sx={{ 
-            fontSize: fontSizes.body1, 
-            mt: 2, 
-            color: 'text.secondary',
-            cursor: 'pointer',
-            '&:hover': { textDecoration: 'underline' }
-          }}
-          onClick={() => {
-            console.log('Manual refresh requested by user');
-            hasRefreshedRef.current = false; // Reset to allow refresh again
-            refreshSchedule().then(() => refreshContent(true));
-          }}
-        >
-          Click to refresh content
-        </Typography>
+          )}
+          
+          <Typography 
+            sx={{ 
+              fontSize: getScaledFontSize(fontSizes.body1), 
+              mt: 2, 
+              color: 'text.secondary',
+              cursor: 'pointer',
+              '&:hover': { textDecoration: 'underline' }
+            }}
+            onClick={() => {
+              console.log('Manual refresh requested by user');
+              hasRefreshedRef.current = false; // Reset to allow refresh again
+              refreshSchedule().then(() => refreshContent(true));
+            }}
+          >
+            Click to refresh content
+          </Typography>
+        </Box>
       </Box>
     );
   }
   
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%', 
-      position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      
-      {/* Content Card - Not animated, remains static */}
-      <Box
-        sx={{ 
-          width: '85%',
-          height: '85%',
-          maxWidth: screenSize.isLargeScreen ? '1100px' : '900px', 
-          maxHeight: '80vh',
-          overflow: 'auto',
+    <Fade in={showContent} timeout={500}>
+      <Box 
+        sx={{
           display: 'flex',
-          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          borderRadius: 4,
-          p: screenSize.isLargeScreen ? 5 : 4,
+          height: '100%',
+          width: '100%',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <Box sx={{ 
           bgcolor: 'rgba(255, 255, 255, 0.7)',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
           border: '1px solid rgba(218, 165, 32, 0.2)',
+          borderRadius: 4,
+          p: screenSize.is720p ? 1 : 2,
+          width: screenSize.is720p ? '97%' : '95%',
+          height: screenSize.is720p ? '95%' : '90%',
+          display: 'flex',
+          flexDirection: 'column',
           position: 'relative',
           zIndex: 1,
-          mx: 'auto',
-          my: 'auto' // Add vertical margin auto to center
-        }}
-      >
-        <Box 
-          sx={{ 
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 3,
-            width: '100%',
-            justifyContent: 'center',
-            flex: 1
-          }}
-        >
-          {/* Content based on type - Only this part is animated */}
-          <Box sx={{ 
-            flex: 1, 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            width: '100%',
-            minHeight: '300px', // Taller min-height to ensure content fits
-            position: 'relative' // Position relative for absolute positioning of Fade component
-          }}>
-            <Fade 
-              in={showContent} 
-              timeout={{ enter: 800, exit: 400 }}
-              style={{ 
-                position: 'absolute', // Position absolute to prevent layout shifts
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+          overflow: 'hidden',
+        }}>
+          <Box
+            sx={{
+              borderBottom: '3px solid',
+              borderColor: 'primary.main',
+              pb: screenSize.is720p ? 1 : 1.5,
+              mb: screenSize.is720p ? 1 : 2,
+              width: '100%',
+              flex: '0 0 auto',
+            }}
+          >
+            <Typography 
+              sx={{ 
+                fontWeight: 'bold',
+                fontSize: getScaledFontSize(fontSizes.h2),
+                textAlign: 'center',
+                color: 'primary.main'
               }}
             >
-              <Box sx={{ 
-                width: '100%',
-                height: '100%',
-                padding: 2,
-                display: 'flex', 
-                flexDirection: 'column',
-                alignItems: 'center', 
-                justifyContent: 'center',
-                overflow: 'visible' // Allow content to be visible
-              }}>
-                {/* Move Content Header inside the Fade component */}
-                <Box
-                  sx={{
-                    borderBottom: '3px solid',
-                    borderColor: 'primary.main',
-                    pb: 2,
-                    mb: 3,
-                    width: '100%'
-                  }}
-                >
-                  <Typography 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      fontSize: fontSizes.h2,
-                      textAlign: 'center',
-                      color: 'primary.main'
-                    }}
-                  >
-                    {contentItems[currentItemIndex]?.contentItem?.type === 'ASMA_AL_HUSNA' 
-                      ? 'Asma ul Husna' 
-                      : contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
-                  </Typography>
-                </Box>
-                
-                {renderContent()}
-              </Box>
-            </Fade>
+              {contentItems[currentItemIndex]?.contentItem?.type === 'ASMA_AL_HUSNA' 
+                ? 'Asma ul Husna' 
+                : contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ 
+            flex: '1 1 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'auto',
+            width: '100%',
+          }}>
+            {renderContent()}
           </Box>
         </Box>
       </Box>
-    </Box>
+    </Fade>
   );
 };
 

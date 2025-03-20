@@ -145,8 +145,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           sx={{ 
             background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
             color: 'white',
-            py: 2.5,
-            px: 3,
+            py: screenSize.is720p ? 1.8 : 2.5,
+            px: screenSize.is720p ? 2 : 3,
             textAlign: 'center',
             borderBottom: '3px solid',
             borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
@@ -213,7 +213,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         sx={{ 
           display: 'flex',
           flexDirection: 'column',
-          p: 2,
+          p: screenSize.is720p ? 1.5 : 2,
           justifyContent: 'flex-start',
           overflow: 'hidden',
           position: 'relative',
@@ -221,7 +221,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           bgcolor: 'rgba(250, 250, 250, 0.98)',
           flex: 1,
           ...(isLandscape ? {
-            minWidth: screenSize.isLargeScreen ? '400px' : '350px',
+            minWidth: screenSize.is720p 
+              ? '300px' 
+              : (screenSize.isLargeScreen ? '400px' : '350px'),
             borderRight: '1px solid',
             borderColor: 'rgba(218, 165, 32, 0.3)',
             boxShadow: '4px 0 12px rgba(0, 0, 0, 0.08)',
@@ -350,7 +352,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '0px',
                   borderBottom: index < todaysPrayerTimes.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                   border: prayer.isNext 
-                    ? '3px solid rgba(46, 204, 113, 0.9)'
+                    ? '3px solid #2A9D8F'
                     : prayer.isCurrent
                       ? '2px solid rgba(20, 66, 114, 0.9)'
                       : 'none',
@@ -406,7 +408,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       overflow: 'hidden',
                       backgroundColor: prayer.isCurrent 
                         ? 'rgba(20, 66, 114, 0.95)' 
-                        : 'rgba(46, 204, 113, 0.95)',
+                        : '#2A9D8F',
                     }}
                   >
                     <IslamicPatternBackground 

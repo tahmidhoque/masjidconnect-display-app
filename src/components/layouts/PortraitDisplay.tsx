@@ -22,7 +22,7 @@ const PortraitDisplay: React.FC = () => {
     hijriDate,
   } = usePrayerTimes();
   
-  const { fontSizes } = useResponsiveFontSize();
+  const { fontSizes, screenSize } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showMobileSilenceReminder, setShowMobileSilenceReminder] = useState(false);
 
@@ -80,8 +80,8 @@ const PortraitDisplay: React.FC = () => {
         sx={{ 
           background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
           color: 'white',
-          p: 2.5,
-          pb: 2,
+          p: screenSize.is720p ? 1.8 : 2.5,
+          pb: screenSize.is720p ? 1.5 : 2,
           borderBottom: '3px solid',
           borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
           display: 'flex',
@@ -156,7 +156,7 @@ const PortraitDisplay: React.FC = () => {
             fontWeight: 'bold',
             fontSize: fontSizes.h1,
             fontFamily: "'Poppins', sans-serif",
-            color: '#F1C40F',
+            color: '#E9C46A',
             letterSpacing: '2px',
             lineHeight: 1.1,
             textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
@@ -174,11 +174,15 @@ const PortraitDisplay: React.FC = () => {
       
       {/* Main Content */}
       <Box sx={{ 
-        flexGrow: 1,
+        flex: 1,
         position: 'relative',
         zIndex: 1,
         overflow: 'hidden',
-        p: 2,
+        p: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 0,
       }}>
         <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
           <IslamicPatternBackground variant="subtle" />
@@ -190,11 +194,11 @@ const PortraitDisplay: React.FC = () => {
               background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
               color: '#0A2647',
               borderRadius: '16px',
-              p: 5,
+              p: screenSize.is720p ? 3 : 5,
               textAlign: 'center',
               width: '90%',
               mx: 'auto',
-              mt: 4,
+              mt: screenSize.is720p ? 2 : 4,
               boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
               border: '1px solid rgba(218, 165, 32, 0.5)',
               position: 'relative',
@@ -259,7 +263,18 @@ const PortraitDisplay: React.FC = () => {
             </Typography>
           </Box>
         ) : (
-          <ContentCarousel />
+          <Box sx={{ 
+            width: '100%', 
+            height: '100%', 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            overflow: 'hidden',
+            position: 'relative',
+            p: screenSize.is720p ? 1 : 2,
+          }}>
+            <ContentCarousel />
+          </Box>
         )}
       </Box>
       
@@ -268,9 +283,9 @@ const PortraitDisplay: React.FC = () => {
         sx={{ 
           background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
           color: 'white',
-          p: 1.5,
+          p: screenSize.is720p ? 1 : 1.5,
           borderTop: '3px solid',
-          borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
+          borderImage: 'linear-gradient(90deg, #E9C46A 0%, #F1C40F 100%) 1',
           display: 'flex',
           justifyContent: 'flex-end',
           alignItems: 'center',
