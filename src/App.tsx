@@ -20,14 +20,16 @@ import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
 import ErrorScreen from './components/screens/ErrorScreen';
-import DebugScreen from './components/screens/DebugScreen';
-import { PrayerTimesProvider } from './contexts/PrayerTimesContext';
-import { PrayerStatusProvider } from './contexts/PrayerStatusContext';
-import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
-import { ScreenSettingsProvider } from './contexts/ScreenSettingsContext';
-import { DebugMenuProvider } from './contexts/DebugMenuContext';
-import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+
+// Create a simple AuthenticatedRoute component
+interface AuthenticatedRouteProps {
+  children: React.ReactNode;
+}
+
+const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/pair" replace />;
+};
 
 /**
  * AppContent Component
@@ -115,7 +117,6 @@ const AppContent: React.FC = () => {
           <Route path="/pair" element={<PairingScreen />} />
           <Route path="/loading" element={<LoadingScreen />} />
           <Route path="/error" element={<ErrorScreen />} />
-          <Route path="/debug" element={<DebugScreen />} />
         </Routes>
       </div>
     </Fade>
@@ -131,37 +132,28 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <SnackbarProvider maxSnack={3}>
+      <SnackbarProvider maxSnack={3}>
+        <Router>
           <AuthProvider>
-            <NetworkStatusProvider>
-              <ScreenSettingsProvider>
-                <OfflineProvider>
-                  <PrayerTimesProvider>
-                    <PrayerStatusProvider>
-                      <ContentProvider>
-                        <DebugMenuProvider>
-                          <EmergencyAlertProvider>
-                            <Router>
-                              <Routes>
-                                <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
-                                <Route path="/pair" element={<PairingScreen />} />
-                                <Route path="/loading" element={<LoadingScreen />} />
-                                <Route path="/error" element={<ErrorScreen />} />
-                                <Route path="/debug" element={<DebugScreen />} />
-                              </Routes>
-                            </Router>
-                          </EmergencyAlertProvider>
-                        </DebugMenuProvider>
-                      </ContentProvider>
-                    </PrayerStatusProvider>
-                  </PrayerTimesProvider>
-                </OfflineProvider>
-              </ScreenSettingsProvider>
-            </NetworkStatusProvider>
+            <OrientationProvider>
+              <OfflineProvider>
+                <ContentProvider>
+                  <EmergencyAlertProvider>
+                    <ApiErrorBoundary>
+                      <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
+                      {/* <CorsErrorNotification /> */}
+                      <AuthErrorDetector />
+                      <EmergencyAlertOverlay />
+                      <EmergencyAlertDebug />
+                      <AppContent />
+                    </ApiErrorBoundary>
+                  </EmergencyAlertProvider>
+                </ContentProvider>
+              </OfflineProvider>
+            </OrientationProvider>
           </AuthProvider>
-        </SnackbarProvider>
-      </LocalizationProvider>
+        </Router>
+      </SnackbarProvider>
     </ThemeProvider>
   );
 };
