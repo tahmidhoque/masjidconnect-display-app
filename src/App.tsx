@@ -15,7 +15,6 @@ import AuthErrorDetector from './components/common/AuthErrorDetector';
 import OfflineNotification from './components/OfflineNotification';
 import ApiErrorBoundary from './components/common/ApiErrorBoundary';
 import EmergencyAlertOverlay from './components/common/EmergencyAlertOverlay';
-import EmergencyAlertDebug from './components/common/EmergencyAlertDebug';
 import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
@@ -144,7 +143,6 @@ const App: React.FC = () => {
                       {/* <CorsErrorNotification /> */}
                       <AuthErrorDetector />
                       <EmergencyAlertOverlay />
-                      <EmergencyAlertDebug />
                       <AppContent />
                     </ApiErrorBoundary>
                   </EmergencyAlertProvider>

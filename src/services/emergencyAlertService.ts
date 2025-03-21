@@ -454,26 +454,6 @@ class EmergencyAlertService {
   }
 
   /**
-   * Create a test alert for debugging purposes
-   */
-  public createTestAlert(): void {
-    console.log('🚨 EmergencyAlertService: Creating test alert');
-    
-    const testAlert: EmergencyAlert = {
-      id: 'test-alert-' + Date.now(),
-      title: 'Test Emergency Alert',
-      message: 'This is a test of the emergency alert system. If you can see this message, the alert display is working properly.',
-      color: '#e74c3c', // Red color
-      expiresAt: new Date(Date.now() + 60000).toISOString(), // 1 minute from now
-      createdAt: new Date().toISOString(),
-      masjidId: 'test-masjid-id'
-    };
-    
-    console.log('🚨 EmergencyAlertService: Test alert created:', testAlert);
-    this.setCurrentAlert(testAlert);
-  }
-
-  /**
    * Get current connection status for debugging
    */
   public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null } {
@@ -514,10 +494,5 @@ class EmergencyAlertService {
 }
 
 const emergencyAlertService = new EmergencyAlertService();
-
-// Make service available in global scope for testing via console
-if (typeof window !== 'undefined') {
-  (window as any).emergencyAlertService = emergencyAlertService;
-}
 
 export default emergencyAlertService; 

@@ -8,7 +8,6 @@ interface EmergencyAlertContextType {
   currentAlert: EmergencyAlert | null;
   hasActiveAlert: boolean;
   clearAlert: () => void;
-  createTestAlert: () => void;
 }
 
 const EmergencyAlertContext = createContext<EmergencyAlertContextType | undefined>(undefined);
@@ -60,25 +59,6 @@ export const EmergencyAlertProvider: React.FC<EmergencyAlertProviderProps> = ({ 
     }
   }, [isAuthenticated]);
 
-  // Create a test alert (for debugging or demo)
-  const createTestAlert = () => {
-    console.log('🚨 EmergencyAlertContext: Creating manual test alert');
-    
-    // Create a more persistent test alert (2 minutes duration)
-    const testAlert: EmergencyAlert = {
-      id: 'test-alert-' + Date.now(),
-      title: 'Test Emergency Alert',
-      message: 'This is a test of the emergency alert system. This alert was manually triggered for testing purposes. If you can see this message, the alert display system is working properly.',
-      color: '#e74c3c', // Red
-      expiresAt: new Date(Date.now() + 120000).toISOString(), // 2 minutes from now
-      createdAt: new Date().toISOString(),
-      masjidId: 'test-masjid-id'
-    };
-    
-    console.log('🚨 EmergencyAlertContext: Setting test alert:', testAlert);
-    setCurrentAlert(testAlert);
-  };
-
   // Clear the current alert manually
   const clearAlert = () => {
     if (currentAlert) {
@@ -91,8 +71,7 @@ export const EmergencyAlertProvider: React.FC<EmergencyAlertProviderProps> = ({ 
   const value = {
     currentAlert,
     hasActiveAlert: !!currentAlert,
-    clearAlert,
-    createTestAlert
+    clearAlert
   };
 
   // Log when the alert state changes

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useEmergencyAlert } from '../../contexts/EmergencyAlertContext';
-import { Alert, Button, Paper, Typography, Box, IconButton, Menu, MenuItem } from '@mui/material';
+import { Paper, Typography, Box, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { keyframes } from '@mui/system';
 
 // Define the fade-in animation
@@ -18,50 +17,10 @@ const fadeInAnimation = keyframes`
 `;
 
 const EmergencyAlert: React.FC = () => {
-  const { currentAlert, hasActiveAlert, clearAlert, createTestAlert } = useEmergencyAlert();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const openMenu = Boolean(anchorEl);
-
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
+  const { currentAlert, hasActiveAlert, clearAlert } = useEmergencyAlert();
 
   return (
     <>
-      {/* This hidden debug button is only visible in development mode */}
-      {process.env.NODE_ENV === 'development' && !hasActiveAlert && (
-        <Box position="fixed" bottom={20} right={20} zIndex={9999}>
-          <IconButton
-            color="primary"
-            size="small"
-            onClick={handleMenuClick}
-            aria-controls={openMenu ? 'emergency-debug-menu' : undefined}
-            aria-haspopup="true"
-            aria-expanded={openMenu ? 'true' : undefined}
-            sx={{ bgcolor: 'rgba(255,255,255,0.8)', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' } }}
-          >
-            <MoreVertIcon />
-          </IconButton>
-          <Menu
-            id="emergency-debug-menu"
-            anchorEl={anchorEl}
-            open={openMenu}
-            onClose={handleMenuClose}
-            MenuListProps={{
-              'aria-labelledby': 'emergency-debug-button',
-            }}
-          >
-            <MenuItem onClick={() => { createTestAlert(); handleMenuClose(); }}>
-              Create Test Alert
-            </MenuItem>
-          </Menu>
-        </Box>
-      )}
-
       {hasActiveAlert && (
         <Paper
           elevation={3}
