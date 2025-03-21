@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Fade } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
@@ -19,7 +19,15 @@ import EmergencyAlertDebug from './components/common/EmergencyAlertDebug';
 import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
-import SSETestComponent from './components/screens/SSETestComponent';
+import ErrorScreen from './components/screens/ErrorScreen';
+import DebugScreen from './components/screens/DebugScreen';
+import { PrayerTimesProvider } from './contexts/PrayerTimesContext';
+import { PrayerStatusProvider } from './contexts/PrayerStatusContext';
+import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
+import { ScreenSettingsProvider } from './contexts/ScreenSettingsContext';
+import { DebugMenuProvider } from './contexts/DebugMenuContext';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 /**
  * AppContent Component
@@ -103,11 +111,11 @@ const AppContent: React.FC = () => {
       <div>
         {isAuthenticated && <AuthErrorDetector />}
         <Routes>
-          <Route 
-            path="*" 
-            element={isAuthenticated ? <DisplayScreen /> : <PairingScreen />} 
-          />
-          <Route path="/sse-test" element={<SSETestComponent />} />
+          <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
+          <Route path="/pair" element={<PairingScreen />} />
+          <Route path="/loading" element={<LoadingScreen />} />
+          <Route path="/error" element={<ErrorScreen />} />
+          <Route path="/debug" element={<DebugScreen />} />
         </Routes>
       </div>
     </Fade>
@@ -123,28 +131,37 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SnackbarProvider maxSnack={3}>
-        <Router>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <SnackbarProvider maxSnack={3}>
           <AuthProvider>
-            <OrientationProvider>
-              <OfflineProvider>
-                <ContentProvider>
-                  <EmergencyAlertProvider>
-                    <ApiErrorBoundary>
-                      <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
-                      {/* <CorsErrorNotification /> */}
-                      <AuthErrorDetector />
-                      <EmergencyAlertOverlay />
-                      <EmergencyAlertDebug />
-                      <AppContent />
-                    </ApiErrorBoundary>
-                  </EmergencyAlertProvider>
-                </ContentProvider>
-              </OfflineProvider>
-            </OrientationProvider>
+            <NetworkStatusProvider>
+              <ScreenSettingsProvider>
+                <OfflineProvider>
+                  <PrayerTimesProvider>
+                    <PrayerStatusProvider>
+                      <ContentProvider>
+                        <DebugMenuProvider>
+                          <EmergencyAlertProvider>
+                            <Router>
+                              <Routes>
+                                <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
+                                <Route path="/pair" element={<PairingScreen />} />
+                                <Route path="/loading" element={<LoadingScreen />} />
+                                <Route path="/error" element={<ErrorScreen />} />
+                                <Route path="/debug" element={<DebugScreen />} />
+                              </Routes>
+                            </Router>
+                          </EmergencyAlertProvider>
+                        </DebugMenuProvider>
+                      </ContentProvider>
+                    </PrayerStatusProvider>
+                  </PrayerTimesProvider>
+                </OfflineProvider>
+              </ScreenSettingsProvider>
+            </NetworkStatusProvider>
           </AuthProvider>
-        </Router>
-      </SnackbarProvider>
+        </SnackbarProvider>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 };

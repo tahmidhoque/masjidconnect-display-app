@@ -9,7 +9,6 @@ interface EmergencyAlertContextType {
   hasActiveAlert: boolean;
   clearAlert: () => void;
   createTestAlert: () => void;
-  testSSEConnection: () => void;
 }
 
 const EmergencyAlertContext = createContext<EmergencyAlertContextType | undefined>(undefined);
@@ -80,28 +79,6 @@ export const EmergencyAlertProvider: React.FC<EmergencyAlertProviderProps> = ({ 
     setCurrentAlert(testAlert);
   };
 
-  // Test SSE connection
-  const testSSEConnection = () => {
-    console.log('🚨 EmergencyAlertContext: Testing SSE connection');
-    
-    // Get the current connection status
-    const status = emergencyAlertService.getConnectionStatus();
-    console.log('🚨 EmergencyAlertContext: Current SSE connection status:', status);
-    
-    // If not connected, try to reconnect
-    if (!status.connected) {
-      const baseURL = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000' 
-        : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-        
-      console.log('🚨 EmergencyAlertContext: Reconnecting with baseURL:', baseURL);
-      emergencyAlertService.initialize(baseURL);
-    }
-    
-    // Run a more detailed connection test
-    emergencyAlertService.testConnection();
-  };
-
   // Clear the current alert manually
   const clearAlert = () => {
     if (currentAlert) {
@@ -115,8 +92,7 @@ export const EmergencyAlertProvider: React.FC<EmergencyAlertProviderProps> = ({ 
     currentAlert,
     hasActiveAlert: !!currentAlert,
     clearAlert,
-    createTestAlert,
-    testSSEConnection
+    createTestAlert
   };
 
   // Log when the alert state changes

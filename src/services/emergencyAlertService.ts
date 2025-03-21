@@ -40,66 +40,44 @@ class EmergencyAlertService {
    * Connect to the SSE endpoint
    */
   private connectToEventSource(baseURL: string): void {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
-
     try {
-      // Make sure we have no duplicate slashes in the URL
-      const base = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+      // Close existing connection if any
+      if (this.eventSource) {
+        this.eventSource.close();
+        this.eventSource = null;
+      }
       
       // Use the correct endpoint for SSE
-      const endpoint = '/api/sse'; 
-      this.connectionUrl = `${base}${endpoint}`;
+      const endpoint = '/api/sse';
+      this.connectionUrl = `${baseURL}${endpoint}`;
       
       logger.info(`EmergencyAlertService: Connecting to SSE at ${this.connectionUrl}`);
       console.log(`🚨 EmergencyAlertService: Connecting to SSE at ${this.connectionUrl}`);
       
-      // Use our enhanced DebugEventSource for better debugging
-      const options = { withCredentials: false };
-      const eventSource = process.env.NODE_ENV === 'development'
-        ? new DebugEventSource(this.connectionUrl, options) as unknown as EventSource
-        : new EventSource(this.connectionUrl, options);
-        
+      // Create a new EventSource
+      let eventSource: EventSource;
+      if (process.env.NODE_ENV === 'development') {
+        // Cast DebugEventSource to EventSource for compatibility
+        eventSource = new DebugEventSource(this.connectionUrl, {
+          withCredentials: true,
+        }) as unknown as EventSource;
+      } else {
+        eventSource = new EventSource(this.connectionUrl, {
+          withCredentials: true,
+        });
+      }
+      
       this.eventSource = eventSource;
       
-      console.log('🚨 EmergencyAlertService: EventSource created', eventSource);
+      // Setup event listeners
+      this.setupEventListeners(eventSource);
       
-      // Add connection status UI indicator
-      this.addConnectionIndicator(this.connectionUrl);
-
-      // Set up event handlers as in the working test
-      eventSource.onopen = () => {
-        console.log('🚨 EmergencyAlertService: Connection opened successfully');
-        logger.info('EmergencyAlertService: SSE connection established');
-        this.updateConnectionIndicator(true);
-        this.reconnectAttempts = 0; // Reset reconnect attempts on success
-      };
+      // Handle open event
+      eventSource.onopen = this.handleConnectionOpen;
       
-      // Add additional test events to catch different formats from the server
-      eventSource.addEventListener('EMERGENCY_ALERT', this.handleAlertEvent);
-      eventSource.addEventListener('EMERGENCY_UPDATE', this.handleUpdateEvent);
-      eventSource.addEventListener('EMERGENCY_CANCEL', this.handleCancelEvent);
-      
-      // Add lowercase variants
-      eventSource.addEventListener('emergency_alert', this.handleAlertEvent);
-      eventSource.addEventListener('emergency_update', this.handleUpdateEvent);
-      eventSource.addEventListener('emergency_cancel', this.handleCancelEvent);
-      
-      // Add camelCase variants
-      eventSource.addEventListener('emergencyAlert', this.handleAlertEvent);
-      eventSource.addEventListener('emergencyUpdate', this.handleUpdateEvent);
-      eventSource.addEventListener('emergencyCancel', this.handleCancelEvent);
-      
-      // Generic message handler for any unhandled messages
-      eventSource.onmessage = this.handleGenericMessage;
-      
-      // Standard error handler
-      // Add standard error handler
+      // Handle error events
       eventSource.onerror = (error) => {
         console.error('SSE connection error:', error);
-        this.updateConnectionIndicator(false);
         this.handleConnectionError(error);
       };
     } catch (error) {
@@ -108,81 +86,6 @@ class EmergencyAlertService {
       this.scheduleReconnect();
     }
   }
-
-  /**
-   * Add a visual indicator for SSE connection status
-   */
-  private addConnectionIndicator(url: string): void {
-    // Check if we already have an indicator
-    let indicator = document.getElementById('sse-connection-indicator');
-    
-    if (!indicator) {
-      // Create the indicator element
-      indicator = document.createElement('div');
-      indicator.id = 'sse-connection-indicator';
-      indicator.style.position = 'fixed';
-      indicator.style.top = '10px';
-      indicator.style.right = '10px';
-      indicator.style.padding = '5px 10px';
-      indicator.style.borderRadius = '4px';
-      indicator.style.fontSize = '12px';
-      indicator.style.fontFamily = 'monospace';
-      indicator.style.zIndex = '10000';
-      indicator.style.cursor = 'pointer';
-      indicator.title = 'SSE Connection Status';
-      
-      // Add a click handler to show more details
-      indicator.onclick = () => {
-        alert(`SSE Connection Details:
-URL: ${url}
-Status: ${this.eventSource ? 'Connected' : 'Disconnected'}
-Ready State: ${this.eventSource ? this.eventSource.readyState : 'N/A'}
-Reconnect Attempts: ${this.reconnectAttempts}`);
-      };
-      
-      document.body.appendChild(indicator);
-    }
-    
-    // Initial state
-    this.updateConnectionIndicator(false);
-  }
-
-  /**
-   * Update the connection indicator status
-   */
-  private updateConnectionIndicator(connected: boolean): void {
-    const indicator = document.getElementById('sse-connection-indicator');
-    if (!indicator) return;
-    
-    if (connected) {
-      indicator.style.backgroundColor = '#4caf50';
-      indicator.style.color = 'white';
-      indicator.textContent = '● SSE Connected';
-    } else {
-      indicator.style.backgroundColor = '#f44336';
-      indicator.style.color = 'white';
-      indicator.textContent = '○ SSE Disconnected';
-    }
-  }
-
-  /**
-   * Handle generic messages (non-specific events)
-   */
-  private handleGenericMessage = (event: MessageEvent): void => {
-    console.log('🚨 EmergencyAlertService: Received generic message:', event.data);
-    
-    try {
-      const data = JSON.parse(event.data);
-      
-      // Check if this looks like an alert
-      if (data && data.title && data.message && data.expiresAt) {
-        console.log('🚨 EmergencyAlertService: Generic message appears to be an alert:', data);
-        this.setCurrentAlert(data);
-      }
-    } catch (error) {
-      console.log('🚨 EmergencyAlertService: Not a JSON message or not an alert format:', event.data);
-    }
-  };
 
   /**
    * Set up event listeners for the EventSource
@@ -224,10 +127,12 @@ Reconnect Attempts: ${this.reconnectAttempts}`);
    * Handle successful connection
    */
   private handleConnectionOpen = (): void => {
+    this.reconnectAttempts = 0;
     logger.info('EmergencyAlertService: SSE connection established');
     console.log('🚨 EmergencyAlertService: SSE connection established!');
-    // Reset reconnect attempts on successful connection
-    this.reconnectAttempts = 0;
+    
+    // Load any saved alert data
+    this.loadSavedAlert();
   };
 
   /**
@@ -569,114 +474,41 @@ Reconnect Attempts: ${this.reconnectAttempts}`);
   }
 
   /**
-   * Get the current connection status and URL
+   * Get current connection status for debugging
    */
   public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null } {
     return {
-      connected: !!this.eventSource && this.eventSource.readyState === EventSource.OPEN,
+      connected: this.eventSource !== null && this.eventSource.readyState === 1,
       url: this.connectionUrl,
       readyState: this.eventSource ? this.eventSource.readyState : null
     };
   }
 
   /**
-   * Test the SSE connection and provide detailed diagnostic information
-   */
-  public testConnection(): void {
-    console.log('🚨 EmergencyAlertService: Testing SSE connection...');
-    
-    // Check if we have an active event source
-    if (!this.eventSource) {
-      console.error('🚨 EmergencyAlertService: No active EventSource connection!');
-      console.log('🚨 Trying to create a new connection...');
-      
-      // Try to reinitialize
-      this.initialize(process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-      return;
-    }
-    
-    // Check EventSource readyState
-    const readyStateMap = {
-      0: 'CONNECTING',
-      1: 'OPEN',
-      2: 'CLOSED'
-    };
-    
-    const readyState = this.eventSource.readyState;
-    const readyStateText = readyStateMap[readyState as keyof typeof readyStateMap] || 'UNKNOWN';
-    
-    console.log('🚨 EventSource ready state:', readyStateText, `(${readyState})`);
-    console.log('🚨 Connection URL:', this.connectionUrl);
-    
-    // Get credentials to check if they might be the issue
-    const credentials = this.getCredentials();
-    console.log('🚨 Credentials available:', !!credentials);
-    
-    if (credentials) {
-      console.log('🚨 API Key (masked):', 
-        credentials.apiKey ? `${credentials.apiKey.substring(0, 3)}...${credentials.apiKey.slice(-3)}` : 'None');
-      console.log('🚨 Screen ID (masked):', 
-        credentials.screenId ? `${credentials.screenId.substring(0, 3)}...${credentials.screenId.slice(-3)}` : 'None');
-    }
-    
-    // Check if we're connected and the Network tab shows the connection
-    console.log(`
-🚨 TROUBLESHOOTING:
-1. Check Network tab: You should see a persistent connection to ${this.connectionUrl}
-2. The connection should have status 200 and type "event-stream"
-3. If you don't see it, make sure there are no CORS issues
-4. If you see error 401, check your credentials
-
-Try to manually create a test alert to verify the UI works: emergencyAlertService.createTestAlert()
-    `);
-    
-    // Update the connection indicator
-    this.updateConnectionIndicator(readyState === 1);
-  }
-
-  /**
-   * Try to extract alert information from raw data
+   * Handle an alert that comes in via the API instead of SSE
    */
   private tryParseRawAlert(data: any): void {
-    console.log('🚨 EmergencyAlertService: Attempting to parse raw alert data:', data);
-    
     try {
-      // If it's a string but not JSON, use it as a message
-      if (typeof data === 'string' && data.trim() !== '') {
-        // Create a simple alert from the string
-        const simpleAlert: EmergencyAlert = {
-          id: `raw-alert-${Date.now()}`,
-          title: 'Emergency Alert',
-          message: data,
-          color: '#e74c3c',
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          createdAt: new Date().toISOString(),
-          masjidId: 'unknown'
-        };
-        
-        console.log('🚨 EmergencyAlertService: Created simple alert from string:', simpleAlert);
-        this.setCurrentAlert(simpleAlert);
-      } 
-      // If it's an object with useful fields but not matching our exact format
-      else if (typeof data === 'object' && data !== null) {
-        const message = data.message || data.text || data.content || data.body || 'Emergency alert received';
-        const title = data.title || data.subject || data.name || 'Emergency Alert';
-        
-        const reconstructedAlert: EmergencyAlert = {
-          id: data.id || `reconstructed-alert-${Date.now()}`,
-          title: title,
-          message: message,
-          color: data.color || '#e74c3c',
-          expiresAt: data.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          createdAt: data.createdAt || new Date().toISOString(),
-          masjidId: data.masjidId || 'unknown'
-        };
-        
-        console.log('🚨 EmergencyAlertService: Reconstructed alert from object:', reconstructedAlert);
-        this.setCurrentAlert(reconstructedAlert);
+      // Check if it's already a valid object
+      if (typeof data === 'object' && data !== null) {
+        if (data.id && data.title && data.message && data.expiresAt) {
+          this.setCurrentAlert(data as EmergencyAlert);
+          return;
+        }
       }
-    } catch (error) {
-      console.error('🚨 EmergencyAlertService: Failed to extract alert from raw data:', error);
+      
+      // Try to parse as JSON string
+      if (typeof data === 'string') {
+        const parsed = JSON.parse(data);
+        if (parsed && parsed.id && parsed.title && parsed.message && parsed.expiresAt) {
+          this.setCurrentAlert(parsed as EmergencyAlert);
+          return;
+        }
+      }
+      
+      logger.warn('EmergencyAlertService: Raw alert data not valid for emergency alert', { data });
+    } catch (e) {
+      logger.error('EmergencyAlertService: Error parsing raw alert data', { error: e });
     }
   }
 }

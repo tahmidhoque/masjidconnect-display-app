@@ -18,7 +18,7 @@ const fadeInAnimation = keyframes`
 `;
 
 const EmergencyAlert: React.FC = () => {
-  const { currentAlert, hasActiveAlert, clearAlert, createTestAlert, testSSEConnection } = useEmergencyAlert();
+  const { currentAlert, hasActiveAlert, clearAlert, createTestAlert } = useEmergencyAlert();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const openMenu = Boolean(anchorEl);
 
@@ -57,9 +57,6 @@ const EmergencyAlert: React.FC = () => {
           >
             <MenuItem onClick={() => { createTestAlert(); handleMenuClose(); }}>
               Create Test Alert
-            </MenuItem>
-            <MenuItem onClick={() => { testSSEConnection(); handleMenuClose(); }}>
-              Test SSE Connection
             </MenuItem>
           </Menu>
         </Box>
