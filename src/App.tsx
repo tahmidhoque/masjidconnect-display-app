@@ -7,15 +7,19 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { OrientationProvider } from './contexts/OrientationContext';
 import { ContentProvider } from './contexts/ContentContext';
 import { OfflineProvider } from './contexts/OfflineContext';
+import { EmergencyAlertProvider } from './contexts/EmergencyAlertContext';
 import DisplayScreen from './components/screens/DisplayScreen';
 import PairingScreen from './components/screens/PairingScreen';
 import LoadingScreen from './components/screens/LoadingScreen';
 import AuthErrorDetector from './components/common/AuthErrorDetector';
 import OfflineNotification from './components/OfflineNotification';
 import ApiErrorBoundary from './components/common/ApiErrorBoundary';
+import EmergencyAlertOverlay from './components/common/EmergencyAlertOverlay';
+import EmergencyAlertDebug from './components/common/EmergencyAlertDebug';
 import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
+import SSETestComponent from './components/screens/SSETestComponent';
 
 /**
  * AppContent Component
@@ -103,6 +107,7 @@ const AppContent: React.FC = () => {
             path="*" 
             element={isAuthenticated ? <DisplayScreen /> : <PairingScreen />} 
           />
+          <Route path="/sse-test" element={<SSETestComponent />} />
         </Routes>
       </div>
     </Fade>
@@ -124,12 +129,16 @@ const App: React.FC = () => {
             <OrientationProvider>
               <OfflineProvider>
                 <ContentProvider>
-                  <ApiErrorBoundary>
-                    <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
-                    {/* <CorsErrorNotification /> */}
-                    <AuthErrorDetector />
-                    <AppContent />
-                  </ApiErrorBoundary>
+                  <EmergencyAlertProvider>
+                    <ApiErrorBoundary>
+                      <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
+                      {/* <CorsErrorNotification /> */}
+                      <AuthErrorDetector />
+                      <EmergencyAlertOverlay />
+                      <EmergencyAlertDebug />
+                      <AppContent />
+                    </ApiErrorBoundary>
+                  </EmergencyAlertProvider>
                 </ContentProvider>
               </OfflineProvider>
             </OrientationProvider>

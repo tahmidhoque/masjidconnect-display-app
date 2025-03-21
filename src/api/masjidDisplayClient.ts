@@ -1063,6 +1063,46 @@ class MasjidDisplayClient {
       }
     }
   }
+
+  /**
+   * Manually test the emergency alert system
+   * @returns {Promise<boolean>} Success status
+   */
+  async testEmergencyAlert(): Promise<boolean> {
+    try {
+      console.log("🚨 Testing emergency alert system with a local alert");
+      // Dispatch a custom event to simulate the SSE alert
+      const testAlertData = {
+        id: "test-alert-" + Date.now(),
+        title: "Test Emergency Alert",
+        message: "This is a test of the emergency alert system from the API client. If you can see this, the alert rendering is working.",
+        color: "#e74c3c", // Red
+        expiresAt: new Date(Date.now() + 30000).toISOString(), // 30 seconds from now
+        createdAt: new Date().toISOString(),
+        masjidId: "test-masjid"
+      };
+      
+      // Create a new MessageEvent
+      const testEvent = new MessageEvent("EMERGENCY_ALERT", {
+        data: JSON.stringify(testAlertData),
+        origin: window.location.origin
+      });
+      
+      // Dispatch the event to the window
+      window.dispatchEvent(testEvent);
+      
+      // Also try the global event target approach
+      const globalEventTarget = document.createDocumentFragment();
+      globalEventTarget.dispatchEvent(new CustomEvent("EMERGENCY_ALERT", {
+        detail: testAlertData
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error("Error testing emergency alert:", error);
+      return false;
+    }
+  }
 }
 
 // Create and export a singleton instance

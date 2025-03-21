@@ -1,5 +1,5 @@
 import localforage from 'localforage';
-import { ScreenContent, PrayerTimes, PrayerStatus, Event, ApiCredentials, Schedule } from '../api/models';
+import { ScreenContent, PrayerTimes, PrayerStatus, Event, ApiCredentials, Schedule, EmergencyAlert } from '../api/models';
 
 // Initialize DB
 localforage.config({
@@ -18,6 +18,7 @@ enum StorageKeys {
   LAST_UPDATED = 'lastUpdated',
   API_KEY = 'masjid_api_key',
   SCREEN_ID = 'masjid_screen_id',
+  EMERGENCY_ALERT = 'emergency_alert',
 }
 
 // Storage Service
@@ -163,6 +164,19 @@ class StorageService {
 
   async getLastUpdated(): Promise<Record<string, string> | null> {
     return localforage.getItem<Record<string, string>>(StorageKeys.LAST_UPDATED);
+  }
+
+  // Emergency Alert
+  async saveEmergencyAlert(alert: EmergencyAlert): Promise<void> {
+    await localforage.setItem(StorageKeys.EMERGENCY_ALERT, alert);
+  }
+
+  async getEmergencyAlert(): Promise<EmergencyAlert | null> {
+    return localforage.getItem<EmergencyAlert>(StorageKeys.EMERGENCY_ALERT);
+  }
+
+  async removeEmergencyAlert(): Promise<void> {
+    await localforage.removeItem(StorageKeys.EMERGENCY_ALERT);
   }
 
   // Clear all data

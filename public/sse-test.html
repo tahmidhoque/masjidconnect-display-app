@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SSE Connection Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      margin-top: 20px;
+    }
+    #controls {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: #f5f5f5;
+      border-radius: 5px;
+    }
+    #messages {
+      border: 1px solid #ddd;
+      padding: 10px;
+      height: 400px;
+      overflow-y: auto;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+    }
+    .message {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .error {
+      color: red;
+    }
+    .connection {
+      color: blue;
+    }
+    .event {
+      color: green;
+      font-weight: bold;
+    }
+    label {
+      display: inline-block;
+      width: 120px;
+    }
+    input[type="text"] {
+      width: 400px;
+      padding: 5px;
+    }
+    button {
+      padding: 5px 10px;
+      margin-right: 10px;
+    }
+    .status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 3px;
+      margin-left: 10px;
+    }
+    .connected {
+      background-color: #4caf50;
+      color: white;
+    }
+    .disconnected {
+      background-color: #f44336;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>SSE Connection Test</h1>
+  
+  <div id="controls">
+    <div>
+      <label for="baseUrl">API Base URL:</label>
+      <input type="text" id="baseUrl" value="http://localhost:3000" />
+    </div>
+    <div style="margin-top: 10px;">
+      <label for="endpoint">SSE Endpoint:</label>
+      <input type="text" id="endpoint" value="/api/sse" />
+    </div>
+    <div style="margin-top: 10px;">
+      <input type="checkbox" id="withCredentials" />
+      <label for="withCredentials">Use withCredentials</label>
+    </div>
+    <div style="margin-top: 15px;">
+      <button id="connect">Connect</button>
+      <button id="disconnect" disabled>Disconnect</button>
+      <span id="status" class="status disconnected">Disconnected</span>
+    </div>
+  </div>
+  
+  <div class="container">
+    <h2>Connection Log</h2>
+    <div id="messages"></div>
+  </div>
+  
+  <script>
+    // DOM elements
+    const baseUrlInput = document.getElementById('baseUrl');
+    const endpointInput = document.getElementById('endpoint');
+    const withCredentialsCheckbox = document.getElementById('withCredentials');
+    const connectButton = document.getElementById('connect');
+    const disconnectButton = document.getElementById('disconnect');
+    const statusSpan = document.getElementById('status');
+    const messagesDiv = document.getElementById('messages');
+    
+    let eventSource = null;
+    
+    // Add a message to the log
+    function addMessage(text, type = '') {
+      const message = document.createElement('div');
+      message.classList.add('message');
+      if (type) {
+        message.classList.add(type);
+      }
+      
+      const time = new Date().toLocaleTimeString();
+      message.textContent = `[${time}] ${text}`;
+      
+      messagesDiv.appendChild(message);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    // Update connection status UI
+    function updateStatus(connected) {
+      if (connected) {
+        statusSpan.textContent = 'Connected';
+        statusSpan.className = 'status connected';
+        connectButton.disabled = true;
+        disconnectButton.disabled = false;
+      } else {
+        statusSpan.textContent = 'Disconnected';
+        statusSpan.className = 'status disconnected';
+        connectButton.disabled = false;
+        disconnectButton.disabled = true;
+      }
+    }
+    
+    // Connect to SSE endpoint
+    function connect() {
+      try {
+        // Validate inputs
+        const baseUrl = baseUrlInput.value.trim();
+        const endpoint = endpointInput.value.trim();
+        const withCredentials = withCredentialsCheckbox.checked;
+        
+        if (!baseUrl) {
+          addMessage('Base URL is required', 'error');
+          return;
+        }
+        
+        // Clean up any existing connection
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        
+        // Format the URL
+        const url = baseUrl.endsWith('/') && endpoint.startsWith('/') 
+          ? `${baseUrl.slice(0, -1)}${endpoint}`
+          : (!baseUrl.endsWith('/') && !endpoint.startsWith('/'))
+            ? `${baseUrl}/${endpoint}`
+            : `${baseUrl}${endpoint}`;
+        
+        addMessage(`Connecting to ${url}${withCredentials ? ' with credentials' : ''}`, 'connection');
+        
+        // Create new EventSource
+        eventSource = new EventSource(url, { withCredentials });
+        
+        // Set up event handlers
+        eventSource.onopen = (event) => {
+          addMessage('Connection opened successfully', 'connection');
+          updateStatus(true);
+        };
+        
+        eventSource.onerror = (error) => {
+          addMessage(`Connection error: ${JSON.stringify(error)}`, 'error');
+          updateStatus(false);
+          
+          // Provide CORS troubleshooting info
+          addMessage('Possible CORS solutions:', 'error');
+          addMessage('1. Ensure server sends these headers:', 'error');
+          addMessage('   Access-Control-Allow-Origin: *', 'error');
+          addMessage('   Access-Control-Allow-Methods: GET', 'error');
+          addMessage('   Access-Control-Allow-Headers: Content-Type', 'error');
+          
+          // Close connection on error
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+        };
+        
+        // Listen for emergency alert events
+        eventSource.addEventListener('EMERGENCY_ALERT', (event) => {
+          addMessage(`EMERGENCY_ALERT event received: ${event.data}`, 'event');
+        });
+        
+        eventSource.addEventListener('EMERGENCY_UPDATE', (event) => {
+          addMessage(`EMERGENCY_UPDATE event received: ${event.data}`, 'event');
+        });
+        
+        eventSource.addEventListener('EMERGENCY_CANCEL', (event) => {
+          addMessage(`EMERGENCY_CANCEL event received: ${event.data}`, 'event');
+        });
+        
+        // Catch all other events
+        eventSource.onmessage = (event) => {
+          addMessage(`Generic message received: ${event.data}`);
+        };
+        
+      } catch (error) {
+        addMessage(`Error creating connection: ${error.message}`, 'error');
+        updateStatus(false);
+      }
+    }
+    
+    // Disconnect from SSE endpoint
+    function disconnect() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+        addMessage('Connection closed', 'connection');
+        updateStatus(false);
+      }
+    }
+    
+    // Set up event listeners
+    connectButton.addEventListener('click', connect);
+    disconnectButton.addEventListener('click', disconnect);
+    
+    // Initialize status
+    updateStatus(false);
+    addMessage('Ready to test SSE connection. Click "Connect" to start.', 'connection');
+  </script>
+</body>
+</html> 

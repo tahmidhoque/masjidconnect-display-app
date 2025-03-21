@@ -236,4 +236,14 @@ export interface ApiResponse<T> {
   cached?: boolean;
   offlineFallback?: boolean;
   status?: number; // Add status code property for error responses
+}
+
+export interface EmergencyAlert {
+  id: string;
+  title: string;
+  message: string;
+  color: string;
+  expiresAt: string; // ISO date string when alert expires
+  createdAt: string; // ISO date string when alert was created
+  masjidId: string;  // ID of the masjid that created the alert
 } 
