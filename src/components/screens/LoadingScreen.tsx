@@ -20,7 +20,7 @@ interface LoadingScreenProps {
  */
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, requestPairingCode } = useAuth();
   const { orientation, setAdminOrientation } = useOrientation();
   const { masjidName, screenContent } = useContent();
   
@@ -54,6 +54,24 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       setShowContent(true);
     }, 300);
   }, []);
+
+  // Request pairing code if not authenticated
+  useEffect(() => {
+    // Only request code if not authenticated and we're in the loading phase (likely transitioning to pair screen)
+    if (!isAuthenticated) {
+      // Check if localStorage already has a valid pairing code
+      const storedPairingCode = localStorage.getItem('pairingCode');
+      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
+      
+      // Only request a new code if we don't have a valid non-expired one
+      if (!storedPairingCode || !storedPairingCodeExpiresAt || new Date(storedPairingCodeExpiresAt) <= new Date()) {
+        console.log('[LoadingScreen] Requesting pairing code during loading...');
+        requestPairingCode(orientation).catch(err => {
+          console.error('[LoadingScreen] Error requesting pairing code:', err);
+        });
+      }
+    }
+  }, [isAuthenticated, requestPairingCode, orientation]);
 
   // Simple, deterministic loading sequence
   useEffect(() => {
@@ -213,7 +231,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const LoadingContent = () => (
     <Box
       sx={{
-        backgroundColor: theme.palette.primary.main,
+        background: 'linear-gradient(135deg, #0A2647 0%, #144272 100%)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
