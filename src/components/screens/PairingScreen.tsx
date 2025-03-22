@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrientation } from '../../contexts/OrientationContext';
 import { useSnackbar } from 'notistack';
+import { useNavigate } from 'react-router-dom';
 import logoNoTextBlue from '../../assets/logos/logo-notext-blue.svg';
 import { getAdminBaseUrl, getPairingUrl } from '../../utils/adminUrlUtils';
 
@@ -29,7 +30,9 @@ const PairingScreen: React.FC = () => {
     pairingCode, 
     pairingCodeExpiresAt,
     isPairingCodeExpired,
-    setIsPaired
+    setIsPaired,
+    isAuthenticated,
+    isPaired
   } = useAuth();
   const { orientation } = useOrientation();
   const [fadeIn, setFadeIn] = useState<boolean>(false);
@@ -38,12 +41,21 @@ const PairingScreen: React.FC = () => {
   const requestInProgress = useRef<boolean>(false);
   const pollingRef = useRef<boolean>(false);
   const { enqueueSnackbar } = useSnackbar();
+  const navigate = useNavigate();
   
   // Track if component is mounted
   const isMounted = useRef<boolean>(true);
   
   // Add separate state for QR code loading
   const [isQrLoading, setIsQrLoading] = useState<boolean>(false);
+  
+  // Navigation effect to redirect when authentication is successful
+  useEffect(() => {
+    if (isAuthenticated && isPaired) {
+      console.log('[PairingScreen] Authentication successful, redirecting to display screen');
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, isPaired, navigate]);
   
   // Start polling for pairing status
   const startPolling = useCallback(async (code: string) => {
@@ -65,6 +77,9 @@ const PairingScreen: React.FC = () => {
         
         // Force a re-render of the App component by updating the isPaired state in AuthContext
         setIsPaired(true);
+        
+        // Navigate to the display screen
+        navigate('/', { replace: true });
       } else {
         console.log('[PairingScreen] Device not yet paired, continuing to poll...');
         // Polling continues in the AuthContext through interval-based checks
@@ -74,7 +89,7 @@ const PairingScreen: React.FC = () => {
       pollingRef.current = false;
       setIsPolling(false);
     }
-  }, [checkPairingStatus, setIsPaired]);
+  }, [checkPairingStatus, setIsPaired, navigate]);
   
   // Handle refresh button click
   const handleRefresh = useCallback(async () => {
@@ -317,13 +332,23 @@ const PairingScreen: React.FC = () => {
       // Force immediate authentication by calling setIsPaired(true)
       setIsPaired(true);
       
+      // Redirect to the main display screen
+      navigate('/', { replace: true });
+      
       // Mark that we've done this check to avoid loops
       localStorage.setItem('credentials_check_done', 'true');
     } else {
       console.log('[PairingScreen] No existing credentials found');
       localStorage.setItem('credentials_check_done', 'true');
     }
-  }, [setIsPaired]);
+  }, [setIsPaired, navigate]);
+  
+  // If already authenticated, redirect to the main screen
+  useEffect(() => {
+    if (isAuthenticated && isPaired) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, isPaired, navigate]);
   
   return (
     <PairingScreenLayout
