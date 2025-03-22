@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 
 /**
+ * Interface for screen size properties
+ */
+interface ScreenSize {
+  width: number;
+  height: number;
+  isLargeScreen: boolean;
+  is720p?: boolean;
+}
+
+/**
  * useResponsiveFontSize
  * 
  * A custom hook that returns responsive font size multipliers based on screen resolution.
@@ -9,7 +19,7 @@ import { useEffect, useState } from 'react';
  */
 const useResponsiveFontSize = () => {
   const [fontSizeMultiplier, setFontSizeMultiplier] = useState(1.2);
-  const [screenSize, setScreenSize] = useState({
+  const [screenSize, setScreenSize] = useState<ScreenSize>({
     width: window.innerWidth,
     height: window.innerHeight,
     isLargeScreen: window.innerWidth >= 1920 || window.innerHeight >= 1080
@@ -36,9 +46,18 @@ const useResponsiveFontSize = () => {
       else if (isLargeScreen && (width >= 2400 || height >= 1300)) {
         multiplier = 1.4;
       }
+      // For 720p screens (1280x720)
+      else if (width <= 1280 || height <= 720) {
+        multiplier = 0.9;
+      }
       
       setFontSizeMultiplier(multiplier);
-      setScreenSize({ width, height, isLargeScreen });
+      setScreenSize({ 
+        width, 
+        height, 
+        isLargeScreen,
+        is720p: width <= 1280 || height <= 720 
+      });
     };
 
     // Calculate initially

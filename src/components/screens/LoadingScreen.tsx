@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, useTheme, Fade } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrientation } from '../../contexts/OrientationContext';
@@ -20,144 +20,113 @@ interface LoadingScreenProps {
  */
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
-  const { isAuthenticated } = useAuth();
-  const { isInitializing, initializationStage } = useAppInitialization();
-  const { orientation } = useOrientation();
+  const { isAuthenticated, requestPairingCode } = useAuth();
+  const { orientation, setAdminOrientation } = useOrientation();
   const { masjidName, screenContent } = useContent();
+  
+  // Animation and content states
   const [rotationAngle, setRotationAngle] = useState(0);
   const [showContent, setShowContent] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
   
-  // Use the same pattern as DisplayScreen for orientation tracking
-  const [currentOrientation, setCurrentOrientation] = useState(orientation);
-  const prevOrientationRef = useRef(orientation);
+  // Reference to track if we've already triggered completion
+  const hasCompletedRef = useRef(false);
   
-  // Use our rotation handling hook to determine if we need to rotate
-  const { shouldRotate, physicalOrientation } = useRotationHandling(currentOrientation);
+  // Track orientation for proper rendering
+  const { shouldRotate } = useRotationHandling(orientation);
   
-  // Calculate viewport dimensions for portrait mode
+  // Calculate viewport dimensions
   const windowWidth = window.innerWidth;
   const windowHeight = window.innerHeight;
-  
-  // Use refs to track loading time and transition state
-  const loadingStartTimeRef = useRef<number>(Date.now());
-  const transitionTriggeredRef = useRef<boolean>(false);
-  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update current orientation when orientation context changes
-  useEffect(() => {
-    // If orientation has changed
-    if (prevOrientationRef.current !== orientation) {
-      console.log("LoadingScreen: Orientation changed from", prevOrientationRef.current, "to", orientation);
-      
-      // Wait for a brief moment, then update orientation
-      const timer = setTimeout(() => {
-        setCurrentOrientation(orientation);
-        prevOrientationRef.current = orientation;
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [orientation]);
-  
-  // Animation effect for the custom loader
+  // Simple spinner animation effect - runs independently
   useEffect(() => {
     const animationInterval = setInterval(() => {
-      setRotationAngle(prevAngle => (prevAngle + 1) % 360);
-    }, 20);
-
+      setRotationAngle(prev => (prev + 2) % 360);
+    }, 30);
+    
     return () => clearInterval(animationInterval);
   }, []);
 
-  // Handle transition to next screen with improved timing
-  const triggerTransition = useCallback(() => {
-    if (transitionTriggeredRef.current || !onComplete) return;
-    
-    console.log("LoadingScreen: Triggering transition to next screen");
-    transitionTriggeredRef.current = true;
-    
-    // Calculate how long we've been loading
-    const loadingTime = Date.now() - loadingStartTimeRef.current;
-    
-    // Ensure minimum loading time for a premium feel
-    const minLoadingTime = isAuthenticated ? 3000 : 2000; // Longer for authenticated users
-    const remainingTime = Math.max(0, minLoadingTime - loadingTime);
-    
-    console.log(`LoadingScreen: Loading time ${loadingTime}ms, waiting additional ${remainingTime}ms for premium feel`);
-    
-    // Call onComplete with a delay for a more premium experience
-    // Store the timeout reference so we can clear it if needed
-    completionTimeoutRef.current = setTimeout(() => {
-      if (onComplete) {
-        console.log("LoadingScreen: Calling onComplete callback NOW");
-        onComplete();
-      }
-    }, remainingTime);
-  }, [isAuthenticated, onComplete]);
-
-  // Clean up timeouts on unmount
+  // Fade in the content initially
   useEffect(() => {
-    return () => {
-      if (completionTimeoutRef.current) {
-        clearTimeout(completionTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Watch for initialization completion
-  useEffect(() => {
-    if (!isInitializing && !transitionTriggeredRef.current) {
-      console.log("LoadingScreen: Detected initialization complete");
-      setLoadingStage('complete');
-      
-      // Add a slight delay before triggering transition for a more premium feel
-      const timer = setTimeout(() => {
-        triggerTransition();
-      }, 1200); // Increased delay for a smoother transition
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isInitializing, triggerTransition]);
-
-  // Handle loading stage updates based on initialization stage
-  useEffect(() => {
-    console.log("LoadingScreen: Current initialization stage:", initializationStage);
-    
-    // Initial fade-in animation
-    const fadeTimer = setTimeout(() => {
+    setTimeout(() => {
       setShowContent(true);
     }, 300);
+  }, []);
 
-    // Update loading stage based on initialization stage
-    if (initializationStage === 'auth') {
-      setLoadingStage('initializing');
-    } else if (initializationStage === 'orientation' || initializationStage === 'content') {
-      setLoadingStage('setting-up');
-    } else if (initializationStage === 'complete') {
-      setLoadingStage('ready');
-      
-      // Show "Ready" message briefly before completing
-      const readyTimer = setTimeout(() => {
-        setLoadingStage('complete');
-      }, 1000); // Longer delay for premium feel
-      
-      return () => clearTimeout(readyTimer);
-    }
-    
-    return () => clearTimeout(fadeTimer);
-  }, [initializationStage]);
-
-  // Guaranteed transition after a maximum time
+  // Request pairing code if not authenticated
   useEffect(() => {
-    const forceTransitionTimer = setTimeout(() => {
-      if (!transitionTriggeredRef.current) {
-        console.log("LoadingScreen: Force transition timer triggered");
-        triggerTransition();
+    // Only request code if not authenticated and we're in the loading phase (likely transitioning to pair screen)
+    if (!isAuthenticated) {
+      // Check if localStorage already has a valid pairing code
+      const storedPairingCode = localStorage.getItem('pairingCode');
+      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
+      
+      // Only request a new code if we don't have a valid non-expired one
+      if (!storedPairingCode || !storedPairingCodeExpiresAt || new Date(storedPairingCodeExpiresAt) <= new Date()) {
+        console.log('[LoadingScreen] Requesting pairing code during loading...');
+        requestPairingCode(orientation).catch(err => {
+          console.error('[LoadingScreen] Error requesting pairing code:', err);
+        });
       }
-    }, isAuthenticated ? 8000 : 6000); // Longer timeout for a premium feel
+    }
+  }, [isAuthenticated, requestPairingCode, orientation]);
+
+  // Simple, deterministic loading sequence
+  useEffect(() => {
+    console.log('Initializing loading sequence');
     
-    return () => clearTimeout(forceTransitionTimer);
-  }, [isAuthenticated, triggerTransition]);
+    // Set initial loading stage
+    setLoadingStage('initializing');
+    
+    // Progress through stages with timeouts
+    const stageTimers: NodeJS.Timeout[] = [];
+    
+    // Stage 1: Setting up
+    stageTimers.push(setTimeout(() => {
+      console.log('Advancing to setting-up stage');
+      setLoadingStage('setting-up');
+    }, 2500));
+    
+    // Stage 2: Ready
+    stageTimers.push(setTimeout(() => {
+      console.log('Advancing to ready stage');
+      setLoadingStage('ready');
+    }, 5000));
+    
+    // Stage 3: Complete
+    stageTimers.push(setTimeout(() => {
+      console.log('Advancing to complete stage');
+      setLoadingStage('complete');
+    }, 7500));
+    
+    // Stage 4: Call onComplete to transition
+    stageTimers.push(setTimeout(() => {
+      if (onComplete && !hasCompletedRef.current) {
+        console.log('Loading sequence complete, transitioning...');
+        hasCompletedRef.current = true;
+        onComplete();
+      }
+    }, 10000));
+    
+    // Clean up all timers on unmount
+    return () => {
+      console.log('Cleaning up loading sequence timers');
+      stageTimers.forEach(timer => clearTimeout(timer));
+    };
+  }, []); // Empty dependency array ensures this only runs once
+
+  // Update orientation from screen content when it changes
+  useEffect(() => {
+    if (!screenContent) return;
+    
+    const newOrientation = screenContent?.data?.screen?.orientation ?? screenContent?.screen?.orientation;
+    
+    if (newOrientation && newOrientation !== orientation) {
+      setAdminOrientation(newOrientation);
+    }
+  }, [screenContent, setAdminOrientation, orientation]);
 
   // Get display message based on loading stage and authentication status
   const getDisplayMessage = () => {
@@ -170,10 +139,10 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
         case 'ready':
           return 'Preparing your display...';
         case 'complete':
-          // Show mosque name if available, otherwise fallback to a generic welcome message
+          // Show mosque name with Assalamualaikum in Arabic
           return masjidName 
-            ? `Welcome to ${masjidName}` 
-            : 'Welcome to MasjidConnect';
+            ? `السلام عليكم - ${masjidName}` 
+            : 'السلام عليكم';
         default:
           return 'Loading...';
       }
@@ -186,14 +155,14 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
         case 'ready':
           return 'Ready to connect';
         case 'complete':
-          return 'Welcome to MasjidConnect';
+          return 'السلام عليكم';
         default:
           return 'Loading...';
       }
     }
   };
 
-  // Custom Islamic geometric pattern loader - original version
+  // Custom Islamic geometric pattern loader
   const CustomLoader = () => {
     const goldColor = theme.palette.warning.main; // Gold color
     const emeraldColor = '#2A9D8F'; // Emerald Green from brand guidelines
@@ -258,11 +227,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     );
   };
 
-  // Main content to be displayed in the appropriate orientation container
+  // Main content to be displayed
   const LoadingContent = () => (
     <Box
       sx={{
-        backgroundColor: theme.palette.primary.main,
+        background: 'linear-gradient(135deg, #0A2647 0%, #144272 100%)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -331,8 +300,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
             textAlign: 'center',
             fontWeight: 300,
             letterSpacing: '0.05em',
-            fontSize: loadingStage === 'complete' ? '1.2rem' : '1rem',
-            transition: 'font-size 0.3s ease',
+            fontSize: loadingStage === 'complete' ? '1.5rem' : '1.2rem',
+            transition: 'font-size 0.5s ease',
             mt: 2,
             mb: 4,
           }}
@@ -342,8 +311,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       </Box>
     </Box>
   );
-
-  console.log("LoadingScreen: Rendering with orientation:", currentOrientation, "shouldRotate:", shouldRotate);
 
   return (
     <Box
@@ -358,12 +325,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       }}
     >
       <Fade in={showContent} timeout={800}>
-        {currentOrientation === 'LANDSCAPE' || !shouldRotate ? (
-          // Landscape orientation or no rotation needed
-          <Box sx={{ width: '100%', height: '100%' }}>
-            <LoadingContent />
-          </Box>
-        ) : (
+        {shouldRotate ? (
           // Portrait orientation with rotation transform
           <Box
             sx={{
@@ -376,6 +338,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
               transformOrigin: 'center',
             }}
           >
+            <LoadingContent />
+          </Box>
+        ) : (
+          // Landscape orientation or no rotation needed
+          <Box sx={{ width: '100%', height: '100%' }}>
             <LoadingContent />
           </Box>
         )}

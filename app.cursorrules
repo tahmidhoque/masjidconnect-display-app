@@ -144,7 +144,7 @@ export default ComponentName;
 
 ### Material UI
 - Follow the MasjidConnect design system
-- Use Material UI components for consistency
+- Use Custom UI components that match the branding and theme of the project
 - Customize components using the theme
 
 ### Responsive Design
@@ -178,7 +178,6 @@ export default ComponentName;
 
 ### Component Tests
 - Test component rendering and interactions
-- Mock external dependencies
 - Test different states and edge cases
 
 ## Documentation Guidelines
@@ -203,3 +202,6 @@ The application should work reliably in offline environments. Always implement p
 
 ### Error Handling
 Implement robust error handling to ensure the display continues to function even when errors occur. Use error boundaries and fallback UI. 
+
+### Implementing new features or fixing existing ones 
+when asked to create a new feature or fix an exisiting feature always look at how the whole code from start to finish works and make sure you understand the full flow of data and where it comes from and how it trickles through all the contexts and services to get to components 

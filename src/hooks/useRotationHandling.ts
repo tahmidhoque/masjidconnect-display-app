@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Orientation } from '../contexts/OrientationContext';
 
 /**
@@ -14,32 +14,53 @@ export function useRotationHandling(desiredOrientation: Orientation) {
     window.innerHeight > window.innerWidth ? 'PORTRAIT' : 'LANDSCAPE'
   );
   
-  // Determine if we need to apply rotation
-  const shouldRotate = physicalOrientation !== desiredOrientation;
+  // Determine if we need to apply rotation - memoize to prevent recalculation
+  const shouldRotate = useMemo(() => 
+    physicalOrientation !== desiredOrientation,
+  [physicalOrientation, desiredOrientation]);
   
-  // Update physical orientation on window resize
+  // Optimize the orientation update with debounce
+  const updatePhysicalOrientation = useCallback(() => {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const newOrientation: Orientation = isPortrait ? 'PORTRAIT' : 'LANDSCAPE';
+    
+    if (newOrientation !== physicalOrientation) {
+      // Remove console log to reduce spam
+      setPhysicalOrientation(newOrientation);
+    }
+  }, [physicalOrientation]);
+  
+  // Update physical orientation on window resize with debounce
   useEffect(() => {
-    const updatePhysicalOrientation = () => {
-      const isPortrait = window.innerHeight > window.innerWidth;
-      const newOrientation: Orientation = isPortrait ? 'PORTRAIT' : 'LANDSCAPE';
-      
-      if (newOrientation !== physicalOrientation) {
-        console.log('Physical device orientation changed:', newOrientation);
-        setPhysicalOrientation(newOrientation);
+    // Debounce resize events to avoid frequent updates
+    let resizeTimer: NodeJS.Timeout | null = null;
+    
+    const handleResize = () => {
+      // Cancel previous timer
+      if (resizeTimer) {
+        clearTimeout(resizeTimer);
       }
+      
+      // Set new timer
+      resizeTimer = setTimeout(() => {
+        updatePhysicalOrientation();
+      }, 100); // 100ms debounce
     };
     
     // Initial check
     updatePhysicalOrientation();
     
     // Listen for resize events
-    window.addEventListener('resize', updatePhysicalOrientation);
+    window.addEventListener('resize', handleResize);
     
     // Cleanup
     return () => {
-      window.removeEventListener('resize', updatePhysicalOrientation);
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimer) {
+        clearTimeout(resizeTimer);
+      }
     };
-  }, [physicalOrientation]);
+  }, [updatePhysicalOrientation]);
   
   return {
     shouldRotate,

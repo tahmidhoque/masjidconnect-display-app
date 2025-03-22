@@ -1,10 +1,10 @@
 import React from 'react';
-import { Box, useTheme } from '@mui/material';
+import { Box, useTheme, alpha } from '@mui/material';
 
 interface IslamicPatternBackgroundProps {
   width?: string | number;
   height?: string | number;
-  variant?: 'default' | 'light' | 'dark' | 'subtle' | 'custom';
+  variant?: 'default' | 'light' | 'dark' | 'subtle' | 'embossed' | 'custom';
   opacity?: number;
   patternColor?: string;
   backgroundColor?: string;
@@ -48,6 +48,12 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
       backgroundColor: 'rgba(255, 255, 255, 0.98)',
       opacity: 0.2,
     },
+    embossed: {
+      // Use colors that will create better emboss effect
+      patternColor: patternColor || theme.palette.warning.main,
+      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+      opacity: 0.6,
+    },
     custom: {
       patternColor: patternColor || theme.palette.warning.main,
       backgroundColor: backgroundColor || 'rgba(255, 255, 255, 0.9)',
@@ -55,6 +61,7 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
     },
   };
   
+  // Get the base config for the selected variant
   const config = variant === 'custom' 
     ? variantConfig.custom 
     : {
@@ -63,6 +70,11 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
         ...(backgroundColor && { backgroundColor }),
         ...(opacity !== undefined && { opacity }),
       };
+
+  // Define effective emboss strength, stronger for embossed variant
+  const effectiveEmbossStrength = variant === 'embossed' 
+    ? 'strong' 
+    : embossStrength;
 
   // Create unique IDs
   const patternId = React.useMemo(() => `islamic-pattern-${Math.random().toString(36).substr(2, 9)}`, []);
@@ -73,10 +85,10 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
     none: { elevation: 0, blur: 0, specular: 0 },
     light: { elevation: 1, blur: 1, specular: 0.2 },
     medium: { elevation: 2, blur: 1.5, specular: 0.3 },
-    strong: { elevation: 3, blur: 2, specular: 0.4 },
+    strong: { elevation: 5, blur: 2.5, specular: 0.6 },
   };
 
-  const currentEmboss = embossConfig[embossStrength];
+  const currentEmboss = embossConfig[effectiveEmbossStrength];
 
   return (
     <Box
@@ -103,31 +115,79 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
       >
         <defs>
           {/* Emboss filter */}
-          {embossStrength !== 'none' && (
+          {effectiveEmbossStrength !== 'none' && variant === 'embossed' ? (
+            // Special emboss filter for embossed variant
             <filter id={embossFilterId} x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation={currentEmboss.blur} result="blur" />
-              <feOffset in="blur" dx={1} dy={1} result="offsetBlur" />
-              <feSpecularLighting
-                in="blur"
-                surfaceScale={currentEmboss.elevation}
-                specularConstant="1"
-                specularExponent="16"
-                lightingColor="#white"
-                result="specular"
-              >
-                <fePointLight x="-5000" y="-10000" z="20000" />
-              </feSpecularLighting>
-              <feComposite in="specular" in2="SourceAlpha" operator="in" result="specular" />
-              <feComposite
-                in="SourceGraphic"
-                in2="specular"
-                operator="arithmetic"
-                k1="0"
-                k2="1"
-                k3={currentEmboss.specular}
-                k4="0"
-              />
+              {/* Base blur for the pattern */}
+              <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur" />
+              
+              {/* Shadow component - offset down and right */}
+              <feOffset in="blur" dx="3" dy="3" result="shadowOffset" />
+              <feFlood floodColor="black" floodOpacity="0.3" result="shadowColor" />
+              <feComposite in="shadowColor" in2="shadowOffset" operator="in" result="shadow" />
+              
+              {/* Light component - offset up and left */}
+              <feOffset in="blur" dx="-1.5" dy="-1.5" result="lightOffset" />
+              <feFlood floodColor="white" floodOpacity="0.5" result="lightColor" />
+              <feComposite in="lightColor" in2="lightOffset" operator="in" result="light" />
+              
+              {/* Merge everything together */}
+              <feMerge>
+                <feMergeNode in="shadow" />
+                <feMergeNode in="SourceGraphic" />
+                <feMergeNode in="light" />
+              </feMerge>
             </filter>
+          ) : (
+            effectiveEmbossStrength !== 'none' && (
+              <filter id={embossFilterId} x="-50%" y="-50%" width="200%" height="200%">
+                {/* Emboss effect created with two components: 
+                    1. Base shadow for depth
+                    2. Highlight for raised edges */}
+                <feGaussianBlur in="SourceAlpha" stdDeviation={currentEmboss.blur} result="blur" />
+                
+                {/* Create shadow - shifted down-right */}
+                <feOffset in="blur" dx={3} dy={3} result="offsetBlur" />
+                <feComposite in="offsetBlur" in2="SourceAlpha" operator="out" result="shadow" />
+                <feColorMatrix 
+                  in="shadow"
+                  type="matrix"
+                  values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.5 0"
+                  result="darkShadow"
+                />
+                
+                {/* Create highlight - shifted up-left */}
+                <feOffset in="blur" dx={-2} dy={-2} result="offsetBlurHigh" />
+                <feComposite in="offsetBlurHigh" in2="SourceAlpha" operator="out" result="highlight" />
+                <feColorMatrix 
+                  in="highlight"
+                  type="matrix"
+                  values="1 0 0 0 1   1 0 0 0 1   1 0 0 0 1   0 0 0 0.7 0"
+                  result="lightHighlight"
+                />
+                
+                {/* Add specular lighting for shine effect */}
+                <feSpecularLighting
+                  in="blur"
+                  surfaceScale={currentEmboss.elevation}
+                  specularConstant="1.5"
+                  specularExponent="25"
+                  lightingColor="#white"
+                  result="specular"
+                >
+                  <fePointLight x="-15000" y="-15000" z="15000" />
+                </feSpecularLighting>
+                <feComposite in="specular" in2="SourceAlpha" operator="in" result="specular" />
+                
+                {/* Combine all effects */}
+                <feMerge>
+                  <feMergeNode in="darkShadow" />
+                  <feMergeNode in="SourceGraphic" />
+                  <feMergeNode in="lightHighlight" />
+                  <feMergeNode in="specular" />
+                </feMerge>
+              </filter>
+            )
           )}
 
           <pattern 
@@ -139,10 +199,10 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
             <g 
               fill="none" 
               stroke={config.patternColor} 
-              strokeWidth={20}
+              strokeWidth={variant === 'embossed' ? 25 : 20}
               strokeLinecap="square"
               opacity={config.opacity}
-              filter={embossStrength !== 'none' ? `url(#${embossFilterId})` : undefined}
+              filter={effectiveEmbossStrength !== 'none' ? `url(#${embossFilterId})` : undefined}
               transform={`scale(${patternSize / 800})`}
             >
               {/* Quarter pattern */}

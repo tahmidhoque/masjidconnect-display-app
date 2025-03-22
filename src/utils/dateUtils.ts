@@ -108,37 +108,79 @@ export const getNextPrayerTime = (
     { name: 'Asr', time: prayerTimes.asr },
     { name: 'Maghrib', time: prayerTimes.maghrib },
     { name: 'Isha', time: prayerTimes.isha },
-  ];
+  ].filter(prayer => prayer.time); // Only include prayers with valid times
+  
+  // Sort prayers by time
+  prayers.sort((a, b) => a.time.localeCompare(b.time));
   
   const currentHours = currentTime.getHours();
   const currentMinutes = currentTime.getMinutes();
   const currentTimeString = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
   
+  console.log("Current time:", currentTimeString);
+  console.log("Prayer times:", prayers);
+  
   // Find the next prayer
   for (const prayer of prayers) {
     if (prayer.time > currentTimeString) {
+      console.log("Found next prayer:", prayer.name, prayer.time);
       return { name: prayer.name, time: prayer.time };
     }
   }
   
-  // If no prayer is found, return Fajr for the next day
-  return { name: 'Fajr (Tomorrow)', time: prayers[0].time };
+  // If no prayer is found, it means all prayers for today have passed
+  // Return the first prayer for the next day (first prayer in sorted list)
+  if (prayers.length > 0) {
+    console.log("All prayers for today have passed. Next prayer is first prayer tomorrow:", prayers[0].name);
+    return { name: prayers[0].name, time: prayers[0].time };
+  }
+  
+  // Fallback in case the prayers array is empty
+  console.log("No prayers found in the data");
+  return { name: 'Fajr', time: '05:00' };
 };
 
 // Calculate time until next prayer
 export const getTimeUntilNextPrayer = (nextPrayerTime: string): string => {
-  const now = new Date();
-  const nextPrayer = parseTimeString(nextPrayerTime);
+  if (!nextPrayerTime) return '';
   
-  // If next prayer is tomorrow's Fajr
-  if (nextPrayer < now) {
-    nextPrayer.setDate(nextPrayer.getDate() + 1);
+  try {
+    const now = new Date();
+    const nextPrayer = parseTimeString(nextPrayerTime);
+    
+    // If next prayer time is earlier than current time,
+    // it means it's for tomorrow
+    if (nextPrayer <= now) {
+      nextPrayer.setDate(nextPrayer.getDate() + 1);
+      console.log("Next prayer is tomorrow:", nextPrayerTime, "adjusted date:", nextPrayer);
+    }
+    
+    const diffMilliseconds = nextPrayer.getTime() - now.getTime();
+    const diffSeconds = Math.floor(diffMilliseconds / 1000);
+    
+    if (diffSeconds <= 0) {
+      return '0 mins';
+    }
+    
+    // Format time in a way that's both human-readable and parseable by the countdown component
+    const hours = Math.floor(diffSeconds / 3600);
+    const minutes = Math.floor((diffSeconds % 3600) / 60);
+    const seconds = diffSeconds % 60;
+    
+    // For longer times (> 1 hour), return a more human-readable format
+    if (hours > 0) {
+      return `${hours} hr${hours > 1 ? 's' : ''} ${minutes} min${minutes > 1 ? 's' : ''}`;
+    } 
+    // For shorter times, include seconds in a more precise format
+    else if (minutes > 0) {
+      return `${minutes} min${minutes > 1 ? 's' : ''} ${seconds} sec${seconds > 1 ? 's' : ''}`;
+    } else {
+      return `${seconds} sec${seconds > 1 ? 's' : ''}`;
+    }
+  } catch (error) {
+    console.error('Error calculating time until next prayer:', error);
+    return '';
   }
-  
-  const diffMilliseconds = nextPrayer.getTime() - now.getTime();
-  const diffMinutes = Math.floor(diffMilliseconds / (1000 * 60));
-  
-  return formatMinutesToDisplay(diffMinutes);
 };
 
 // Get the current Hijri date

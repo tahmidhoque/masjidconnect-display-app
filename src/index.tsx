@@ -31,6 +31,18 @@ serviceWorkerRegistration.register({
   },
   onSuccess: (registration) => {
     console.log('Service worker registered successfully');
+    
+    // Listen for controller change (SW activation)
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      console.log('Service worker controller changed - new version activated');
+    });
+    
+    // Prefetch and cache critical assets on successful registration
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CACHE_CRITICAL_ASSETS'
+      });
+    }
   }
 });
 

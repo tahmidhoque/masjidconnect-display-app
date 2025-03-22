@@ -1,17 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Fade } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { OrientationProvider } from './contexts/OrientationContext';
 import { ContentProvider } from './contexts/ContentContext';
+import { OfflineProvider } from './contexts/OfflineContext';
+import { EmergencyAlertProvider } from './contexts/EmergencyAlertContext';
 import DisplayScreen from './components/screens/DisplayScreen';
 import PairingScreen from './components/screens/PairingScreen';
 import LoadingScreen from './components/screens/LoadingScreen';
 import AuthErrorDetector from './components/common/AuthErrorDetector';
+import OfflineNotification from './components/OfflineNotification';
+import ApiErrorBoundary from './components/common/ApiErrorBoundary';
+import EmergencyAlert from './components/common/EmergencyAlert';
+import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
+import ErrorScreen from './components/screens/ErrorScreen';
+
+// Create a simple AuthenticatedRoute component
+interface AuthenticatedRouteProps {
+  children: React.ReactNode;
+}
+
+const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/pair" replace />;
+};
 
 /**
  * AppContent Component
@@ -24,6 +41,12 @@ const AppContent: React.FC = () => {
   const { isInitializing } = useAppInitialization();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [authChecked, setAuthChecked] = useState(false); // Track if we've already done the auth check
+  
+  // Handle when loading is complete
+  const handleLoadingComplete = () => {
+    console.log('Loading complete callback received, transitioning...');
+    setIsInitialLoad(false);
+  };
   
   // Emergency authentication check on mount - run only once
   useEffect(() => {
@@ -69,19 +92,16 @@ const AppContent: React.FC = () => {
   // Start loading sequence
   useEffect(() => {
     if (isInitialLoad) {
-      // Simulate loading time for a more natural app startup experience
+      console.log('Starting app loading sequence');
+      // Increase loading time to ensure loading screen completes its sequence
       const timer = setTimeout(() => {
+        console.log('App loading timeout completed, calling handleLoadingComplete');
         handleLoadingComplete();
-      }, 2000);
+      }, 12000); // Increased from 2000ms to 12000ms to ensure LoadingScreen completes
       
       return () => clearTimeout(timer);
     }
-  }, [isInitialLoad]);
-  
-  // Handle when loading is complete
-  const handleLoadingComplete = () => {
-    setIsInitialLoad(false);
-  };
+  }, [isInitialLoad, handleLoadingComplete]);
   
   if (isInitialLoad || isInitializing) {
     return <LoadingScreen onComplete={handleLoadingComplete} />;
@@ -92,10 +112,10 @@ const AppContent: React.FC = () => {
       <div>
         {isAuthenticated && <AuthErrorDetector />}
         <Routes>
-          <Route 
-            path="*" 
-            element={isAuthenticated ? <DisplayScreen /> : <PairingScreen />} 
-          />
+          <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
+          <Route path="/pair" element={<PairingScreen />} />
+          <Route path="/loading" element={<LoadingScreen />} />
+          <Route path="/error" element={<ErrorScreen />} />
         </Routes>
       </div>
     </Fade>
@@ -109,20 +129,30 @@ const AppContent: React.FC = () => {
  */
 const App: React.FC = () => {
   return (
-    <Router>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <SnackbarProvider maxSnack={3}>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <SnackbarProvider maxSnack={3}>
+        <Router>
           <AuthProvider>
             <OrientationProvider>
-              <ContentProvider>
-                <AppContent />
-              </ContentProvider>
+              <OfflineProvider>
+                <ContentProvider>
+                  <EmergencyAlertProvider>
+                    <ApiErrorBoundary>
+                      <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
+                      {/* <CorsErrorNotification /> */}
+                      <AuthErrorDetector />
+                      <EmergencyAlert />
+                      <AppContent />
+                    </ApiErrorBoundary>
+                  </EmergencyAlertProvider>
+                </ContentProvider>
+              </OfflineProvider>
             </OrientationProvider>
           </AuthProvider>
-        </SnackbarProvider>
-      </ThemeProvider>
-    </Router>
+        </Router>
+      </SnackbarProvider>
+    </ThemeProvider>
   );
 };
 
