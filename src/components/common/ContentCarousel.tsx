@@ -835,5 +835,4 @@ const ContentCarousel: React.FC = () => {
   );
 };
 
-// Wrap in React.memo to prevent unnecessary renders
 export default React.memo(ContentCarousel); 

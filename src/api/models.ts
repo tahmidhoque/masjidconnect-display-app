@@ -238,11 +238,25 @@ export interface ApiResponse<T> {
   status?: number; // Add status code property for error responses
 }
 
+// Predefined alert color values matching ALERT_COLOR_SCHEMES
+export type AlertColorType = 
+  | '#f44336' // RED
+  | '#ff9800' // ORANGE
+  | '#ffb74d' // AMBER
+  | '#2196f3' // BLUE
+  | '#4caf50' // GREEN
+  | '#9c27b0' // PURPLE
+  | '#263238' // DARK
+  | string;   // Allow for custom colors
+
+import { AlertColorSchemeKey } from '../components/common/EmergencyAlertOverlay';
+
 export interface EmergencyAlert {
   id: string;
   title: string;
   message: string;
-  color: string;
+  color: AlertColorType;
+  colorScheme?: AlertColorSchemeKey; // Name of predefined color scheme (RED, PURPLE, etc)
   expiresAt: string; // ISO date string when alert expires
   createdAt: string; // ISO date string when alert was created
   masjidId: string;  // ID of the masjid that created the alert

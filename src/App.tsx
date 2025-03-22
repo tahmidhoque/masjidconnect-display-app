@@ -14,7 +14,7 @@ import LoadingScreen from './components/screens/LoadingScreen';
 import AuthErrorDetector from './components/common/AuthErrorDetector';
 import OfflineNotification from './components/OfflineNotification';
 import ApiErrorBoundary from './components/common/ApiErrorBoundary';
-import EmergencyAlertOverlay from './components/common/EmergencyAlertOverlay';
+import EmergencyAlert from './components/common/EmergencyAlert';
 import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
@@ -142,7 +142,7 @@ const App: React.FC = () => {
                       <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
                       {/* <CorsErrorNotification /> */}
                       <AuthErrorDetector />
-                      <EmergencyAlertOverlay />
+                      <EmergencyAlert />
                       <AppContent />
                     </ApiErrorBoundary>
                   </EmergencyAlertProvider>

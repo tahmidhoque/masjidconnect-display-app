@@ -2,6 +2,7 @@ import { EmergencyAlert } from '../api/models';
 import logger from '../utils/logger';
 import storageService from './storageService';
 import { DebugEventSource } from '../utils/debugEventSource';
+import { AlertColorSchemeKey } from '../components/common/EmergencyAlertOverlay';
 
 // Event Types for SSE
 const EVENT_TYPES = {
@@ -222,6 +223,31 @@ class EmergencyAlertService {
       // Ensure createdAt exists
       if (!alertData.createdAt) {
         alertData.createdAt = new Date().toISOString();
+      }
+      
+      // Detect color scheme based on the color value
+      if (alertData.color && !alertData.colorScheme) {
+        // Define color mappings for predefined schemes
+        const colorToScheme: Record<string, AlertColorSchemeKey> = {
+          '#f44336': 'RED',
+          '#ff9800': 'ORANGE',
+          '#ffb74d': 'AMBER',
+          '#2196f3': 'BLUE',
+          '#4caf50': 'GREEN',
+          '#9c27b0': 'PURPLE',
+          '#263238': 'DARK',
+        };
+        
+        // Normalize the color for comparison (lowercase, no spaces)
+        const normalizedColor = alertData.color.toLowerCase().replace(/\s+/g, '');
+        
+        // Look for exact match in predefined schemes
+        Object.entries(colorToScheme).forEach(([color, scheme]) => {
+          if (color.toLowerCase() === normalizedColor) {
+            alertData.colorScheme = scheme;
+            console.log('🚨 EmergencyAlertService: Detected color scheme:', scheme);
+          }
+        });
       }
       
       console.log('🚨 EmergencyAlertService: Parsed alert data:', alertData);

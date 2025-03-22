@@ -26,6 +26,11 @@ const PortraitDisplay: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showMobileSilenceReminder, setShowMobileSilenceReminder] = useState(false);
 
+  // Log masjid name for debugging
+  useEffect(() => {
+    console.log("PortraitDisplay: Masjid name =", masjidName);
+  }, [masjidName]);
+
   // Update current time every second
   useEffect(() => {
     const timer = setInterval(() => {
@@ -51,11 +56,27 @@ const PortraitDisplay: React.FC = () => {
       width: '100%', 
       display: 'flex',
       flexDirection: 'column',
-      background: 'rgba(255, 255, 255, 0.98)',
+      background: `linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)), url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='2' stroke-opacity='0.5'%3E%3Cpath d='M0,50 L50,0 L100,50 L50,100 Z' /%3E%3Cpath d='M25,25 L75,25 L75,75 L25,75 Z' /%3E%3Ccircle cx='50' cy='50' r='25' /%3E%3Ccircle cx='50' cy='50' r='12.5' /%3E%3Cpath d='M25,25 L75,75 M25,75 L75,25' /%3E%3C/g%3E%3C/svg%3E")`,
+      backgroundPosition: 'center',
+      backgroundSize: 'cover',
       overflow: 'hidden',
       position: 'relative',
     }}>
-      {/* Main background pattern */}
+      {/* Decorative Islamic Pattern at top */}
+      <Box 
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '80px',
+          background: `url("data:image/svg+xml,%3Csvg width='120' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='1.2' stroke-opacity='0.3'%3E%3Cpath d='M0,40 L40,0 L80,40 L120,0 M0,40 L40,80 L80,40 L120,80'/%3E%3Cpath d='M20,40 L40,60 L60,40 L40,20 Z M60,40 L80,60 L100,40 L80,20 Z'/%3E%3Ccircle cx='40' cy='40' r='10' /%3E%3Ccircle cx='80' cy='40' r='10' /%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat-x',
+          backgroundPosition: 'center',
+          zIndex: 0,
+          opacity: 0.7,
+        }}
+      />
       
       {/* Logo Watermark */}
       <Box 
@@ -64,7 +85,7 @@ const PortraitDisplay: React.FC = () => {
         alt="MasjidConnect"
         sx={{
           position: 'absolute',
-          width: '60%',
+          width: '50%',
           maxWidth: '600px',
           opacity: 0.08,
           top: '50%',
@@ -80,8 +101,7 @@ const PortraitDisplay: React.FC = () => {
         sx={{ 
           background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
           color: 'white',
-          p: screenSize.is720p ? 1.8 : 2.5,
-          pb: screenSize.is720p ? 1.5 : 2,
+          p: 2,
           borderBottom: '3px solid',
           borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
           display: 'flex',
@@ -98,12 +118,12 @@ const PortraitDisplay: React.FC = () => {
               component="img"
               src={logoGold}
               alt=""
-              sx={{ height: '32px', width: 'auto', marginRight: 1 }}
+              sx={{ height: '28px', width: 'auto', marginRight: 1 }}
             />
             <Typography 
               sx={{ 
                 fontWeight: 'bold',
-                fontSize: fontSizes.h3,
+                fontSize: fontSizes.h4,
                 fontFamily: "'Poppins', sans-serif",
                 background: 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)',
                 backgroundClip: 'text',
@@ -120,11 +140,11 @@ const PortraitDisplay: React.FC = () => {
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center', 
-            mt: 0.75,
+            mt: 0.5,
             pl: 0.5,
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.body2,
+              fontSize: fontSizes.caption,
               fontStyle: 'italic',
               opacity: 0.9,
               mr: 1,
@@ -133,184 +153,142 @@ const PortraitDisplay: React.FC = () => {
               {hijriDate}
             </Typography>
             <Box sx={{ 
-              height: '4px', 
-              width: '4px', 
+              height: '3px', 
+              width: '3px', 
               borderRadius: '50%', 
               bgcolor: '#DAA520',
               opacity: 0.9, 
               mx: 0.75 
             }} />
             <Typography sx={{ 
-              fontSize: fontSizes.body2,
+              fontSize: fontSizes.caption,
               opacity: 0.9,
               color: 'rgba(255, 255, 255, 0.85)',
             }}>
               {currentDate}
             </Typography>
           </Box>
-        
         </Box>
         
         <Typography 
           sx={{ 
             fontWeight: 'bold',
-            fontSize: fontSizes.h1,
+            fontSize: fontSizes.h2,
             fontFamily: "'Poppins', sans-serif",
-            color: '#E9C46A',
-            letterSpacing: '2px',
+            color: '#F1C40F',
+            letterSpacing: '1px',
             lineHeight: 1.1,
-            textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
           }}
         >
           {format(currentTime, 'HH:mm')}
         </Typography>
       </Box>
       
-      {/* Prayer Times Panel */}
-      <PrayerTimesPanel 
-        variant="portrait" 
-        onCountdownComplete={handleCountdownComplete} 
-      />
-      
-      {/* Main Content */}
+      {/* Main Content Area */}
       <Box sx={{ 
-        flex: 1,
+        display: 'flex', 
+        flexDirection: 'column',
+        flexGrow: 1,
+        overflow: 'hidden',
         position: 'relative',
         zIndex: 1,
-        overflow: 'hidden',
-        p: 0,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 0,
       }}>
-        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-          <IslamicPatternBackground variant="subtle" />
-        </Box>
-        
-        {showMobileSilenceReminder ? (
-          <Box 
-            sx={{
-              background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
-              color: '#0A2647',
-              borderRadius: '16px',
-              p: screenSize.is720p ? 3 : 5,
-              textAlign: 'center',
-              width: '90%',
-              mx: 'auto',
-              mt: screenSize.is720p ? 2 : 4,
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-              border: '1px solid rgba(218, 165, 32, 0.5)',
-              position: 'relative',
-              overflow: 'hidden',
-              zIndex: 1,
-            }}
-          >
-            {/* Decorative corners */}
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '40px',
-              height: '40px',
-              borderTop: '3px solid rgba(255, 255, 255, 0.5)',
-              borderLeft: '3px solid rgba(255, 255, 255, 0.5)',
-            }} />
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '40px',
-              height: '40px',
-              borderTop: '3px solid rgba(255, 255, 255, 0.5)',
-              borderRight: '3px solid rgba(255, 255, 255, 0.5)',
-            }} />
-            <Box sx={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              width: '40px',
-              height: '40px',
-              borderBottom: '3px solid rgba(255, 255, 255, 0.5)',
-              borderLeft: '3px solid rgba(255, 255, 255, 0.5)',
-            }} />
-            <Box sx={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              width: '40px',
-              height: '40px',
-              borderBottom: '3px solid rgba(255, 255, 255, 0.5)',
-              borderRight: '3px solid rgba(255, 255, 255, 0.5)',
-            }} />
-            
-            <Typography 
-              sx={{ 
-                fontWeight: 'bold', 
-                fontSize: fontSizes.h1, 
-                mb: 2,
-                fontFamily: "'Poppins', sans-serif",
-                textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              }}
-            >
-              Prayer Time
-            </Typography>
-            <Typography sx={{ 
-              fontSize: fontSizes.h4,
-              fontFamily: "'Poppins', sans-serif",
-            }}>
-              Please silence your mobile devices
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ 
-            width: '100%', 
-            height: '100%', 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            overflow: 'hidden',
-            position: 'relative',
-            p: screenSize.is720p ? 1 : 2,
-          }}>
-            <ContentCarousel />
-          </Box>
-        )}
-      </Box>
-      
-      {/* Footer */}
-      <Box 
-        sx={{ 
-          background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
-          color: 'white',
-          p: screenSize.is720p ? 1 : 1.5,
-          borderTop: '3px solid',
-          borderImage: 'linear-gradient(90deg, #E9C46A 0%, #F1C40F 100%) 1',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
+        {/* Prayer Times Panel */}
         <Box 
           sx={{ 
+            width: '100%',
             display: 'flex',
-            alignItems: 'center',
-            mr: 2,
+            flexDirection: 'column',
+            overflow: 'hidden',
+            position: 'relative',
           }}
         >
-          <Box 
-            component="img"
-            src={logoGold}
-            alt=""
-            sx={{
-              height: '30px',
-              marginRight: 1,
-            }}
+          <PrayerTimesPanel 
+            variant="portrait" 
+            onCountdownComplete={handleCountdownComplete} 
           />
         </Box>
+        
+        {/* Main Content */}
+        <Box 
+          sx={{ 
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+            minHeight: 0,
+          }}
+        >
+          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+            <IslamicPatternBackground variant="embossed" />
+          </Box>
+          
+          {showMobileSilenceReminder ? (
+            <Box
+              sx={{
+                background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
+                color: '#0A2647',
+                borderRadius: '16px',
+                p: 3,
+                textAlign: 'center',
+                width: '90%',
+                mx: 'auto',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid rgba(218, 165, 32, 0.5)',
+                position: 'relative',
+                overflow: 'hidden',
+                zIndex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: fontSizes.h3,
+                  fontWeight: 'bold',
+                  mb: 2,
+                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                }}
+              >
+                Prayer Time
+              </Typography>
+              
+              <Typography
+                sx={{
+                  fontSize: fontSizes.h4,
+                  mb: 2,
+                }}
+              >
+                Please silence your mobile devices
+              </Typography>
+            </Box>
+          ) : (
+            <ContentCarousel />
+          )}
+        </Box>
       </Box>
+      
+      {/* Decorative Islamic Pattern at bottom */}
+      <Box 
+        sx={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '80px',
+          background: `url("data:image/svg+xml,%3Csvg width='160' height='90' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='2.5' stroke-opacity='0.6'%3E%3Cpath d='M0,45 L40,5 L80,45 L120,5 L160,45 M0,45 L40,85 L80,45 L120,85 L160,45'/%3E%3Cpath d='M20,45 L40,65 L60,45 L40,25 Z M60,45 L80,65 L100,45 L80,25 Z M100,45 L120,65 L140,45 L120,25 Z'/%3E%3Ccircle cx='40' cy='45' r='15' /%3E%3Ccircle cx='80' cy='45' r='15' /%3E%3Ccircle cx='120' cy='45' r='15' /%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat-x',
+          backgroundPosition: 'center',
+          zIndex: 0,
+          opacity: 0.6,
+          transform: 'rotate(180deg)',
+        }}
+      />
     </Box>
   );
 };

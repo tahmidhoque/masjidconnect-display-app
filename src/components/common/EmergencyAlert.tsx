@@ -1,62 +1,59 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Fade } from '@mui/material';
 import { useEmergencyAlert } from '../../contexts/EmergencyAlertContext';
-import { Paper, Typography, Box, IconButton } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import { keyframes } from '@mui/system';
+import { ALERT_COLOR_SCHEMES } from './EmergencyAlertOverlay';
+import EmergencyAlertOverlay from './EmergencyAlertOverlay';
 
-// Define the fade-in animation
-const fadeInAnimation = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
+/**
+ * EmergencyAlert component
+ * 
+ * This component serves as a wrapper for the EmergencyAlertOverlay.
+ * The alert is displayed as a full-screen overlay with an Islamic pattern background.
+ * 
+ * The following predefined alert color schemes are available:
+ * 
+ * - RED (#f44336): High urgency, critical emergency alerts
+ * - ORANGE (#ff9800): Important alerts requiring attention
+ * - AMBER (#ffb74d): Moderate urgency alerts
+ * - BLUE (#2196f3): Informational emergency alerts
+ * - GREEN (#4caf50): Status updates and resolutions
+ * - PURPLE (#9c27b0): Special announcements during emergency situations
+ * - DARK (#263238): Serious alerts requiring immediate attention
+ * 
+ * Custom colors can also be used and will automatically determine appropriate contrast text colors.
+ */
 const EmergencyAlert: React.FC = () => {
-  const { currentAlert, hasActiveAlert, clearAlert } = useEmergencyAlert();
-
+  const { hasActiveAlert } = useEmergencyAlert();
+  const [visible, setVisible] = useState(false);
+  
+  // Handle animation states
+  useEffect(() => {
+    // When alert becomes active, show it immediately
+    if (hasActiveAlert) {
+      setVisible(true);
+    } 
+    // When alert becomes inactive, delay the removal to allow fade-out animation
+    else {
+      // If currently visible, start fade-out
+      if (visible) {
+        const timer = setTimeout(() => {
+          setVisible(false);
+        }, 500); // Match this to the Fade timeout
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [hasActiveAlert, visible]);
+  
+  // Don't render anything if there's no alert and animation has completed
+  if (!hasActiveAlert && !visible) return null;
+  
   return (
-    <>
-      {hasActiveAlert && (
-        <Paper
-          elevation={3}
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 9999,
-            bgcolor: currentAlert?.color || '#f44336',
-            color: 'white',
-            p: 2,
-            borderRadius: 0,
-            animation: `${fadeInAnimation} 0.5s ease-in-out`
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
-              {currentAlert?.title || 'Emergency Alert'}
-            </Typography>
-            <IconButton
-              size="small"
-              aria-label="close"
-              color="inherit"
-              onClick={clearAlert}
-              sx={{ ml: 2 }}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-          <Typography variant="body1">
-            {currentAlert?.message || 'Emergency alert details not available'}
-          </Typography>
-        </Paper>
-      )}
-    </>
+    <Fade in={hasActiveAlert} timeout={500} onExited={() => console.log('Alert fade-out completed')}>
+      <div>
+        <EmergencyAlertOverlay />
+      </div>
+    </Fade>
   );
 };
 
