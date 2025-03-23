@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline, Fade } from '@mui/material';
+import { CssBaseline, Box, Fade } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { OrientationProvider } from './contexts/OrientationContext';
@@ -15,7 +15,6 @@ import AuthErrorDetector from './components/common/AuthErrorDetector';
 import OfflineNotification from './components/OfflineNotification';
 import ApiErrorBoundary from './components/common/ApiErrorBoundary';
 import EmergencyAlert from './components/common/EmergencyAlert';
-import CorsErrorNotification from './components/common/CorsErrorNotification';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
 import ErrorScreen from './components/screens/ErrorScreen';
@@ -30,95 +29,52 @@ const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = ({ children }) => 
   return isAuthenticated ? <>{children}</> : <Navigate to="/pair" replace />;
 };
 
-/**
- * AppContent Component
- * 
- * This component handles the main content display, including loading screens
- * and authentication state.
- */
-const AppContent: React.FC = () => {
-  const { isAuthenticated, isPaired, setIsPaired } = useAuth();
+// Main App Routes component defined separately to access auth context
+const AppRoutes: React.FC = () => {
   const { isInitializing } = useAppInitialization();
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false); // Track if we've already done the auth check
+  const [showContent, setShowContent] = useState(false);
   
-  // Handle when loading is complete
-  const handleLoadingComplete = () => {
-    console.log('Loading complete callback received, transitioning...');
-    setIsInitialLoad(false);
-  };
-  
-  // Emergency authentication check on mount - run only once
+  // Add effect to fade in content after initialization completes
   useEffect(() => {
-    // Skip if we've already run the check
-    if (authChecked) return;
-    
-    console.log('[App] 🚀 Initial mount - one-time emergency auth check');
-    
-    // Check ALL credential formats
-    const apiKey = localStorage.getItem('masjid_api_key') || localStorage.getItem('apiKey');
-    const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
-    
-    console.log('[App] Emergency auth check found:', {
-      hasApiKey: !!apiKey && apiKey.length > 10,
-      hasScreenId: !!screenId && screenId.length > 5,
-      isAuthenticated,
-      isPaired
-    });
-    
-    if (apiKey && screenId && (!isAuthenticated || !isPaired)) {
-      console.log('[App] 🔥 EMERGENCY: Found credentials but not authenticated! Forcing auth...');
-      setIsPaired(true);
-    }
-    
-    // Mark that we've done the check
-    setAuthChecked(true);
-  }, [isAuthenticated, isPaired, authChecked, setIsPaired]);
-  
-  // Log auth state changes
-  useEffect(() => {
-    console.log('[App] Auth state changed:', { 
-      isAuthenticated, 
-      isPaired,
-      localStorage: {
-        masjid_api_key: !!localStorage.getItem('masjid_api_key'),
-        masjid_screen_id: !!localStorage.getItem('masjid_screen_id'),
-        apiKey: !!localStorage.getItem('apiKey'),
-        screenId: !!localStorage.getItem('screenId')
-      }
-    });
-  }, [isAuthenticated, isPaired]);
-  
-  // Start loading sequence
-  useEffect(() => {
-    if (isInitialLoad) {
-      console.log('Starting app loading sequence');
-      // Increase loading time to ensure loading screen completes its sequence
+    if (!isInitializing) {
+      // Add slight delay to ensure loading screen has time to start fading out
+      // This creates an overlapping transition effect
       const timer = setTimeout(() => {
-        console.log('App loading timeout completed, calling handleLoadingComplete');
-        handleLoadingComplete();
-      }, 12000); // Increased from 2000ms to 12000ms to ensure LoadingScreen completes
-      
+        setShowContent(true);
+      }, 800);
       return () => clearTimeout(timer);
     }
-  }, [isInitialLoad, handleLoadingComplete]);
+  }, [isInitializing]);
   
-  if (isInitialLoad || isInitializing) {
-    return <LoadingScreen onComplete={handleLoadingComplete} />;
-  }
-  
+  // Always render LoadingScreen, but it will fade out based on isInitializing state
   return (
-    <Fade in={!isInitialLoad} timeout={800}>
-      <div>
-        {isAuthenticated && <AuthErrorDetector />}
-        <Routes>
-          <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
-          <Route path="/pair" element={<PairingScreen />} />
-          <Route path="/loading" element={<LoadingScreen />} />
-          <Route path="/error" element={<ErrorScreen />} />
-        </Routes>
-      </div>
-    </Fade>
+    <>
+      <LoadingScreen />
+      
+      {/* Main content with improved fade-in effect */}
+      <Fade in={showContent} timeout={1200}>
+        <Box sx={{ 
+          opacity: showContent ? 1 : 0,
+          width: '100%', 
+          height: '100%',
+          position: 'relative',
+          // Add transform to create a slight movement effect during transition
+          transform: showContent ? 'translateY(0)' : 'translateY(20px)',
+          transition: 'transform 1s ease-out, opacity 1.2s ease-in-out',
+        }}>
+          <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
+          <AuthErrorDetector />
+          <EmergencyAlert />
+          <Routes>
+            <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
+            <Route path="/pair" element={<PairingScreen />} />
+            <Route path="/loading" element={<LoadingScreen />} />
+            <Route path="/error" element={<ErrorScreen />} />
+            <Route path="*" element={<Navigate replace to="/" />} />
+          </Routes>
+        </Box>
+      </Fade>
+    </>
   );
 };
 
@@ -139,11 +95,21 @@ const App: React.FC = () => {
                 <ContentProvider>
                   <EmergencyAlertProvider>
                     <ApiErrorBoundary>
-                      <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
-                      {/* <CorsErrorNotification /> */}
-                      <AuthErrorDetector />
-                      <EmergencyAlert />
-                      <AppContent />
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          position: 'fixed',
+                          width: '100vw',
+                          height: '100vh',
+                          top: 0,
+                          left: 0,
+                          overflow: 'hidden',
+                          bgcolor: 'background.default',
+                        }}
+                      >
+                        <AppRoutes />
+                      </Box>
                     </ApiErrorBoundary>
                   </EmergencyAlertProvider>
                 </ContentProvider>

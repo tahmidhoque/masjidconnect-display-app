@@ -12,7 +12,6 @@ localforage.config({
 enum StorageKeys {
   SCREEN_CONTENT = 'screenContent',
   PRAYER_TIMES = 'prayerTimes',
-  PRAYER_STATUS = 'prayerStatus',
   EVENTS = 'events',
   SCHEDULE = 'schedule',
   LAST_UPDATED = 'lastUpdated',
@@ -108,19 +107,7 @@ class StorageService {
   }
 
   async getPrayerTimes(): Promise<PrayerTimes[] | PrayerTimes | null> {
-    const result = await localforage.getItem<PrayerTimes[] | PrayerTimes>(StorageKeys.PRAYER_TIMES);
-    console.log('Retrieved prayer times from storage:', result);
-    return result;
-  }
-
-  // Prayer Status
-  async savePrayerStatus(prayerStatus: PrayerStatus): Promise<void> {
-    await localforage.setItem(StorageKeys.PRAYER_STATUS, prayerStatus);
-    await this.updateLastUpdated(StorageKeys.PRAYER_STATUS);
-  }
-
-  async getPrayerStatus(): Promise<PrayerStatus | null> {
-    return localforage.getItem<PrayerStatus>(StorageKeys.PRAYER_STATUS);
+    return localforage.getItem<PrayerTimes[] | PrayerTimes>(StorageKeys.PRAYER_TIMES);
   }
 
   // Events

@@ -5,20 +5,18 @@ import logger, { getLastError } from '../utils/logger';
 class DataSyncService {
   private syncIntervals: Record<string, number | null> = {
     content: null,
-    prayerStatus: null,
     prayerTimes: null,
     events: null,
-    heartbeat: null,
-    schedule: null
+    schedule: null,
+    heartbeat: null
   };
   
   private lastSyncTime: Record<string, number> = {
     content: 0,
-    prayerStatus: 0,
     prayerTimes: 0,
     events: 0,
-    heartbeat: 0,
-    schedule: 0
+    schedule: 0,
+    heartbeat: 0
   };
   
   private startTime: number = Date.now();
@@ -29,9 +27,7 @@ class DataSyncService {
   
   // Track backoff status for APIs
   private backoffStatus: Record<string, { inBackoff: boolean, nextTry: number }> = {
-    heartbeat: { inBackoff: false, nextTry: 0 },
     content: { inBackoff: false, nextTry: 0 },
-    prayerStatus: { inBackoff: false, nextTry: 0 },
     prayerTimes: { inBackoff: false, nextTry: 0 },
     events: { inBackoff: false, nextTry: 0 },
     schedule: { inBackoff: false, nextTry: 0 }
@@ -40,20 +36,16 @@ class DataSyncService {
   // Add throttling mechanism
   private lastSyncAttempts: Record<string, number> = {
     content: 0,
-    prayerStatus: 0,
     prayerTimes: 0,
     events: 0,
-    heartbeat: 0,
     schedule: 0
   };
   
   private readonly MIN_SYNC_INTERVAL: Record<string, number> = {
-    content: 30 * 1000, // 30 seconds
-    prayerStatus: 30 * 1000, // 30 seconds
-    prayerTimes: 60 * 1000, // 1 minute
-    schedule: 60 * 1000, // 1 minute
-    events: 60 * 1000, // 1 minute
-    heartbeat: 60 * 1000 // 1 minute
+    content: 10000, // 10 seconds
+    prayerTimes: 10000, // 10 seconds
+    events: 10000, // 10 seconds
+    schedule: 10000, // 10 seconds
   };
   
   // Helper method to check if a sync should be throttled
@@ -121,7 +113,6 @@ class DataSyncService {
     // Log the intervals we're using
     logger.info('Starting all sync processes with intervals', {
       content: `${POLLING_INTERVALS.CONTENT / (60 * 1000)} minutes`,
-      prayerStatus: `${POLLING_INTERVALS.PRAYER_STATUS / 1000} seconds`,
       prayerTimes: `${POLLING_INTERVALS.PRAYER_TIMES / (60 * 60 * 1000)} hours`,
       schedule: `${POLLING_INTERVALS.CONTENT / (60 * 1000)} minutes`, // Use same interval as content
       events: `${POLLING_INTERVALS.EVENTS / (60 * 1000)} minutes`,
@@ -131,10 +122,6 @@ class DataSyncService {
     // Only start syncs if they're not already running
     if (this.syncIntervals.content === null) {
       this.startContentSync();
-    }
-    
-    if (this.syncIntervals.prayerStatus === null) {
-      this.startPrayerStatusSync();
     }
     
     if (this.syncIntervals.prayerTimes === null) {
@@ -158,7 +145,6 @@ class DataSyncService {
   private stopAllSyncs(): void {
     logger.info('Stopping all sync processes');
     this.stopContentSync();
-    this.stopPrayerStatusSync();
     this.stopPrayerTimesSync();
     this.stopScheduleSync();
     this.stopEventsSync();
@@ -195,7 +181,6 @@ class DataSyncService {
     
     const syncPromises = [
       this.syncContent(forceRefresh),
-      this.syncPrayerStatus(forceRefresh),
       this.syncPrayerTimes(forceRefresh),
       this.syncEvents(forceRefresh),
       this.syncSchedule(forceRefresh)
@@ -215,14 +200,13 @@ class DataSyncService {
       // Log results of each sync operation
       const syncResults: Record<string, string> = {
         content: results[0].status,
-        prayerStatus: results[1].status,
-        prayerTimes: results[2].status,
-        events: results[3].status,
-        schedule: results[4].status
+        prayerTimes: results[1].status,
+        events: results[2].status,
+        schedule: results[3].status
       };
       
       if (includeHeartbeat) {
-        syncResults.heartbeat = results[5].status;
+        syncResults.heartbeat = results[4].status;
       }
       
       // Check if any syncs failed
@@ -234,7 +218,7 @@ class DataSyncService {
         // Log detailed errors for each failed sync
         failedSyncs.forEach((result, index) => {
           if (result.status === 'rejected') {
-            const syncTypes = ['content', 'prayerStatus', 'prayerTimes', 'events', 'schedule'];
+            const syncTypes = ['content', 'prayerTimes', 'events', 'schedule'];
             if (includeHeartbeat) syncTypes.push('heartbeat');
             
             const syncType = index < syncTypes.length ? syncTypes[index] : 'unknown';
@@ -328,89 +312,6 @@ class DataSyncService {
         });
       } else {
         logger.error('Error during forced content sync', { error });
-      }
-    }
-  }
-
-  // Prayer status sync methods
-  private startPrayerStatusSync(): void {
-    if (this.syncIntervals.prayerStatus !== null) return;
-
-    logger.debug('Starting prayer status sync with interval', { 
-      interval: `${POLLING_INTERVALS.PRAYER_STATUS / 1000} seconds` 
-    });
-    
-    // Schedule periodic sync - don't sync immediately as it will be done in syncAllData
-    this.syncIntervals.prayerStatus = window.setInterval(() => {
-      this.syncPrayerStatus();
-    }, POLLING_INTERVALS.PRAYER_STATUS);
-  }
-
-  private stopPrayerStatusSync(): void {
-    if (this.syncIntervals.prayerStatus !== null) {
-      window.clearInterval(this.syncIntervals.prayerStatus);
-      this.syncIntervals.prayerStatus = null;
-      logger.debug('Stopped prayer status sync');
-    }
-  }
-
-  public async syncPrayerStatus(forceRefresh: boolean = false): Promise<void> {
-    if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
-
-    // Apply throttling unless it's a force refresh
-    if (!forceRefresh && this.shouldThrottleSync('prayerStatus')) {
-      logger.debug('Throttling prayer status sync - too frequent calls');
-      return;
-    }
-
-    // Skip backoff check if force refresh
-    if (!forceRefresh && this.backoffStatus.prayerStatus.inBackoff) {
-      const now = Date.now();
-      if (now < this.backoffStatus.prayerStatus.nextTry) {
-        logger.debug(`Prayer status sync in backoff until ${new Date(this.backoffStatus.prayerStatus.nextTry).toISOString()}, skipping`);
-        return;
-      } else {
-        // Reset backoff since we passed the backoff time
-        this.backoffStatus.prayerStatus.inBackoff = false;
-        logger.debug('Prayer status sync backoff period ended, retrying');
-      }
-    }
-
-    try {
-      logger.debug('Syncing prayer status...', { forceRefresh });
-      this.lastSyncTime.prayerStatus = Date.now();
-
-      // Fetch prayer status
-      const prayerStatusResponse = await masjidDisplayClient.getPrayerStatus(forceRefresh);
-      if (prayerStatusResponse.success && prayerStatusResponse.data) {
-        await storageService.savePrayerStatus(prayerStatusResponse.data);
-        logger.debug('Prayer status sync completed successfully');
-      } else {
-        // Don't enter backoff mode if force refresh
-        if (!forceRefresh) {
-          // If server has an error, implement backoff
-          this.backoffStatus.prayerStatus.inBackoff = true;
-          this.backoffStatus.prayerStatus.nextTry = Date.now() + (2 * 60 * 1000); // Wait 2 minutes before next try
-          logger.warn('Prayer status sync failed, entering backoff mode', { 
-            error: prayerStatusResponse.error, 
-            backoffUntil: new Date(this.backoffStatus.prayerStatus.nextTry).toISOString() 
-          });
-        } else {
-          logger.warn('Force prayer status sync failed', { error: prayerStatusResponse.error });
-        }
-      }
-    } catch (error) {
-      // Don't enter backoff mode if force refresh
-      if (!forceRefresh) {
-        // Error occurred, implement backoff
-        this.backoffStatus.prayerStatus.inBackoff = true;
-        this.backoffStatus.prayerStatus.nextTry = Date.now() + (2 * 60 * 1000); // Wait 2 minutes before next try
-        logger.error('Error syncing prayer status, entering backoff mode', { 
-          error, 
-          backoffUntil: new Date(this.backoffStatus.prayerStatus.nextTry).toISOString() 
-        });
-      } else {
-        logger.error('Error during forced prayer status sync', { error });
       }
     }
   }

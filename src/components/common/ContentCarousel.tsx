@@ -31,7 +31,6 @@ interface ScheduleItem {
  */
 const ContentCarousel: React.FC = () => {
   const { schedule, events, refreshContent, refreshSchedule } = useContent();
-  console.log('ContentCarousel: schedule', schedule);
   const { fontSizes, screenSize } = useResponsiveFontSize();
   
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
@@ -41,120 +40,32 @@ const ContentCarousel: React.FC = () => {
   // Use refs to prevent unnecessary re-renders
   const contentItemsRef = useRef<Array<any>>([]);
   const hasRefreshedRef = useRef(false);
+  const isComponentMountedRef = useRef(true);
   
-  // Memoize refreshContent to prevent unnecessary re-renders
-  const refreshContentOnce = useCallback(() => {
-    if (!hasRefreshedRef.current) {
-      console.log('ContentCarousel: Refreshing content and schedule...');
-      // First try to refresh the schedule specifically
-      refreshSchedule()
-        .then(() => {
-          console.log('ContentCarousel: Schedule refresh attempt completed');
-          // Then do the general content refresh as a backup
-          return refreshContent();
-        })
-        .then(() => {
-          console.log('ContentCarousel: Content refreshed successfully');
-          hasRefreshedRef.current = true;
-        })
-        .catch(err => console.error('Error refreshing content:', err));
-    }
-  }, [refreshContent, refreshSchedule]);
-  
-  // Refresh content when component mounts - with safeguard against infinite refreshes
+  // Refresh content only once
   useEffect(() => {
-    // Create stable function references to avoid dependency changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const doRefreshSchedule = refreshSchedule;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const doRefreshContent = refreshContent;
-
-    // Only refresh if we haven't already refreshed (using the existing ref)
     if (!hasRefreshedRef.current) {
-      console.log('ContentCarousel: First mount, refreshing content once...');
-      
-      // Do a single refresh of schedule and content
-      doRefreshSchedule()
-        .then(() => {
-          console.log('ContentCarousel: Initial schedule refresh completed');
-          return doRefreshContent(true);
-        })
-        .then(() => {
-          console.log('ContentCarousel: Initial content refresh completed');
-          hasRefreshedRef.current = true; // Mark as refreshed to prevent future refreshes
-        })
-        .catch(err => {
-          console.error('Error during initial refresh:', err);
-          // Still mark as refreshed to prevent infinite retry loops
-          hasRefreshedRef.current = true;
-        });
-    } else {
-      console.log('ContentCarousel: Skipping refresh as content was already refreshed');
+      hasRefreshedRef.current = true;
+      refreshSchedule().catch(() => {});
     }
     
-    // Cleanup function to help prevent memory leaks
     return () => {
-      console.log('ContentCarousel: Component unmounting');
+      isComponentMountedRef.current = false;
     };
-  }, []); // Empty dependency array - run only on mount
-  
-  // Debug output for schedule and events
-  useEffect(() => {
-    console.log('ContentCarousel: Current schedule:', schedule);
-    console.log('ContentCarousel: Current events:', events);
-    
-    // More detailed debugging of schedule structure
-    if (schedule) {
-      console.log('ContentCarousel: Schedule ID:', schedule.id);
-      console.log('ContentCarousel: Schedule name:', schedule.name);
-      console.log('ContentCarousel: Schedule items array exists:', !!schedule.items);
-      console.log('ContentCarousel: Schedule items length:', schedule.items?.length || 0);
-      
-      // Check the first item if available
-      if (schedule.items && schedule.items.length > 0) {
-        console.log('ContentCarousel: First item:', schedule.items[0]);
-        console.log('ContentCarousel: First item has contentItem:', !!schedule.items[0].contentItem);
-      }
-    }
-    
-    // Check if we're using fallback schedule
-    if (schedule?.id === 'fallback-schedule') {
-      console.log('WARNING: Using fallback schedule! API data retrieval may have failed.');
-    } else if (schedule?.id === 'normalized-schedule') {
-      console.log('INFO: Using normalized schedule from API data.');
-    }
-  }, [schedule, events]);
+  }, [refreshSchedule]);
   
   // Prepare content items for carousel
   useEffect(() => {
-    console.log('ContentCarousel: Beginning content preparation with schedule:', schedule);
+    if (!isComponentMountedRef.current) return;
+    
     let items = [];
     
     // Add schedule items if available
     if (schedule?.items && schedule.items.length > 0) {
-      console.log('ContentCarousel: Schedule items found:', schedule.items.length);
-      console.log('ContentCarousel: First raw schedule item:', JSON.stringify(schedule.items[0], null, 2));
-      
       // Map schedule items to the expected format
       const mappedItems = schedule.items.map((item, index) => {
-        // Log item structure more extensively
-        console.log(`ContentCarousel: Item ${index} structure:`, {
-          id: item.id,
-          hasContentItem: !!item.contentItem,
-          topLevelProps: {
-            hasType: 'type' in item,
-            hasTitle: 'title' in item,
-            hasContent: 'content' in item,
-            hasDuration: 'duration' in item,
-            hasOrder: 'order' in item
-          },
-          allKeys: Object.keys(item)
-        });
-        
         // If item doesn't have contentItem property, create it from the item's properties
         if (!item.contentItem) {
-          console.log(`ContentCarousel: Item at index ${index} missing contentItem, creating from top-level properties:`, item);
-          
           // Use type assertion to handle API format with top-level properties
           const apiItem = item as unknown as { 
             id: string; 
@@ -178,12 +89,6 @@ const ContentCarousel: React.FC = () => {
           };
         }
         
-        console.log(`ContentCarousel: Processing item ${index} with existing contentItem:`, {
-          id: item.id,
-          hasContentItem: true,
-          contentItemType: item.contentItem.type
-        });
-        
         const contentItem = item.contentItem;
         return {
           id: item.id,
@@ -200,21 +105,13 @@ const ContentCarousel: React.FC = () => {
         };
       }).filter(Boolean);
       
-      console.log('ContentCarousel: Mapped items count:', mappedItems.length);
-      
       if (mappedItems.length > 0) {
-        console.log('ContentCarousel: First mapped item:', JSON.stringify(mappedItems[0], null, 2));
         items.push(...mappedItems);
-      } else {
-        console.warn('ContentCarousel: No valid items found after mapping schedule items');
       }
-    } else {
-      console.warn('ContentCarousel: No schedule items found - schedule.items:', schedule?.items ? schedule.items.length : 'undefined');
     }
     
     // Add upcoming events if available
     if (events && events.length > 0) {
-      console.log('Events found:', events);
       items.push(...events.map(event => ({
         id: event.id,
         order: 999, // Place events after scheduled content
@@ -229,8 +126,6 @@ const ContentCarousel: React.FC = () => {
         endDate: event.endDate,
         location: event.location
       })));
-    } else {
-      console.warn('No events found');
     }
     
     // Sort by order - handle null safety with non-null assertion
@@ -240,22 +135,14 @@ const ContentCarousel: React.FC = () => {
       return ((a as any).order || 999) - ((b as any).order || 999);
     });
     
-    // Remove the mock data fallback
-    if (items.length === 0) {
-      console.log('No content found from API or storage');
-    }
-    
-    console.log('Content items prepared:', items);
-    
-    // Update state and refs
-    contentItemsRef.current = items;
-    setContentItems(items);
-    
-    // Reset current index when content changes to prevent out-of-bounds
-    if (currentItemIndex >= items.length) {
+    // Only update if the items have actually changed
+    if (JSON.stringify(items) !== JSON.stringify(contentItemsRef.current)) {
+      contentItemsRef.current = items;
+      setContentItems(items);
+      // Reset to first item when content changes
       setCurrentItemIndex(0);
     }
-  }, [schedule, events, currentItemIndex]);
+  }, [schedule, events]);
   
   // Rotate through content items
   useEffect(() => {

@@ -28,14 +28,12 @@ const CACHE_EXPIRATION = {
   PRAYER_TIMES: 10 * 60 * 1000, // 10 minutes (was 1 hour)
   CONTENT: 5 * 60 * 1000, // 5 minutes
   EVENTS: 30 * 60 * 1000, // 30 minutes
-  PRAYER_STATUS: 60 * 1000, // 60 seconds (was 15 seconds)
 };
 
 // Polling intervals (in milliseconds)
 export const POLLING_INTERVALS = {
   HEARTBEAT: 2 * 60 * 1000, // 2 minutes (was 60 seconds)
   CONTENT: 10 * 60 * 1000, // 10 minutes (was 5 minutes)
-  PRAYER_STATUS: 60 * 1000, // 60 seconds (was 15 seconds)
   PRAYER_TIMES: 10 * 60 * 1000, // 10 minutes (was 1 hour)
   EVENTS: 30 * 60 * 1000, // 30 minutes
 };
@@ -756,75 +754,6 @@ class MasjidDisplayClient {
     }
     
     return result;
-  }
-
-  // Get prayer status
-  public async getPrayerStatus(forceRefresh: boolean = false): Promise<ApiResponse<PrayerStatus>> {
-    // If offline and no force refresh, first try to get from storage
-    if (!navigator.onLine && !forceRefresh) {
-      try {
-        const storedStatus = await localforage.getItem<PrayerStatus>('prayerStatus');
-        if (storedStatus) {
-          // If offline, calculate current prayer status from stored data
-          const calculatedStatus = this.calculateCurrentPrayerStatus(storedStatus);
-          logger.info('Using calculated prayer status from stored data while offline');
-          return {
-            data: calculatedStatus,
-            success: true,
-            cached: true,
-            offlineFallback: true
-          };
-        }
-      } catch (error) {
-        logger.error('Error retrieving stored prayer status', { error });
-      }
-    }
-    
-    // Either online or no stored status found
-    const result = await this.fetchWithCache<PrayerStatus>(
-      '/api/prayer-status',
-      { method: 'GET' },
-      CACHE_EXPIRATION.PRAYER_STATUS
-    );
-    
-    // If successful, store in localforage for offline use
-    if (result.success && result.data) {
-      try {
-        await localforage.setItem('prayerStatus', result.data);
-        logger.debug('Stored prayer status in localforage for offline use');
-      } catch (error) {
-        logger.error('Failed to store prayer status in localforage', { error });
-      }
-    }
-    
-    return result;
-  }
-  
-  // Calculate current prayer status from stored data when offline
-  private calculateCurrentPrayerStatus(storedStatus: PrayerStatus): PrayerStatus {
-    // Create a new object so we don't modify the stored one
-    const calculatedStatus = { ...storedStatus };
-    
-    // Update the timestamp to current time
-    calculatedStatus.timestamp = new Date().toISOString();
-    
-    // Check if we need to update the current prayer based on time
-    if (calculatedStatus.nextPrayer) {
-      const now = new Date();
-      const nextPrayerTime = new Date(calculatedStatus.nextPrayer.time);
-      
-      // If next prayer time has passed, we need to update the status
-      if (now > nextPrayerTime) {
-        // Logic to update to next prayer (simplified)
-        // In a real implementation, this would be more sophisticated
-        // using the full prayer times for the day
-        calculatedStatus.currentPrayer = calculatedStatus.nextPrayer;
-        calculatedStatus.nextPrayer = null; // Would need actual next prayer
-        calculatedStatus.isAfterIsha = calculatedStatus.currentPrayer.name === 'ISHA';
-      }
-    }
-    
-    return calculatedStatus;
   }
 
   // Get events

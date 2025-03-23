@@ -20,14 +20,17 @@ interface LoadingScreenProps {
  */
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
-  const { isAuthenticated, requestPairingCode } = useAuth();
-  const { orientation, setAdminOrientation } = useOrientation();
-  const { masjidName, screenContent } = useContent();
+  const { isAuthenticated } = useAuth();
+  const { orientation } = useOrientation();
+  const { masjidName } = useContent();
+  const { loadingMessage, initializationStage, isInitializing } = useAppInitialization();
   
   // Animation and content states
   const [rotationAngle, setRotationAngle] = useState(0);
   const [showContent, setShowContent] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
+  const [showSpinner, setShowSpinner] = useState(true);
+  const [spinnerOpacity, setSpinnerOpacity] = useState(1);
   
   // Reference to track if we've already triggered completion
   const hasCompletedRef = useRef(false);
@@ -55,28 +58,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     }, 300);
   }, []);
 
-  // Request pairing code if not authenticated
+  // Progress through loading stages with timeouts for premium feel
   useEffect(() => {
-    // Only request code if not authenticated and we're in the loading phase (likely transitioning to pair screen)
-    if (!isAuthenticated) {
-      // Check if localStorage already has a valid pairing code
-      const storedPairingCode = localStorage.getItem('pairingCode');
-      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
-      
-      // Only request a new code if we don't have a valid non-expired one
-      if (!storedPairingCode || !storedPairingCodeExpiresAt || new Date(storedPairingCodeExpiresAt) <= new Date()) {
-        console.log('[LoadingScreen] Requesting pairing code during loading...');
-        requestPairingCode(orientation).catch(err => {
-          console.error('[LoadingScreen] Error requesting pairing code:', err);
-        });
-      }
-    }
-  }, [isAuthenticated, requestPairingCode, orientation]);
-
-  // Simple, deterministic loading sequence
-  useEffect(() => {
-    console.log('Initializing loading sequence');
-    
     // Set initial loading stage
     setLoadingStage('initializing');
     
@@ -85,51 +68,55 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     
     // Stage 1: Setting up
     stageTimers.push(setTimeout(() => {
-      console.log('Advancing to setting-up stage');
       setLoadingStage('setting-up');
     }, 2500));
     
     // Stage 2: Ready
     stageTimers.push(setTimeout(() => {
-      console.log('Advancing to ready stage');
       setLoadingStage('ready');
     }, 5000));
     
-    // Stage 3: Complete
+    // Stage 3: Complete - fade spinner gradually
     stageTimers.push(setTimeout(() => {
-      console.log('Advancing to complete stage');
       setLoadingStage('complete');
+      
+      // Gradually fade out the spinner over 2 seconds
+      const fadeStart = Date.now();
+      const fadeDuration = 2000;
+      const fadeInterval = setInterval(() => {
+        const elapsed = Date.now() - fadeStart;
+        const progress = Math.min(elapsed / fadeDuration, 1);
+        setSpinnerOpacity(1 - progress);
+        
+        if (progress >= 1) {
+          clearInterval(fadeInterval);
+          // Only hide spinner completely after fade completes
+          setShowSpinner(false);
+        }
+      }, 50); // Update every 50ms for smooth animation
     }, 7500));
-    
-    // Stage 4: Call onComplete to transition
-    stageTimers.push(setTimeout(() => {
-      if (onComplete && !hasCompletedRef.current) {
-        console.log('Loading sequence complete, transitioning...');
-        hasCompletedRef.current = true;
-        onComplete();
-      }
-    }, 10000));
     
     // Clean up all timers on unmount
     return () => {
-      console.log('Cleaning up loading sequence timers');
       stageTimers.forEach(timer => clearTimeout(timer));
     };
   }, []); // Empty dependency array ensures this only runs once
 
-  // Update orientation from screen content when it changes
-  useEffect(() => {
-    if (!screenContent) return;
-    
-    const newOrientation = screenContent?.data?.screen?.orientation ?? screenContent?.screen?.orientation;
-    
-    if (newOrientation && newOrientation !== orientation) {
-      setAdminOrientation(newOrientation);
-    }
-  }, [screenContent, setAdminOrientation, orientation]);
-
   // Get display message based on loading stage and authentication status
   const getDisplayMessage = () => {
+    // For final stage, always show the Salam greeting with mosque name if available
+    if (loadingStage === 'complete' || initializationStage === 'complete') {
+      if (isAuthenticated && masjidName) {
+        return `السلام عليكم - ${masjidName}`;
+      }
+      return 'السلام عليكم';
+    }
+    
+    // For other stages, use app initialization message if available
+    if (loadingMessage && initializationStage !== 'complete') {
+      return loadingMessage;
+    }
+    
     if (isAuthenticated) {
       switch (loadingStage) {
         case 'initializing':
@@ -138,24 +125,20 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
           return 'Fetching latest content...';
         case 'ready':
           return 'Preparing your display...';
-        case 'complete':
-          // Show mosque name with Assalamualaikum in Arabic
-          return masjidName 
-            ? `السلام عليكم - ${masjidName}` 
-            : 'السلام عليكم';
         default:
           return 'Loading...';
       }
     } else {
+      // Not authenticated
+      const isPaired = localStorage.getItem('masjid_screen_id') !== null;
+      
       switch (loadingStage) {
         case 'initializing':
           return 'Initializing...';
         case 'setting-up':
-          return 'Setting up display...';
+          return isPaired ? 'Reconnecting to your masjid...' : 'Setting up display...';
         case 'ready':
-          return 'Ready to connect';
-        case 'complete':
-          return 'السلام عليكم';
+          return isPaired ? 'Ready to reconnect' : 'Ready to pair';
         default:
           return 'Loading...';
       }
@@ -169,7 +152,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     const skyBlueColor = '#66D1FF'; // Sky Blue from brand guidelines
 
     return (
-      <Box sx={{ position: 'relative', width: 80, height: 80, marginBottom: 2 }}>
+      <Box sx={{ position: 'relative', width: 120, height: 120, marginBottom: 3 }}>
         {/* Outer rotating ring */}
         <Box
           sx={{
@@ -179,7 +162,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
             width: '100%',
             height: '100%',
             borderRadius: '50%',
-            border: `3px solid ${goldColor}`,
+            border: `4px solid ${goldColor}`,
             borderTopColor: 'transparent',
             transform: `rotate(${rotationAngle}deg)`,
           }}
@@ -194,7 +177,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
             width: '70%',
             height: '70%',
             borderRadius: '50%',
-            border: `3px solid ${emeraldColor}`,
+            border: `4px solid ${emeraldColor}`,
             borderRightColor: 'transparent',
             transform: `rotate(${-rotationAngle * 1.5}deg)`,
           }}
@@ -244,7 +227,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       {/* Empty top space for balance */}
       <Box sx={{ flexGrow: 1 }} />
       
-      {/* Logo container */}
+      {/* Logo container - fixed height to prevent movement */}
       <Box
         sx={{
           display: 'flex',
@@ -252,6 +235,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
           alignItems: 'center',
           justifyContent: 'center',
           flexGrow: 2,
+          position: 'relative', // Keep position stable
         }}
       >
         <Box sx={{ 
@@ -275,7 +259,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
         </Box>
       </Box>
 
-      {/* Bottom section */}
+      {/* Bottom section with fixed height to prevent layout shifts */}
       <Box
         sx={{ 
           display: 'flex',
@@ -284,6 +268,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
           marginTop: 'auto',
           flexGrow: 1,
           justifyContent: 'flex-end',
+          minHeight: '240px', // Increased height for better spacing
+          position: 'relative', // Create a containing context
           '@keyframes logoGlow': {
             '0%': { filter: 'brightness(1)' },
             '50%': { filter: 'brightness(1.3)' },
@@ -291,23 +277,49 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
           },
         }}
       >
-        {loadingStage !== 'complete' && <CustomLoader />}
-
-        <Typography
-          variant="body1" 
-          sx={{
-            color: '#fff',
-            textAlign: 'center',
-            fontWeight: 300,
-            letterSpacing: '0.05em',
-            fontSize: loadingStage === 'complete' ? '1.5rem' : '1.2rem',
-            transition: 'font-size 0.5s ease',
-            mt: 2,
-            mb: 4,
+        {/* Fixed position spinner container with smooth opacity transition */}
+        <Box 
+          sx={{ 
+            height: 'auto',
+            width: '100%', 
+            display: 'flex',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            position: 'relative', // Changed to relative positioning
+            marginBottom: 4, // Add space between spinner and text
+            opacity: spinnerOpacity,
+            transition: 'opacity 2s ease',
+            visibility: showSpinner ? 'visible' : 'hidden',
           }}
         >
-          {getDisplayMessage()}
-        </Typography>
+          <CustomLoader />
+        </Box>
+
+        {/* Message container - central and more prominent */}
+        <Box
+          sx={{
+            width: '100%',
+            position: 'relative',
+            textAlign: 'center',
+            padding: '0 24px',
+            marginBottom: 4, // Add space at bottom
+          }}
+        >
+          <Typography
+            variant="body1" 
+            sx={{
+              color: '#fff',
+              textAlign: 'center',
+              fontWeight: 400,
+              letterSpacing: '0.05em',
+              fontSize: loadingStage === 'complete' ? '1.8rem' : '1.4rem',
+              transition: 'font-size 0.5s ease',
+              textShadow: '0 2px 4px rgba(0,0,0,0.5)', // Add shadow for better visibility
+            }}
+          >
+            {getDisplayMessage()}
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );
@@ -322,7 +334,16 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
         top: 0,
         left: 0,
         backgroundColor: theme.palette.background.default,
+        // Use opacity transition for entire component to fade out
+        opacity: 1,
+        transition: 'opacity 1.2s ease-in-out',
+        '&.fade-out': {
+          opacity: 0,
+        },
+        zIndex: 9999, // Ensure loading screen is above other content
       }}
+      // Add className conditionally to avoid type errors
+      className={!isInitializing ? 'fade-out' : undefined}
     >
       <Fade in={showContent} timeout={800}>
         {shouldRotate ? (
