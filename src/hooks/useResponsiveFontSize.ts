@@ -9,6 +9,8 @@ interface ScreenSize {
   isLargeScreen: boolean;
   is720p: boolean;
   is1080p: boolean;
+  is1440p: boolean;
+  is4K: boolean;
   isSmallerThan720p: boolean;
   aspectRatio: number;
   isLandscape: boolean;
@@ -43,6 +45,8 @@ const useResponsiveFontSize = () => {
         isLargeScreen: width >= 1920 || height >= 1080,
         is720p: width <= 1280 || height <= 720,
         is1080p: (width > 1280 && width <= 1920) || (height > 720 && height <= 1080),
+        is1440p: (width > 1920 && width <= 2560) || (height > 1080 && height <= 1440),
+        is4K: width > 3000 || height > 1600,
         isSmallerThan720p: width < 960 || height < 540,
         aspectRatio,
         isLandscape
@@ -71,6 +75,8 @@ const useResponsiveFontSize = () => {
         isLargeScreen: width >= 1920 || height >= 1080,
         is720p: width <= 1280 || height <= 720,
         is1080p: (width > 1280 && width <= 1920) || (height > 720 && height <= 1080),
+        is1440p: (width > 1920 && width <= 2560) || (height > 1080 && height <= 1440),
+        is4K: width > 3000 || height > 1600,
         isSmallerThan720p: width < 960 || height < 540,
         aspectRatio,
         isLandscape
@@ -120,6 +126,26 @@ const useResponsiveFontSize = () => {
     headerText: getSizeRem(1.1),
   };
   
+  // Calculate a proportional sidebar width based on screen resolution
+  const calculateSidebarWidth = () => {
+    // Base width calculations based on screen resolution
+    if (screenSize.is4K) {
+      // For 4K displays (3840x2160 and above)
+      // Keep proportions similar but allow for more width
+      return `${Math.max(Math.min(screenSize.width * 0.25, 750), 600)}px`;
+    } else if (screenSize.is1440p) {
+      // For 1440p displays (2560x1440)
+      // Moderately wider than 1080p
+      return `${Math.max(Math.min(screenSize.width * 0.27, 580), 480)}px`;
+    } else if (screenSize.is1080p) {
+      // For 1080p displays (1920x1080)
+      return `${Math.max(Math.min(screenSize.width * 0.28, 480), 380)}px`;
+    } else {
+      // For 720p and lower resolutions (1280x720 and below)
+      return `${Math.max(Math.min(screenSize.width * 0.25, 360), 320)}px`;
+    }
+  };
+  
   // Layout measurements
   const layout = {
     prayerRowHeight: getSizePx(38),
@@ -128,7 +154,7 @@ const useResponsiveFontSize = () => {
     standardGap: getSizePx(6),
     standardPadding: getSizePx(10),
     headerSpacing: getSizePx(8),
-    sidebarWidth: '320px', // Fixed width for the sidebar
+    sidebarWidth: calculateSidebarWidth(),
   };
 
   return { 
