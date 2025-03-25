@@ -32,9 +32,9 @@ const CACHE_EXPIRATION = {
 
 // Polling intervals (in milliseconds)
 export const POLLING_INTERVALS = {
-  HEARTBEAT: 2 * 60 * 1000, // 2 minutes (was 60 seconds)
-  CONTENT: 10 * 60 * 1000, // 10 minutes (was 5 minutes)
-  PRAYER_TIMES: 10 * 60 * 1000, // 10 minutes (was 1 hour)
+  HEARTBEAT: 2 * 60 * 1000, // 2 minutes
+  CONTENT: 10 * 60 * 1000, // 10 minutes
+  PRAYER_TIMES: 10 * 60 * 1000, // 10 minutes
   EVENTS: 30 * 60 * 1000, // 30 minutes
 };
 
@@ -97,10 +97,18 @@ class MasjidDisplayClient {
     // Set the baseURL from environment or use default
     let baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
     
+    // Remove any trailing slash for consistency
+    baseURL = baseURL.replace(/\/$/, '');
+    
     // Apply CORS proxy in development if enabled
     if (USE_CORS_PROXY && process.env.NODE_ENV === 'development') {
-      logger.info(`Using CORS proxy: ${CORS_PROXY_URL}${baseURL}`);
-      baseURL = `${CORS_PROXY_URL}${baseURL}`;
+      // Ensure we don't double-apply the CORS proxy
+      if (!baseURL.includes(CORS_PROXY_URL)) {
+        logger.info(`Using CORS proxy: ${CORS_PROXY_URL}${baseURL}`);
+        baseURL = `${CORS_PROXY_URL}${baseURL}`;
+      } else {
+        logger.info(`CORS proxy already in baseURL: ${baseURL}`);
+      }
     }
     
     this.baseURL = baseURL;
@@ -415,7 +423,10 @@ class MasjidDisplayClient {
     options: AxiosRequestConfig = {}, 
     cacheTime: number = 0
   ): Promise<ApiResponse<T>> {
-    const cacheKey = `${endpoint}:${JSON.stringify(options)}`;
+    // Ensure endpoint doesn't start with a slash to avoid URL path issues
+    const normalizedEndpoint = endpoint.replace(/^\//, '');
+    
+    const cacheKey = `${normalizedEndpoint}:${JSON.stringify(options)}`;
     const now = Date.now();
     
     // Check if we have a valid cache entry
@@ -424,7 +435,7 @@ class MasjidDisplayClient {
     
     // If offline, always use cache regardless of expiration
     if (!navigator.onLine && cachedItem) {
-      logger.info(`Using cached data for ${endpoint} because device is offline`, {
+      logger.info(`Using cached data for ${normalizedEndpoint} because device is offline`, {
         cached: true,
         expired: isExpired,
         offlineMode: true
@@ -439,7 +450,7 @@ class MasjidDisplayClient {
 
     // If we have a non-expired cache entry, use it
     if (cachedItem && !isExpired) {
-      logger.debug(`Using cached data for ${endpoint}`, { 
+      logger.debug(`Using cached data for ${normalizedEndpoint}`, { 
         cached: true, 
         expiry: new Date(cachedItem.expiry).toISOString(),
         timeLeft: Math.floor((cachedItem.expiry - now) / 1000) + 's'
@@ -454,9 +465,9 @@ class MasjidDisplayClient {
     // Otherwise, fetch from network
     try {
       // Mark this endpoint as loading
-      this.isLoading.set(endpoint, true);
+      this.isLoading.set(normalizedEndpoint, true);
       
-      const response = await this.fetchWithRetry<T>(endpoint, options, cacheTime);
+      const response = await this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime);
       
       // If success, update cache
       if (response.success && response.data) {
@@ -466,18 +477,18 @@ class MasjidDisplayClient {
         });
         
         // Reset backoff for this endpoint
-        this.resetBackoff(endpoint);
+        this.resetBackoff(normalizedEndpoint);
       }
       
       return validateApiResponse(response);
     } catch (error: any) {
       // Handle error
-      const errorMessage = `Failed to fetch ${endpoint}: ${error.message || 'Unknown error'}`;
+      const errorMessage = `Failed to fetch ${normalizedEndpoint}: ${error.message || 'Unknown error'}`;
       logger.error(errorMessage, { error });
       
       // If we have a cached item, return it even if expired as a fallback
       if (cachedItem) {
-        logger.info(`Falling back to cached data for ${endpoint} due to fetch error`, {
+        logger.info(`Falling back to cached data for ${normalizedEndpoint} due to fetch error`, {
           cached: true,
           expired: isExpired,
           error: error.message || 'Unknown error'
@@ -496,7 +507,7 @@ class MasjidDisplayClient {
       return createErrorResponse(errorMessage);
     } finally {
       // Mark this endpoint as no longer loading
-      this.isLoading.set(endpoint, false);
+      this.isLoading.set(normalizedEndpoint, false);
     }
   }
   
@@ -509,29 +520,33 @@ class MasjidDisplayClient {
   ): Promise<ApiResponse<T>> {
     const maxRetries = 3;
     let retryDelay = 1000; // Start with 1 second
-    const cacheKey = `${endpoint}-${JSON.stringify(options)}`;
+    
+    // Ensure endpoint doesn't start with a slash to avoid URL path issues
+    const normalizedEndpoint = endpoint.replace(/^\//, '');
+    
+    const cacheKey = `${normalizedEndpoint}-${JSON.stringify(options)}`;
     
     // Mark this endpoint as loading
-    this.isLoading.set(endpoint, true);
+    this.isLoading.set(normalizedEndpoint, true);
     
     try {
-      if (!shouldDebounceLog(`request-${endpoint}`)) {
-        logger.debug(`Making request to ${endpoint}`, { 
+      if (!shouldDebounceLog(`request-${normalizedEndpoint}`)) {
+        logger.debug(`Making request to ${normalizedEndpoint}`, { 
           method: options.method, 
           hasData: !!options.data,
           hasAuth: this.isAuthenticated(),
           withCredentials: options.withCredentials,
-          url: this.baseURL + endpoint
+          url: `${this.baseURL}/${normalizedEndpoint}`
         });
       }
       
       const response = await this.client.request<any, AxiosResponse<T>>({
-        url: endpoint,
+        url: normalizedEndpoint,
         ...options,
       });
       
-      if (!shouldDebounceLog(`response-${endpoint}`)) {
-        logger.debug(`Response from ${endpoint}:`, {
+      if (!shouldDebounceLog(`response-${normalizedEndpoint}`)) {
+        logger.debug(`Response from ${normalizedEndpoint}:`, {
           status: response.status,
           hasData: !!response.data
         });
@@ -551,16 +566,16 @@ class MasjidDisplayClient {
       }
       
       // Reset backoff for this endpoint after successful request
-      this.resetBackoff(endpoint);
+      this.resetBackoff(normalizedEndpoint);
       
       // Mark this endpoint as no longer loading
-      this.isLoading.set(endpoint, false);
+      this.isLoading.set(normalizedEndpoint, false);
       
       return result;
     } catch (error: any) {
       // Only log errors that aren't debounced
-      if (!shouldDebounceLog(`error-${endpoint}`)) {
-        logger.error(`Error fetching ${endpoint}:`, {
+      if (!shouldDebounceLog(`error-${normalizedEndpoint}`)) {
+        logger.error(`Error fetching ${normalizedEndpoint}:`, {
           message: error.message,
           status: error.response?.status,
           data: error.response?.data,
@@ -570,7 +585,7 @@ class MasjidDisplayClient {
       }
       
       // Mark this endpoint as no longer loading
-      this.isLoading.set(endpoint, false);
+      this.isLoading.set(normalizedEndpoint, false);
       
       // Handle unauthorized responses (invalid token)
       if (error.response?.status === 401) {
@@ -594,7 +609,7 @@ class MasjidDisplayClient {
         // Return expired cache as fallback if available
         const cached = this.cache.get(cacheKey);
         if (cached) {
-          logger.warn(`Error fetching ${endpoint}, using expired cache`);
+          logger.warn(`Error fetching ${normalizedEndpoint}, using expired cache`);
           return cached.data;
         }
         
@@ -615,19 +630,19 @@ class MasjidDisplayClient {
         const jitter = Math.random() * 0.3 + 0.85; // Random value between 0.85 and 1.15
         const delay = retryDelay * jitter;
         
-        logger.info(`Retrying ${endpoint} in ${Math.round(delay)}ms (attempt ${retries + 1}/${maxRetries})`);
+        logger.info(`Retrying ${normalizedEndpoint} in ${Math.round(delay)}ms (attempt ${retries + 1}/${maxRetries})`);
         
         await new Promise(resolve => setTimeout(resolve, delay));
         
         retryDelay *= 2; // Double the delay for next retry
-        return this.fetchWithRetry<T>(endpoint, options, cacheTime, retries + 1);
+        return this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime, retries + 1);
       }
       
       // For other errors, don't retry
       // Return expired cache as fallback if available
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        logger.warn(`Error fetching ${endpoint}, using expired cache`);
+        logger.warn(`Error fetching ${normalizedEndpoint}, using expired cache`);
         return cached.data;
       }
       
@@ -645,7 +660,8 @@ class MasjidDisplayClient {
 
     try {
       // Use the correct endpoint from the integration guide
-      const endpoint = '/api/screen/heartbeat';
+      // Remove any leading slash to ensure consistent handling with baseURL
+      const endpoint = 'api/screen/heartbeat'.replace(/^\//, '');
       
       const payload = {
         screenId: this.credentials!.screenId,
@@ -653,16 +669,49 @@ class MasjidDisplayClient {
         deviceInfo: status.metrics
       };
 
+      // Log detailed information about the request
+      logger.debug('Preparing heartbeat request', { 
+        endpoint,
+        fullUrl: `${this.baseURL}/${endpoint}`,
+        corsProxyEnabled: USE_CORS_PROXY,
+        environment: process.env.NODE_ENV,
+        screenId: this.credentials?.screenId
+      });
+      
+      // Use consistent options with other API calls
       const options = {
         method: 'POST',
-        data: payload
+        data: payload,
+        timeout: 30000 // 30 second timeout
       };
-
-      const result = await this.fetchWithRetry<HeartbeatResponse>(endpoint, options);
+      
+      // Use fetchWithCache with 0 cache time to ensure consistent CORS and auth handling
+      const result = await this.fetchWithCache<HeartbeatResponse>(endpoint, options, 0);
+      
+      if (!result.success) {
+        logger.warn('Heartbeat response not successful', { error: result.error });
+      } else {
+        logger.debug('Heartbeat response successful');
+      }
+      
       return validateApiResponse(result);
-    } catch (error) {
-      logger.error('Error sending heartbeat', { error });
-      return createErrorResponse('Failed to send heartbeat');
+    } catch (error: any) {
+      // Enhanced error logging with CORS-specific details
+      const isCorsError = error.message?.includes('CORS') || 
+                        error.message?.includes('NetworkError') ||
+                        error.message?.includes('Network Error');
+      
+      logger.error('Error sending heartbeat', { 
+        error, 
+        message: error.message,
+        isCorsError,
+        corsProxyEnabled: USE_CORS_PROXY,
+        baseUrl: this.baseURL,
+        status: error.response?.status,
+        headers: error.config?.headers
+      });
+      
+      return createErrorResponse('Failed to send heartbeat: ' + (isCorsError ? 'CORS policy error' : error.message));
     }
   }
 

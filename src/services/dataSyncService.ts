@@ -30,7 +30,8 @@ class DataSyncService {
     content: { inBackoff: false, nextTry: 0 },
     prayerTimes: { inBackoff: false, nextTry: 0 },
     events: { inBackoff: false, nextTry: 0 },
-    schedule: { inBackoff: false, nextTry: 0 }
+    schedule: { inBackoff: false, nextTry: 0 },
+    heartbeat: { inBackoff: false, nextTry: 0 }
   };
 
   // Add throttling mechanism
@@ -38,14 +39,16 @@ class DataSyncService {
     content: 0,
     prayerTimes: 0,
     events: 0,
-    schedule: 0
+    schedule: 0,
+    heartbeat: 0
   };
   
   private readonly MIN_SYNC_INTERVAL: Record<string, number> = {
     content: 10000, // 10 seconds
     prayerTimes: 10000, // 10 seconds
     events: 10000, // 10 seconds
-    schedule: 10000, // 10 seconds
+    schedule: 10000, // 10 seconds,
+    heartbeat: 30000 // 30 seconds (match MIN_HEARTBEAT_INTERVAL)
   };
   
   // Helper method to check if a sync should be throttled
@@ -545,17 +548,29 @@ class DataSyncService {
   }
 
   private async sendHeartbeat(): Promise<void> {
-    if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
+    if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) {
+      logger.debug('Skipping heartbeat - offline or not authenticated');
+      return;
+    }
 
-    // Apply throttling for heartbeat
-    if (this.shouldThrottleSync('heartbeat')) {
-      logger.debug('Throttling heartbeat - too frequent calls');
+    // Record time for tracking
+    const now = Date.now();
+    
+    // Apply throttling for heartbeat - should check BEFORE updating lastSyncAttempts
+    const lastAttempt = this.lastSyncAttempts.heartbeat || 0;
+    const timeSinceLastAttempt = now - lastAttempt;
+    const minInterval = this.MIN_SYNC_INTERVAL.heartbeat;
+    
+    if (timeSinceLastAttempt < minInterval) {
+      logger.debug(`Throttling heartbeat - too frequent calls (${Math.round(timeSinceLastAttempt/1000)}s < ${Math.round(minInterval/1000)}s)`);
       return;
     }
     
+    // Update last attempt time AFTER throttle check
+    this.lastSyncAttempts.heartbeat = now;
+    
     // Check if we're in backoff mode for heartbeat
     if (this.backoffStatus.heartbeat.inBackoff) {
-      const now = Date.now();
       if (now < this.backoffStatus.heartbeat.nextTry) {
         logger.debug(`Heartbeat in backoff until ${new Date(this.backoffStatus.heartbeat.nextTry).toISOString()}, skipping`);
         return;
@@ -566,17 +581,15 @@ class DataSyncService {
       }
     }
     
-    // Record time to prevent too frequent heartbeats
-    const now = Date.now();
-    if (now - this.lastHeartbeatTime < this.MIN_HEARTBEAT_INTERVAL) {
-      logger.debug('Skipping heartbeat - too soon since last heartbeat');
+    // Second check for time between heartbeat successful sends (not just attempts)
+    const timeSinceLastHeartbeat = now - this.lastHeartbeatTime;
+    if (timeSinceLastHeartbeat < this.MIN_HEARTBEAT_INTERVAL) {
+      logger.debug(`Skipping heartbeat - too soon since last successful heartbeat (${Math.round(timeSinceLastHeartbeat/1000)}s < ${Math.round(this.MIN_HEARTBEAT_INTERVAL/1000)}s)`);
       return;
     }
     
     try {
       logger.debug('Sending heartbeat...');
-      this.lastHeartbeatTime = now;
-      this.lastSyncTime.heartbeat = now;
       
       // Calculate uptime
       const uptime = Math.floor((now - this.startTime) / 1000);
@@ -595,9 +608,13 @@ class DataSyncService {
       };
       
       // Send heartbeat to server
+      logger.debug('Calling masjidDisplayClient.sendHeartbeat', { request: heartbeatRequest });
       const response = await masjidDisplayClient.sendHeartbeat(heartbeatRequest);
       
       if (response.success) {
+        // Only update the successful time on success
+        this.lastHeartbeatTime = now;
+        this.lastSyncTime.heartbeat = now;
         logger.debug('Heartbeat sent successfully');
       } else {
         // Implement backoff if heartbeat fails
