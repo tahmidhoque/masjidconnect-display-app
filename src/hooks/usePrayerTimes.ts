@@ -10,6 +10,7 @@ import {
 } from '../utils/dateUtils';
 import masjidDisplayClient from '../api/masjidDisplayClient';
 import logger from '../utils/logger';
+import dayjs from 'dayjs';
 
 interface FormattedPrayerTime {
   name: string;
@@ -20,6 +21,7 @@ interface FormattedPrayerTime {
   isNext: boolean;
   isCurrent: boolean;
   timeUntil: string;
+  jamaatTime?: string;
 }
 
 interface PrayerTimesHook {
@@ -34,6 +36,7 @@ interface PrayerTimesHook {
 }
 
 const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Zuhr', 'Asr', 'Maghrib', 'Isha'];
+const SKIP_PRAYERS = ['Sunrise']; // Prayers to skip in countdown
 
 export const usePrayerTimes = (): PrayerTimesHook => {
   // Only get prayerTimes and refreshPrayerTimes from ContentContext
@@ -146,16 +149,32 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     
     const now = new Date();
     const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const isAfterMidnightBeforeFajr = now.getHours() < 6;
+    
+    // Filter out prayers that should be skipped for the countdown
+    const countdownPrayers = prayers.filter(p => !SKIP_PRAYERS.includes(p.name));
     
     // Sort prayers by time
-    const sortedPrayers = [...prayers].sort((a, b) => a.time.localeCompare(b.time));
+    const sortedPrayers = [...countdownPrayers].sort((a, b) => a.time.localeCompare(b.time));
     
     // Current prayer: find the last prayer that has occurred
     let currentIndex = -1;
-    for (let i = sortedPrayers.length - 1; i >= 0; i--) {
-      if (sortedPrayers[i].time <= currentTimeStr) {
-        currentIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
-        break;
+    
+    // Special handling for after midnight before Fajr
+    if (isAfterMidnightBeforeFajr) {
+      // When it's after midnight but before Fajr, the current prayer should be Isha
+      const ishaIndex = prayers.findIndex(p => p.name === 'Isha');
+      if (ishaIndex >= 0) {
+        currentIndex = ishaIndex;
+        logger.info('After midnight before Fajr: Setting current prayer to Isha');
+      }
+    } else {
+      // Normal case - find the last prayer that has occurred
+      for (let i = sortedPrayers.length - 1; i >= 0; i--) {
+        if (sortedPrayers[i].time <= currentTimeStr) {
+          currentIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
+          break;
+        }
       }
     }
     
@@ -166,11 +185,69 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
     
     // Next prayer: find the earliest prayer that hasn't occurred yet
+    // IMPORTANT: Check if the current prayer has a jamaat time and if it hasn't passed yet
     let nextIndex = -1;
-    for (let i = 0; i < sortedPrayers.length; i++) {
-      if (sortedPrayers[i].time > currentTimeStr) {
-        nextIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
-        break;
+    
+    // If we have a current prayer, check if we're between adhan time and jamaat time
+    if (currentIndex >= 0) {
+      const currentPrayer = prayers[currentIndex];
+      const jamaatTime = currentPrayer.jamaat;
+      
+      // EDGE CASE: If we're between adhan time and jamaat time,
+      // the current prayer should also be the next prayer for countdown purposes
+      if (jamaatTime && currentPrayer.time <= currentTimeStr && jamaatTime > currentTimeStr) {
+        logger.info(`Between ${currentPrayer.name} adhan (${currentPrayer.time}) and jamaat (${jamaatTime}), showing countdown to jamaat`);
+        nextIndex = currentIndex;
+        return { currentIndex, nextIndex };
+      }
+    }
+
+    // If we have a current prayer with jamaat time that hasn't passed yet,
+    // keep the current prayer as the next prayer for countdown purposes
+    if (currentIndex >= 0 && prayers[currentIndex].jamaat) {
+      const currentPrayer = prayers[currentIndex];
+      const jamaatTime = currentPrayer.jamaat;
+      
+      // Special handling for after midnight before Fajr
+      if (isAfterMidnightBeforeFajr && currentPrayer.name === 'Isha') {
+        // If it's after midnight and current prayer is Isha,
+        // we need to find Fajr as the next prayer regardless of jamaat time
+        const fajrIndex = prayers.findIndex(p => p.name === 'Fajr');
+        if (fajrIndex >= 0) {
+          nextIndex = fajrIndex;
+          logger.info('After midnight: Setting next prayer to Fajr');
+        }
+      }
+      else if (jamaatTime && jamaatTime > currentTimeStr) {
+        // If jamaat time hasn't passed yet, keep the current prayer as the next prayer
+        nextIndex = currentIndex;
+        logger.info(`Maintaining ${currentPrayer.name} as next prayer because jamaat time ${jamaatTime} hasn't passed yet`);
+      } else {
+        // If jamaat time has passed, find the next prayer normally
+        for (let i = 0; i < sortedPrayers.length; i++) {
+          if (sortedPrayers[i].time > currentTimeStr) {
+            nextIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
+            break;
+          }
+        }
+      }
+    } else {
+      // Special handling for after midnight before Fajr
+      if (isAfterMidnightBeforeFajr) {
+        // If it's after midnight and before Fajr, next prayer should be Fajr
+        const fajrIndex = prayers.findIndex(p => p.name === 'Fajr');
+        if (fajrIndex >= 0) {
+          nextIndex = fajrIndex;
+          logger.info('After midnight: Setting next prayer to Fajr');
+        }
+      } else {
+        // No current prayer or no jamaat time, find the next prayer normally
+        for (let i = 0; i < sortedPrayers.length; i++) {
+          if (sortedPrayers[i].time > currentTimeStr) {
+            nextIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
+            break;
+          }
+        }
       }
     }
     
@@ -185,66 +262,32 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
   // Process prayer times function with improved performance - memoized
   const processPrayerTimes = useCallback(() => {
-    // Skip if no prayer times data is available
-    if (!prayerTimes) {
-      logger.debug('No prayer times available to process');
-      return;
-    }
-    
-    // Skip if already processing or throttled
+    // Set processing flag to prevent concurrent processing
     if (calculationsRef.current.isProcessing) {
       return;
     }
-    
-    // Add throttling to prevent excessive processing
-    const now = Date.now();
-    if (now - calculationsRef.current.lastProcessTime < MIN_PROCESS_INTERVAL) {
-      return;
-    }
-    
-    // Update processing state
     calculationsRef.current.isProcessing = true;
-    calculationsRef.current.lastProcessTime = now;
-    
+
     try {
-      // Check if we need to refresh data (e.g., if day has changed)
+      // Check for date change first
       checkForDayChange();
       
-      // Create a new array for prayer times to avoid modifying existing state
+      // Get current date/time
+      const now = Date.now();
       const prayers: FormattedPrayerTime[] = [];
+      const prayerTimesForCalculation: { name: string; time: string }[] = [];
       
-      // Find today's prayer times from the data array
-      const nowMoment = moment();
-      const todayDateStr = nowMoment.format('YYYY-MM-DD');
+      // Initialize variables for calculations
       let todayData = prayerTimes;
-      
-      // Check if prayerTimes has data array (new format)
-      if ('data' in prayerTimes && Array.isArray(prayerTimes.data)) {
-        // Find today's prayer times in the array
-        const todayEntry = prayerTimes.data.find(entry => {
-          // Match entries by date (strip time part if present)
-          if (entry.date && typeof entry.date === 'string') {
-            return entry.date.substring(0, 10) === todayDateStr;
-          }
-          return false;
-        });
-        
-        if (todayEntry) {
-          todayData = todayEntry;
-        } else if (prayerTimes.data.length > 0) {
-          // If we can't find today's data, use the first entry as fallback
-          todayData = prayerTimes.data[0];
-        }
-      }
-      
-      // Initialize variables for local calculations
       let nextPrayerName = '';
       let currentPrayerName = '';
       
-      // Extract all prayer times for local calculations
-      const prayerTimesForCalculation: {name: string, time: string}[] = [];
+      // Check if we have the data array format and extract today's prayer times if so
+      if (prayerTimes && prayerTimes.data && Array.isArray(prayerTimes.data) && prayerTimes.data.length > 0) {
+        todayData = prayerTimes.data[0];
+      }
       
-      // Extract prayer times safely, ensuring we have fallbacks
+      // Helper function to safely extract time
       const extractTime = (key: string): string => {
         if (typeof todayData === 'object' && todayData !== null) {
           return (todayData as any)[key] || '';
@@ -254,6 +297,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       
       // Build prayer times for calculation
       PRAYER_NAMES.forEach(name => {
+        // Skip prayers in SKIP_PRAYERS for next prayer calculation
+        if (SKIP_PRAYERS.includes(name)) {
+          return;
+        }
+        
         const lowerName = name.toLowerCase();
         const time = extractTime(lowerName);
         if (time) {
@@ -274,7 +322,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       if (Object.values(prayerRecord).some(time => time)) {
         // Only calculate if we have at least one valid time
         try {
-          const { name } = getNextPrayerTime(nowMoment.toDate(), prayerRecord);
+          const { name } = getNextPrayerTime(new Date(), prayerRecord);
           nextPrayerName = name;
           
           // Store in ref for later comparisons
@@ -326,6 +374,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             isNext: forcedIsNext,
             isCurrent,
             timeUntil,
+            jamaatTime: jamaat,
           };
 
           prayers.push(prayer);
@@ -347,7 +396,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       setTodaysPrayerTimes(prayers);
       
       // Set Jumuah time if it's Friday
-      if (isJumuahToday && todayData.jummahJamaat) {
+      if (isJumuahToday && todayData && todayData.jummahJamaat) {
         setJumuahTime(todayData.jummahJamaat);
         setJumuahDisplayTime(formatTimeToDisplay(todayData.jummahJamaat));
       }
@@ -355,12 +404,34 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Use the accurate calculation function to ensure proper flags
       const { currentIndex, nextIndex } = calculatePrayersAccurately(prayers);
       
+      // EDGE CASE: Check if any prayer is between adhan and jamaat time
+      const currentTimeObj = new Date();
+      const currentTimeStr = `${currentTimeObj.getHours().toString().padStart(2, '0')}:${currentTimeObj.getMinutes().toString().padStart(2, '0')}`;
+      const betweenAdhanAndJamaat = prayers.findIndex(p => 
+        p.time <= currentTimeStr && 
+        p.jamaat && 
+        p.jamaat > currentTimeStr
+      );
+      
+      if (betweenAdhanAndJamaat >= 0) {
+        // We're between adhan and jamaat for some prayer
+        const prayer = prayers[betweenAdhanAndJamaat];
+        logger.info(`Found prayer between adhan and jamaat: ${prayer.name}. Setting as next prayer.`);
+        
+        // Update the prayer's timeUntil to be to jamaat time
+        const updatedPrayer = {...prayer};
+        if (updatedPrayer.jamaat) {
+          updatedPrayer.timeUntil = getTimeUntilNextPrayer(updatedPrayer.jamaat);
+          setNextPrayer(updatedPrayer);
+        }
+      }
       // Apply the flags based on calculated indices
-      if (currentIndex >= 0 && (!currentPrayer || currentPrayer.name !== prayers[currentIndex].name)) {
+      else if (currentIndex >= 0 && (!currentPrayer || currentPrayer.name !== prayers[currentIndex].name)) {
         setCurrentPrayer(prayers[currentIndex]);
       }
       
-      if (nextIndex >= 0 && (!nextPrayer || nextPrayer.name !== prayers[nextIndex].name)) {
+      // Only update next prayer if we haven't found a prayer between adhan and jamaat
+      else if (nextIndex >= 0 && (!nextPrayer || nextPrayer.name !== prayers[nextIndex].name)) {
         const updatedNextPrayer = {...prayers[nextIndex]};
         updatedNextPrayer.timeUntil = getTimeUntilNextPrayer(updatedNextPrayer.time);
         setNextPrayer(updatedNextPrayer);

@@ -1,4 +1,12 @@
 import * as React from "react";
+
+interface SvgProps {
+  width?: string;
+  height?: string;
+  fill?: string;
+  [key: string]: any; // for any additional props
+}
+
 const SVGComponent = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -281,3 +289,47 @@ const SVGComponent = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 export default SVGComponent;
+
+export const NoMobilePhoneIcon: React.FC<SvgProps> = (props) => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={props.width || '100px'}
+      height={props.height || '100px'}
+      fill={props.fill || 'currentColor'}
+      {...props}
+    >
+      <path d="M0 0h24v24H0z" fill="none" />
+      <path d="M15.5 1h-8C6.12 1 5 2.12 5 3.5v17C5 21.88 6.12 23 7.5 23h8c1.38 0 2.5-1.12 2.5-2.5v-17C18 2.12 16.88 1 15.5 1zm-4 21c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-4H7V4h9v14z" />
+      <path transform="rotate(45, 12, 12)" d="M2 12h20" stroke="#FF0000" strokeWidth="2.5" />
+      <path transform="rotate(-45, 12, 12)" d="M2 12h20" stroke="#FF0000" strokeWidth="2.5" />
+    </svg>
+  );
+};
+
+export const PrayerRowsIcon: React.FC<SvgProps> = (props) => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={props.width || '100px'}
+      height={props.height || '100px'}
+      fill={props.fill || 'currentColor'}
+      {...props}
+    >
+      <path d="M0 0h24v24H0z" fill="none" />
+      {/* Person 1 */}
+      <circle cx="6" cy="8" r="2" />
+      <path d="M4 10h4v5h-4z" />
+      {/* Person 2 */}
+      <circle cx="12" cy="8" r="2" />
+      <path d="M10 10h4v5h-4z" />
+      {/* Person 3 */}
+      <circle cx="18" cy="8" r="2" />
+      <path d="M16 10h4v5h-4z" />
+      {/* Row line */}
+      <path d="M2 18h20" strokeWidth="2" stroke="currentColor" fill="none" />
+    </svg>
+  );
+};

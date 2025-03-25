@@ -101,7 +101,11 @@ export const getNextPrayerTime = (
   currentTime: Date,
   prayerTimes: Record<string, string>
 ): { name: string; time: string } => {
-  const prayers = [
+  // Define prayers to skip in countdown
+  const SKIP_PRAYERS = ['Sunrise'];
+  
+  // Create prayers array with all prayers
+  const allPrayers = [
     { name: 'Fajr', time: prayerTimes.fajr },
     { name: 'Sunrise', time: prayerTimes.sunrise },
     { name: 'Zuhr', time: prayerTimes.zuhr },
@@ -109,6 +113,9 @@ export const getNextPrayerTime = (
     { name: 'Maghrib', time: prayerTimes.maghrib },
     { name: 'Isha', time: prayerTimes.isha },
   ].filter(prayer => prayer.time); // Only include prayers with valid times
+  
+  // Filter out prayers that should be skipped for the countdown
+  const prayers = allPrayers.filter(prayer => !SKIP_PRAYERS.includes(prayer.name));
   
   // Sort prayers by time
   prayers.sort((a, b) => a.time.localeCompare(b.time));
@@ -118,12 +125,12 @@ export const getNextPrayerTime = (
   const currentTimeString = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
   
   console.log("Current time:", currentTimeString);
-  console.log("Prayer times:", prayers);
+  console.log("Prayer times available:", prayers.map(p => `${p.name}: ${p.time}`).join(', '));
   
   // Find the next prayer
   for (const prayer of prayers) {
     if (prayer.time > currentTimeString) {
-      console.log("Found next prayer:", prayer.name, prayer.time);
+      console.log(`Found next prayer: ${prayer.name} at ${prayer.time}, current time is ${currentTimeString}`);
       return { name: prayer.name, time: prayer.time };
     }
   }
@@ -131,7 +138,7 @@ export const getNextPrayerTime = (
   // If no prayer is found, it means all prayers for today have passed
   // Return the first prayer for the next day (first prayer in sorted list)
   if (prayers.length > 0) {
-    console.log("All prayers for today have passed. Next prayer is first prayer tomorrow:", prayers[0].name);
+    console.log(`All prayers for today have passed. Next prayer is first prayer tomorrow: ${prayers[0].name} at ${prayers[0].time}`);
     return { name: prayers[0].name, time: prayers[0].time };
   }
   
@@ -146,19 +153,25 @@ export const getTimeUntilNextPrayer = (nextPrayerTime: string): string => {
   
   try {
     const now = new Date();
-    const nextPrayer = parseTimeString(nextPrayerTime);
+    let nextPrayer = parseTimeString(nextPrayerTime);
+    
+    // Debug information
+    console.log(`Calculating time until prayer at ${nextPrayerTime}`);
+    console.log(`Current time: ${now.getHours()}:${now.getMinutes()}`);
+    console.log(`Parsed prayer time: ${nextPrayer.getHours()}:${nextPrayer.getMinutes()}`);
     
     // If next prayer time is earlier than current time,
     // it means it's for tomorrow
-    if (nextPrayer <= now) {
+    if (nextPrayer < now) {
       nextPrayer.setDate(nextPrayer.getDate() + 1);
-      console.log("Next prayer is tomorrow:", nextPrayerTime, "adjusted date:", nextPrayer);
+      console.log(`Prayer time adjusted to tomorrow: ${nextPrayer.toLocaleTimeString()}`);
     }
     
     const diffMilliseconds = nextPrayer.getTime() - now.getTime();
     const diffSeconds = Math.floor(diffMilliseconds / 1000);
     
     if (diffSeconds <= 0) {
+      console.log(`Time until prayer is zero or negative: ${diffSeconds}s`);
       return '0 mins';
     }
     
@@ -166,6 +179,8 @@ export const getTimeUntilNextPrayer = (nextPrayerTime: string): string => {
     const hours = Math.floor(diffSeconds / 3600);
     const minutes = Math.floor((diffSeconds % 3600) / 60);
     const seconds = diffSeconds % 60;
+    
+    console.log(`Time until prayer: ${hours}h ${minutes}m ${seconds}s`);
     
     // For longer times (> 1 hour), return a more human-readable format
     if (hours > 0) {
@@ -178,7 +193,7 @@ export const getTimeUntilNextPrayer = (nextPrayerTime: string): string => {
       return `${seconds} sec${seconds > 1 ? 's' : ''}`;
     }
   } catch (error) {
-    console.error('Error calculating time until next prayer:', error);
+    console.error('Error calculating time until next prayer:', error, nextPrayerTime);
     return '';
   }
 };

@@ -3,6 +3,7 @@ import { Box, Typography, Fade } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import IslamicPatternBackground from './IslamicPatternBackground';
+import { NoMobilePhoneIcon, PrayerRowsIcon } from '../../assets/svgComponent';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -28,19 +29,39 @@ interface ScheduleItem {
  * 
  * Displays content items in a carousel/slideshow format.
  * Automatically rotates through items based on their specified duration.
+ * Also displays prayer announcements when prayer times are reached.
  */
 const ContentCarousel: React.FC = () => {
-  const { schedule, events, refreshContent, refreshSchedule } = useContent();
+  const { 
+    schedule, 
+    events, 
+    refreshContent, 
+    refreshSchedule,
+    // Prayer announcement states
+    showPrayerAnnouncement,
+    prayerAnnouncementName,
+    isPrayerJamaat,
+  } = useContent();
+  
   const { fontSizes, screenSize } = useResponsiveFontSize();
   
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [showContent, setShowContent] = useState(true);
   const [contentItems, setContentItems] = useState<Array<any>>([]);
+  const [isChangingItem, setIsChangingItem] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [currentItemDisplayTime, setCurrentItemDisplayTime] = useState(30000); // Default 30 seconds
   
   // Use refs to prevent unnecessary re-renders
   const contentItemsRef = useRef<Array<any>>([]);
   const hasRefreshedRef = useRef(false);
   const isComponentMountedRef = useRef(true);
+  const hasUserInteracted = useRef(false);
+  const lastInteractionTime = useRef(Date.now());
+  
+  // Constants
+  const defaultDuration = 30; // Default duration in seconds
+  const userInteractionTimeout = 60000; // 1 minute before resuming auto-rotation after user interaction
   
   // Refresh content only once
   useEffect(() => {
@@ -144,52 +165,59 @@ const ContentCarousel: React.FC = () => {
     }
   }, [schedule, events]);
   
-  // Rotate through content items
+  // Handle auto-rotation
   useEffect(() => {
-    if (contentItems.length === 0) return;
-    
-    const currentItem = contentItems[currentItemIndex];
-    if (!currentItem?.contentItem) {
-      console.error('Invalid current item:', currentItem);
-      // Move to next item if current is invalid
-      setCurrentItemIndex((prevIndex) => 
-        prevIndex === contentItems.length - 1 ? 0 : prevIndex + 1
-      );
+    // Don't rotate if prayer announcement is active
+    if (showPrayerAnnouncement) {
+      console.log('Carousel rotation paused due to active prayer announcement');
+      setAutoRotate(false);
       return;
     }
     
-    const duration = currentItem?.contentItem?.duration || 30;
+    // Re-enable rotation when prayer announcement ends
+    if (!showPrayerAnnouncement && !autoRotate && !hasUserInteracted.current) {
+      console.log('Carousel rotation resumed after prayer announcement ended');
+      setAutoRotate(true);
+    }
     
-    console.log(`Displaying content: ${currentItem?.contentItem?.title} for ${duration} seconds`);
-    
-    // Initially show content
-    setShowContent(true);
-    
-    // Set timeout for current content duration
+    if (!autoRotate || contentItems.length <= 1 || hasUserInteracted.current) {
+      return;
+    }
+
     const timer = setTimeout(() => {
-      // Fade out
-      setShowContent(false);
+      const nextIndex = (currentItemIndex + 1) % contentItems.length;
+      setCurrentItemIndex(nextIndex);
+      setIsChangingItem(true);
       
-      // After fade out, move to next item
-      const fadeOutTimer = window.setTimeout(() => {
-        setCurrentItemIndex((prevIndex) => 
-          prevIndex === contentItems.length - 1 ? 0 : prevIndex + 1
-        );
-        
-        // Fade in new content after a brief delay
-        const fadeInTimer = window.setTimeout(() => {
-          setShowContent(true);
-        }, 100); // Very small delay to ensure state updates properly
-        
-        return () => clearTimeout(fadeInTimer);
-      }, 400); // Slightly longer fade-out for smoother transitions
-      
-      return () => clearTimeout(fadeOutTimer);
-    }, duration * 1000);
-    
-    // Cleanup timer on unmount or when dependencies change
+      // Reset user interaction flag after rotation has occurred
+      if (Date.now() - lastInteractionTime.current > userInteractionTimeout) {
+        hasUserInteracted.current = false;
+      }
+    }, currentItemDisplayTime);
+
     return () => clearTimeout(timer);
-  }, [currentItemIndex, contentItems]);
+  }, [autoRotate, currentItemIndex, contentItems.length, currentItemDisplayTime, showPrayerAnnouncement]);
+
+  // Reset display time when content changes
+  useEffect(() => {
+    if (!contentItems[currentItemIndex]) return;
+    
+    // Skip updating display time during prayer announcements
+    if (showPrayerAnnouncement) return;
+    
+    try {
+      const item = contentItems[currentItemIndex].contentItem;
+      if (item) {
+        // Get duration from the content item or use default
+        const newDuration = item.duration || defaultDuration;
+        // Convert to milliseconds
+        setCurrentItemDisplayTime(newDuration * 1000);
+      }
+    } catch (error) {
+      console.error('Error setting display time:', error);
+      setCurrentItemDisplayTime(defaultDuration * 1000);
+    }
+  }, [currentItemIndex, contentItems, defaultDuration, showPrayerAnnouncement]);
   
   // Add a helper function to scale down font sizes
   const getScaledFontSize = (baseSize: string) => {
@@ -595,6 +623,77 @@ const ContentCarousel: React.FC = () => {
     }
   };
   
+  // Render prayer announcement content
+  const renderPrayerAnnouncement = () => {
+    return (
+      <Box
+        sx={{
+          background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
+          color: '#0A2647',
+          borderRadius: '16px',
+          p: screenSize.is720p ? 3 : 5,
+          textAlign: 'center',
+          width: '90%',
+          mx: 'auto',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(218, 165, 32, 0.5)',
+          position: 'relative',
+          overflow: 'hidden',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: getScaledFontSize(fontSizes.h2),
+            fontWeight: 'bold',
+            mb: 2,
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            letterSpacing: '0.5px',
+          }}
+        >
+          {isPrayerJamaat ? `${prayerAnnouncementName} Jamaa't Time` : `${prayerAnnouncementName} Time`}
+        </Typography>
+        
+        <Typography
+          sx={{
+            fontSize: getScaledFontSize(fontSizes.h3),
+            mb: 3,
+            letterSpacing: '0.5px',
+          }}
+        >
+          {isPrayerJamaat 
+            ? 'Please straighten your rows for prayer' 
+            : 'Please silence your mobile devices'}
+        </Typography>
+        
+        <Box sx={{ mb: 2, mt: 2 }}>
+          {isPrayerJamaat ? (
+            <PrayerRowsIcon width="120px" height="120px" fill="#0A2647" />
+          ) : (
+            <NoMobilePhoneIcon width="120px" height="120px" fill="#0A2647" />
+          )}
+        </Box>
+        
+        <Typography
+          sx={{
+            fontSize: getScaledFontSize(fontSizes.h4),
+            mt: 2,
+            opacity: 0.9,
+            letterSpacing: '0.5px',
+          }}
+        >
+          {isPrayerJamaat 
+            ? 'Jamaa\'t is about to begin' 
+            : 'Adhaan is about to begin'}
+        </Typography>
+      </Box>
+    );
+  };
+  
   // Empty state display for ContentCarousel
   if (contentItems.length === 0) {
     return (
@@ -665,10 +764,16 @@ const ContentCarousel: React.FC = () => {
           width: '100%',
           position: 'relative',
           overflow: 'hidden',
+          transition: 'background-color 0.7s ease-in-out',
+          backgroundColor: showPrayerAnnouncement 
+            ? 'rgba(10, 38, 71, 0.95)' // Navy blue background for prayer announcements
+            : 'transparent',
         }}
       >
         <Box sx={{ 
-          bgcolor: 'rgba(255, 255, 255, 0.7)',
+          bgcolor: showPrayerAnnouncement 
+            ? 'rgba(10, 38, 71, 0.8)' // Darker card for announcements 
+            : 'rgba(255, 255, 255, 0.7)',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
           border: '1px solid rgba(218, 165, 32, 0.2)',
           borderRadius: 4,
@@ -680,15 +785,17 @@ const ContentCarousel: React.FC = () => {
           position: 'relative',
           zIndex: 1,
           overflow: 'hidden',
+          transition: 'background-color 0.7s ease-in-out, color 0.7s ease-in-out',
         }}>
           <Box
             sx={{
               borderBottom: '3px solid',
-              borderColor: 'primary.main',
+              borderColor: showPrayerAnnouncement ? '#F1C40F' : 'primary.main',
               pb: screenSize.is720p ? 1 : 1.5,
               mb: screenSize.is720p ? 1 : 2,
               width: '100%',
               flex: '0 0 auto',
+              transition: 'border-color 0.7s ease-in-out',
             }}
           >
             <Typography 
@@ -696,12 +803,15 @@ const ContentCarousel: React.FC = () => {
                 fontWeight: 'bold',
                 fontSize: getScaledFontSize(fontSizes.h2),
                 textAlign: 'center',
-                color: 'primary.main'
+                color: showPrayerAnnouncement ? '#F1C40F' : 'primary.main',
+                transition: 'color 0.7s ease-in-out',
               }}
             >
-              {contentItems[currentItemIndex]?.contentItem?.type === 'ASMA_AL_HUSNA' 
-                ? 'Asma ul Husna' 
-                : contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
+              {showPrayerAnnouncement 
+                ? (isPrayerJamaat ? `${prayerAnnouncementName} Jamaa't Time` : `${prayerAnnouncementName} Time`) 
+                : contentItems[currentItemIndex]?.contentItem?.type === 'ASMA_AL_HUSNA' 
+                  ? 'Asma ul Husna' 
+                  : contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
             </Typography>
           </Box>
           
@@ -714,7 +824,7 @@ const ContentCarousel: React.FC = () => {
             overflow: 'auto',
             width: '100%',
           }}>
-            {renderContent()}
+            {showPrayerAnnouncement ? renderPrayerAnnouncement() : renderContent()}
           </Box>
         </Box>
       </Box>

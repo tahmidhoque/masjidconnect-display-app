@@ -7,7 +7,7 @@ import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 
 interface PrayerTimesPanelProps {
   variant: 'landscape' | 'portrait';
-  onCountdownComplete?: () => void;
+  onCountdownComplete?: (isJamaat: boolean) => void;
 }
 
 /**
@@ -190,6 +190,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           <PrayerCountdown 
             prayerName={nextPrayer.name}
             prayerTime={nextPrayer.time}
+            jamaatTime={nextPrayer.jamaat}
             timeUntilNextPrayer={nextPrayer.timeUntil}
             onCountdownComplete={onCountdownComplete}
             key={`${nextPrayer.name}-${nextPrayer.time}`}

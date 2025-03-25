@@ -16,15 +16,21 @@ import IslamicPatternBackground from '../common/IslamicPatternBackground';
  * Provides a complete view with all required elements.
  */
 const LandscapeDisplay: React.FC = () => {
-  const { masjidName } = useContent();
+  const { 
+    masjidName, 
+    setPrayerAnnouncement, 
+    showPrayerAnnouncement, 
+    prayerAnnouncementName, 
+    isPrayerJamaat 
+  } = useContent();
   const {
     currentDate,
     hijriDate,
+    nextPrayer,
   } = usePrayerTimes();
   
   const { fontSizes, screenSize, layout } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showMobileSilenceReminder, setShowMobileSilenceReminder] = useState(false);
 
   // Log masjid name for debugging
   useEffect(() => {
@@ -41,13 +47,51 @@ const LandscapeDisplay: React.FC = () => {
   }, []);
 
   // Handle prayer countdown reaching zero
-  const handleCountdownComplete = () => {
-    setShowMobileSilenceReminder(true);
-    
-    // Hide the reminder after 2 minutes
-    setTimeout(() => {
-      setShowMobileSilenceReminder(false);
-    }, 120000); // 2 minutes
+  const handleCountdownComplete = (isJamaat: boolean) => {
+    if (nextPrayer) {
+      console.log(`========== PRAYER COUNTDOWN COMPLETE ==========`);
+      console.log(`Prayer countdown complete: ${nextPrayer.name}, isJamaat: ${isJamaat}`);
+      console.log(`Current time: ${new Date().toLocaleTimeString()}`);
+      
+      // Prevent skipping Sunrise
+      if (nextPrayer.name === 'Sunrise') {
+        console.log('Skipping Sunrise announcement (not announcing)');
+        return;
+      }
+      
+      // Store current prayer info for cleanup
+      const prayerNameSnapshot = nextPrayer.name;
+      const isJamaatSnapshot = isJamaat;
+      
+      // Log detailed information for debugging
+      console.log(`Setting prayer announcement for ${prayerNameSnapshot} (isJamaat: ${isJamaatSnapshot})`);
+      
+      // Show prayer announcement in content carousel for 2 minutes
+      setPrayerAnnouncement(true, prayerNameSnapshot, isJamaatSnapshot);
+      
+      // Hide the announcement after 2 minutes - using a more precise check
+      console.log(`Announcement will be hidden at ${new Date(Date.now() + 120000).toLocaleTimeString()}`);
+      setTimeout(() => {
+        console.log(`========== PRAYER ANNOUNCEMENT TIMEOUT ==========`);
+        console.log(`Timeout triggered for ${prayerNameSnapshot}`);
+        console.log(`Current prayer at timeout: ${nextPrayer?.name}`);
+        console.log(`Current time: ${new Date().toLocaleTimeString()}`);
+        
+        // Check if we are still showing an announcement for the same prayer
+        if (showPrayerAnnouncement && prayerNameSnapshot === prayerAnnouncementName && isJamaatSnapshot === isPrayerJamaat) {
+          console.log(`Hiding prayer announcement for: ${prayerNameSnapshot}`);
+          setPrayerAnnouncement(false, '', false);
+        } else {
+          console.log(`Not hiding announcement - conditions changed or already hidden`);
+          console.log(`Current announcement state: ${showPrayerAnnouncement ? 'showing' : 'hidden'}`);
+          console.log(`Prayer name match: ${prayerNameSnapshot === prayerAnnouncementName}`);
+          console.log(`Jamaat match: ${isJamaatSnapshot === isPrayerJamaat}`);
+        }
+        console.log(`==============================================`);
+      }, 120000); // 2 minutes
+      
+      console.log(`==============================================`);
+    }
   };
 
   return (
@@ -249,52 +293,7 @@ const LandscapeDisplay: React.FC = () => {
             <IslamicPatternBackground variant="embossed" />
           </Box>
           
-          {showMobileSilenceReminder ? (
-            /* Mobile silence reminder content */
-            <Box
-              sx={{
-                background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
-                color: '#0A2647',
-                borderRadius: '16px',
-                p: screenSize.is720p ? 3 : 5,
-                textAlign: 'center',
-                width: '90%',
-                mx: 'auto',
-                mt: screenSize.is720p ? 2 : 4,
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-                border: '1px solid rgba(218, 165, 32, 0.5)',
-                position: 'relative',
-                overflow: 'hidden',
-                zIndex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: fontSizes.h2,
-                  fontWeight: 'bold',
-                  mb: 2,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                }}
-              >
-                Prayer Time
-              </Typography>
-              
-              <Typography
-                sx={{
-                  fontSize: fontSizes.h3,
-                  mb: 3,
-                }}
-              >
-                Please silence your mobile devices
-              </Typography>
-            </Box>
-          ) : (
-            <ContentCarousel />
-          )}
+          <ContentCarousel />
         </Box>
       </Box>
       

@@ -6,6 +6,10 @@ import dataSyncService from '../services/dataSyncService';
 import storageService from '../services/storageService';
 import logger from '../utils/logger';
 
+// Constants
+const MIN_REFRESH_INTERVAL = 10 * 1000; // 10 seconds
+const SKIP_PRAYERS = ['Sunrise']; // Prayers to skip in announcements
+
 // Define the ContentContext type
 interface ContentContextType {
   isLoading: boolean;
@@ -19,6 +23,11 @@ interface ContentContextType {
   refreshPrayerTimes: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
   lastUpdated: Date | null;
+  // Prayer announcement states
+  showPrayerAnnouncement: boolean;
+  prayerAnnouncementName: string;
+  isPrayerJamaat: boolean;
+  setPrayerAnnouncement: (show: boolean, prayerName?: string, isJamaat?: boolean) => void;
 }
 
 interface ContentProviderProps {
@@ -48,11 +57,15 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   const [masjidTimezone, setMasjidTimezone] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Prayer announcement states
+  const [showPrayerAnnouncement, setShowPrayerAnnouncement] = useState<boolean>(false);
+  const [prayerAnnouncementName, setPrayerAnnouncementName] = useState<string>('');
+  const [isPrayerJamaat, setIsPrayerJamaat] = useState<boolean>(false);
+  
   // Use refs to track initialization and prevent unnecessary renders
   const initializedRef = useRef(false);
   const lastRefreshTimeRef = useRef(0);
   const isUpdatingRef = useRef(false);
-  const MIN_REFRESH_INTERVAL = 30000; // 30 seconds
 
   // Helper function to normalize schedule data from API to app expected format
   const normalizeScheduleData = useCallback((schedule: any): Schedule => {
@@ -415,6 +428,31 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     };
   };
 
+  // Prayer announcement management function
+  const setPrayerAnnouncement = useCallback((show: boolean, prayerName: string = '', isJamaat: boolean = false) => {
+    console.log(`========== PRAYER ANNOUNCEMENT ==========`);
+    console.log(`Setting prayer announcement - show: ${show}, prayer: ${prayerName}, isJamaat: ${isJamaat}`);
+    console.log(`Current state: show=${showPrayerAnnouncement}, prayer=${prayerAnnouncementName}, isJamaat=${isPrayerJamaat}`);
+    
+    if (show && SKIP_PRAYERS.includes(prayerName)) {
+      console.log(`Skipping announcement for ${prayerName} as it's in SKIP_PRAYERS list`);
+      return;
+    }
+    
+    if (show && prayerName) {
+      // Show announcement
+      setShowPrayerAnnouncement(true);
+      setPrayerAnnouncementName(prayerName);
+      setIsPrayerJamaat(isJamaat);
+      console.log(`Prayer announcement ACTIVATED for ${prayerName} (${isJamaat ? 'Jamaat' : 'Adhaan'})`);
+    } else {
+      // Hide announcement
+      setShowPrayerAnnouncement(false);
+      console.log(`Prayer announcement HIDDEN (was showing ${prayerAnnouncementName})`);
+    }
+    console.log(`========================================`);
+  }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
+
   // Initial setup - runs once when component mounts
   useEffect(() => {
     // Use refs to ensure this only runs once
@@ -448,6 +486,11 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
         refreshPrayerTimes,
         refreshSchedule,
         lastUpdated,
+        // Prayer announcement values
+        showPrayerAnnouncement,
+        prayerAnnouncementName,
+        isPrayerJamaat,
+        setPrayerAnnouncement,
       }}
     >
       {children}

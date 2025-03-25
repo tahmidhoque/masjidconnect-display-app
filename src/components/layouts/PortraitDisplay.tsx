@@ -16,15 +16,15 @@ import IslamicPatternBackground from '../common/IslamicPatternBackground';
  * Provides a complete view with all required elements.
  */
 const PortraitDisplay: React.FC = () => {
-  const { masjidName } = useContent();
+  const { masjidName, setPrayerAnnouncement } = useContent();
   const {
     currentDate,
     hijriDate,
+    nextPrayer,
   } = usePrayerTimes();
   
   const { fontSizes, screenSize } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showMobileSilenceReminder, setShowMobileSilenceReminder] = useState(false);
 
   // Log masjid name for debugging
   useEffect(() => {
@@ -41,13 +41,25 @@ const PortraitDisplay: React.FC = () => {
   }, []);
 
   // Handle prayer countdown reaching zero
-  const handleCountdownComplete = () => {
-    setShowMobileSilenceReminder(true);
-    
-    // Hide the reminder after 2 minutes
-    setTimeout(() => {
-      setShowMobileSilenceReminder(false);
-    }, 120000); // 2 minutes
+  const handleCountdownComplete = (isJamaat: boolean) => {
+    if (nextPrayer) {
+      console.log(`Prayer countdown complete: ${nextPrayer.name}, isJamaat: ${isJamaat}`);
+      
+      // Show prayer announcement in content carousel for 2 minutes
+      setPrayerAnnouncement(true, nextPrayer.name, isJamaat);
+      
+      // Hide the announcement after 2 minutes
+      // Use current prayer name to ensure we don't hide a different announcement
+      const prayerName = nextPrayer.name;
+      
+      setTimeout(() => {
+        // Only hide if this is still the same prayer
+        if (prayerName === nextPrayer?.name) {
+          setPrayerAnnouncement(false);
+          console.log(`Hiding prayer announcement for: ${prayerName}`);
+        }
+      }, 120000); // 2 minutes
+    }
   };
 
   return (
@@ -226,50 +238,7 @@ const PortraitDisplay: React.FC = () => {
             <IslamicPatternBackground variant="embossed" />
           </Box>
           
-          {showMobileSilenceReminder ? (
-            <Box
-              sx={{
-                background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
-                color: '#0A2647',
-                borderRadius: '16px',
-                p: 3,
-                textAlign: 'center',
-                width: '90%',
-                mx: 'auto',
-                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
-                border: '1px solid rgba(218, 165, 32, 0.5)',
-                position: 'relative',
-                overflow: 'hidden',
-                zIndex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: fontSizes.h3,
-                  fontWeight: 'bold',
-                  mb: 2,
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                }}
-              >
-                Prayer Time
-              </Typography>
-              
-              <Typography
-                sx={{
-                  fontSize: fontSizes.h4,
-                  mb: 2,
-                }}
-              >
-                Please silence your mobile devices
-              </Typography>
-            </Box>
-          ) : (
-            <ContentCarousel />
-          )}
+          <ContentCarousel />
         </Box>
       </Box>
       
