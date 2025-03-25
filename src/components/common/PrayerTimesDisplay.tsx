@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Grid, Paper, Divider } from '@mui/material';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 
 interface PrayerTimesDisplayProps {
   simplified?: boolean;
@@ -22,36 +23,82 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
     isJumuahToday,
     jumuahDisplayTime,
   } = usePrayerTimes();
+  
+  const { fontSizes, screenSize } = useResponsiveFontSize();
 
   if (simplified) {
     // Simplified view (for sidebar or compact display)
     return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+      <Box sx={{ p: screenSize.is720p ? 1.5 : 2 }}>
+        <Typography 
+          variant="subtitle1" 
+          sx={{ 
+            mb: 1, 
+            fontWeight: 'bold',
+            fontSize: screenSize.is720p ? '0.9rem' : '1rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {currentDate}
           {hijriDate && (
-            <Typography component="span" variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+            <Typography 
+              component="span" 
+              variant="caption" 
+              sx={{ 
+                display: 'block', 
+                mt: 0.5,
+                fontSize: screenSize.is720p ? '0.7rem' : '0.8rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {hijriDate}
             </Typography>
           )}
         </Typography>
         
-        <Grid container spacing={1} sx={{ mt: 1 }}>
+        <Grid container spacing={screenSize.is720p ? 0.5 : 1} sx={{ mt: 1 }}>
           {todaysPrayerTimes.map((prayer) => (
             <Grid item xs={4} key={prayer.name}>
               <Box sx={{ 
-                p: 1, 
+                p: screenSize.is720p ? 0.5 : 1, 
                 textAlign: 'center',
-                bgcolor: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'background.paper',
+                bgcolor: prayer.isNext ? '#2A9D8F' : prayer.isCurrent ? 'primary.main' : 'background.paper',
                 color: (prayer.isNext || prayer.isCurrent) ? 'white' : 'inherit',
                 borderRadius: 1,
                 transform: prayer.isNext ? 'scale(1.05)' : 'none',
-                transition: 'transform 0.2s ease-in-out'
+                transition: 'transform 0.2s ease-in-out',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
               }}>
-                <Typography variant="caption" component="div">
+                <Typography 
+                  variant="caption" 
+                  component="div"
+                  sx={{
+                    fontSize: screenSize.is720p ? '0.65rem' : '0.75rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {prayer.name}
                 </Typography>
-                <Typography variant="body2" component="div" sx={{ fontWeight: 'bold' }}>
+                <Typography 
+                  variant="body2" 
+                  component="div" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {prayer.displayTime}
                 </Typography>
               </Box>
@@ -61,16 +108,35 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
           {isJumuahToday && (
             <Grid item xs={12} sx={{ mt: 1 }}>
               <Box sx={{ 
-                p: 1, 
+                p: screenSize.is720p ? 0.5 : 1, 
                 textAlign: 'center', 
                 bgcolor: 'warning.main', 
                 color: 'warning.contrastText',
                 borderRadius: 1
               }}>
-                <Typography variant="caption" component="div">
+                <Typography 
+                  variant="caption" 
+                  component="div"
+                  sx={{
+                    fontSize: screenSize.is720p ? '0.65rem' : '0.75rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   Jumu'ah
                 </Typography>
-                <Typography variant="body2" component="div" sx={{ fontWeight: 'bold' }}>
+                <Typography 
+                  variant="body2" 
+                  component="div" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {jumuahDisplayTime}
                 </Typography>
               </Box>
@@ -80,7 +146,15 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
         
         {nextPrayer && (
           <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="body2">
+            <Typography 
+              variant="body2"
+              sx={{
+                fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               Next Prayer: <strong>{nextPrayer.name}</strong> in <strong>{nextPrayer.timeUntil}</strong>
             </Typography>
           </Box>
@@ -92,39 +166,105 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
   // Full view
   return (
     <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-      <Box sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', p: 2 }}>
-        <Typography variant="h6">Prayer Times</Typography>
-        <Typography variant="body2">{currentDate}</Typography>
+      <Box sx={{ 
+        bgcolor: 'primary.main', 
+        color: 'primary.contrastText', 
+        p: screenSize.is720p ? 1.5 : 2
+      }}>
+        <Typography 
+          variant="h6"
+          sx={{
+            fontSize: screenSize.is720p ? '1.1rem' : '1.25rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          Prayer Times
+        </Typography>
+        <Typography 
+          variant="body2"
+          sx={{
+            fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {currentDate}
+        </Typography>
         {hijriDate && (
-          <Typography variant="body2">{hijriDate}</Typography>
+          <Typography 
+            variant="body2"
+            sx={{
+              fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {hijriDate}
+          </Typography>
         )}
       </Box>
       
-      <Box sx={{ p: 2 }}>
-        <Grid container spacing={2}>
+      <Box sx={{ p: screenSize.is720p ? 1.5 : 2 }}>
+        <Grid container spacing={screenSize.is720p ? 1 : 2}>
           <Grid item xs={12}>
             {nextPrayer && (
               <Paper 
                 elevation={1} 
                 sx={{ 
-                  p: 2, 
-                  mb: 2, 
+                  p: screenSize.is720p ? 1.5 : 2, 
+                  mb: screenSize.is720p ? 1.5 : 2, 
                   textAlign: 'center', 
-                  bgcolor: 'success.main', 
+                  bgcolor: '#2A9D8F', 
                   color: 'success.contrastText' 
                 }}
               >
-                <Typography variant="subtitle1">
+                <Typography 
+                  variant="subtitle1"
+                  sx={{
+                    fontSize: screenSize.is720p ? '0.9rem' : '1rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   Next Prayer: {nextPrayer.name}
                 </Typography>
-                <Typography variant="h4">
+                <Typography 
+                  variant="h4"
+                  sx={{
+                    fontSize: screenSize.is720p ? '1.8rem' : '2.125rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {nextPrayer.displayTime}
                 </Typography>
-                <Typography variant="body2">
+                <Typography 
+                  variant="body2"
+                  sx={{
+                    fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {nextPrayer.timeUntil} remaining
                 </Typography>
                 {nextPrayer.displayJamaat && (
-                  <Typography variant="body2">
+                  <Typography 
+                    variant="body2"
+                    sx={{
+                      fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     Jamaat: {nextPrayer.displayJamaat}
                   </Typography>
                 )}
@@ -135,21 +275,45 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
               <Paper 
                 elevation={1} 
                 sx={{ 
-                  p: 1, 
-                  mb: 2, 
+                  p: screenSize.is720p ? 0.75 : 1, 
+                  mb: screenSize.is720p ? 1.5 : 2, 
                   textAlign: 'center', 
                   bgcolor: 'primary.main', 
                   color: 'primary.contrastText' 
                 }}
               >
-                <Typography variant="subtitle2">
+                <Typography 
+                  variant="subtitle2"
+                  sx={{
+                    fontSize: screenSize.is720p ? '0.8rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   Current Prayer: {currentPrayer.name}
                 </Typography>
-                <Typography variant="h6">
+                <Typography 
+                  variant="h6"
+                  sx={{
+                    fontSize: screenSize.is720p ? '1rem' : '1.25rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {currentPrayer.displayTime}
                 </Typography>
                 {currentPrayer.displayJamaat && (
-                  <Typography variant="body2">
+                  <Typography 
+                    variant="body2"
+                    sx={{
+                      fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     Jamaat: {currentPrayer.displayJamaat}
                   </Typography>
                 )}
@@ -157,15 +321,48 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
             )}
             
             {/* Prayer times table */}
-            <Grid container spacing={1}>
+            <Grid container spacing={screenSize.is720p ? 0.5 : 1}>
               <Grid item xs={4}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Prayer</Typography>
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: screenSize.is720p ? '0.8rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  Prayer
+                </Typography>
               </Grid>
               <Grid item xs={4}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Adhan</Typography>
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: screenSize.is720p ? '0.8rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  Adhan
+                </Typography>
               </Grid>
               <Grid item xs={4}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Jamaat</Typography>
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    fontSize: screenSize.is720p ? '0.8rem' : '0.875rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  Jamaat
+                </Typography>
               </Grid>
               
               <Grid item xs={12}>
@@ -179,7 +376,11 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                       variant="body2" 
                       sx={{ 
                         fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
-                        color: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'inherit'
+                        color: prayer.isNext ? '#2A9D8F' : prayer.isCurrent ? 'primary.main' : 'inherit',
+                        fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {prayer.name}
@@ -190,7 +391,11 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                       variant="body2"
                       sx={{ 
                         fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
-                        color: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'inherit'
+                        color: prayer.isNext ? '#2A9D8F' : prayer.isCurrent ? 'primary.main' : 'inherit',
+                        fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {prayer.displayTime}
@@ -201,7 +406,11 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                       variant="body2"
                       sx={{ 
                         fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
-                        color: prayer.isNext ? 'success.main' : prayer.isCurrent ? 'primary.main' : 'inherit'
+                        color: prayer.isNext ? '#2A9D8F' : prayer.isCurrent ? 'primary.main' : 'inherit',
+                        fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       {prayer.displayJamaat || '-'}
@@ -213,20 +422,50 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
               {isJumuahToday && (
                 <React.Fragment>
                   <Grid item xs={12}>
-                    <Divider />
+                    <Divider sx={{ my: screenSize.is720p ? 0.5 : 0.75 }} />
                   </Grid>
                   <Grid item xs={4}>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'bold', 
+                        color: 'warning.main',
+                        fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       Jumu'ah
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'bold', 
+                        color: 'warning.main',
+                        fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       -
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
-                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'bold', 
+                        color: 'warning.main',
+                        fontSize: screenSize.is720p ? '0.75rem' : '0.875rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       {jumuahDisplayTime}
                     </Typography>
                   </Grid>

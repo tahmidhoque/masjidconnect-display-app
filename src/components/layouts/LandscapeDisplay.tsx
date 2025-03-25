@@ -22,7 +22,7 @@ const LandscapeDisplay: React.FC = () => {
     hijriDate,
   } = usePrayerTimes();
   
-  const { fontSizes, screenSize } = useResponsiveFontSize();
+  const { fontSizes, screenSize, layout } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showMobileSilenceReminder, setShowMobileSilenceReminder] = useState(false);
 
@@ -210,18 +210,20 @@ const LandscapeDisplay: React.FC = () => {
         overflow: 'hidden',
         position: 'relative',
         zIndex: 1,
+        width: '100%',
+        boxSizing: 'border-box',
       }}>
         {/* Prayer Times Sidebar */}
         <Box 
           sx={{ 
-            width: '30%', 
-            minWidth: screenSize.is720p 
-              ? '300px' 
-              : (screenSize.isLargeScreen ? '400px' : '350px'),
+            width: layout.sidebarWidth,
+            maxWidth: layout.sidebarWidth,
+            minWidth: layout.sidebarWidth,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
             position: 'relative',
+            overflow: 'hidden',
+            flexShrink: 0,
           }}
         >
           <PrayerTimesPanel 

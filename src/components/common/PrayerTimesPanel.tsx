@@ -27,7 +27,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     jumuahDisplayTime,
   } = usePrayerTimes();
 
-  const { fontSizes, screenSize } = useResponsiveFontSize();
+  const { fontSizes, layout, screenSize, getSizeRem, getSizePx } = useResponsiveFontSize();
 
   const isLandscape = variant === 'landscape';
 
@@ -35,13 +35,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   const pulseKeyframes = useMemo(() => `
     @keyframes pulseShadow {
       0% {
-        box-shadow: 0 0 10px rgba(33, 140, 116, 0.4);
+        box-shadow: 0 0 10px rgba(42, 157, 143, 0.4);
       }
       50% {
-        box-shadow: 0 0 15px rgba(33, 140, 116, 0.6);
+        box-shadow: 0 0 15px rgba(42, 157, 143, 0.6);
       }
       100% {
-        box-shadow: 0 0 10px rgba(33, 140, 116, 0.4);
+        box-shadow: 0 0 10px rgba(42, 157, 143, 0.4);
       }
     }
     
@@ -59,16 +59,16 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     
     @keyframes pulseGlow {
       0% {
-        border-color: rgba(46, 204, 113, 0.7);
-        box-shadow: 0 0 8px rgba(46, 204, 113, 0.5), 0 0 15px rgba(46, 204, 113, 0.3);
+        border-color: rgba(42, 157, 143, 0.7);
+        box-shadow: 0 0 8px rgba(42, 157, 143, 0.5), 0 0 15px rgba(42, 157, 143, 0.3);
       }
       50% {
-        border-color: rgba(46, 204, 113, 1);
-        box-shadow: 0 0 15px rgba(46, 204, 113, 0.8), 0 0 25px rgba(46, 204, 113, 0.5);
+        border-color: rgba(42, 157, 143, 1);
+        box-shadow: 0 0 20px rgba(42, 157, 143, 0.8), 0 0 30px rgba(42, 157, 143, 0.6);
       }
       100% {
-        border-color: rgba(46, 204, 113, 0.7);
-        box-shadow: 0 0 8px rgba(46, 204, 113, 0.5), 0 0 15px rgba(46, 204, 113, 0.3);
+        border-color: rgba(42, 157, 143, 0.7);
+        box-shadow: 0 0 8px rgba(42, 157, 143, 0.5), 0 0 15px rgba(42, 157, 143, 0.3);
       }
     }
     
@@ -86,13 +86,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     
     @keyframes pulseBackground {
       0% {
-        background-color: rgba(33, 140, 116, 0.8);
+        background-color: rgba(42, 157, 143, 0.8);
       }
       50% {
-        background-color: rgba(46, 204, 113, 0.9);
+        background-color: rgba(42, 157, 143, 0.9);
       }
       100% {
-        background-color: rgba(33, 140, 116, 0.8);
+        background-color: rgba(42, 157, 143, 0.8);
       }
     }
     
@@ -145,8 +145,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           sx={{ 
             background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
             color: 'white',
-            py: screenSize.is720p ? 1.8 : 2.5,
-            px: screenSize.is720p ? 2 : 3,
+            py: getSizeRem(1.2),
+            px: getSizeRem(2.0),
             textAlign: 'center',
             borderBottom: '3px solid',
             borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
@@ -154,6 +154,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             zIndex: 1,
             boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
             animation: 'headerBorderGlow 2.5s infinite ease-in-out',
+            height: 'auto',
+            width: '100%',
+            boxSizing: 'border-box',
+            minHeight: layout.countdownHeight,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -168,14 +175,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           }}
         >
           <Typography sx={{ 
-            fontSize: fontSizes.h4,
+            fontSize: fontSizes.nextPrayerTitle,
             fontFamily: "'Poppins', sans-serif",
             fontWeight: 700,
-            mb: 1,
+            mb: getSizeRem(0.5),
             color: '#F1C40F',
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
             letterSpacing: '0.5px',
-            // animation: 'headerGlow 2.5s infinite ease-in-out',
             position: 'relative',
             zIndex: 1
           }}>
@@ -190,15 +196,15 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           />
           {nextPrayer.displayJamaat && (
             <Typography sx={{ 
-              fontSize: fontSizes.body1,
+              fontSize: fontSizes.caption,
               fontFamily: "'Poppins', sans-serif",
-              mt: 1.5,
+              mt: getSizeRem(0.5),
               color: '#F1C40F',
               fontWeight: 'bold',
               letterSpacing: '0.5px',
               display: 'inline-block',
-              px: 2,
-              py: 0.25,
+              px: getSizeRem(1.0),
+              py: getSizeRem(0.2),
               borderRadius: '4px',
               background: 'rgba(255,255,255,0.1)',
             }}>
@@ -213,17 +219,19 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         sx={{ 
           display: 'flex',
           flexDirection: 'column',
-          p: screenSize.is720p ? 1.5 : 2,
+          p: layout.standardPadding,
+          pt: getSizeRem(0.6),
+          px: getSizeRem(0.6),
+          pb: 0,
           justifyContent: 'flex-start',
-          overflow: 'hidden',
           position: 'relative',
           zIndex: 1,
           bgcolor: 'rgba(250, 250, 250, 0.98)',
           flex: 1,
+          height: '100%',
+          width: '100%',
+          boxSizing: 'border-box',
           ...(isLandscape ? {
-            minWidth: screenSize.is720p 
-              ? '300px' 
-              : (screenSize.isLargeScreen ? '400px' : '350px'),
             borderRight: '1px solid',
             borderColor: 'rgba(218, 165, 32, 0.3)',
             boxShadow: '4px 0 12px rgba(0, 0, 0, 0.08)',
@@ -235,13 +243,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         }}
       >
         {/* Header row with divider */}
-        <Box sx={{ mb: 1.5 }}>
+        <Box sx={{ mb: getSizeRem(0.4) }}>
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            mb: 1, 
-            px: isLandscape ? 1.5 : 1,
-            py: 1,
+            mb: getSizeRem(0.4),
+            px: getSizeRem(0.8),
+            py: getSizeRem(0.5),
             backgroundColor: 'rgba(10, 38, 71, 0.05)',
             borderRadius: '6px',
             border: '1px solid rgba(10, 38, 71, 0.07)',
@@ -249,26 +257,31 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             {isLandscape ? (
               <>
                 <Typography sx={{ 
-                  fontSize: fontSizes.body1, 
+                  fontSize: fontSizes.headerText, 
                   fontWeight: 'bold',
                   color: '#0A2647',
                   letterSpacing: '0.3px',
+                  width: '33%',
                 }}>
                   Start Time
                 </Typography>
                 <Typography sx={{ 
-                  fontSize: fontSizes.body1, 
+                  fontSize: fontSizes.headerText, 
                   fontWeight: 'bold',
                   color: '#0A2647',
                   letterSpacing: '0.3px',
+                  width: '33%',
+                  textAlign: 'center',
                 }}>
                   Prayer
                 </Typography>
                 <Typography sx={{ 
-                  fontSize: fontSizes.body1, 
+                  fontSize: fontSizes.headerText, 
                   fontWeight: 'bold',
                   color: '#0A2647',
                   letterSpacing: '0.3px',
+                  width: '33%',
+                  textAlign: 'right',
                 }}>
                   Jamaa't
                 </Typography>
@@ -276,9 +289,20 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             ) : (
               <>
                 <Typography sx={{ 
-                  fontSize: fontSizes.body1, 
+                  fontSize: fontSizes.headerText, 
                   fontWeight: 'bold', 
-                  width: '30%',
+                  width: '32%',
+                  color: '#0A2647',
+                  fontFamily: "'Poppins', sans-serif",
+                  letterSpacing: '0.3px',
+                }}>
+                  Start Time
+                </Typography>
+                <Typography sx={{ 
+                  fontSize: fontSizes.headerText, 
+                  fontWeight: 'bold', 
+                  width: '36%', 
+                  textAlign: 'center',
                   color: '#0A2647',
                   fontFamily: "'Poppins', sans-serif",
                   letterSpacing: '0.3px',
@@ -286,20 +310,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   Prayer
                 </Typography>
                 <Typography sx={{ 
-                  fontSize: fontSizes.body1, 
+                  fontSize: fontSizes.headerText, 
                   fontWeight: 'bold', 
-                  width: '35%', 
-                  textAlign: 'center',
-                  color: '#0A2647',
-                  fontFamily: "'Poppins', sans-serif",
-                  letterSpacing: '0.3px',
-                }}>
-                  Start
-                </Typography>
-                <Typography sx={{ 
-                  fontSize: fontSizes.body1, 
-                  fontWeight: 'bold', 
-                  width: '35%', 
+                  width: '32%', 
                   textAlign: 'right',
                   color: '#0A2647',
                   fontFamily: "'Poppins', sans-serif",
@@ -312,7 +325,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           </Box>
           <Divider sx={{ 
             borderColor: 'rgba(10, 38, 71, 0.07)',
-            mb: 1.5
+            mb: getSizeRem(0.4),
+            mt: getSizeRem(0.4),
           }} />
         </Box>
         
@@ -324,12 +338,16 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             position: 'relative',
             zIndex: 1,
             width: '100%',
-            px: isLandscape ? 0.5 : 0.25,
-            // Add subtle background stripes for better readability
+            boxSizing: 'border-box',
             backgroundImage: 'linear-gradient(rgba(246, 248, 250, 0.5) 50%, transparent 50%)',
-            backgroundSize: '100% 80px',
-            pb: 1,
-            gap: 1.5,
+            backgroundSize: `100% ${layout.prayerRowHeight}`,
+            pb: getSizeRem(1.0),
+            gap: getSizeRem(0.4),
+            overflow: 'visible',
+            height: '100%',
+            maxHeight: 'none',
+            px: getSizeRem(0.8),
+            mx: 0,
           }}
         >
           {todaysPrayerTimes.length > 0 ? (
@@ -345,39 +363,39 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  height: isLandscape ? '60px' : '48px',
-                  pl: isLandscape ? 3 : 1.5,
-                  pr: isLandscape ? 3 : 1.5,
+                  height: layout.prayerRowHeight,
+                  pl: getSizeRem(0.6),
+                  pr: getSizeRem(0.6),
                   position: 'relative',
                   borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '0px',
                   borderBottom: index < todaysPrayerTimes.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                   border: prayer.isNext 
-                    ? '3px solid #2A9D8F'
+                    ? '2px solid #2A9D8F'
                     : prayer.isCurrent
                       ? '2px solid rgba(20, 66, 114, 0.9)'
                       : 'none',
                   transition: 'all 0.3s ease',
                   transform: prayer.isNext 
-                    ? 'scale(1.05)' 
+                    ? 'scale(1.02)'
                     : prayer.isCurrent
                       ? 'scale(1.01)'
                       : 'scale(1)',
                   boxShadow: prayer.isNext 
-                    ? '0 6px 16px rgba(33, 140, 116, 0.4), 0 0 15px rgba(46, 204, 113, 0.4)' 
+                    ? '0 4px 12px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3)' 
                     : prayer.isCurrent
                       ? '0 2px 8px rgba(20, 66, 114, 0.3)'
                       : 'none',
-                  overflow: 'hidden',
-                  mx: prayer.isNext ? 1 : 0,
-                  my: prayer.isNext ? 0.9 : 0,
+                  overflow: 'visible',
+                  mx: prayer.isNext ? getSizeRem(0.4) : 0,
+                  my: prayer.isNext ? getSizeRem(0.8) : getSizeRem(0.2),
                   backgroundColor: prayer.isNext 
-                    ? 'rgba(46, 204, 113, 0.8)'
+                    ? 'rgba(42, 157, 143, 0.8)'
                     : prayer.isCurrent
                       ? 'rgba(20, 66, 114, 0.8)'
                       : index % 2 === 0 
                         ? 'rgba(246, 248, 250, 0.5)' 
                         : 'transparent',
-                  zIndex: prayer.isNext || prayer.isCurrent ? 2 : 1,
+                  zIndex: prayer.isNext ? 5 : (prayer.isCurrent ? 4 : 1),
                   animation: prayer.isNext 
                     ? 'pulseBackground 2s infinite ease-in-out, pulseGlow 2s infinite ease-in-out, pulseScale 3s infinite ease-in-out' 
                     : prayer.isCurrent
@@ -394,6 +412,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     animation: 'nextPrayerShine 2.5s infinite linear',
                     zIndex: 0
                   } : {},
+                  '& .MuiTypography-root': {
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }
                 }}
               >
                 {(prayer.isCurrent || prayer.isNext) && (
@@ -415,7 +438,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       variant="custom"
                       width="100%"
                       height="100%"
-                      patternColor={prayer.isCurrent ? '#0A2647' : '#27ae60'}
+                      patternColor={prayer.isCurrent ? '#0A2647' : '#2A9D8F'}
                       backgroundColor="transparent"
                       opacity={prayer.isNext ? 0.4 : 0.3}
                       patternSize={prayer.isNext ? 70 : 80}
@@ -430,10 +453,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     <Typography 
                       sx={{ 
                         fontWeight: 'bold',
-                        fontSize: prayer.isNext ? fontSizes.h4 : fontSizes.h5,
+                        fontSize: prayer.isNext 
+                          ? fontSizes.prayerTime
+                          : fontSizes.prayerName,
                         width: '33%',
                         textAlign: 'left',
-                        pl: 1.5,
+                        pl: getSizeRem(0.5),
                         fontFamily: "'Poppins', sans-serif",
                         zIndex: 1,
                         color: prayer.isCurrent 
@@ -442,6 +467,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                             ? '#FFFFFF' 
                             : '#144272',
                         textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {prayer.displayTime}
@@ -451,7 +479,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     <Typography 
                       sx={{ 
                         fontWeight: 'bold',
-                        fontSize: prayer.isNext ? fontSizes.h4 : fontSizes.h5,
+                        fontSize: prayer.isNext 
+                          ? fontSizes.prayerTime
+                          : fontSizes.prayerName,
                         width: '33%',
                         textAlign: 'center',
                         fontFamily: "'Poppins', sans-serif",
@@ -462,6 +492,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                             ? '#FFFFFF' 
                             : '#0A2647',
                         textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {prayer.name}
@@ -472,11 +505,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       sx={{ 
                         fontWeight: prayer.displayJamaat ? 'bold' : 'normal',
                         fontSize: prayer.displayJamaat 
-                          ? (prayer.isNext ? fontSizes.h4 : fontSizes.h5) 
-                          : fontSizes.body1,
+                          ? (prayer.isNext ? fontSizes.prayerTime : fontSizes.prayerName)
+                          : fontSizes.caption,
                         width: '33%',
                         textAlign: 'right',
-                        pr: 1.5,
+                        pr: getSizeRem(0.5),
                         fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
                         opacity: prayer.displayJamaat ? 1 : 0.7,
                         fontFamily: "'Poppins', sans-serif",
@@ -487,6 +520,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                             ? '#FFFFFF' 
                             : '#144272',
                         textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {prayer.displayJamaat || 'N/A'}
@@ -494,33 +530,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   </>
                 ) : (
                   <>
-                    {/* Prayer Name - Portrait */}
+                    {/* Start Time - Portrait */}
                     <Typography 
                       sx={{ 
                         fontWeight: 'bold',
-                        fontSize: fontSizes.body1,
-                        width: '30%',
-                        fontFamily: "'Poppins', sans-serif",
-                        zIndex: 1,
-                        color: prayer.isCurrent 
-                          ? '#FFFFFF' 
-                          : prayer.isNext 
-                            ? '#FFFFFF' 
-                            : '#0A2647',
-                        pl: 0.5,
-                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
-                      }}
-                    >
-                      {prayer.name}
-                    </Typography>
-                    
-                    {/* Time - Portrait */}
-                    <Typography 
-                      sx={{ 
-                        fontWeight: 'bold',
-                        fontSize: fontSizes.h5,
-                        width: '35%',
-                        textAlign: 'center',
+                        fontSize: fontSizes.prayerName,
+                        width: '32%',
                         fontFamily: "'Poppins', sans-serif",
                         zIndex: 1,
                         color: prayer.isCurrent 
@@ -528,19 +543,48 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                           : prayer.isNext 
                             ? '#FFFFFF' 
                             : '#144272',
-                        letterSpacing: 0.5,
+                        pl: getSizeRem(0.3),
                         textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {prayer.displayTime}
+                    </Typography>
+                    
+                    {/* Prayer Name - Portrait */}
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: fontSizes.prayerTime,
+                        width: '36%',
+                        textAlign: 'center',
+                        fontFamily: "'Poppins', sans-serif",
+                        zIndex: 1,
+                        color: prayer.isCurrent 
+                          ? '#FFFFFF' 
+                          : prayer.isNext 
+                            ? '#FFFFFF' 
+                            : '#0A2647',
+                        letterSpacing: 0.5,
+                        textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {prayer.name}
                     </Typography>
                     
                     {/* Jamaat - Portrait */}
                     <Typography 
                       sx={{ 
                         fontWeight: prayer.displayJamaat ? 'medium' : 'normal',
-                        fontSize: prayer.displayJamaat ? fontSizes.body1 : fontSizes.caption,
-                        width: '35%',
+                        fontSize: prayer.displayJamaat 
+                          ? fontSizes.prayerName
+                          : fontSizes.caption,
+                        width: '32%',
                         textAlign: 'right',
                         fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
                         opacity: prayer.displayJamaat ? 1 : 0.7,
@@ -551,8 +595,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                           : prayer.isNext 
                             ? '#FFFFFF' 
                             : '#144272',
-                        pr: 0.5,
+                        pr: getSizeRem(0.3),
                         textShadow: (prayer.isNext || prayer.isCurrent) ? '0 1px 2px rgba(0,0,0,0.2)' : 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {prayer.displayJamaat || 'N/A'}
@@ -595,25 +642,27 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           {isJumuahToday && (
             <Box
               sx={{ 
-                p: isLandscape ? 1.25 : 1.1,
-                mb: 0.5,
-                borderRadius: 1.5,
+                p: getSizeRem(0.7),
+                mb: getSizeRem(0.4),
+                mt: getSizeRem(0.4),
+                borderRadius: getSizeRem(0.8),
                 background: 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)',
                 color: '#0A2647',
                 boxShadow: '0 3px 8px rgba(218, 165, 32, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                height: isLandscape ? '75px' : '65px',
-                minHeight: isLandscape ? '75px' : '65px',
-                mx: isLandscape ? 0.5 : 0.25,
+                height: layout.prayerRowHeight,
                 border: '1px solid rgba(218, 165, 32, 0.4)',
                 position: 'relative',
                 overflow: 'hidden',
-                mt: 0.5,
+                '& .MuiTypography-root': {
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }
               }}
             >
-              {/* Background pattern for Jumuah */}
               <Box sx={{
                 position: 'absolute',
                 top: 0,
@@ -637,13 +686,16 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   <Typography 
                     sx={{ 
                       fontWeight: 'bold',
-                      fontSize: fontSizes.h4,
+                      fontSize: fontSizes.prayerName,
                       width: '33%',
                       textAlign: 'left',
-                      pl: 1.5,
+                      pl: getSizeRem(0.5),
                       fontFamily: "'Poppins', sans-serif",
                       zIndex: 1,
                       color: '#0A2647',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {jumuahDisplayTime}
@@ -653,12 +705,15 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   <Typography 
                     sx={{ 
                       fontWeight: 'bold',
-                      fontSize: fontSizes.h4,
+                      fontSize: fontSizes.prayerName,
                       width: '33%',
                       textAlign: 'center',
                       fontFamily: "'Poppins', sans-serif",
                       zIndex: 1,
                       color: '#0A2647',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     Jumu'ah
@@ -669,7 +724,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     sx={{ 
                       width: '33%',
                       textAlign: 'right',
-                      pr: 1.5,
+                      pr: getSizeRem(1),
                       zIndex: 1,
                     }}
                   >
@@ -678,44 +733,50 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 </>
               ) : (
                 <>
-                  {/* Prayer Name - Portrait */}
-                  <Typography 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      fontSize: fontSizes.body1,
-                      width: '30%',
-                      fontFamily: "'Poppins', sans-serif",
-                      zIndex: 1,
-                      color: '#0A2647',
-                      pl: 0.5,
-                    }}
-                  >
-                    Jumu'ah
-                  </Typography>
-                  
                   {/* Time - Portrait */}
                   <Typography 
                     sx={{ 
                       fontWeight: 'bold',
-                      fontSize: fontSizes.h5,
-                      width: '35%',
-                      textAlign: 'center',
+                      fontSize: fontSizes.prayerName,
+                      width: '32%',
                       fontFamily: "'Poppins', sans-serif",
                       zIndex: 1,
                       color: '#0A2647',
-                      letterSpacing: 0.5,
+                      pl: getSizeRem(0.3),
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {jumuahDisplayTime}
                   </Typography>
                   
+                  {/* Prayer Name - Portrait */}
+                  <Typography 
+                    sx={{ 
+                      fontWeight: 'bold',
+                      fontSize: fontSizes.prayerTime,
+                      width: '36%',
+                      textAlign: 'center',
+                      fontFamily: "'Poppins', sans-serif",
+                      zIndex: 1,
+                      color: '#0A2647',
+                      letterSpacing: 0.5,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Jumu'ah
+                  </Typography>
+                  
                   {/* Empty space for consistency - Portrait */}
                   <Typography 
                     sx={{ 
-                      width: '35%',
+                      width: '32%',
                       textAlign: 'right',
                       zIndex: 1,
-                      pr: 0.5,
+                      pr: getSizeRem(0.3),
                     }}
                   >
                     &nbsp;

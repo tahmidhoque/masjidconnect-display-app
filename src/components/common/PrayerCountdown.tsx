@@ -26,7 +26,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [displayTimes, setDisplayTimes] = useState(true);
-  const { fontSizes, screenSize } = useResponsiveFontSize();
+  const { fontSizes, layout, getSizeRem } = useResponsiveFontSize();
   const initializingRef = useRef<boolean>(true);
   
   // Calculate remaining time and update countdown
@@ -138,7 +138,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         fontSize: fontSizes.h3,
         textAlign: 'center',
         color: '#F1C40F',
-        my: 2,
+        my: getSizeRem(1.5),
         animation: 'pulseScale 1s infinite ease-in-out',
       }}>
         It's {prayerName} time!
@@ -151,31 +151,38 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'center',
-        gap: screenSize.is720p ? 1 : 2, 
+        gap: getSizeRem(0.2),
         alignItems: 'center',
-        mt: 0.5,
+        mt: getSizeRem(0.2),
+        mb: getSizeRem(0.2),
       }}>
         {/* Hours */}
-        <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ 
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          minWidth: getSizeRem(4),
+        }}>
           <Typography sx={{ 
-            fontSize: screenSize.is720p ? fontSizes.huge : '5.5rem',
+            fontSize: fontSizes.countdownDigit,
             fontWeight: 'bold',
-            lineHeight: 1.1,
+            lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
             color: '#F1C40F',
-            letterSpacing: '-2px',
-            textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            letterSpacing: '0px',
+            textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
           }}>
             {hours.toString().padStart(2, '0')}
           </Typography>
           <Typography sx={{ 
-            fontSize: fontSizes.body2,
+            fontSize: fontSizes.countdownLabel,
             fontWeight: 'bold',
             textTransform: 'uppercase',
             opacity: 0.9,
-            mt: -0.5,
+            mt: getSizeRem(-0.2),
             color: 'rgba(255, 255, 255, 0.7)',
-            letterSpacing: '1px',
+            letterSpacing: '0.3px',
           }}>
             HOURS
           </Typography>
@@ -183,37 +190,44 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         
         {/* Separator */}
         <Typography sx={{ 
-          fontSize: screenSize.is720p ? fontSizes.huge : '5.5rem',
+          fontSize: fontSizes.countdownDigit,
           fontWeight: 'bold',
           lineHeight: 1,
           fontFamily: "'Poppins', sans-serif",
           color: '#F1C40F',
           alignSelf: 'flex-start',
-          mt: 0,
-          opacity: 0.9
+          mt: getSizeRem(0),
+          opacity: 0.9,
+          mx: getSizeRem(0.1),
         }}>:</Typography>
         
         {/* Minutes */}
-        <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ 
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          minWidth: getSizeRem(4),
+        }}>
           <Typography sx={{ 
-            fontSize: screenSize.is720p ? fontSizes.huge : '5.5rem',
+            fontSize: fontSizes.countdownDigit,
             fontWeight: 'bold',
-            lineHeight: 1.1,
+            lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
             color: '#F1C40F',
-            letterSpacing: '-2px',
-            textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            letterSpacing: '0px',
+            textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
           }}>
             {minutes.toString().padStart(2, '0')}
           </Typography>
           <Typography sx={{ 
-            fontSize: fontSizes.body2,
+            fontSize: fontSizes.countdownLabel,
             fontWeight: 'bold',
             textTransform: 'uppercase',
             opacity: 0.9,
-            mt: -0.5,
+            mt: getSizeRem(-0.2),
             color: 'rgba(255, 255, 255, 0.7)',
-            letterSpacing: '1px',
+            letterSpacing: '0.3px',
           }}>
             MINUTES
           </Typography>
@@ -221,37 +235,44 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         
         {/* Separator */}
         <Typography sx={{ 
-          fontSize: screenSize.is720p ? fontSizes.huge : '5.5rem',
+          fontSize: fontSizes.countdownDigit,
           fontWeight: 'bold',
           lineHeight: 1,
           fontFamily: "'Poppins', sans-serif",
           color: '#F1C40F',
           alignSelf: 'flex-start',
-          mt: 0,
-          opacity: 0.9
+          mt: getSizeRem(0),
+          opacity: 0.9,
+          mx: getSizeRem(0.1),
         }}>:</Typography>
         
         {/* Seconds */}
-        <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ 
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          minWidth: getSizeRem(4),
+        }}>
           <Typography sx={{ 
-            fontSize: screenSize.is720p ? fontSizes.huge : '5.5rem',
+            fontSize: fontSizes.countdownDigit,
             fontWeight: 'bold',
-            lineHeight: 1.1,
+            lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
             color: '#F1C40F',
-            letterSpacing: '-2px',
-            textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            letterSpacing: '0px',
+            textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
           }}>
             {seconds.toString().padStart(2, '0')}
           </Typography>
           <Typography sx={{ 
-            fontSize: fontSizes.body2,
+            fontSize: fontSizes.countdownLabel,
             fontWeight: 'bold',
             textTransform: 'uppercase',
             opacity: 0.9,
-            mt: -0.5,
+            mt: getSizeRem(-0.1),
             color: 'rgba(255, 255, 255, 0.7)',
-            letterSpacing: '1px',
+            letterSpacing: '0.3px',
           }}>
             SECONDS
           </Typography>
