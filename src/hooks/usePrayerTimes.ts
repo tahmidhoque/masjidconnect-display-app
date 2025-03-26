@@ -147,9 +147,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const calculatePrayersAccurately = useCallback((prayers: FormattedPrayerTime[]) => {
     if (!prayers || prayers.length === 0) return { currentIndex: -1, nextIndex: -1 };
     
-    const now = new Date();
-    const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const isAfterMidnightBeforeFajr = now.getHours() < 6;
+    const now = moment();
+    const currentTimeStr = now.format('HH:mm');
+    const isAfterMidnightBeforeFajr = now.hours() < 6;
     
     // Filter out prayers that should be skipped for the countdown
     const countdownPrayers = prayers.filter(p => !SKIP_PRAYERS.includes(p.name));
@@ -170,12 +170,29 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       if (ishaIndex >= 0) {
         // Check if Isha jamaat has passed - if so, we shouldn't mark it as current
         const isha = prayers[ishaIndex];
-        if (isha.jamaat && currentTimeStr > isha.jamaat) {
-          logger.info('After midnight before Fajr: Isha jamaat has passed, not highlighting as current');
-          // Do not set current prayer
+        if (isha.jamaat) {
+          // Convert to moment for proper comparison
+          const ishaJamaatMoment = moment().hours(0).minutes(0).seconds(0);
+          const [ishaJamaatHours, ishaJamaatMinutes] = isha.jamaat.split(':').map(Number);
+          
+          if (!isNaN(ishaJamaatHours) && !isNaN(ishaJamaatMinutes)) {
+            ishaJamaatMoment.hours(ishaJamaatHours).minutes(ishaJamaatMinutes);
+            
+            // If Isha jamaat is PM time (after noon)
+            if (ishaJamaatHours >= 12) {
+              // We're in early AM hours of the next day, so check against yesterday's Isha
+              if (now.isAfter(ishaJamaatMoment)) {
+                logger.info('After midnight before Fajr: Isha jamaat has passed, not highlighting as current');
+                // Do not set current prayer
+              } else {
+                currentIndex = ishaIndex;
+                logger.info('After midnight before Fajr: Setting current prayer to Isha');
+              }
+            }
+          }
         } else {
           currentIndex = ishaIndex;
-          logger.info('After midnight before Fajr: Setting current prayer to Isha');
+          logger.info('After midnight before Fajr: Setting current prayer to Isha (no jamaat time)');
         }
         
         // Next prayer should be Fajr regardless
@@ -186,6 +203,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         }
       }
     } else {
+      // Regular time flow
+      
       // Find the last prayer whose adhan time has passed (this is the current prayer period we're in)
       for (let i = sortedPrayers.length - 1; i >= 0; i--) {
         if (sortedPrayers[i].time <= currentTimeStr) {
@@ -244,32 +263,41 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           if (nextIndex === -1 || (nextIndex === currentIndex)) {
             logger.info(`Looking for next prayer after ${currentPrayer.name}`);
             
-            // Find the next prayer after the current one
+            // Find the next prayer after the current one in the sorted list
             let foundNext = false;
-            for (let i = 0; i < sortedPrayers.length; i++) {
-              // Skip until we find the current prayer
-              if (sortedPrayers[i].name !== currentPrayer.name) continue;
-              
-              // Then look at the prayer after it
-              if (i + 1 < sortedPrayers.length) {
-                const newNextName = sortedPrayers[i + 1].name;
-                const newNextIndex = prayers.findIndex(p => p.name === newNextName);
+            
+            // First create a map of prayer name to index
+            const prayerNameToIndex = new Map<string, number>();
+            prayers.forEach((p, idx) => prayerNameToIndex.set(p.name, idx));
+            
+            // Get the index of the current prayer in the sorted array
+            const currentPrayerSortedIndex = sortedPrayers.findIndex(p => p.name === currentPrayer.name);
+            
+            if (currentPrayerSortedIndex >= 0) {
+              // Check if there's a next prayer in the sequence
+              if (currentPrayerSortedIndex < sortedPrayers.length - 1) {
+                // Get the next prayer in the sequence
+                const nextPrayerName = sortedPrayers[currentPrayerSortedIndex + 1].name;
+                const nextPrayerIndex = prayerNameToIndex.get(nextPrayerName);
                 
-                if (newNextIndex >= 0) {
-                  logger.info(`Setting ${prayers[newNextIndex].name} as the next prayer`);
-                  nextIndex = newNextIndex;
+                if (nextPrayerIndex !== undefined) {
+                  logger.info(`Setting ${prayers[nextPrayerIndex].name} as the next prayer (next in sequence)`);
+                  nextIndex = nextPrayerIndex;
                   foundNext = true;
-                  break;
                 }
               }
-            }
-            
-            // If we didn't find a next prayer after the current one, it means we're at the end of the day
-            if (!foundNext) {
-              // The next prayer will be the first prayer of tomorrow
-              const firstPrayerTomorrow = sortedPrayers[0];
-              nextIndex = prayers.findIndex(p => p.name === firstPrayerTomorrow.name);
-              logger.info(`At end of day: Setting first prayer for tomorrow (${firstPrayerTomorrow.name}) as next`);
+              
+              // If we didn't find a next prayer after the current one, it means we're at the end of the day
+              if (!foundNext) {
+                // The next prayer will be the first prayer of tomorrow
+                const firstPrayerTomorrow = sortedPrayers[0];
+                const firstPrayerIndex = prayerNameToIndex.get(firstPrayerTomorrow.name);
+                
+                if (firstPrayerIndex !== undefined) {
+                  nextIndex = firstPrayerIndex;
+                  logger.info(`At end of day: Setting first prayer for tomorrow (${firstPrayerTomorrow.name}) as next`);
+                }
+              }
             }
           }
         }
@@ -418,17 +446,19 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         setCurrentPrayer(null);
       }
       
+      // Calculate time until next prayer or jamaat
       if (nextIndex >= 0) {
         prayers[nextIndex].isNext = true;
         
-        // Calculate time until next prayer or jamaat
+        // Get the next prayer object
         const nextPrayer = prayers[nextIndex];
+        
+        // Current time for comparison
+        const now = moment();
+        const currentTimeStr = now.format('HH:mm');
         
         // If next prayer has jamaat time and it's after the adhan time and current time is between adhan and jamaat
         // then countdown to jamaat time, otherwise countdown to adhan time
-        const currentTimeObj = new Date();
-        const currentTimeStr = `${currentTimeObj.getHours().toString().padStart(2, '0')}:${currentTimeObj.getMinutes().toString().padStart(2, '0')}`;
-        
         if (nextPrayer.jamaat && 
             nextPrayer.time <= currentTimeStr && 
             nextPrayer.jamaat > currentTimeStr) {
@@ -439,11 +469,30 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           // Make sure this prayer is not also marked as current when it's between adhan and jamaat
           nextPrayer.isCurrent = false;
         } else {
-          // Countdown to adhan time
-          nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
-          logger.info(`Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time})`);
+          // Check if this prayer's time has already passed today
+          const prayerTime = moment().hours(0).minutes(0).seconds(0);
+          const [prayerHours, prayerMinutes] = nextPrayer.time.split(':').map(Number);
+          prayerTime.hours(prayerHours).minutes(prayerMinutes);
+          
+          // If prayer time has passed today, it means we're counting down to tomorrow's occurrence
+          if (now.isAfter(prayerTime) && !(now.hours() < 6 && nextPrayer.name === 'Fajr')) {
+            logger.info(`Prayer time ${nextPrayer.time} is in the past, adjusting to tomorrow`);
+            nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time, true); // Pass flag to force tomorrow
+          } else {
+            // Special handling for after midnight scenario with Isha prayer
+            if (now.hours() < 6 && nextPrayer.name === 'Fajr') {
+              // Use moment to properly calculate time until
+              nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
+              logger.info(`Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time}) - early morning hours`);
+            } else {
+              // Regular countdown to adhan time
+              nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
+              logger.info(`Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time})`);
+            }
+          }
         }
         
+        // Update next prayer in state
         setNextPrayer(nextPrayer);
       } else {
         // Clear next prayer if none was found

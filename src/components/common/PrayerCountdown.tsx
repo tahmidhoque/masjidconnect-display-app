@@ -3,6 +3,7 @@ import { Box, Typography, Fade } from '@mui/material';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import { parseTimeString } from '../../utils/dateUtils';
 import logger from '../../utils/logger';
+import moment from 'moment';
 
 interface PrayerCountdownProps {
   prayerName: string;
@@ -32,10 +33,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const [displayTimes, setDisplayTimes] = useState(true);
   const [countingDownToJamaat, setCountingDownToJamaat] = useState(false);
   const [textTransition, setTextTransition] = useState(false);
-  const { fontSizes, layout, getSizeRem } = useResponsiveFontSize();
+  const { fontSizes, layout, screenSize, getSizeRem } = useResponsiveFontSize();
   const initializingRef = useRef<boolean>(true);
   const prayerTimePassedRef = useRef<boolean>(false);
   const jamaatTimePassedRef = useRef<boolean>(false);
+  const initialLoadTimestampRef = useRef<number>(Date.now());
   
   // Calculate remaining time and update countdown
   useEffect(() => {
@@ -61,129 +63,150 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         
         // EDGE CASE: Check if we're starting between prayer time and jamaat time
         // If so, immediately enter jamaat countdown mode
-        const now = new Date();
-        const [timeHoursStr, timeMinutesStr] = prayerTime.split(':');
+        const now = moment();
         
-        if (timeHoursStr && timeMinutesStr && jamaatTime) {
-          const timeHours = parseInt(timeHoursStr, 10);
-          const timeMinutes = parseInt(timeMinutesStr, 10);
+        // Parse prayer time using moment
+        const prayerMoment = moment().hours(0).minutes(0).seconds(0);
+        const [prayerHours, prayerMinutes] = prayerTime.split(':').map(Number);
+        
+        if (!isNaN(prayerHours) && !isNaN(prayerMinutes)) {
+          prayerMoment.hours(prayerHours).minutes(prayerMinutes);
           
-          const prayerDate = new Date();
-          prayerDate.setHours(timeHours, timeMinutes, 0, 0);
-          
-          const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
-          if (jamaatHoursStr && jamaatMinutesStr) {
-            const jamaatHours = parseInt(jamaatHoursStr, 10);
-            const jamaatMinutes = parseInt(jamaatMinutesStr, 10);
+          // If prayer time has passed but jamaat hasn't
+          if (now.isAfter(prayerMoment) && jamaatTime) {
+            const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+            const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
             
-            const jamaatDate = new Date();
-            jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
-            
-            // We're between prayer time and jamaat time, switch to jamaat countdown
-            if (now > prayerDate && now < jamaatDate) {
-              prayerTimePassedRef.current = true;
-              setCountingDownToJamaat(true);
-              logger.info(`[CRITICAL] Starting countdown between ${prayerName} adhan (${prayerTime}) and jamaat (${jamaatTime})`);
+            if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
+              jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+              
+              // Handle after midnight special case
+              if (now.hours() < 6 && prayerName === 'Isha') {
+                if (jamaatMoment.isAfter(prayerMoment)) {
+                  jamaatMoment.subtract(1, 'day');
+                }
+              }
+              
+              if (now.isBefore(jamaatMoment)) {
+                logger.info(`[PrayerCountdown] Starting between ${prayerName} time and jamaat time, entering jamaat countdown mode`);
+                setCountingDownToJamaat(true);
+                prayerTimePassedRef.current = true;
+              }
             }
           }
         }
-      } catch (e) {
-        console.error("Error parsing pre-calculated time", e);
+        
+        initializingRef.current = false;
+      } catch (error) {
+        logger.error('[PrayerCountdown] Error parsing initial time', { error });
+        initializingRef.current = false;
       }
-      
-      initializingRef.current = false;
     }
     
     const calculateRemainingTime = () => {
       try {
-        // Parse prayer time
-        const [timeHoursStr, timeMinutesStr] = prayerTime.split(':');
-        if (!timeHoursStr || !timeMinutesStr) {
-          return;
-        }
-        
-        const timeHours = parseInt(timeHoursStr, 10);
-        const timeMinutes = parseInt(timeMinutesStr, 10);
-        
-        if (isNaN(timeHours) || isNaN(timeMinutes)) {
-          return;
-        }
-        
-        // Create date objects
-        const now = new Date();
+        // Create moment objects for easier date handling
+        const now = moment();
         
         // Create prayer time for today
-        const prayerDate = new Date();
-        prayerDate.setHours(timeHours, timeMinutes, 0, 0);
+        const prayerMoment = moment().hours(0).minutes(0).seconds(0);
+        const [prayerHours, prayerMinutes] = prayerTime.split(':').map(Number);
+        
+        if (isNaN(prayerHours) || isNaN(prayerMinutes)) {
+          return;
+        }
+        
+        prayerMoment.hours(prayerHours).minutes(prayerMinutes);
         
         // Initialize targetTime with prayer date as default
-        let targetTime = prayerDate;
+        let targetMoment = prayerMoment.clone();
         
         // If already counting down to jamaat, continue with jamaat countdown
         if (countingDownToJamaat && jamaatTime) {
-          const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
-          if (jamaatHoursStr && jamaatMinutesStr) {
-            const jamaatHours = parseInt(jamaatHoursStr, 10);
-            const jamaatMinutes = parseInt(jamaatMinutesStr, 10);
+          const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
+          if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
+            const jamaatMoment = moment().hours(0).minutes(0).seconds(0)
+              .hours(jamaatHours).minutes(jamaatMinutes);
             
-            if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-              const jamaatDate = new Date();
-              jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
+            // Special handling for after midnight
+            const isAfterMidnightBeforeFajr = now.hours() < 6 && prayerName === 'Isha';
+            if (isAfterMidnightBeforeFajr) {
+              // Handle Isha jamaat that's after midnight
+              if (jamaatMoment.hours() < 6) {
+                // If jamaatTime is small hours (like 01:30), it's meant for today not tomorrow
+                // No adjustment needed
+              } else {
+                // If jamaatTime is in the evening (like 20:30), we've crossed to new day
+                jamaatMoment.subtract(1, 'day');
+              }
               
-              // Handle after midnight case for Isha's Jamaat
-              const isAfterMidnightBeforeFajr = now.getHours() < 6 && prayerName === 'Isha';
-              if (isAfterMidnightBeforeFajr && now > jamaatDate) {
+              // If jamaat is in the past, mark as passed
+              if (now.isAfter(jamaatMoment) && !jamaatTimePassedRef.current) {
                 jamaatTimePassedRef.current = true;
+                logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed (${jamaatTime})`);
                 
-                if (displayTimes) {
-                  logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed`);
+                // Only trigger events if not during initial page load
+                const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+                if (displayTimes && timeSinceLoad > 5000) {
                   triggerCountdownComplete(true);
                   return;
                 }
               }
-              
-              // If jamaat time has passed and we haven't completed the countdown
-              if (now >= jamaatDate && !jamaatTimePassedRef.current) {
+            } else {
+              // Regular jamaat time check for non-midnight scenario
+              if (now.isAfter(jamaatMoment) && !jamaatTimePassedRef.current) {
                 jamaatTimePassedRef.current = true;
                 
-                // Trigger callback only once
-                if (displayTimes) {
+                // Trigger callback only once and not during initial load
+                const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+                if (displayTimes && timeSinceLoad > 5000) {
                   logger.info(`[CRITICAL] ${prayerName} jamaat time has just arrived (${jamaatTime})`);
                   triggerCountdownComplete(true);
+                  return;
                 }
-                return; // Don't continue processing
               }
-              
-              targetTime = jamaatDate;
+            }
+            
+            targetMoment = jamaatMoment.clone();
+            
+            // If target is in the past, set it for tomorrow
+            if (now.isAfter(targetMoment)) {
+              targetMoment.add(1, 'day');
             }
           }
         }
         // Not counting down to jamaat yet, handle prayer/jamaat transitions
         else {
           // Check if prayer time has already passed today
-          const prayerHasPassed = now >= prayerDate;
+          const prayerHasPassed = now.isAfter(prayerMoment);
           
           // Special handling for Isha after midnight when Fajr is next
-          const isAfterMidnightBeforeFajr = now.getHours() < 6 && prayerName === 'Isha';
+          const isAfterMidnightBeforeFajr = now.hours() < 6 && prayerName === 'Isha';
           
           if (isAfterMidnightBeforeFajr) {
             prayerTimePassedRef.current = true;
             
             // If this is Isha after midnight and Isha jamaat has passed
             if (jamaatTime) {
-              const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
-              if (jamaatHoursStr && jamaatMinutesStr) {
-                const jamaatHours = parseInt(jamaatHoursStr, 10);
-                const jamaatMinutes = parseInt(jamaatMinutesStr, 10);
+              const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+              const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
+              
+              if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
+                jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
                 
-                const jamaatDate = new Date();
-                jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
+                // Adjust jamaat time for after midnight scenario
+                if (jamaatMoment.hours() >= 18) { // If jamaat is PM time
+                  jamaatMoment.subtract(1, 'day'); // It was from yesterday
+                }
                 
                 // If we're after jamaat, mark it as passed if we haven't already
-                if (now > jamaatDate && !jamaatTimePassedRef.current) {
+                if (now.isAfter(jamaatMoment) && !jamaatTimePassedRef.current) {
                   jamaatTimePassedRef.current = true;
                   logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed (${jamaatTime})`);
-                  if (displayTimes) {
+                  
+                  // Only trigger events if not during initial page load
+                  const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+                  if (displayTimes && timeSinceLoad > 5000) {
                     triggerCountdownComplete(true);
                     return;
                   }
@@ -192,185 +215,152 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             }
             
             // Set up for tomorrow's prayer
-            prayerDate.setDate(prayerDate.getDate() + 1);
-            targetTime = prayerDate;
+            targetMoment = prayerMoment.clone().add(1, 'day');
           }
-          // Normal time passing check
-          else if (prayerHasPassed) {
-            // Only trigger the event if we're just now detecting that the prayer time has passed
-            if (!prayerTimePassedRef.current) {
-              // Set the flag first to prevent multiple triggers
-              prayerTimePassedRef.current = true;
-              
-              // CRITICAL FIX: Make sure we log and trigger the adhan announcement
-              logger.info(`[CRITICAL] ${prayerName} adhan time has just arrived (${prayerTime})`);
-              
-              // Trigger the event for prayer time immediately if we're at the exact time
-              // or if we're within 30 seconds after the prayer time
-              const justPassed = Math.abs(now.getTime() - prayerDate.getTime()) <= 30000;
-              if (justPassed && displayTimes) {
-                triggerCountdownComplete(false);
-                return; // Stop execution to prevent further calculations
-              }
-            } else {
-              // Prayer time already passed in a previous calculation
-              prayerTimePassedRef.current = true;
+          // Regular flow for regular times
+          else if (prayerHasPassed && !prayerTimePassedRef.current) {
+            // Prayer time has just passed
+            prayerTimePassedRef.current = true;
+            
+            // Trigger completion callback for prayer time - but not during initial page load
+            const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+            if (displayTimes && timeSinceLoad > 5000) {
+              logger.info(`[CRITICAL] ${prayerName} time has just arrived (${prayerTime})`);
+              triggerCountdownComplete(false);
+              return;
             }
             
             // If we have a jamaatTime and we're not already counting down to it
             if (jamaatTime) {
-              const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
-              if (jamaatHoursStr && jamaatMinutesStr) {
-                const jamaatHours = parseInt(jamaatHoursStr, 10);
-                const jamaatMinutes = parseInt(jamaatMinutesStr, 10);
-                
-                if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-                  // Set up jamaat date
-                  const jamaatDate = new Date();
-                  jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
-                  
-                  // If jamaat time is still in the future, switch to counting down to jamaat
-                  if (now < jamaatDate) {
-                    // Trigger transition animation
-                    setTextTransition(true);
-                    setTimeout(() => {
-                      setCountingDownToJamaat(true);
-                      setTextTransition(false);
-                      logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
-                    }, 500); // Match fade out duration
-                    
-                    targetTime = jamaatDate;
-                  } else {
-                    // Both prayer and jamaat times have passed
-                    jamaatTimePassedRef.current = true;
-                    
-                    // Trigger countdown completion for jamaat if it just passed
-                    const jamaatJustPassed = Math.abs(now.getTime() - jamaatDate.getTime()) <= 30000;
-                    if (jamaatJustPassed && displayTimes) {
-                      logger.info(`[CRITICAL] ${prayerName} jamaat time has just passed (${jamaatTime})`);
-                      triggerCountdownComplete(true);
-                      return; // Stop execution
-                    }
-                    
-                    // Set future prayer time for tomorrow
-                    prayerDate.setDate(prayerDate.getDate() + 1);
-                    targetTime = prayerDate;
-                  }
-                }
-              }
-            } else if (!jamaatTimePassedRef.current) {
-              // Set future prayer time for tomorrow if no jamaat time or jamaat already passed
-              prayerDate.setDate(prayerDate.getDate() + 1);
-              targetTime = prayerDate;
-            }
-          } else if (prayerTimePassedRef.current && !jamaatTimePassedRef.current && !countingDownToJamaat && jamaatTime) {
-            // Late transition to jamaat countdown if needed
-            const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
-            if (jamaatHoursStr && jamaatMinutesStr) {
-              const jamaatHours = parseInt(jamaatHoursStr, 10);
-              const jamaatMinutes = parseInt(jamaatMinutesStr, 10);
+              const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+              const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
               
               if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-                const jamaatDate = new Date();
-                jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
+                jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
                 
-                if (now < jamaatDate) {
-                  // Explicitly transition to jamaat countdown
+                // If jamaat time is still in the future, switch to counting down to jamaat
+                if (now.isBefore(jamaatMoment)) {
+                  // Trigger transition animation
                   setTextTransition(true);
                   setTimeout(() => {
                     setCountingDownToJamaat(true);
                     setTextTransition(false);
-                    logger.info(`[PrayerCountdown] Late transition to ${prayerName} jamaat countdown`);
-                  }, 500);
+                    logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
+                  }, 500); // Match fade out duration
                   
-                  targetTime = jamaatDate;
+                  targetMoment = jamaatMoment.clone();
+                } else {
+                  // Both prayer and jamaat times have passed
+                  jamaatTimePassedRef.current = true;
+                  
+                  // Trigger countdown completion for jamaat if it just passed - not during initial load
+                  const jamaatJustPassed = Math.abs(now.diff(jamaatMoment, 'milliseconds')) <= 30000;
+                  const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+                  if (jamaatJustPassed && displayTimes && timeSinceLoad > 5000) {
+                    logger.info(`[CRITICAL] ${prayerName} jamaat time has just passed (${jamaatTime})`);
+                    triggerCountdownComplete(true);
+                    return; // Stop execution
+                  }
+                  
+                  // Set future prayer time for tomorrow
+                  targetMoment = prayerMoment.clone().add(1, 'day');
                 }
               }
+            } else {
+              // Set future prayer time for tomorrow if no jamaat time
+              targetMoment = prayerMoment.clone().add(1, 'day');
             }
+          } else if (prayerTimePassedRef.current && !jamaatTimePassedRef.current && !countingDownToJamaat && jamaatTime) {
+            // Late transition to jamaat countdown if needed
+            const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+            const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
+            
+            if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
+              jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+              
+              if (now.isBefore(jamaatMoment)) {
+                // Explicitly transition to jamaat countdown
+                setTextTransition(true);
+                setTimeout(() => {
+                  setCountingDownToJamaat(true);
+                  setTextTransition(false);
+                  logger.info(`[PrayerCountdown] Late transition to ${prayerName} jamaat countdown`);
+                }, 500);
+                
+                targetMoment = jamaatMoment.clone();
+              } else {
+                // Jamaat time has passed, prepare for tomorrow
+                targetMoment = prayerMoment.clone().add(1, 'day');
+              }
+            }
+          } else if (!prayerHasPassed) {
+            // Simple case: prayer time is still in the future
+            targetMoment = prayerMoment.clone();
+          } else {
+            // Default: set to tomorrow's prayer time
+            targetMoment = prayerMoment.clone().add(1, 'day');
           }
         }
         
         // Calculate time difference - ensure we never show negative values
-        const diffMs = Math.max(0, targetTime.getTime() - now.getTime());
+        const diffMs = Math.max(0, targetMoment.diff(now, 'milliseconds'));
+        const totalSeconds = Math.floor(diffMs / 1000);
         
-        // Check for exact zero moment
-        if (diffMs === 0) {
-          // If we haven't triggered for the prayer time yet and we're not counting to jamaat
-          if (!prayerTimePassedRef.current && !countingDownToJamaat) {
-            prayerTimePassedRef.current = true;
-            logger.info(`[CRITICAL] ${prayerName} adhan countdown reached zero (${prayerTime})`);
-            triggerCountdownComplete(false);
-            return;
-          }
-          // If we're at jamaat time and haven't triggered for jamaat yet
-          else if (countingDownToJamaat && !jamaatTimePassedRef.current) {
-            jamaatTimePassedRef.current = true;
-            logger.info(`[CRITICAL] ${prayerName} jamaat countdown reached zero (${jamaatTime})`);
-            triggerCountdownComplete(true);
-            return;
-          }
+        // Update state with new countdown values
+        const newHours = Math.floor(totalSeconds / 3600);
+        const newMinutes = Math.floor((totalSeconds % 3600) / 60);
+        const newSeconds = totalSeconds % 60;
+        
+        setHours(newHours);
+        setMinutes(newMinutes);
+        setSeconds(newSeconds);
+        
+        // Debug log every minute or when any value changes
+        if (newSeconds === 0 || newHours !== hours || newMinutes !== minutes || newSeconds !== seconds) {
+          logger.debug(`[PrayerCountdown] ${prayerName} countdown: ${formatRemainingTimeLog(newHours, newMinutes, newSeconds)}`, {
+            prayerName,
+            prayerTime,
+            jamaatTime,
+            countingDownToJamaat,
+            targetTime: targetMoment.format('YYYY-MM-DD HH:mm:ss')
+          });
         }
         
-        // Calculate hours, minutes, seconds
-        const diffSec = Math.floor(diffMs / 1000);
-        const h = Math.floor(diffSec / 3600);
-        const m = Math.floor((diffSec % 3600) / 60);
-        const s = diffSec % 60;
-        
-        // Log detailed time information occasionally for debugging only
-        if (diffSec % 60 === 0) { // Only log once per minute to reduce noise
-          console.log(`Countdown for ${prayerName}: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        }
-        
-        setHours(h);
-        setMinutes(m);
-        setSeconds(s);
-        
-        // Reset completion state if we have time remaining
-        if (!displayTimes && diffMs > 0) {
-          setDisplayTimes(true);
+        // Check if countdown has reached zero
+        if (totalSeconds === 0 && displayTimes) {
+          // Only trigger events if not during initial page load
+          const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+          if (timeSinceLoad > 5000) {
+            if (countingDownToJamaat) {
+              logger.info(`[CRITICAL] ${prayerName} jamaat time has arrived`);
+              triggerCountdownComplete(true);
+            } else {
+              logger.info(`[CRITICAL] ${prayerName} time has arrived`);
+              triggerCountdownComplete(false);
+            }
+          }
         }
       } catch (error) {
-        console.error('Error calculating prayer countdown:', error);
+        logger.error('[PrayerCountdown] Error calculating remaining time', { error });
       }
     };
     
-    // Calculate initially
+    // Calculate time immediately
     calculateRemainingTime();
     
-    // Update every second
-    const timer = setInterval(calculateRemainingTime, 1000);
+    // Set up interval for countdown
+    const intervalId = setInterval(calculateRemainingTime, 1000);
     
-    return () => clearInterval(timer);
-  }, [prayerTime, prayerName, jamaatTime, onCountdownComplete, timeUntilNextPrayer, displayTimes, countingDownToJamaat]);
-
-  // Debug key handler
-  const handleKeyPress = useCallback((event: KeyboardEvent) => {
-    // Press 'D' key to trigger debug countdown completion
-    if (event.key.toLowerCase() === 'd') {
-      logger.info('[PrayerCountdown] Debug key pressed - triggering countdown completion');
-      
-      const isCurrentlyForJamaat = countingDownToJamaat;
-      
-      // Log detailed information for debugging
-      logger.info('[PrayerCountdown] Debug key pressed with detailed state', {
-        prayerName,
-        jamaatTime,
-        countingDownToJamaat: isCurrentlyForJamaat,
-        showingDisplayTimes: displayTimes,
-        prayerTimePassed: prayerTimePassedRef.current,
-        jamaatTimePassed: jamaatTimePassedRef.current
-      });
-      
-      triggerCountdownComplete(isCurrentlyForJamaat);
-    }
-  }, [prayerName, jamaatTime, countingDownToJamaat, displayTimes]);
-
-  useEffect(() => {
-    // Add debug key listener
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleKeyPress]);
+    // Clean up interval on component unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [prayerTime, jamaatTime, prayerName, onCountdownComplete, displayTimes, countingDownToJamaat, hours, minutes, seconds]);
+  
+  // Format time for display
+  const formatTimeDisplay = (value: number) => {
+    return value.toString().padStart(2, '0');
+  };
 
   const triggerCountdownComplete = (isForJamaat: boolean) => {
     logger.info('[PrayerCountdown] Triggering countdown complete', {
@@ -430,9 +420,15 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   }
 
   return (
-    <Box>
-      <Fade in={!textTransition} timeout={500}>
-        <Typography sx={{
+    <Fade in={!textTransition}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        my: 2
+      }}>
+        <Typography sx={{ 
           fontWeight: 'bold', 
           fontSize: fontSizes.caption,
           textAlign: 'center',
@@ -443,139 +439,139 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             ? `${prayerName} Jamaa't will be in` 
             : `${prayerName} will be in`}
         </Typography>
-      </Fade>
-      
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center',
-        gap: getSizeRem(0.2),
-        alignItems: 'center',
-        mt: getSizeRem(0.2),
-        mb: getSizeRem(0.2),
-      }}>
-        {/* Hours */}
+        
         <Box sx={{ 
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
+          display: 'flex', 
+          justifyContent: 'center',
+          gap: getSizeRem(0.2),
           alignItems: 'center',
-          minWidth: getSizeRem(4),
+          mt: getSizeRem(0.2),
+          mb: getSizeRem(0.2),
         }}>
+          {/* Hours */}
+          <Box sx={{ 
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            minWidth: getSizeRem(4),
+          }}>
+            <Typography sx={{ 
+              fontSize: fontSizes.countdownDigit,
+              fontWeight: 'bold',
+              lineHeight: 1,
+              fontFamily: "'Poppins', sans-serif",
+              color: '#F1C40F',
+              letterSpacing: '0px',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+            }}>
+              {formatTimeDisplay(hours)}
+            </Typography>
+            <Typography sx={{ 
+              fontSize: fontSizes.countdownLabel,
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              mt: getSizeRem(-0.2),
+              color: 'rgba(255, 255, 255, 0.7)',
+              letterSpacing: '0.3px',
+            }}>
+              HOURS
+            </Typography>
+          </Box>
+          
+          {/* Separator */}
           <Typography sx={{ 
             fontSize: fontSizes.countdownDigit,
-            fontWeight: 'bold',
+            fontWeight: 'bold', 
             lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
             color: '#F1C40F',
-            letterSpacing: '0px',
-            textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
-          }}>
-            {hours.toString().padStart(2, '0')}
-          </Typography>
-          <Typography sx={{ 
-            fontSize: fontSizes.countdownLabel,
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
+            alignSelf: 'flex-start',
+            mt: getSizeRem(0),
             opacity: 0.9,
-            mt: getSizeRem(-0.2),
-            color: 'rgba(255, 255, 255, 0.7)',
-            letterSpacing: '0.3px',
+            mx: getSizeRem(0.1),
+          }}>:</Typography>
+          
+          {/* Minutes */}
+          <Box sx={{ 
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            minWidth: getSizeRem(4),
           }}>
-            HOURS
-          </Typography>
-        </Box>
-        
-        {/* Separator */}
-        <Typography sx={{ 
-          fontSize: fontSizes.countdownDigit,
-          fontWeight: 'bold',
-          lineHeight: 1,
-          fontFamily: "'Poppins', sans-serif",
-          color: '#F1C40F',
-          alignSelf: 'flex-start',
-          mt: getSizeRem(0),
-          opacity: 0.9,
-          mx: getSizeRem(0.1),
-        }}>:</Typography>
-        
-        {/* Minutes */}
-        <Box sx={{ 
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          minWidth: getSizeRem(4),
-        }}>
+            <Typography sx={{ 
+              fontSize: fontSizes.countdownDigit,
+              fontWeight: 'bold',
+              lineHeight: 1,
+              fontFamily: "'Poppins', sans-serif",
+              color: '#F1C40F',
+              letterSpacing: '0px',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+            }}>
+              {formatTimeDisplay(minutes)}
+            </Typography>
+            <Typography sx={{ 
+              fontSize: fontSizes.countdownLabel,
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              mt: getSizeRem(-0.2),
+              color: 'rgba(255, 255, 255, 0.7)',
+              letterSpacing: '0.3px',
+            }}>
+              MINUTES
+            </Typography>
+          </Box>
+          
+          {/* Separator */}
           <Typography sx={{ 
             fontSize: fontSizes.countdownDigit,
-            fontWeight: 'bold',
+            fontWeight: 'bold', 
             lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
             color: '#F1C40F',
-            letterSpacing: '0px',
-            textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
-          }}>
-            {minutes.toString().padStart(2, '0')}
-          </Typography>
-          <Typography sx={{ 
-            fontSize: fontSizes.countdownLabel,
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
+            alignSelf: 'flex-start',
+            mt: getSizeRem(0),
             opacity: 0.9,
-            mt: getSizeRem(-0.2),
-            color: 'rgba(255, 255, 255, 0.7)',
-            letterSpacing: '0.3px',
+            mx: getSizeRem(0.1),
+          }}>:</Typography>
+          
+          {/* Seconds */}
+          <Box sx={{ 
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            minWidth: getSizeRem(4),
           }}>
-            MINUTES
-          </Typography>
-        </Box>
-        
-        {/* Separator */}
-        <Typography sx={{ 
-          fontSize: fontSizes.countdownDigit,
-          fontWeight: 'bold',
-          lineHeight: 1,
-          fontFamily: "'Poppins', sans-serif",
-          color: '#F1C40F',
-          alignSelf: 'flex-start',
-          mt: getSizeRem(0),
-          opacity: 0.9,
-          mx: getSizeRem(0.1),
-        }}>:</Typography>
-        
-        {/* Seconds */}
-        <Box sx={{ 
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          minWidth: getSizeRem(4),
-        }}>
-          <Typography sx={{ 
-            fontSize: fontSizes.countdownDigit,
-            fontWeight: 'bold',
-            lineHeight: 1,
-            fontFamily: "'Poppins', sans-serif",
-            color: '#F1C40F',
-            letterSpacing: '0px',
-            textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
-          }}>
-            {seconds.toString().padStart(2, '0')}
-          </Typography>
-          <Typography sx={{ 
-            fontSize: fontSizes.countdownLabel,
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            opacity: 0.9,
-            mt: getSizeRem(-0.1),
-            color: 'rgba(255, 255, 255, 0.7)',
-            letterSpacing: '0.3px',
-          }}>
-            SECONDS
-          </Typography>
+            <Typography sx={{ 
+              fontSize: fontSizes.countdownDigit,
+              fontWeight: 'bold',
+              lineHeight: 1,
+              fontFamily: "'Poppins', sans-serif",
+              color: '#F1C40F',
+              letterSpacing: '0px',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+            }}>
+              {formatTimeDisplay(seconds)}
+            </Typography>
+            <Typography sx={{ 
+              fontSize: fontSizes.countdownLabel,
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              mt: getSizeRem(-0.1),
+              color: 'rgba(255, 255, 255, 0.7)',
+              letterSpacing: '0.3px',
+            }}>
+              SECONDS
+            </Typography>
+          </Box>
         </Box>
       </Box>
-    </Box>
+    </Fade>
   );
 };
 
