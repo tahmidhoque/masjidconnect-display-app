@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { ScreenContent, PrayerTimes, Event, Schedule } from '../api/models';
 import masjidDisplayClient from '../api/masjidDisplayClient';
 import { useAuth } from './AuthContext';
@@ -21,7 +21,7 @@ export interface ContentContextType {
   masjidTimezone: string | null;
   refreshContent: (forceRefresh?: boolean) => Promise<void>;
   refreshPrayerTimes: () => Promise<void>;
-  refreshSchedule: () => Promise<void>;
+  refreshSchedule: (forceRefresh?: boolean) => Promise<void>;
   lastUpdated: Date | null;
   carouselTime: number;
   setCarouselTime: (time: number) => void;
@@ -343,38 +343,111 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     }
   }, [isAuthenticated, processPrayerTimes]);
 
-  // Simplified refreshSchedule to prevent rerender loops
-  const refreshSchedule = useCallback(async (): Promise<void> => {
-    if (isUpdatingRef.current || !isAuthenticated) return;
-    
-    const now = Date.now();
-    if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
-      logger.debug("ContentContext: Throttling schedule refresh");
-      return;
-    }
-    
-    isUpdatingRef.current = true;
-    lastRefreshTimeRef.current = now;
-
+  // Helper function to fetch schedule directly from the API
+  const fetchScheduleFromAPI = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
     try {
+      logger.info('ContentContext: Fetching schedule from API');
+      console.log('🔍 FETCHING SCHEDULE FROM API');
+      
       // Use data sync service to sync schedule
-      await dataSyncService.syncSchedule(true);
+      await dataSyncService.syncSchedule(forceRefresh);
       
       // Get updated schedule from storage
       const updatedSchedule = await storageService.getSchedule();
       if (updatedSchedule) {
-        const normalizedSchedule = normalizeScheduleData(updatedSchedule);
+        console.log('🔍 SCHEDULE FETCHED FROM API:', updatedSchedule);
+        const normalizedSchedule = normalizeScheduleData(updatedSchedule as any);
         setSchedule(normalizedSchedule);
         
         // Update last updated time
         setLastUpdated(new Date());
+      } else {
+        console.log('🔍 NO SCHEDULE RETURNED FROM API');
       }
     } catch (error) {
-      logger.error("ContentContext: Error refreshing schedule", { error });
+      logger.error('ContentContext: Error fetching schedule from API', { error });
+      console.error('🔍 ERROR FETCHING SCHEDULE FROM API:', error);
+    }
+  }, [normalizeScheduleData]);
+
+  // Refresh schedule content
+  const refreshSchedule = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
+    if (isUpdatingRef.current) {
+      logger.info('ContentContext: Already refreshing schedule, skipping request');
+      return;
+    }
+    
+    const now = Date.now();
+    if (!forceRefresh && now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+      logger.info('ContentContext: Refresh throttled, skipping request');
+      return;
+    }
+    
+    logger.info('ContentContext: Refreshing schedule', { forceRefresh });
+    console.log('🔍 REFRESHING SCHEDULE, forceRefresh:', forceRefresh);
+    
+    isUpdatingRef.current = true;
+    
+    try {
+      // First try loading from local storage
+      let scheduleData = await storageService.getSchedule();
+      console.log('🔍 SCHEDULE FROM STORAGE:', scheduleData);
+      
+      if (scheduleData) {
+        logger.info('ContentContext: Schedule loaded from storage');
+        
+        // Log the shape of the data to help debug
+        console.log('🔍 SCHEDULE DATA TYPE:', typeof scheduleData);
+        console.log('🔍 SCHEDULE IS ARRAY:', Array.isArray(scheduleData));
+        console.log('🔍 SCHEDULE HAS ITEMS:', !!(scheduleData as any).items);
+        
+        if (Array.isArray(scheduleData)) {
+          // If it's an array, create a schedule object
+          console.log('🔍 CONVERTING ARRAY TO SCHEDULE OBJECT');
+          scheduleData = {
+            id: 'local-schedule',
+            name: 'Schedule',
+            items: scheduleData as any // Cast to any to avoid type errors
+          };
+        } else if (typeof scheduleData === 'object' && scheduleData !== null) {
+          // If it's an object but doesn't have an items property, it might be in a nested format
+          if (!(scheduleData as any).items && (scheduleData as any).data) {
+            console.log('🔍 SCHEDULE HAS NESTED DATA:', !!(scheduleData as any).data);
+            
+            if (Array.isArray((scheduleData as any).data)) {
+              console.log('🔍 NESTED DATA IS ARRAY WITH LENGTH:', (scheduleData as any).data.length);
+              // Use the data array as items
+              scheduleData = {
+                id: (scheduleData as any).id || 'local-schedule',
+                name: (scheduleData as any).name || 'Schedule',
+                items: (scheduleData as any).data
+              };
+            }
+          }
+        }
+        
+        // If we have a valid schedule object with items, process it
+        if (typeof scheduleData === 'object' && scheduleData !== null && (scheduleData as any).items) {
+          console.log('🔍 NORMALIZED SCHEDULE HAS ITEMS:', (scheduleData as any).items.length);
+          setSchedule(normalizeScheduleData(scheduleData as Schedule));
+        } else {
+          console.log('🔍 INVALID SCHEDULE STRUCTURE, FETCHING FROM API');
+          // If local storage doesn't have a valid format, try the API
+          await fetchScheduleFromAPI(forceRefresh);
+        }
+      } else {
+        logger.info('ContentContext: No schedule in storage, fetching from API');
+        console.log('🔍 NO SCHEDULE IN STORAGE, FETCHING FROM API');
+        await fetchScheduleFromAPI(forceRefresh);
+      }
+    } catch (error) {
+      logger.error('ContentContext: Error refreshing schedule', { error });
+      console.error('🔍 ERROR REFRESHING SCHEDULE:', error);
     } finally {
       isUpdatingRef.current = false;
+      lastRefreshTimeRef.current = Date.now();
     }
-  }, [isAuthenticated, normalizeScheduleData]);
+  }, [fetchScheduleFromAPI, normalizeScheduleData]);
 
   // Create fallback prayer times data to use when no data is available
   const createFallbackPrayerTimes = (): PrayerTimes => {
@@ -544,30 +617,49 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     };
   }, [isAuthenticated, loadContent]);
 
+  // Exposed context value
+  const contextValue = useMemo(() => ({
+    isLoading,
+    screenContent,
+    prayerTimes,
+    schedule,
+    events,
+    masjidName,
+    masjidTimezone,
+    refreshContent,
+    refreshPrayerTimes,
+    refreshSchedule,
+    lastUpdated,
+    carouselTime,
+    setCarouselTime,
+    showPrayerAnnouncement,
+    prayerAnnouncementName,
+    isPrayerJamaat,
+    setPrayerAnnouncement,
+    setShowPrayerAnnouncement,
+    setPrayerAnnouncementName,
+    setIsPrayerJamaat
+  }), [
+    isLoading,
+    screenContent,
+    prayerTimes,
+    schedule,
+    events,
+    masjidName,
+    masjidTimezone,
+    refreshContent,
+    refreshPrayerTimes,
+    refreshSchedule,
+    lastUpdated,
+    carouselTime,
+    showPrayerAnnouncement,
+    prayerAnnouncementName,
+    isPrayerJamaat
+  ]);
+
   return (
     <ContentContext.Provider
-      value={{
-        isLoading,
-        screenContent,
-        prayerTimes,
-        schedule,
-        events,
-        masjidName,
-        masjidTimezone,
-        refreshContent,
-        refreshPrayerTimes,
-        refreshSchedule,
-        lastUpdated,
-        carouselTime,
-        setCarouselTime,
-        showPrayerAnnouncement,
-        prayerAnnouncementName,
-        isPrayerJamaat,
-        setPrayerAnnouncement,
-        setShowPrayerAnnouncement,
-        setPrayerAnnouncementName,
-        setIsPrayerJamaat,
-      }}
+      value={contextValue}
     >
       {children}
     </ContentContext.Provider>

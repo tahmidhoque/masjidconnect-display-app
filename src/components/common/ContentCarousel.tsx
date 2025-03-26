@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
-import { Box, Typography, Fade } from '@mui/material';
+import { Box, Typography, Fade, CircularProgress } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import IslamicPatternBackground from './IslamicPatternBackground';
 import { NoMobilePhoneIcon, PrayerRowsIcon } from '../../assets/svgComponent';
 import logger from '../../utils/logger';
+import { useOrientation } from '../../contexts/OrientationContext';
+import localforage from 'localforage';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -38,6 +40,7 @@ const ContentCarousel: React.FC = () => {
     events, 
     refreshContent, 
     refreshSchedule,
+    isLoading,
     // Prayer announcement states
     showPrayerAnnouncement,
     prayerAnnouncementName,
@@ -46,6 +49,8 @@ const ContentCarousel: React.FC = () => {
     setPrayerAnnouncementName,
     setIsPrayerJamaat,
   } = useContent();
+  
+  const { orientation } = useOrientation();
   
   const { fontSizes, screenSize } = useResponsiveFontSize();
   
@@ -56,6 +61,7 @@ const ContentCarousel: React.FC = () => {
   const [isChangingItem, setIsChangingItem] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
   const [currentItemDisplayTime, setCurrentItemDisplayTime] = useState(30000); // Default 30 seconds
+  const [contentLoading, setContentLoading] = useState(true);
   
   // Debug state
   const [showDebugInfo, setShowDebugInfo] = useState(false);
@@ -68,6 +74,7 @@ const ContentCarousel: React.FC = () => {
   const lastInteractionTime = useRef(Date.now());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastAnnouncementState = useRef<boolean>(false);
+  const lastOrientationRef = useRef<string>(orientation);
   
   // Constants
   const defaultDuration = 30; // Default duration in seconds
@@ -107,37 +114,142 @@ const ContentCarousel: React.FC = () => {
     }
   }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
   
-  // Refresh content only once
+  // Refresh content when mounted and when orientation changes
   useEffect(() => {
+    // Initial content load
     if (!hasRefreshedRef.current) {
+      logger.info('ContentCarousel: Initial schedule refresh');
       hasRefreshedRef.current = true;
-      console.log('ContentCarousel: Initial schedule refresh');
       refreshSchedule().catch((error) => {
-        console.error('Failed to refresh schedule:', error);
+        logger.error('Failed to refresh schedule:', error);
       });
+    }
+    
+    // Handle orientation changes - refresh content when orientation changes
+    if (lastOrientationRef.current !== orientation) {
+      logger.info('ContentCarousel: Orientation changed, refreshing schedule', {
+        from: lastOrientationRef.current,
+        to: orientation
+      });
+      
+      // Force a new refresh of content when orientation changes
+      refreshSchedule().catch((error) => {
+        logger.error('Failed to refresh schedule after orientation change:', error);
+      });
+      
+      lastOrientationRef.current = orientation;
     }
     
     return () => {
       isComponentMountedRef.current = false;
-      // FIX: Clean up timer on unmount
+      // Clean up timer on unmount
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [refreshSchedule]);
+  }, [refreshSchedule, orientation]);
+  
+  // Debug schedule changes
+  useEffect(() => {
+    logger.info('ContentCarousel: Schedule changed', { 
+      hasSchedule: !!schedule,
+      itemCount: schedule?.items?.length || 0,
+      firstItem: schedule?.items?.[0] ? {
+        hasContentItem: !!schedule.items[0].contentItem,
+        type: schedule.items[0].contentItem?.type || 'unknown'
+      } : 'no items',
+      rawSchedule: JSON.stringify(schedule).substring(0, 200) + '...'
+    });
+    
+    // Detailed console.log for immediate debugging visibility
+    console.log('🔍 SCHEDULE CHANGED:', {
+      hasItems: !!(schedule?.items && schedule.items.length > 0),
+      itemCount: schedule?.items?.length || 0,
+      firstItemSample: schedule?.items?.[0] ? JSON.stringify(schedule.items[0]).substring(0, 150) : 'no items'
+    });
+  }, [schedule]);
+  
+  // Add direct debug of raw data in IndexedDB
+  useEffect(() => {
+    // One-time check of IndexedDB data
+    const checkIndexedDB = async () => {
+      try {
+        // This uses the browser's built-in IndexedDB API
+        const dbRequest = indexedDB.open('MasjidConnect', 1);
+        
+        dbRequest.onsuccess = (event) => {
+          // @ts-ignore
+          const db = event.target.result;
+          
+          if (db.objectStoreNames.contains('display_storage')) {
+            const transaction = db.transaction('display_storage', 'readonly');
+            const store = transaction.objectStore('display_storage');
+            
+            const scheduleRequest = store.get('schedule');
+            
+            scheduleRequest.onsuccess = () => {
+              const data = scheduleRequest.result;
+              console.log('🔍 DIRECT INDEXEDDB CHECK - SCHEDULE:', data);
+              logger.info('ContentCarousel: Direct IndexedDB check - schedule data', {
+                hasData: !!data,
+                type: typeof data,
+                isArray: Array.isArray(data),
+                hasItems: !!(data?.items && data.items.length > 0),
+                itemCount: data?.items?.length || 0
+              });
+            };
+            
+            scheduleRequest.onerror = (error: Event) => {
+              console.error('Error reading schedule from IndexedDB:', error);
+            };
+          } else {
+            console.log('display_storage object store not found');
+          }
+        };
+        
+        dbRequest.onerror = (error) => {
+          console.error('Error opening IndexedDB:', error);
+        };
+      } catch (error) {
+        console.error('Error checking IndexedDB:', error);
+      }
+    };
+    
+    checkIndexedDB();
+  }, []);
   
   // Prepare content items for carousel
   useEffect(() => {
     if (!isComponentMountedRef.current) return;
     
+    logger.info('ContentCarousel: Processing content items', {
+      hasSchedule: !!schedule,
+      hasScheduleItems: !!(schedule?.items && schedule.items.length > 0),
+      hasEvents: !!(events && events.length > 0),
+      contentItemsCount: contentItemsRef.current.length
+    });
+    
+    // More detailed console log for immediate visibility
+    console.log('🔍 PROCESSING CONTENT ITEMS:', {
+      hasSchedule: !!schedule,
+      scheduleType: schedule ? typeof schedule : 'null',
+      hasItems: !!(schedule?.items && schedule.items.length > 0),
+      itemsCount: schedule?.items?.length || 0,
+      contentItemsRefCount: contentItemsRef.current.length
+    });
+    
     let items = [];
     
     // Add schedule items if available
     if (schedule?.items && schedule.items.length > 0) {
+      console.log('🔍 MAPPING SCHEDULE ITEMS, count:', schedule.items.length);
+      
       // Map schedule items to the expected format
       const mappedItems = schedule.items.map((item, index) => {
         // If item doesn't have contentItem property, create it from the item's properties
         if (!item.contentItem) {
+          console.log(`🔍 Item ${index} missing contentItem, transforming:`, item);
+          
           // Use type assertion to handle API format with top-level properties
           const apiItem = item as unknown as { 
             id: string; 
@@ -162,6 +274,8 @@ const ContentCarousel: React.FC = () => {
         }
         
         const contentItem = item.contentItem;
+        console.log(`🔍 Item ${index} has contentItem, type:`, contentItem.type || 'unknown');
+        
         return {
           id: item.id,
           order: item.order || 999,
@@ -178,7 +292,10 @@ const ContentCarousel: React.FC = () => {
       }).filter(Boolean);
       
       if (mappedItems.length > 0) {
+        console.log(`🔍 Mapped ${mappedItems.length} items from schedule`);
         items.push(...mappedItems);
+      } else {
+        console.log('🔍 No valid items after mapping schedule items');
       }
     }
     
@@ -307,6 +424,26 @@ const ContentCarousel: React.FC = () => {
 
   // Render content based on its type
   const renderContent = () => {
+    // Show loading indicator while content is being loaded for the first time
+    if (contentLoading && isLoading) {
+      return (
+        <Box sx={{ 
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 2,
+          p: screenSize.is720p ? 1 : 2
+        }}>
+          <CircularProgress color="primary" />
+          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+            Loading content...
+          </Typography>
+        </Box>
+      );
+    }
+    
     // Guard clauses for empty state
     if (!contentItems || contentItems.length === 0 || currentItemIndex >= contentItems.length) {
       return (
@@ -924,6 +1061,148 @@ const ContentCarousel: React.FC = () => {
     return () => document.removeEventListener('prayer-announcement', handleCustomPrayerAnnouncement);
   }, [showPrayerAnnouncement, emergencyToggleAnnouncement]);
   
+  // Update loading state based on content and isLoading
+  useEffect(() => {
+    // If we have content items, we're no longer loading
+    if (contentItems.length > 0) {
+      setContentLoading(false);
+    } else if (!isLoading && contentLoading) {
+      // If API loading is done but we still don't have content, stop showing the loading indicator
+      setContentLoading(false);
+    }
+  }, [contentItems.length, isLoading, contentLoading]);
+  
+  // Force a reload if content is empty after initial load
+  useEffect(() => {
+    // Wait until loading is complete and check if we actually have content
+    if (!isLoading && !contentItems.length && hasRefreshedRef.current) {
+      console.log('🔍 NO CONTENT ITEMS AFTER LOADING, will force reload in 1 second');
+      
+      // Set a short timeout to prevent immediate reloading
+      const timeoutId = setTimeout(() => {
+        logger.info('ContentCarousel: No content items after loading, forcing reload');
+        
+        // Try direct fetch from localStorage/IndexedDB as a diagnostic step
+        try {
+          const checkStorage = async () => {
+            // Try to open IndexedDB
+            const dbRequest = indexedDB.open('MasjidConnect', 1);
+            
+            dbRequest.onsuccess = (event) => {
+              // @ts-ignore
+              const db = event.target.result;
+              
+              if (db.objectStoreNames.contains('display_storage')) {
+                const transaction = db.transaction('display_storage', 'readonly');
+                const store = transaction.objectStore('display_storage');
+                
+                const scheduleRequest = store.get('schedule');
+                
+                scheduleRequest.onsuccess = () => {
+                  const data = scheduleRequest.result;
+                  console.log('🆘 EMERGENCY STORAGE CHECK - SCHEDULE:', data);
+                  
+                  if (data && (data.items?.length > 0 || (Array.isArray(data) && data.length > 0))) {
+                    console.log('🔍 FOUND VALID SCHEDULE DATA IN INDEXEDDB, FORCING REFRESH');
+                    refreshSchedule().catch((error: unknown) => {
+                      const errorMessage = error instanceof Error ? error.message : String(error);
+                      logger.error('Failed to reload schedule:', { errorMessage });
+                    });
+                  } else {
+                    console.log('🔍 NO VALID SCHEDULE DATA IN INDEXEDDB');
+                    refreshContent(true).then(() => {
+                      refreshSchedule();
+                    }).catch(error => {
+                      logger.error('Failed to refresh content and schedule:', error);
+                    });
+                  }
+                };
+              }
+            };
+          };
+          
+          checkStorage();
+        } catch (error: unknown) {
+          console.error('Error during emergency storage check:', error);
+          // Fall back to normal refresh
+          refreshSchedule().catch((error: unknown) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error('Failed to reload schedule:', { errorMessage });
+          });
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isLoading, contentItems.length, refreshSchedule, refreshContent]);
+  
+  // Force refresh content
+  const forceRefreshContent = useCallback(() => {
+    console.log('🔥 FORCE REFRESHING CONTENT AND SCHEDULE');
+    logger.info('ContentCarousel: Force refreshing content and schedule');
+    
+    // Set loading state
+    setContentLoading(true);
+    
+    // First refresh all content
+    refreshContent(true).then(() => {
+      // Then refresh schedule specifically
+      return refreshSchedule();
+    }).catch((error: unknown) => {
+      logger.error('Error during force refresh:', { error });
+      console.error('🔥 ERROR DURING FORCE REFRESH:', error);
+    }).finally(() => {
+      console.log('🔥 FORCE REFRESH COMPLETED');
+    });
+  }, [refreshContent, refreshSchedule]);
+  
+  // Reset all storage (dangerous, but useful for fixing corrupted data)
+  const resetAllStorage = useCallback(() => {
+    // This uses the browser's built-in IndexedDB API directly
+    console.log('🧨 ATTEMPTING TO RESET ALL STORAGE');
+    logger.info('ContentCarousel: Resetting all storage');
+    
+    try {
+      // First try using localforage's clear method
+      try {
+        localforage.clear().then(() => {
+          console.log('🧨 LOCALFORAGE STORAGE CLEARED');
+          
+          // After clearing, force a refresh
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }).catch((err: unknown) => {
+          console.error('Error clearing localforage:', err);
+        });
+      } catch (error) {
+        console.error('Error with localforage clear:', error);
+        
+        // Fallback: Try to delete the database directly
+        try {
+          const deleteRequest = indexedDB.deleteDatabase('MasjidConnect');
+          
+          deleteRequest.onsuccess = () => {
+            console.log('🧨 DATABASE DELETED SUCCESSFULLY');
+            
+            // After deleting, force a refresh
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          };
+          
+          deleteRequest.onerror = () => {
+            console.error('Error deleting database');
+          };
+        } catch (dbError) {
+          console.error('Error deleting database:', dbError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in resetAllStorage:', error);
+    }
+  }, []);
+  
   // Main render
   return (
     <>
@@ -980,6 +1259,64 @@ const ContentCarousel: React.FC = () => {
         >
           {renderPrayerAnnouncement()}
         </Box>
+        
+        {/* Hidden refresh button - only visible when content fails to load */}
+        {(!contentItems || contentItems.length === 0) && (
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 10,
+              right: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+              zIndex: 1000,
+            }}
+          >
+            <Box
+              onClick={forceRefreshContent}
+              sx={{
+                backgroundColor: 'rgba(25, 118, 210, 0.8)',
+                color: 'white',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                '&:hover': {
+                  backgroundColor: 'rgba(25, 118, 210, 1)'
+                }
+              }}
+            >
+              <span>{contentLoading ? 'Loading...' : 'Refresh Content'}</span>
+              {contentLoading && <CircularProgress size={16} sx={{ color: 'white' }} />}
+            </Box>
+            
+            <Box
+              onClick={resetAllStorage}
+              sx={{
+                backgroundColor: 'rgba(211, 47, 47, 0.8)',
+                color: 'white',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                '&:hover': {
+                  backgroundColor: 'rgba(211, 47, 47, 1)'
+                }
+              }}
+            >
+              <span>Reset Storage</span>
+            </Box>
+          </Box>
+        )}
       </Box>
       
       {/* Debug Info Overlay */}

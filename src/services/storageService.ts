@@ -67,6 +67,65 @@ class StorageService {
         resultKeys: result && typeof result === 'object' ? Object.keys(result) : []
       });
       
+      // Directly inspect the database to verify the data
+      try {
+        console.log('🔍 DIRECT STORAGE INSPECTION');
+        // Get all keys from localForage
+        const keys = await localforage.keys();
+        console.log('🔍 Available keys in storage:', keys);
+        
+        // Check if our key exists
+        if (keys.includes(StorageKeys.SCHEDULE)) {
+          console.log('🔍 SCHEDULE key found in storage');
+        } else {
+          console.log('🔍 SCHEDULE key NOT found in storage!');
+        }
+        
+        // Check raw database
+        const dbRequest = indexedDB.open('MasjidConnect', 1);
+        dbRequest.onsuccess = (event) => {
+          // @ts-ignore
+          const db = event.target.result;
+          console.log('🔍 Available object stores:', Array.from(db.objectStoreNames));
+          
+          if (db.objectStoreNames.contains('display_storage')) {
+            console.log('🔍 display_storage object store found');
+            try {
+              const transaction = db.transaction('display_storage', 'readonly');
+              const store = transaction.objectStore('display_storage');
+              const scheduleRequest = store.get(StorageKeys.SCHEDULE);
+              
+              scheduleRequest.onsuccess = () => {
+                const data = scheduleRequest.result;
+                console.log('🔍 Raw data from IndexedDB for SCHEDULE:', data);
+                console.log('🔍 Has data?', !!data);
+                if (data) {
+                  console.log('🔍 Data type:', typeof data);
+                  console.log('🔍 Keys:', Object.keys(data));
+                  console.log('🔍 Is array?', Array.isArray(data));
+                  console.log('🔍 Has items?', !!(data.items));
+                  console.log('🔍 Items count:', data.items?.length);
+                }
+              };
+              
+              scheduleRequest.onerror = function(this: IDBRequest) {
+                console.error('🔍 Error reading SCHEDULE from IndexedDB:', this.error);
+              };
+            } catch (error: unknown) {
+              console.error('🔍 Error during IndexedDB inspection:', error);
+            }
+          } else {
+            console.log('🔍 display_storage object store NOT found!');
+          }
+        };
+        
+        dbRequest.onerror = function(this: IDBRequest) {
+          console.error('🔍 Error opening IndexedDB for inspection:', this.error);
+        };
+      } catch (error: unknown) {
+        console.error('🔍 Error during storage inspection:', error);
+      }
+      
       if (result) {
         // If it's a Schedule object with an 'items' property, log the first item
         if ('items' in result && Array.isArray(result.items) && result.items.length > 0) {
@@ -77,6 +136,34 @@ class StorageService {
               : 'No contentItem',
             itemKeys: Object.keys(result.items[0])
           });
+          
+          // Add a force refresh mechanism in case of potential stale data
+          console.log('🔍 CHECKING IF DATA MIGHT BE STALE OR CORRUPTED');
+          let potentiallyCorrupted = false;
+          
+          // Check for common indicators of corrupted data
+          if ('items' in result && Array.isArray(result.items)) {
+            for (let i = 0; i < result.items.length; i++) {
+              const item = result.items[i];
+              if (!item || typeof item !== 'object') {
+                console.log(`🔍 Invalid item at index ${i}:`, item);
+                potentiallyCorrupted = true;
+                break;
+              }
+              
+              if (!('contentItem' in item) || !item.contentItem) {
+                console.log(`🔍 Item at index ${i} missing contentItem:`, item);
+                potentiallyCorrupted = true;
+                break;
+              }
+            }
+          }
+          
+          if (potentiallyCorrupted) {
+            console.log('🔍 POTENTIALLY CORRUPTED DATA DETECTED! Consider clearing storage.');
+          } else {
+            console.log('🔍 Data structure looks valid.');
+          }
         }
       }
       
