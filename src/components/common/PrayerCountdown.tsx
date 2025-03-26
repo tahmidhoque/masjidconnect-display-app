@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography, Fade } from '@mui/material';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import { parseTimeString } from '../../utils/dateUtils';
+import logger from '../../utils/logger';
 
 interface PrayerCountdownProps {
   prayerName: string;
@@ -45,8 +46,6 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     
     // Set up initial time using pre-calculated value if available
     if (initializingRef.current && timeUntilNextPrayer) {
-      console.log("Initializing countdown with pre-calculated value:", timeUntilNextPrayer);
-      
       try {
         if (timeUntilNextPrayer.includes('hr') || timeUntilNextPrayer.includes('min')) {
           const hourMatch = timeUntilNextPrayer.match(/(\d+)\s*hr/);
@@ -82,9 +81,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             
             // We're between prayer time and jamaat time, switch to jamaat countdown
             if (now > prayerDate && now < jamaatDate) {
-              console.log(`EDGE CASE: Starting between ${prayerName} time and jamaat time. Switching to jamaat countdown.`);
               prayerTimePassedRef.current = true;
               setCountingDownToJamaat(true);
+              logger.info(`[CRITICAL] Starting countdown between ${prayerName} adhan (${prayerTime}) and jamaat (${jamaatTime})`);
             }
           }
         }
@@ -100,7 +99,6 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         // Parse prayer time
         const [timeHoursStr, timeMinutesStr] = prayerTime.split(':');
         if (!timeHoursStr || !timeMinutesStr) {
-          console.error('Invalid prayer time format:', prayerTime);
           return;
         }
         
@@ -108,18 +106,15 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         const timeMinutes = parseInt(timeMinutesStr, 10);
         
         if (isNaN(timeHours) || isNaN(timeMinutes)) {
-          console.error('Invalid prayer time values:', prayerTime);
           return;
         }
         
-        // Create date objects with proper debugging
+        // Create date objects
         const now = new Date();
-        console.log(`Current time: ${now.toLocaleTimeString()}`);
         
         // Create prayer time for today
         const prayerDate = new Date();
         prayerDate.setHours(timeHours, timeMinutes, 0, 0);
-        console.log(`Prayer time: ${prayerName} at ${prayerDate.toLocaleTimeString()}`);
         
         // Initialize targetTime with prayer date as default
         let targetTime = prayerDate;
@@ -138,23 +133,22 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
               // Handle after midnight case for Isha's Jamaat
               const isAfterMidnightBeforeFajr = now.getHours() < 6 && prayerName === 'Isha';
               if (isAfterMidnightBeforeFajr && now > jamaatDate) {
-                console.log(`After midnight: Isha jamaat from yesterday has passed`);
                 jamaatTimePassedRef.current = true;
                 
-                // If we're displaying times, trigger completion
                 if (displayTimes) {
+                  logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed`);
                   triggerCountdownComplete(true);
                   return;
                 }
               }
               
               // If jamaat time has passed and we haven't completed the countdown
-              if (now > jamaatDate && !jamaatTimePassedRef.current) {
-                console.log(`Jamaat time reached: ${jamaatTime}`);
+              if (now >= jamaatDate && !jamaatTimePassedRef.current) {
                 jamaatTimePassedRef.current = true;
                 
                 // Trigger callback only once
                 if (displayTimes) {
+                  logger.info(`[CRITICAL] ${prayerName} jamaat time has just arrived (${jamaatTime})`);
                   triggerCountdownComplete(true);
                 }
                 return; // Don't continue processing
@@ -167,26 +161,61 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         // Not counting down to jamaat yet, handle prayer/jamaat transitions
         else {
           // Check if prayer time has already passed today
-          const prayerHasPassed = now > prayerDate;
-          console.log(`Has ${prayerName} time passed? ${prayerHasPassed}`);
+          const prayerHasPassed = now >= prayerDate;
           
           // Special handling for Isha after midnight when Fajr is next
           const isAfterMidnightBeforeFajr = now.getHours() < 6 && prayerName === 'Isha';
           
           if (isAfterMidnightBeforeFajr) {
-            console.log('After midnight, before Fajr, and evaluating Isha');
-            // If it's after midnight and before Fajr, and we're checking Isha,
-            // we should consider Isha from yesterday as having passed
             prayerTimePassedRef.current = true;
+            
+            // If this is Isha after midnight and Isha jamaat has passed
+            if (jamaatTime) {
+              const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
+              if (jamaatHoursStr && jamaatMinutesStr) {
+                const jamaatHours = parseInt(jamaatHoursStr, 10);
+                const jamaatMinutes = parseInt(jamaatMinutesStr, 10);
+                
+                const jamaatDate = new Date();
+                jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
+                
+                // If we're after jamaat, mark it as passed if we haven't already
+                if (now > jamaatDate && !jamaatTimePassedRef.current) {
+                  jamaatTimePassedRef.current = true;
+                  logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed (${jamaatTime})`);
+                  if (displayTimes) {
+                    triggerCountdownComplete(true);
+                    return;
+                  }
+                }
+              }
+            }
             
             // Set up for tomorrow's prayer
             prayerDate.setDate(prayerDate.getDate() + 1);
-            console.log(`Setting Isha to tomorrow: ${prayerDate.toLocaleTimeString()}`);
             targetTime = prayerDate;
           }
           // Normal time passing check
           else if (prayerHasPassed) {
-            prayerTimePassedRef.current = true;
+            // Only trigger the event if we're just now detecting that the prayer time has passed
+            if (!prayerTimePassedRef.current) {
+              // Set the flag first to prevent multiple triggers
+              prayerTimePassedRef.current = true;
+              
+              // CRITICAL FIX: Make sure we log and trigger the adhan announcement
+              logger.info(`[CRITICAL] ${prayerName} adhan time has just arrived (${prayerTime})`);
+              
+              // Trigger the event for prayer time immediately if we're at the exact time
+              // or if we're within 30 seconds after the prayer time
+              const justPassed = Math.abs(now.getTime() - prayerDate.getTime()) <= 30000;
+              if (justPassed && displayTimes) {
+                triggerCountdownComplete(false);
+                return; // Stop execution to prevent further calculations
+              }
+            } else {
+              // Prayer time already passed in a previous calculation
+              prayerTimePassedRef.current = true;
+            }
             
             // If we have a jamaatTime and we're not already counting down to it
             if (jamaatTime) {
@@ -199,37 +228,32 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
                   // Set up jamaat date
                   const jamaatDate = new Date();
                   jamaatDate.setHours(jamaatHours, jamaatMinutes, 0, 0);
-                  console.log(`Jamaat time: ${jamaatDate.toLocaleTimeString()}`);
                   
                   // If jamaat time is still in the future, switch to counting down to jamaat
                   if (now < jamaatDate) {
-                    console.log(`Switching from prayer time ${prayerTime} to jamaat time ${jamaatTime}`);
-                    
                     // Trigger transition animation
                     setTextTransition(true);
                     setTimeout(() => {
                       setCountingDownToJamaat(true);
                       setTextTransition(false);
+                      logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
                     }, 500); // Match fade out duration
                     
                     targetTime = jamaatDate;
                   } else {
                     // Both prayer and jamaat times have passed
                     jamaatTimePassedRef.current = true;
-                    console.log(`Both prayer time ${prayerTime} and jamaat time ${jamaatTime} have passed`);
                     
-                    // Trigger countdown completion for jamaat (if it just passed)
-                    const jamaatJustPassed = Math.abs(now.getTime() - jamaatDate.getTime()) < 60000; // Within 1 minute
-                    if (jamaatJustPassed && !displayTimes) {
-                      console.log(`Jamaat time just passed, triggering callback`);
-                      if (onCountdownComplete) {
-                        onCountdownComplete(true);
-                      }
+                    // Trigger countdown completion for jamaat if it just passed
+                    const jamaatJustPassed = Math.abs(now.getTime() - jamaatDate.getTime()) <= 30000;
+                    if (jamaatJustPassed && displayTimes) {
+                      logger.info(`[CRITICAL] ${prayerName} jamaat time has just passed (${jamaatTime})`);
+                      triggerCountdownComplete(true);
+                      return; // Stop execution
                     }
                     
                     // Set future prayer time for tomorrow
                     prayerDate.setDate(prayerDate.getDate() + 1);
-                    console.log(`Setting prayer to tomorrow: ${prayerDate.toLocaleTimeString()}`);
                     targetTime = prayerDate;
                   }
                 }
@@ -237,12 +261,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             } else if (!jamaatTimePassedRef.current) {
               // Set future prayer time for tomorrow if no jamaat time or jamaat already passed
               prayerDate.setDate(prayerDate.getDate() + 1);
-              console.log(`No jamaat, setting prayer to tomorrow: ${prayerDate.toLocaleTimeString()}`);
               targetTime = prayerDate;
             }
           } else if (prayerTimePassedRef.current && !jamaatTimePassedRef.current && !countingDownToJamaat && jamaatTime) {
-            // If the prayer time just passed in a previous interval and we have jamaat time, 
-            // but haven't switched to jamaat countdown yet
+            // Late transition to jamaat countdown if needed
             const [jamaatHoursStr, jamaatMinutesStr] = jamaatTime.split(':');
             if (jamaatHoursStr && jamaatMinutesStr) {
               const jamaatHours = parseInt(jamaatHoursStr, 10);
@@ -254,11 +276,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
                 
                 if (now < jamaatDate) {
                   // Explicitly transition to jamaat countdown
-                  console.log(`Late transition to jamaat time ${jamaatTime}`);
                   setTextTransition(true);
                   setTimeout(() => {
                     setCountingDownToJamaat(true);
                     setTextTransition(false);
+                    logger.info(`[PrayerCountdown] Late transition to ${prayerName} jamaat countdown`);
                   }, 500);
                   
                   targetTime = jamaatDate;
@@ -268,14 +290,25 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           }
         }
         
-        // Calculate time difference
-        const diffMs = targetTime.getTime() - now.getTime();
+        // Calculate time difference - ensure we never show negative values
+        const diffMs = Math.max(0, targetTime.getTime() - now.getTime());
         
-        if (diffMs <= 0 && !countingDownToJamaat && !prayerTimePassedRef.current) {
-          console.log(`Prayer time reached: ${prayerTime}`);
-          prayerTimePassedRef.current = true;
-          triggerCountdownComplete(false);
-          return;
+        // Check for exact zero moment
+        if (diffMs === 0) {
+          // If we haven't triggered for the prayer time yet and we're not counting to jamaat
+          if (!prayerTimePassedRef.current && !countingDownToJamaat) {
+            prayerTimePassedRef.current = true;
+            logger.info(`[CRITICAL] ${prayerName} adhan countdown reached zero (${prayerTime})`);
+            triggerCountdownComplete(false);
+            return;
+          }
+          // If we're at jamaat time and haven't triggered for jamaat yet
+          else if (countingDownToJamaat && !jamaatTimePassedRef.current) {
+            jamaatTimePassedRef.current = true;
+            logger.info(`[CRITICAL] ${prayerName} jamaat countdown reached zero (${jamaatTime})`);
+            triggerCountdownComplete(true);
+            return;
+          }
         }
         
         // Calculate hours, minutes, seconds
@@ -284,12 +317,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         const m = Math.floor((diffSec % 3600) / 60);
         const s = diffSec % 60;
         
-        // Log detailed time information
-        if (diffSec % 30 === 0) { // Only log every 30 seconds to reduce noise
-          console.log(`Countdown for ${prayerName}: ${formatRemainingTimeLog(h, m, s)}`);
-          console.log(`Target time: ${targetTime.toLocaleTimeString()}, Current time: ${now.toLocaleTimeString()}`);
-          console.log(`Time difference: ${diffMs}ms (${diffSec}s)`);
-          console.log(`Prayer passed: ${prayerTimePassedRef.current}, Jamaat passed: ${jamaatTimePassedRef.current}, Counting to jamaat: ${countingDownToJamaat}`);
+        // Log detailed time information occasionally for debugging only
+        if (diffSec % 60 === 0) { // Only log once per minute to reduce noise
+          console.log(`Countdown for ${prayerName}: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
         }
         
         setHours(h);
@@ -314,23 +344,69 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     return () => clearInterval(timer);
   }, [prayerTime, prayerName, jamaatTime, onCountdownComplete, timeUntilNextPrayer, displayTimes, countingDownToJamaat]);
 
-  // Trigger callback when countdown reaches zero
+  // Debug key handler
+  const handleKeyPress = useCallback((event: KeyboardEvent) => {
+    // Press 'D' key to trigger debug countdown completion
+    if (event.key.toLowerCase() === 'd') {
+      logger.info('[PrayerCountdown] Debug key pressed - triggering countdown completion');
+      
+      const isCurrentlyForJamaat = countingDownToJamaat;
+      
+      // Log detailed information for debugging
+      logger.info('[PrayerCountdown] Debug key pressed with detailed state', {
+        prayerName,
+        jamaatTime,
+        countingDownToJamaat: isCurrentlyForJamaat,
+        showingDisplayTimes: displayTimes,
+        prayerTimePassed: prayerTimePassedRef.current,
+        jamaatTimePassed: jamaatTimePassedRef.current
+      });
+      
+      triggerCountdownComplete(isCurrentlyForJamaat);
+    }
+  }, [prayerName, jamaatTime, countingDownToJamaat, displayTimes]);
+
+  useEffect(() => {
+    // Add debug key listener
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [handleKeyPress]);
+
   const triggerCountdownComplete = (isForJamaat: boolean) => {
-    console.log(`==== COUNTDOWN COMPLETE ====`);
-    console.log(`Prayer: ${prayerName}, Jamaat: ${isForJamaat}`);
-    console.log(`Current time: ${new Date().toLocaleTimeString()}`);
+    logger.info('[PrayerCountdown] Triggering countdown complete', {
+      prayerName,
+      jamaatTime,
+      isForJamaat,
+      currentTime: new Date().toISOString()
+    });
+    
+    // Display zeros briefly
     setHours(0);
     setMinutes(0);
     setSeconds(0);
-    setDisplayTimes(false);
     
+    // Execute the callback immediately to ensure it runs
     if (onCountdownComplete) {
-      console.log(`Triggering onCountdownComplete with isJamaat=${isForJamaat}`);
-      onCountdownComplete(isForJamaat);
-    } else {
-      console.log('No onCountdownComplete handler provided');
+      try {
+        // Always use a timeout to ensure this runs outside current execution stack
+        setTimeout(() => {
+          if (onCountdownComplete) {
+            logger.info('[PrayerCountdown] Calling onCountdownComplete callback', { 
+              isForJamaat,
+              prayerName
+            });
+            onCountdownComplete(isForJamaat);
+          }
+        }, 0);
+      } catch (error) {
+        logger.error('[PrayerCountdown] Error in countdown complete callback', { error });
+      }
     }
-    console.log(`============================`);
+    
+    // Then update display state after a brief delay
+    setTimeout(() => {
+      setDisplayTimes(false);
+    }, 1000);  // Show zeros for 1 second
   };
 
   // Format remaining time for console display

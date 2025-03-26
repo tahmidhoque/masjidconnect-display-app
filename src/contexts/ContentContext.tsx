@@ -11,7 +11,7 @@ const MIN_REFRESH_INTERVAL = 10 * 1000; // 10 seconds
 const SKIP_PRAYERS = ['Sunrise']; // Prayers to skip in announcements
 
 // Define the ContentContext type
-interface ContentContextType {
+export interface ContentContextType {
   isLoading: boolean;
   screenContent: ScreenContent | null;
   prayerTimes: PrayerTimes | null;
@@ -23,11 +23,15 @@ interface ContentContextType {
   refreshPrayerTimes: () => Promise<void>;
   refreshSchedule: () => Promise<void>;
   lastUpdated: Date | null;
-  // Prayer announcement states
+  carouselTime: number;
+  setCarouselTime: (time: number) => void;
   showPrayerAnnouncement: boolean;
   prayerAnnouncementName: string;
   isPrayerJamaat: boolean;
   setPrayerAnnouncement: (show: boolean, prayerName?: string, isJamaat?: boolean) => void;
+  setShowPrayerAnnouncement: (show: boolean) => void;
+  setPrayerAnnouncementName: (name: string) => void;
+  setIsPrayerJamaat: (isJamaat: boolean) => void;
 }
 
 interface ContentProviderProps {
@@ -56,6 +60,7 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   const [masjidName, setMasjidName] = useState<string | null>(null);
   const [masjidTimezone, setMasjidTimezone] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [carouselTime, setCarouselTime] = useState<number>(0);
   
   // Prayer announcement states
   const [showPrayerAnnouncement, setShowPrayerAnnouncement] = useState<boolean>(false);
@@ -429,28 +434,95 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   };
 
   // Prayer announcement management function
-  const setPrayerAnnouncement = useCallback((show: boolean, prayerName: string = '', isJamaat: boolean = false) => {
-    console.log(`========== PRAYER ANNOUNCEMENT ==========`);
-    console.log(`Setting prayer announcement - show: ${show}, prayer: ${prayerName}, isJamaat: ${isJamaat}`);
-    console.log(`Current state: show=${showPrayerAnnouncement}, prayer=${prayerAnnouncementName}, isJamaat=${isPrayerJamaat}`);
-    
-    if (show && SKIP_PRAYERS.includes(prayerName)) {
-      console.log(`Skipping announcement for ${prayerName} as it's in SKIP_PRAYERS list`);
+  const setPrayerAnnouncement = useCallback((
+    show: boolean,
+    prayerName?: string,
+    isJamaat?: boolean
+  ) => {
+    // Skip update if nothing is changing
+    if (show === showPrayerAnnouncement && 
+        (!prayerName || prayerName === prayerAnnouncementName) &&
+        (isJamaat === undefined || isJamaat === isPrayerJamaat)) {
       return;
     }
-    
-    if (show && prayerName) {
-      // Show announcement
-      setShowPrayerAnnouncement(true);
+
+    // Only log meaningful state changes
+    logger.info('[ContentContext] Setting prayer announcement', {
+      show,
+      prayerName: prayerName || (show ? prayerAnnouncementName : ''),
+      isJamaat: typeof isJamaat !== 'undefined' ? isJamaat : isPrayerJamaat,
+      timestamp: new Date().toISOString()
+    });
+
+    // CRITICAL FIX: Ensure synchronous updates to avoid race conditions
+    // Use the React 18 automatic batching behavior and synchronous setter
+    // First, update the flag that controls visibility
+    setShowPrayerAnnouncement(show);
+
+    // Then update the name if provided
+    if (prayerName) {
       setPrayerAnnouncementName(prayerName);
-      setIsPrayerJamaat(isJamaat);
-      console.log(`Prayer announcement ACTIVATED for ${prayerName} (${isJamaat ? 'Jamaat' : 'Adhaan'})`);
-    } else {
-      // Hide announcement
-      setShowPrayerAnnouncement(false);
-      console.log(`Prayer announcement HIDDEN (was showing ${prayerAnnouncementName})`);
     }
-    console.log(`========================================`);
+      
+    // Finally update the jamaat flag if provided
+    if (typeof isJamaat !== 'undefined') {
+      setIsPrayerJamaat(isJamaat);
+    }
+
+    // For monitoring purposes, log to console directly
+    console.log(`[CRITICAL] Prayer announcement state set to: ${show ? 'SHOWING' : 'HIDDEN'}, Prayer: ${prayerName || prayerAnnouncementName}, Jamaat: ${isJamaat !== undefined ? isJamaat : isPrayerJamaat}`);
+    
+    // Always dispatch a DOM event as a failsafe mechanism for critical UI updates
+    try {
+      document.dispatchEvent(new CustomEvent('prayer-announcement', { 
+        detail: { 
+          show, 
+          prayerName: prayerName || prayerAnnouncementName, 
+          isJamaat: typeof isJamaat !== 'undefined' ? isJamaat : isPrayerJamaat 
+        } 
+      }));
+    } catch (err) {
+      console.error("Failed to dispatch prayer announcement event:", err);
+    }
+      
+    // If we're showing an announcement, set a failsafe timer to ensure it gets hidden
+    if (show) {
+      // Add a check after a short delay to verify the state was properly updated
+      setTimeout(() => {
+        if (show && !showPrayerAnnouncement) {
+          logger.warn('[ContentContext] State update failed! Retrying setPrayerAnnouncement with forced approach');
+          
+          // Force state update directly with DOM API as a last resort
+          try {
+            // Try again directly with React state
+            setShowPrayerAnnouncement(true);
+            if (prayerName) setPrayerAnnouncementName(prayerName);
+            if (typeof isJamaat !== 'undefined') setIsPrayerJamaat(isJamaat);
+            
+            // Use CSS variables as another fallback mechanism
+            document.documentElement.style.setProperty('--prayer-announcement-visible', 'true');
+            document.documentElement.style.setProperty('--prayer-name', prayerName || prayerAnnouncementName);
+            document.documentElement.style.setProperty('--is-jamaat', isJamaat ? 'true' : 'false');
+          } catch (e) {
+            logger.error('[ContentContext] Critical error in emergency prayer announcement fallback', { error: e });
+          }
+        }
+      }, 250);
+      
+      // Auto-hide after 3 minutes just in case it gets stuck
+      const timeout = setTimeout(() => {
+        logger.info('[ContentContext] Failsafe: Auto-hiding prayer announcement after timeout');
+        setShowPrayerAnnouncement(false);
+        // Also reset CSS variables
+        document.documentElement.style.setProperty('--prayer-announcement-visible', 'false');
+      }, 180000); // 3 minutes
+      
+      // Return cleanup function to prevent memory leaks
+      return () => clearTimeout(timeout);
+    } else {
+      // Reset CSS variables when hiding
+      document.documentElement.style.setProperty('--prayer-announcement-visible', 'false');
+    }
   }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
 
   // Initial setup - runs once when component mounts
@@ -486,11 +558,15 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
         refreshPrayerTimes,
         refreshSchedule,
         lastUpdated,
-        // Prayer announcement values
+        carouselTime,
+        setCarouselTime,
         showPrayerAnnouncement,
         prayerAnnouncementName,
         isPrayerJamaat,
         setPrayerAnnouncement,
+        setShowPrayerAnnouncement,
+        setPrayerAnnouncementName,
+        setIsPrayerJamaat,
       }}
     >
       {children}

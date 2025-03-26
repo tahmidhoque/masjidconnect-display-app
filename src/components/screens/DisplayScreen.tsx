@@ -15,12 +15,14 @@ const TRANSITION_STYLES = {
     height: '100vh',
     overflow: 'hidden',
     transition: 'opacity 0.5s ease-in-out, transform 0.8s ease-in-out',
-    position: 'relative'
+    position: 'relative',
+    willChange: 'transform, opacity'
   },
   content: {
     width: '100%',
     height: '100%',
     transition: 'opacity 0.5s ease-in-out, transform 0.8s ease-in-out',
+    willChange: 'transform, opacity'
   },
   rotated: {
     width: '100vh',
@@ -29,7 +31,8 @@ const TRANSITION_STYLES = {
     top: '50%',
     left: '50%',
     transformOrigin: 'center',
-    transition: 'transform 0.8s ease-in-out, opacity 0.5s ease-in-out'
+    transition: 'transform 0.8s ease-in-out, opacity 0.5s ease-in-out',
+    willChange: 'transform, opacity'
   }
 };
 
@@ -50,6 +53,28 @@ const DisplayScreen: React.FC = () => {
   const { orientation, setAdminOrientation } = useOrientation();
   const [isTransitioning, setIsTransitioning] = useState(false);
   const previousOrientationRef = useRef(orientation);
+  const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Safety timeout to ensure transitions don't get stuck
+  useEffect(() => {
+    // Force reset transition state on component mount to fix stuck animations after refresh
+    setIsTransitioning(false);
+    
+    // Safety cleanup to ensure animation never gets stuck for more than 2 seconds
+    const safetyTimer = setTimeout(() => {
+      if (isTransitioning) {
+        console.log(`⚠️ DisplayScreen: Animation appears stuck, forcing reset`);
+        setIsTransitioning(false);
+      }
+    }, 2000);
+    
+    return () => {
+      clearTimeout(safetyTimer);
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
   
   // Add effect to track orientation changes
   useEffect(() => {
@@ -60,18 +85,47 @@ const DisplayScreen: React.FC = () => {
       // Start transition
       setIsTransitioning(true);
       
+      // Clear any existing timeout
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+      
       // After transition completes, clear the transitioning flag
-      const timer = setTimeout(() => {
+      transitionTimerRef.current = setTimeout(() => {
         setIsTransitioning(false);
         previousOrientationRef.current = orientation;
         
         // Force redraw to ensure layout is correct
         window.dispatchEvent(new Event('resize'));
+        transitionTimerRef.current = null;
       }, 800); // Match the transition duration
       
-      return () => clearTimeout(timer);
+      return () => {
+        if (transitionTimerRef.current) {
+          clearTimeout(transitionTimerRef.current);
+        }
+      };
     }
   }, [orientation]);
+  
+  // Add safety effect to reset transition state if it gets stuck longer than expected
+  useEffect(() => {
+    let safetyTimer: NodeJS.Timeout | null = null;
+    
+    if (isTransitioning) {
+      // If we're transitioning, set a safety timer
+      safetyTimer = setTimeout(() => {
+        console.log(`⚠️ DisplayScreen: Animation safety timeout triggered, forcing reset`);
+        setIsTransitioning(false);
+      }, 1500); // A bit longer than transition duration
+    }
+    
+    return () => {
+      if (safetyTimer) {
+        clearTimeout(safetyTimer);
+      }
+    };
+  }, [isTransitioning]);
   
   // Update orientation from screen content when it changes
   useEffect(() => {
@@ -117,6 +171,26 @@ const DisplayScreen: React.FC = () => {
       <LandscapeDisplay /> : 
       <PortraitDisplay />;
   }, [orientation]);
+
+  // Force a layout update when component mounts
+  useEffect(() => {
+    // Trigger a resize event to force layout recalculation
+    const resizeEvent = new Event('resize');
+    window.dispatchEvent(resizeEvent);
+    
+    // Force a reflow/repaint
+    const forceReflowTimeout = setTimeout(() => {
+      const element = document.documentElement;
+      // Reading offsetHeight causes a reflow
+      // eslint-disable-next-line no-unused-vars
+      const _ = element.offsetHeight; 
+      
+      // Force another resize event after a short delay
+      window.dispatchEvent(resizeEvent);
+    }, 100);
+    
+    return () => clearTimeout(forceReflowTimeout);
+  }, []);
 
   // If content is still loading, show loading screen
   if (isLoading) {

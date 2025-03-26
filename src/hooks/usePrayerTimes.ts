@@ -168,10 +168,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // When it's after midnight but before Fajr, the current prayer should be Isha from yesterday
       const ishaIndex = prayers.findIndex(p => p.name === 'Isha');
       if (ishaIndex >= 0) {
-        currentIndex = ishaIndex;
-        logger.info('After midnight before Fajr: Setting current prayer to Isha');
+        // Check if Isha jamaat has passed - if so, we shouldn't mark it as current
+        const isha = prayers[ishaIndex];
+        if (isha.jamaat && currentTimeStr > isha.jamaat) {
+          logger.info('After midnight before Fajr: Isha jamaat has passed, not highlighting as current');
+          // Do not set current prayer
+        } else {
+          currentIndex = ishaIndex;
+          logger.info('After midnight before Fajr: Setting current prayer to Isha');
+        }
         
-        // And next prayer should be Fajr
+        // Next prayer should be Fajr regardless
         const fajrIndex = prayers.findIndex(p => p.name === 'Fajr');
         if (fajrIndex >= 0) {
           nextIndex = fajrIndex;
@@ -179,61 +186,99 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         }
       }
     } else {
-      // Find current prayer (last prayer whose adhan time has passed)
+      // Find the last prayer whose adhan time has passed (this is the current prayer period we're in)
       for (let i = sortedPrayers.length - 1; i >= 0; i--) {
         if (sortedPrayers[i].time <= currentTimeStr) {
-          currentIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
-          break;
+          const foundPrayerName = sortedPrayers[i].name;
+          const foundPrayerIndex = prayers.findIndex(p => p.name === foundPrayerName);
+          
+          // Set as current prayer
+          if (foundPrayerIndex >= 0) {
+            // Check if this prayer's jamaat time has passed
+            const foundPrayer = prayers[foundPrayerIndex];
+            if (foundPrayer.jamaat && currentTimeStr > foundPrayer.jamaat) {
+              logger.info(`${foundPrayer.name} jamaat time (${foundPrayer.jamaat}) has passed, not marking as current prayer`);
+              // Do not mark as current if jamaat has passed
+            } else {
+              currentIndex = foundPrayerIndex;
+              logger.info(`Current prayer period is ${prayers[currentIndex].name} (adhan time ${prayers[currentIndex].time} has passed)`);
+            }
+            break;
+          }
         }
       }
       
-      // Find next prayer (first prayer whose adhan time is in the future)
+      // Find the first prayer whose adhan time is in the future (this is next up)
       for (let i = 0; i < sortedPrayers.length; i++) {
         if (sortedPrayers[i].time > currentTimeStr) {
-          nextIndex = prayers.findIndex(p => p.name === sortedPrayers[i].name);
-          break;
+          const foundPrayerName = sortedPrayers[i].name;
+          const foundPrayerIndex = prayers.findIndex(p => p.name === foundPrayerName);
+          
+          if (foundPrayerIndex >= 0) {
+            nextIndex = foundPrayerIndex;
+            logger.info(`Next prayer will be ${prayers[nextIndex].name} (adhan time ${prayers[nextIndex].time} is upcoming)`);
+            break;
+          }
         }
       }
       
-      // NEW LOGIC: Check if we're between a prayer's adhan and the next prayer's adhan
-      if (currentIndex >= 0 && nextIndex >= 0) {
+      // CRITICAL FIX: Check whether the current prayer's jamaat time has passed
+      if (currentIndex >= 0) {
         const currentPrayer = prayers[currentIndex];
-        
-        // Check if the prayer's jamaat time has passed
         const jamaatTime = currentPrayer.jamaat;
         
-        if (jamaatTime && jamaatTime <= currentTimeStr) {
-          // If jamaat time has passed, keep current prayer as current
-          // and keep next prayer as next
-          logger.info(`${currentPrayer.name} jamaat (${jamaatTime}) has passed. It's current, and ${prayers[nextIndex].name} is next.`);
-        } else if (jamaatTime && jamaatTime > currentTimeStr) {
-          // If we're between adhan and jamaat times, 
-          // this prayer should only be the next prayer (green) and NOT current (blue)
-          logger.info(`Between ${currentPrayer.name} adhan (${currentPrayer.time}) and jamaat (${jamaatTime}), marking as next only.`);
+        // If we have a jamaat time and are between adhan and jamaat
+        if (jamaatTime && jamaatTime > currentTimeStr) {
+          // If we're between adhan and jamaat, this prayer should be the next prayer (green)
+          // and there should not be a current prayer (blue)
+          logger.info(`Between ${currentPrayer.name} adhan (${currentPrayer.time}) and jamaat (${jamaatTime}), marking as next only (green highlight)`);
           nextIndex = currentIndex;
           currentIndex = -1; // Clear current prayer to avoid blue highlight
         }
-      }
-      
-      // NEW LOGIC: If a prayer's adhan time has arrived but the previous prayer's JAMAAT time hasn't passed yet
-      // In this case, we need to clear the current prayer and only highlight the current prayer as next
-      if (currentIndex >= 0 && currentIndex > 0) {
-        const previousPrayerIndex = currentIndex - 1;
-        const previousPrayer = prayers[previousPrayerIndex];
-        
-        // If the previous prayer exists and has a jamaat time that hasn't passed yet
-        if (previousPrayer && previousPrayer.jamaat && previousPrayer.jamaat > currentTimeStr) {
-          logger.info(`${prayers[currentIndex].name} adhan has arrived, but ${previousPrayer.name} jamaat hasn't passed yet. Setting only ${prayers[currentIndex].name} as next.`);
-          nextIndex = currentIndex;
-          currentIndex = -1; // Clear current prayer
+        // If jamaat time has passed, do not highlight this prayer as current (blue) anymore
+        else if (jamaatTime && jamaatTime <= currentTimeStr) {
+          logger.info(`${currentPrayer.name} jamaat time (${jamaatTime}) has passed, not marking as current prayer`);
+          currentIndex = -1; // Clear current prayer to avoid blue highlight
+          
+          // If we don't have a next prayer yet, look for the next prayer after this one
+          if (nextIndex === -1 || (nextIndex === currentIndex)) {
+            logger.info(`Looking for next prayer after ${currentPrayer.name}`);
+            
+            // Find the next prayer after the current one
+            let foundNext = false;
+            for (let i = 0; i < sortedPrayers.length; i++) {
+              // Skip until we find the current prayer
+              if (sortedPrayers[i].name !== currentPrayer.name) continue;
+              
+              // Then look at the prayer after it
+              if (i + 1 < sortedPrayers.length) {
+                const newNextName = sortedPrayers[i + 1].name;
+                const newNextIndex = prayers.findIndex(p => p.name === newNextName);
+                
+                if (newNextIndex >= 0) {
+                  logger.info(`Setting ${prayers[newNextIndex].name} as the next prayer`);
+                  nextIndex = newNextIndex;
+                  foundNext = true;
+                  break;
+                }
+              }
+            }
+            
+            // If we didn't find a next prayer after the current one, it means we're at the end of the day
+            if (!foundNext) {
+              // The next prayer will be the first prayer of tomorrow
+              const firstPrayerTomorrow = sortedPrayers[0];
+              nextIndex = prayers.findIndex(p => p.name === firstPrayerTomorrow.name);
+              logger.info(`At end of day: Setting first prayer for tomorrow (${firstPrayerTomorrow.name}) as next`);
+            }
+          }
         }
       }
     }
     
     // If no current prayer found (all are in future), there's no current prayer
     if (currentIndex === -1 && sortedPrayers.length > 0) {
-      // This is a change from previous logic - we don't set a current prayer if all prayers are in the future
-      logger.info('No current prayer - all prayers are in the future');
+      logger.info('No current prayer highlighted - all prayers are in the future or all jamaats have passed');
     }
     
     // If no next prayer found (all are in the past), use the first prayer for tomorrow
@@ -241,6 +286,13 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       const firstPrayer = sortedPrayers[0];
       nextIndex = prayers.findIndex(p => p.name === firstPrayer.name);
       logger.info(`All prayers for today have passed. Setting first prayer for tomorrow (${firstPrayer.name}) as next.`);
+    }
+    
+    // Final sanity check: Make sure we don't have a prayer that's both current and next
+    if (currentIndex >= 0 && nextIndex >= 0 && currentIndex === nextIndex) {
+      logger.warn(`Prayer ${prayers[currentIndex].name} is marked as both current and next - fixing by keeping only as next`);
+      // Prioritize "next" (green) status over "current" (blue)
+      currentIndex = -1;
     }
     
     return { currentIndex, nextIndex };

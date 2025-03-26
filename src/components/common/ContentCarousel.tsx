@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { Box, Typography, Fade } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import IslamicPatternBackground from './IslamicPatternBackground';
 import { NoMobilePhoneIcon, PrayerRowsIcon } from '../../assets/svgComponent';
+import logger from '../../utils/logger';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -41,10 +42,14 @@ const ContentCarousel: React.FC = () => {
     showPrayerAnnouncement,
     prayerAnnouncementName,
     isPrayerJamaat,
+    setPrayerAnnouncement,
+    setPrayerAnnouncementName,
+    setIsPrayerJamaat,
   } = useContent();
   
   const { fontSizes, screenSize } = useResponsiveFontSize();
   
+  // Local state for content management
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [showContent, setShowContent] = useState(true);
   const [contentItems, setContentItems] = useState<Array<any>>([]);
@@ -52,26 +57,72 @@ const ContentCarousel: React.FC = () => {
   const [autoRotate, setAutoRotate] = useState(true);
   const [currentItemDisplayTime, setCurrentItemDisplayTime] = useState(30000); // Default 30 seconds
   
-  // Use refs to prevent unnecessary re-renders
+  // Debug state
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  
+  // Use refs to manage state without unnecessary rerenders
   const contentItemsRef = useRef<Array<any>>([]);
   const hasRefreshedRef = useRef(false);
   const isComponentMountedRef = useRef(true);
   const hasUserInteracted = useRef(false);
   const lastInteractionTime = useRef(Date.now());
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAnnouncementState = useRef<boolean>(false);
   
   // Constants
   const defaultDuration = 30; // Default duration in seconds
   const userInteractionTimeout = 60000; // 1 minute before resuming auto-rotation after user interaction
+  const FADE_TRANSITION_DURATION = 500; // Duration for fade transitions
+  
+  // Log when prayer announcement state changes
+  useEffect(() => {
+    // Only log significant changes to reduce noise
+    if (showPrayerAnnouncement) {
+      logger.info(`[ContentCarousel] Prayer announcement activated`, {
+        prayerName: prayerAnnouncementName,
+        isJamaat: isPrayerJamaat
+      });
+    } else if (!showPrayerAnnouncement && lastAnnouncementState.current) {
+      logger.info(`[ContentCarousel] Prayer announcement deactivated`);
+    }
+    
+    // Track last state for comparison
+    lastAnnouncementState.current = showPrayerAnnouncement;
+    
+    // When prayer announcement changes, handle content rotation
+    if (showPrayerAnnouncement) {
+      // If announcement is showing, pause rotation
+      setAutoRotate(false);
+      
+      // Cancel any existing rotation timer
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    } else {
+      // When announcement ends, resume rotation (unless user has interacted)
+      if (!hasUserInteracted.current) {
+        setAutoRotate(true);
+      }
+    }
+  }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
   
   // Refresh content only once
   useEffect(() => {
     if (!hasRefreshedRef.current) {
       hasRefreshedRef.current = true;
-      refreshSchedule().catch(() => {});
+      console.log('ContentCarousel: Initial schedule refresh');
+      refreshSchedule().catch((error) => {
+        console.error('Failed to refresh schedule:', error);
+      });
     }
     
     return () => {
       isComponentMountedRef.current = false;
+      // FIX: Clean up timer on unmount
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
     };
   }, [refreshSchedule]);
   
@@ -167,27 +218,45 @@ const ContentCarousel: React.FC = () => {
   
   // Handle auto-rotation
   useEffect(() => {
-    // Don't rotate if prayer announcement is active
-    if (showPrayerAnnouncement) {
-      console.log('Carousel rotation paused due to active prayer announcement');
-      setAutoRotate(false);
-      return;
+    // Clear any existing timer to prevent memory leaks
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
     
-    // Re-enable rotation when prayer announcement ends
-    if (!showPrayerAnnouncement && !autoRotate && !hasUserInteracted.current) {
-      console.log('Carousel rotation resumed after prayer announcement ended');
-      setAutoRotate(true);
+    // Skip rotation if prayer announcement is active
+    if (showPrayerAnnouncement) {
+      logger.info(`Rotation paused - Prayer announcement active - ${prayerAnnouncementName}`);
+      return;
     }
     
     if (!autoRotate || contentItems.length <= 1 || hasUserInteracted.current) {
       return;
     }
 
-    const timer = setTimeout(() => {
-      const nextIndex = (currentItemIndex + 1) % contentItems.length;
-      setCurrentItemIndex(nextIndex);
+    // Use timer for rotation
+    timerRef.current = setTimeout(() => {
+      logger.debug(`Rotating to next item, current index: ${currentItemIndex}, next: ${(currentItemIndex + 1) % contentItems.length}`);
+      
+      // Start transition
       setIsChangingItem(true);
+      setShowContent(false);
+      
+      // After fade-out, change to next item
+      setTimeout(() => {
+        const nextIndex = (currentItemIndex + 1) % contentItems.length;
+        setCurrentItemIndex(nextIndex);
+        
+        // Reset timer for the next item based on its duration
+        if (contentItems[nextIndex] && contentItems[nextIndex].contentItem) {
+          const nextDuration = contentItems[nextIndex].contentItem.duration || defaultDuration;
+          setCurrentItemDisplayTime(nextDuration * 1000);
+        }
+        
+        // Show new content
+        setShowContent(true);
+        setIsChangingItem(false);
+      }, FADE_TRANSITION_DURATION);
       
       // Reset user interaction flag after rotation has occurred
       if (Date.now() - lastInteractionTime.current > userInteractionTimeout) {
@@ -195,8 +264,12 @@ const ContentCarousel: React.FC = () => {
       }
     }, currentItemDisplayTime);
 
-    return () => clearTimeout(timer);
-  }, [autoRotate, currentItemIndex, contentItems.length, currentItemDisplayTime, showPrayerAnnouncement]);
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [autoRotate, currentItemIndex, contentItems.length, currentItemDisplayTime, showPrayerAnnouncement, prayerAnnouncementName]);
 
   // Reset display time when content changes
   useEffect(() => {
@@ -625,25 +698,54 @@ const ContentCarousel: React.FC = () => {
   
   // Render prayer announcement content
   const renderPrayerAnnouncement = () => {
+    if (!showPrayerAnnouncement) return null;
+    
+    // Always log when we're attempting to render an announcement
+    logger.info('[ContentCarousel] Rendering prayer announcement', {
+      name: prayerAnnouncementName,
+      isJamaat: isPrayerJamaat,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Use different styling for adhaan vs jamaat
+    const bgColor = isPrayerJamaat 
+      ? 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)' 
+      : 'linear-gradient(135deg, #2A9D8F 0%, #205E56 100%)';
+    
+    const textColor = isPrayerJamaat ? '#0A2647' : '#FFFFFF';
+    const iconColor = isPrayerJamaat ? '#0A2647' : '#FFFFFF';
+    
     return (
       <Box
+        onClick={() => {
+          console.log("Prayer announcement clicked");
+        }}
         sx={{
-          background: 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)',
-          color: '#0A2647',
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '90%',
+          maxWidth: '600px',
+          background: bgColor,
+          color: textColor,
           borderRadius: '16px',
           p: screenSize.is720p ? 3 : 5,
           textAlign: 'center',
-          width: '90%',
-          mx: 'auto',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(218, 165, 32, 0.5)',
-          position: 'relative',
-          overflow: 'hidden',
-          zIndex: 1,
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+          border: '3px solid',
+          borderColor: isPrayerJamaat ? 'rgba(244, 208, 63, 0.9)' : 'rgba(42, 157, 143, 0.9)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          zIndex: 999999,
+          animation: 'pulse 2s infinite ease-in-out',
+          '@keyframes pulse': {
+            '0%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)' },
+            '50%': { boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)' },
+            '100%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)' },
+          },
         }}
       >
         <Typography
@@ -672,9 +774,9 @@ const ContentCarousel: React.FC = () => {
         
         <Box sx={{ mb: 2, mt: 2 }}>
           {isPrayerJamaat ? (
-            <PrayerRowsIcon width="120px" height="120px" fill="#0A2647" />
+            <PrayerRowsIcon width="120px" height="120px" fill={iconColor} />
           ) : (
-            <NoMobilePhoneIcon width="120px" height="120px" fill="#0A2647" />
+            <NoMobilePhoneIcon width="120px" height="120px" fill={iconColor} />
           )}
         </Box>
         
@@ -694,142 +796,243 @@ const ContentCarousel: React.FC = () => {
     );
   };
   
-  // Empty state display for ContentCarousel
-  if (contentItems.length === 0) {
-    return (
-      <Box 
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100%',
-          width: '100%',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <Box sx={{ 
-          bgcolor: 'rgba(255, 255, 255, 0.7)',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-          border: '1px solid rgba(218, 165, 32, 0.2)',
-          borderRadius: 4,
-          p: screenSize.is720p ? 1 : 2,
-          width: screenSize.is720p ? '97%' : '95%',
-          height: screenSize.is720p ? '95%' : '90%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-          overflow: 'hidden',
-        }}>
-          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), mb: 2 }}>No content available</Typography>
-          
-          {schedule?.id === 'fallback-schedule' && (
-            <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h6), color: 'warning.main', mb: 2 }}>
-              Using default content. The API connection may be unavailable.
-            </Typography>
-          )}
-          
-          <Typography 
-            sx={{ 
-              fontSize: getScaledFontSize(fontSizes.body1), 
-              mt: 2, 
-              color: 'text.secondary',
-              cursor: 'pointer',
-              '&:hover': { textDecoration: 'underline' }
-            }}
-            onClick={() => {
-              console.log('Manual refresh requested by user');
-              hasRefreshedRef.current = false; // Reset to allow refresh again
-              refreshSchedule().then(() => refreshContent(true));
-            }}
-          >
-            Click to refresh content
-          </Typography>
-        </Box>
-      </Box>
-    );
-  }
+  // Toggle debug info display
+  const toggleDebugInfo = useCallback(() => {
+    setShowDebugInfo(prev => !prev);
+  }, []);
   
+  // Add event listener for debug key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Debug info toggle with 'I' key
+      if (e.key === 'i' || e.key === 'I') {
+        toggleDebugInfo();
+      }
+      
+      // Manual prayer announcement override with 'D' key
+      if (e.key === 'd' || e.key === 'D') {
+        console.log('[DEBUG] D key pressed - forcing prayer announcement');
+        const currentTimestamp = new Date().toLocaleTimeString();
+        
+        // Force the prayer announcement directly
+        if (!showPrayerAnnouncement) {
+          const prayerNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+          const randomPrayer = prayerNames[Math.floor(Math.random() * prayerNames.length)];
+          const isJamaat = Math.random() > 0.5;
+          
+          console.log(`[DEBUG] Forcing prayer announcement: ${randomPrayer}, Jamaat: ${isJamaat}`);
+          
+          // Try two different methods to ensure it works
+          // Method 1: Using ContentContext function
+          setPrayerAnnouncement(true, randomPrayer, isJamaat);
+          
+          // Method 2: Direct state update as backup - removed as we now have proper types
+        } else {
+          // Hide the announcement if it's already showing
+          console.log('[DEBUG] Hiding prayer announcement');
+          setPrayerAnnouncement(false);
+        }
+      }
+      
+      // Emergency override with Shift+A
+      if (e.key.toLowerCase() === 'a' && e.shiftKey) {
+        logger.info("Emergency override: Forcing prayer announcement display");
+        setAutoRotate(false);
+        // Clear any existing rotation timer
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleDebugInfo, setPrayerAnnouncement, showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat, setPrayerAnnouncementName, setIsPrayerJamaat, autoRotate, setAutoRotate]);
+  
+  // Function to directly toggle announcement state (for debugging)
+  const emergencyToggleAnnouncement = useCallback(() => {
+    logger.info(`Emergency toggle: Setting showPrayerAnnouncement to ${!showPrayerAnnouncement}`);
+    
+    if (!showPrayerAnnouncement) {
+      // Force render immediately
+      console.log('Emergency override: Forcing prayer announcement to show');
+      
+      // Render the announcement content directly
+      const box = document.createElement('div');
+      box.style.position = 'fixed';
+      box.style.top = '0';
+      box.style.left = '0';
+      box.style.width = '100%';
+      box.style.height = '100%';
+      box.style.display = 'flex';
+      box.style.justifyContent = 'center';
+      box.style.alignItems = 'center';
+      box.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+      box.style.zIndex = '999999999';
+      
+      const content = document.createElement('div');
+      content.innerHTML = `
+        <div style="background: linear-gradient(135deg, #F1C40F 0%, #DAA520 100%); color: #0A2647; padding: 2rem; border-radius: 16px; text-align: center; width: 80%; max-width: 600px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+          <h2 style="font-size: 2rem; margin-bottom: 1rem;">EMERGENCY DEBUG</h2>
+          <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Prayer Announcement</h3>
+          <p style="font-size: 1.2rem;">This is a forced prayer announcement for debugging purposes.</p>
+          <p style="margin-top: 2rem; font-size: 1rem;">Click anywhere to dismiss</p>
+        </div>
+      `;
+      
+      box.appendChild(content);
+      document.body.appendChild(box);
+      
+      // Remove on click
+      box.addEventListener('click', () => {
+        document.body.removeChild(box);
+      });
+      
+      // Auto-remove after 10 seconds
+      setTimeout(() => {
+        if (document.body.contains(box)) {
+          document.body.removeChild(box);
+        }
+      }, 10000);
+    }
+  }, [showPrayerAnnouncement]);
+  
+  // Add event listener for custom prayer announcement event as emergency fallback
+  useEffect(() => {
+    const handleCustomPrayerAnnouncement = (event: Event) => {
+      // Type assertion for CustomEvent
+      const customEvent = event as CustomEvent<{show: boolean, prayerName: string, isJamaat: boolean}>;
+      
+      if (customEvent.detail) {
+        const { show, prayerName, isJamaat } = customEvent.detail;
+        
+        logger.info(`[ContentCarousel] Received emergency prayer announcement event`, {
+          show,
+          prayerName,
+          isJamaat
+        });
+        
+        // Create a direct emergency overlay if state-based approach failed
+        if (show && !showPrayerAnnouncement) {
+          emergencyToggleAnnouncement();
+        }
+      }
+    };
+    
+    document.addEventListener('prayer-announcement', handleCustomPrayerAnnouncement);
+    return () => document.removeEventListener('prayer-announcement', handleCustomPrayerAnnouncement);
+  }, [showPrayerAnnouncement, emergencyToggleAnnouncement]);
+  
+  // Main render
   return (
-    <Fade in={showContent} timeout={500}>
-      <Box 
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100%',
-          width: '100%',
-          position: 'relative',
-          overflow: 'hidden',
-          transition: 'background-color 0.7s ease-in-out',
-          backgroundColor: showPrayerAnnouncement 
-            ? 'rgba(10, 38, 71, 0.95)' // Navy blue background for prayer announcements
-            : 'transparent',
-        }}
-      >
-        <Box sx={{ 
-          bgcolor: showPrayerAnnouncement 
-            ? 'rgba(10, 38, 71, 0.8)' // Darker card for announcements 
-            : 'rgba(255, 255, 255, 0.7)',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-          border: '1px solid rgba(218, 165, 32, 0.2)',
-          borderRadius: 4,
-          p: screenSize.is720p ? 1 : 2,
-          width: screenSize.is720p ? '97%' : '95%',
-          height: screenSize.is720p ? '95%' : '90%',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          zIndex: 1,
-          overflow: 'hidden',
-          transition: 'background-color 0.7s ease-in-out, color 0.7s ease-in-out',
-        }}>
-          <Box
-            sx={{
-              borderBottom: '3px solid',
-              borderColor: showPrayerAnnouncement ? '#F1C40F' : 'primary.main',
-              pb: screenSize.is720p ? 1 : 1.5,
-              mb: screenSize.is720p ? 1 : 2,
-              width: '100%',
-              flex: '0 0 auto',
-              transition: 'border-color 0.7s ease-in-out',
+    <>
+      {/* Main content */}
+      <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+        {/* Background pattern for both views */}
+        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
+          <IslamicPatternBackground variant="embossed" />
+        </Box>
+        
+        {/* Regular content */}
+        <Fade 
+          in={!showPrayerAnnouncement && showContent} 
+          timeout={FADE_TRANSITION_DURATION}
+          unmountOnExit
+        >
+          <Box 
+            sx={{ 
+              height: '100%', 
+              width: '100%', 
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              position: 'relative',
+              zIndex: 1
             }}
           >
-            <Typography 
-              sx={{ 
-                fontWeight: 'bold',
-                fontSize: getScaledFontSize(fontSizes.h2),
-                textAlign: 'center',
-                color: showPrayerAnnouncement ? '#F1C40F' : 'primary.main',
-                transition: 'color 0.7s ease-in-out',
-              }}
-            >
-              {showPrayerAnnouncement 
-                ? (isPrayerJamaat ? `${prayerAnnouncementName} Jamaa't Time` : `${prayerAnnouncementName} Time`) 
-                : contentItems[currentItemIndex]?.contentItem?.type === 'ASMA_AL_HUSNA' 
-                  ? 'Asma ul Husna' 
-                  : contentItems[currentItemIndex]?.contentItem?.title || 'Content'}
-            </Typography>
+            {renderContent()}
           </Box>
-          
-          <Box sx={{ 
-            flex: '1 1 auto',
+        </Fade>
+        
+        {/* Prayer announcement with hard-coded high z-index */}
+        <Box 
+          onClick={() => console.log('Prayer announcement box clicked')}
+          sx={{ 
+            position: 'fixed', // Use fixed positioning to break out of any stacking contexts
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            overflow: 'auto',
-            width: '100%',
-          }}>
-            {showPrayerAnnouncement ? renderPrayerAnnouncement() : renderContent()}
-          </Box>
+            backgroundColor: isPrayerJamaat 
+              ? 'rgba(241, 196, 15, 0.2)' 
+              : 'rgba(42, 157, 143, 0.2)',
+            opacity: showPrayerAnnouncement ? 1 : 0,
+            visibility: showPrayerAnnouncement ? 'visible' : 'hidden',
+            transition: 'opacity 500ms ease-in-out, visibility 500ms ease-in-out',
+            zIndex: 100000 // Extremely high z-index
+          }}
+        >
+          {renderPrayerAnnouncement()}
         </Box>
       </Box>
-    </Fade>
+      
+      {/* Debug Info Overlay */}
+      {showDebugInfo && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          background: 'rgba(0,0,0,0.8)',
+          color: 'lime',
+          padding: '10px',
+          zIndex: 10000,
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          width: '400px',
+          maxHeight: '100vh',
+          overflowY: 'auto'
+        }}>
+          <h3>Debug Info</h3>
+          <p><strong>KEY CONTROLS:</strong></p>
+          <p>- Press 'I' to toggle this debug panel</p>
+          <p>- Press 'D' to force toggle prayer announcement state</p>
+          <p>- Press 'Shift+A' for emergency announcement override</p>
+          <hr/>
+          <p><strong>Prayer Announcement:</strong> {showPrayerAnnouncement ? 'VISIBLE ✅' : 'HIDDEN ❌'}</p>
+          <p><strong>Prayer Name:</strong> {prayerAnnouncementName || 'None'}</p>
+          <p><strong>Is Jamaat:</strong> {isPrayerJamaat ? 'Yes' : 'No'}</p>
+          <hr/>
+          <p><strong>Auto Rotate:</strong> {autoRotate ? 'ON' : 'OFF'}</p>
+          <p><strong>Current Index:</strong> {currentItemIndex}</p>
+          <p><strong>Total Items:</strong> {contentItems?.length || 0}</p>
+          <p><strong>Last Rotation:</strong> {new Date().toLocaleTimeString()}</p>
+          
+          <button 
+            onClick={emergencyToggleAnnouncement}
+            style={{
+              marginTop: '10px',
+              padding: '8px',
+              backgroundColor: showPrayerAnnouncement ? '#f44336' : '#4caf50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              width: '100%'
+            }}
+          >
+            {showPrayerAnnouncement ? 'HIDE ANNOUNCEMENT' : 'FORCE ANNOUNCEMENT NOW'}
+          </button>
+        </div>
+      )}
+    </>
   );
 };
 
-export default React.memo(ContentCarousel); 
+export default ContentCarousel; 
