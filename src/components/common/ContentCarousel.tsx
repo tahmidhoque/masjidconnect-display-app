@@ -142,6 +142,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   const userInteractionTimeout = 60000; // 1 minute before resuming auto-rotation after user interaction
   const FADE_TRANSITION_DURATION = 500; // Duration for fade transitions
   
+  // Preload next content item to avoid flashing
+  const [nextItemIndex, setNextItemIndex] = useState<number | null>(null);
+  
   // Log when prayer announcement state changes
   useEffect(() => {
     // Track last state for comparison
@@ -426,7 +429,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       // Start a timer to change to the next item
       timerRef.current = setTimeout(() => {
         // Preload next item for smoother transition
-        const nextItemIndex = (currentItemIndex + 1) % contentItems.length;
+        const nextIdx = (currentItemIndex + 1) % contentItems.length;
+        setNextItemIndex(nextIdx);
         
         // Signal we're changing items (causes a fade out)
         setIsChangingItem(true);
@@ -434,7 +438,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         // Short timeout to allow fade out to complete
         setTimeout(() => {
           // Change to the next item
-          setCurrentItemIndex(nextItemIndex);
+          setCurrentItemIndex(nextIdx);
+          setNextItemIndex(null);
           
           // Short timeout before fading back in with the new item
           setTimeout(() => {
@@ -1127,105 +1132,106 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           overflow: 'hidden'
         }}
       >
-        <Fade
-          in={showContent && !isChangingItem && !showPrayerAnnouncement}
-          appear={true}
-          timeout={{
-            appear: 50, // Very short appear time - just enough to let the component render
-            enter: FADE_TRANSITION_DURATION,
-            exit: FADE_TRANSITION_DURATION - 50 // Slightly shorter exit to prevent flicker
-          }}
-          mountOnEnter
-          unmountOnExit={false} // Keep DOM nodes to prevent blur recalculation
-        >
-          <Box sx={{ 
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            width: '100%',
-            p: variant === 'landscape' ? 0.5 : 1,
-          }}>
-            {(contentItems.length > 0 || contentLoading) && (
-              <GlassmorphicContentCard
-                orientation={variant || (orientation.toLowerCase() as 'portrait' | 'landscape')}
-                colorType={contentItems[currentItemIndex]?.contentItem?.type 
-                  ? (getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).colorType || 'primary') 
-                  : 'primary'
-                }
-                contentTypeColor={contentItems[currentItemIndex]?.contentItem?.type 
-                  ? getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).titleColor 
-                  : undefined
-                }
-                isUrgent={contentItems[currentItemIndex]?.contentItem?.urgent || false}
-                sx={{ 
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  mb: 0
+        {/* The glassmorphic card is always rendered, we just fade its contents */}
+        <Box sx={{ 
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          width: '100%',
+          p: variant === 'landscape' ? 0.5 : 1,
+          visibility: (showContent && !showPrayerAnnouncement) ? 'visible' : 'hidden'
+        }}>
+          {(contentItems.length > 0 || contentLoading) && (
+            <GlassmorphicContentCard
+              orientation={variant || (orientation.toLowerCase() as 'portrait' | 'landscape')}
+              colorType={contentItems[currentItemIndex]?.contentItem?.type 
+                ? (getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).colorType || 'primary') 
+                : 'primary'
+              }
+              contentTypeColor={contentItems[currentItemIndex]?.contentItem?.type 
+                ? getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).titleColor 
+                : undefined
+              }
+              isUrgent={contentItems[currentItemIndex]?.contentItem?.urgent || false}
+              sx={{ 
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                mb: 0
+              }}
+            >
+              {/* Content fades in and out, but the card remains */}
+              <Fade
+                in={showContent && !isChangingItem && !showPrayerAnnouncement}
+                timeout={{
+                  enter: FADE_TRANSITION_DURATION,
+                  exit: FADE_TRANSITION_DURATION
                 }}
               >
-                {/* Title header */}
-                <Box
-                  sx={{
-                    width: '100%',
-                    p: 1.5,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    position: 'relative',
-                    zIndex: 1,
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-                  }}
-                >
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontSize: getScaledFontSize(fontSizes.h4),
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
-                      letterSpacing: '0.5px',
-                    }}
-                  >
-                    {contentItems.length > 0 && currentItemIndex < contentItems.length
-                      ? (contentItems[currentItemIndex]?.contentItem?.title || 
-                         getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).title)
-                      : 'Information'
-                    }
-                  </Typography>
-                </Box>
-              
-                {/* Content area */}
-                <Box
-                  sx={{
-                    flex: 1,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    p: { xs: 1.5, sm: 2, md: 3 },
-                    overflow: 'auto'
-                  }}
-                >
-                  {contentLoading ? (
-                    <Box sx={{ 
+                <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  {/* Title header */}
+                  <Box
+                    sx={{
                       width: '100%',
+                      p: 1.5,
                       display: 'flex',
-                      flexDirection: 'column',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      gap: 2
-                    }}>
-                      <CircularProgress color="primary" />
-                      <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
-                        Loading content...
-                      </Typography>
-                    </Box>
-                  ) : renderContent()}
+                      position: 'relative',
+                      zIndex: 1,
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}
+                  >
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontSize: getScaledFontSize(fontSizes.h4),
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      {contentItems.length > 0 && currentItemIndex < contentItems.length
+                        ? (contentItems[currentItemIndex]?.contentItem?.title || 
+                           getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).title)
+                        : 'Information'
+                      }
+                    </Typography>
+                  </Box>
+                
+                  {/* Content area */}
+                  <Box
+                    sx={{
+                      flex: 1,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      p: { xs: 1.5, sm: 2, md: 3 },
+                      overflow: 'auto'
+                    }}
+                  >
+                    {contentLoading ? (
+                      <Box sx={{ 
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 2
+                      }}>
+                        <CircularProgress color="primary" />
+                        <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+                          Loading content...
+                        </Typography>
+                      </Box>
+                    ) : renderContent()}
+                  </Box>
                 </Box>
-              </GlassmorphicContentCard>
-            )}
-          </Box>
-        </Fade>
+              </Fade>
+            </GlassmorphicContentCard>
+          )}
+        </Box>
         
         {/* Prayer announcement with glassmorphic styling */}
         <Fade

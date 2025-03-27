@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useTheme, alpha, SxProps, Theme, Box } from '@mui/material';
 import GlassmorphicCard from './GlassmorphicCard';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
@@ -31,17 +31,6 @@ const GlassmorphicContentCard: React.FC<GlassmorphicContentCardProps> = ({
 }) => {
   const theme = useTheme();
   const { getSizeRem } = useResponsiveFontSize();
-  const [isReady, setIsReady] = useState(false);
-  
-  // Ensure glass effect is ready before displaying content
-  useEffect(() => {
-    // Use requestAnimationFrame to ensure the glass effect is rendered first
-    const timer = requestAnimationFrame(() => {
-      setIsReady(true);
-    });
-    
-    return () => cancelAnimationFrame(timer);
-  }, []);
   
   const isPortrait = orientation === 'portrait';
   
@@ -120,16 +109,7 @@ const GlassmorphicContentCard: React.FC<GlassmorphicContentCardProps> = ({
         ...sx
       }}
     >
-      <Box sx={{ 
-        opacity: isReady ? 1 : 0, 
-        transition: 'opacity 0.1s ease-in',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {children}
-      </Box>
+      {children}
     </GlassmorphicCard>
   );
 };

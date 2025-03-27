@@ -150,10 +150,12 @@ const LandscapeDisplay: React.FC = () => {
       <Box sx={{ 
         display: 'flex',
         flexDirection: 'column',
+        flex: 'nowrap',
         height: '100%',
         position: 'relative',
+        gap: 1,
         zIndex: 2, // Above the background
-        px: 1, // Consistent side padding
+        px: 0.5, // Consistent side padding // Consistent top and bottom padding
       }}>
         {/* Header */}
         <GlassmorphicHeader
@@ -169,7 +171,7 @@ const LandscapeDisplay: React.FC = () => {
           display: 'flex',
           flexGrow: 1,
           pb: 0.5,
-          gap: 1,
+          gap: 2,
           overflow: 'hidden',
           mb: 1, // Reduced margin before footer
         }}>
