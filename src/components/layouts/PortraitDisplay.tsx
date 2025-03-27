@@ -190,26 +190,6 @@ const PortraitDisplay: React.FC = () => {
       overflow: 'hidden',
       position: 'relative',
     }}>
-      {/* Debug controls */}
-      <Button
-        onClick={showDebugAnnouncement}
-        sx={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          color: 'white',
-          zIndex: 99999999,
-          fontSize: '10px',
-          padding: '4px 8px',
-          minWidth: 'unset',
-          '&:hover': {
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          }
-        }}
-      >
-        Debug Announcement
-      </Button>
       
       {/* Decorative Islamic Pattern at top */}
       <Box 
