@@ -1,3 +1,6 @@
+// Import moment at the top of the file
+import moment from 'moment';
+
 // Format time string (e.g., "16:30") to display format (e.g., "4:30 PM")
 export const formatTimeToDisplay = (timeString: string): string => {
   if (!timeString) return '';
@@ -13,9 +16,6 @@ export const formatTimeToDisplay = (timeString: string): string => {
 };
 
 // Parse time string into Date object using moment.js
-import moment from 'moment';
-
-// Parse time string into moment object
 export const parseTimeString = (timeString: string, referenceDate: Date = new Date()): Date => {
   if (!timeString) return new Date();
   

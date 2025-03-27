@@ -17,12 +17,13 @@ const useAppInitialization = () => {
   const orientationContext = useRef<any>(null);
   const contentContext = useRef<any>(null);
   
+  // Always call hooks at the top level, unconditionally
+  const auth = useAuth();
+  const orientation = useOrientation();
+  const content = useContent();
+  
+  // Now set the refs with error handling
   try {
-    // Only update refs if we can successfully get the context
-    const auth = useAuth();
-    const orientation = useOrientation();
-    const content = useContent();
-    
     authContext.current = auth;
     orientationContext.current = orientation;
     contentContext.current = content;
