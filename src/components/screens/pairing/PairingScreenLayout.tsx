@@ -33,7 +33,7 @@ const PairingScreenLayout: React.FC<PairingScreenLayoutProps> = ({
   // Background style
   const backgroundStyle = {
     background: 'linear-gradient(135deg, #0A2647 0%, #144272 100%)',
-    color: 'white',
+    color: '#fff',
   };
   
   return (

@@ -466,33 +466,32 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   }
 
   return (
-    <Fade in={!textTransition}>
-      <Box sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        my: 2
+    <Fade in={displayTimes} timeout={500}>
+      <Box sx={{ 
+        mt: 0,
+        mb: getSizeRem(0.3),
+        opacity: textTransition ? 0.3 : 1,
+        transition: 'opacity 0.5s ease',
       }}>
         <Typography sx={{ 
-          fontWeight: 'bold', 
-          fontSize: fontSizes.caption,
+          fontSize: fontSizes.body1,
+          fontWeight: 500,
           textAlign: 'center',
-          color: 'rgba(255, 255, 255, 0.9)',
-          mb: getSizeRem(0.5)
+          opacity: 0.9,
+          fontFamily: "'Poppins', sans-serif",
+          mb: getSizeRem(0.3),
+          color: '#fff',
         }}>
           {countingDownToJamaat 
             ? `${prayerName} Jamaa't will be in` 
             : `${prayerName} will be in`}
         </Typography>
-        
+
         <Box sx={{ 
-          display: 'flex', 
+          display: 'flex',
           justifyContent: 'center',
-          gap: getSizeRem(0.2),
           alignItems: 'center',
-          mt: getSizeRem(0.2),
-          mb: getSizeRem(0.2),
+          gap: getSizeRem(0.1),
         }}>
           {/* Hours */}
           <Box sx={{ 
@@ -500,10 +499,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            minWidth: getSizeRem(4),
+            minWidth: getSizeRem(3),
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.countdownDigit,
+              fontSize: fontSizes.h3,
               fontWeight: 'bold',
               lineHeight: 1,
               fontFamily: "'Poppins', sans-serif",
@@ -514,12 +513,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
               {formatTimeDisplay(hours)}
             </Typography>
             <Typography sx={{ 
-              fontSize: fontSizes.countdownLabel,
+              fontSize: fontSizes.caption,
               fontWeight: 'bold',
               textTransform: 'uppercase',
               opacity: 0.9,
-              mt: getSizeRem(-0.2),
-              color: 'rgba(255, 255, 255, 0.7)',
+              mt: getSizeRem(-0.1),
+              color: 'rgba(255, 255, 255, 0.8)',
               letterSpacing: '0.3px',
             }}>
               HOURS
@@ -528,7 +527,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           
           {/* Separator */}
           <Typography sx={{ 
-            fontSize: fontSizes.countdownDigit,
+            fontSize: fontSizes.h3,
             fontWeight: 'bold', 
             lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
@@ -545,10 +544,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            minWidth: getSizeRem(4),
+            minWidth: getSizeRem(3),
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.countdownDigit,
+              fontSize: fontSizes.h3,
               fontWeight: 'bold',
               lineHeight: 1,
               fontFamily: "'Poppins', sans-serif",
@@ -559,12 +558,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
               {formatTimeDisplay(minutes)}
             </Typography>
             <Typography sx={{ 
-              fontSize: fontSizes.countdownLabel,
+              fontSize: fontSizes.caption,
               fontWeight: 'bold',
               textTransform: 'uppercase',
               opacity: 0.9,
-              mt: getSizeRem(-0.2),
-              color: 'rgba(255, 255, 255, 0.7)',
+              mt: getSizeRem(-0.1),
+              color: 'rgba(255, 255, 255, 0.8)',
               letterSpacing: '0.3px',
             }}>
               MINUTES
@@ -573,7 +572,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           
           {/* Separator */}
           <Typography sx={{ 
-            fontSize: fontSizes.countdownDigit,
+            fontSize: fontSizes.h3,
             fontWeight: 'bold', 
             lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
@@ -590,10 +589,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            minWidth: getSizeRem(4),
+            minWidth: getSizeRem(3),
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.countdownDigit,
+              fontSize: fontSizes.h3,
               fontWeight: 'bold',
               lineHeight: 1,
               fontFamily: "'Poppins', sans-serif",
@@ -604,18 +603,29 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
               {formatTimeDisplay(seconds)}
             </Typography>
             <Typography sx={{ 
-              fontSize: fontSizes.countdownLabel,
+              fontSize: fontSizes.caption,
               fontWeight: 'bold',
               textTransform: 'uppercase',
               opacity: 0.9,
               mt: getSizeRem(-0.1),
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: 'rgba(255, 255, 255, 0.8)',
               letterSpacing: '0.3px',
             }}>
               SECONDS
             </Typography>
           </Box>
         </Box>
+        
+        <Typography sx={{ 
+          fontSize: fontSizes.caption,
+          textAlign: 'center',
+          color: 'rgba(255, 255, 255, 0.7)',
+          mt: getSizeRem(0.3),
+          fontStyle: 'italic',
+          fontWeight: 500,
+        }}>
+          {countingDownToJamaat ? 'Jamaa\'t' : 'Adhan'} Time
+        </Typography>
       </Box>
     </Fade>
   );

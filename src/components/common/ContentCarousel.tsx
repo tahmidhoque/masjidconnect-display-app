@@ -7,6 +7,7 @@ import { NoMobilePhoneIcon, PrayerRowsIcon } from '../../assets/svgComponent';
 import logger from '../../utils/logger';
 import { useOrientation } from '../../contexts/OrientationContext';
 import localforage from 'localforage';
+import GlassmorphicContentCard from './GlassmorphicContentCard';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -21,6 +22,10 @@ interface ContentItem {
   type: ContentItemType; 
   duration: number;
   reference?: string;
+}
+
+interface ContentCarouselProps {
+  variant?: 'portrait' | 'landscape';
 }
 
 // Helper function to format newlines in text
@@ -39,36 +44,43 @@ const contentTypeConfig: Record<ExtendedContentItemType, {
   title: string;
   titleColor: string;
   textColor: string;
+  colorType?: 'primary' | 'secondary' | 'info';
 }> = {
   'VERSE_HADITH': {
     title: 'Verse from the Quran',
     titleColor: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
     textColor: '#FFFFFF',
+    colorType: 'secondary'
   },
   'HADITH': {
     title: 'Hadith of the Day',
     titleColor: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
     textColor: '#FFFFFF',
+    colorType: 'secondary'
   },
   'ANNOUNCEMENT': {
     title: 'Announcement',
     titleColor: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
     textColor: '#FFFFFF',
+    colorType: 'info'
   },
   'EVENT': {
     title: 'Upcoming Event',
     titleColor: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
     textColor: '#FFFFFF',
+    colorType: 'primary'
   },
   'ASMA_AL_HUSNA': {
     title: 'Names of Allah',
     titleColor: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
     textColor: '#FFFFFF',
+    colorType: 'secondary'
   },
   'CUSTOM': {
     title: 'Information',
     titleColor: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)',
     textColor: '#FFFFFF',
+    colorType: 'primary'
   }
 };
 
@@ -87,7 +99,7 @@ const getContentTypeConfig = (type: string | undefined): typeof contentTypeConfi
  * Automatically rotates through items based on their specified duration.
  * Also displays prayer announcements when prayer times are reached.
  */
-const ContentCarousel: React.FC = () => {
+const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   const { 
     schedule, 
     events, 
@@ -615,6 +627,42 @@ const ContentCarousel: React.FC = () => {
         const fontSizeType = isEidAnnouncement ? 'eid-announcement' : 
                              (isSpecialAnnouncement ? 'event-content' : 'normal');
         
+        // Special handling for Eid prayer - ensure it has translucent background
+        if (isEidAnnouncement) {
+          return (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 3,
+              textAlign: 'center',
+              width: '100%',
+              height: '100%',
+              p: 2,
+              overflow: 'auto',
+              // No background color here to maintain glassmorphic effect
+            }}>
+              <Typography 
+                variant="h2"
+                sx={{ 
+                  fontSize: getDynamicFontSize(eventText, 'eid-announcement'),
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  whiteSpace: 'pre-line',
+                  lineHeight: 2,
+                  color: '#FFFFFF',
+                  textShadow: '0 2px 5px rgba(0, 0, 0, 0.5)', // Stronger text shadow for better contrast
+                  mb: 2
+                }}
+              >
+                {formatTextWithNewlines(eventText)}
+              </Typography>
+            </Box>
+          );
+        }
+        
+        // Return normal event rendering
         return (
           <Box sx={{ 
             display: 'flex', 
@@ -635,7 +683,9 @@ const ContentCarousel: React.FC = () => {
                 textAlign: 'center',
                 fontWeight: isSpecialAnnouncement ? 'bold' : 'medium',
                 whiteSpace: 'pre-line', // Preserve newlines
-                lineHeight: isSpecialAnnouncement ? 2 : 1.5
+                lineHeight: isSpecialAnnouncement ? 2 : 1.5,
+                color: '#FFFFFF',
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
               }}
             >
               {formatTextWithNewlines(eventText)}
@@ -650,27 +700,42 @@ const ContentCarousel: React.FC = () => {
                   flexWrap: 'wrap',
                   gap: 1,
                   mt: 1,
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(8px)',
-                  p: 1,
+                  backdropFilter: 'blur(10px)',
+                  background: 'rgba(0, 0, 0, 0.15)', // More translucent
+                  p: 1.5,
                   borderRadius: 2,
                   width: '100%',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }}
               >
                 {currentItem.startDate && (
-                  <Box>
+                  <Box
+                    sx={{
+                      backdropFilter: 'blur(5px)',
+                      background: 'rgba(255, 255, 255, 0.05)', // More translucent
+                      p: 1,
+                      borderRadius: 1,
+                      flex: 1,
+                      minWidth: '120px'
+                    }}
+                  >
                     <Typography 
                       sx={{ 
                         fontSize: getScaledFontSize(fontSizes.h6),
                         fontWeight: 'bold',
-                        color: 'text.secondary',
+                        color: 'rgba(255, 255, 255, 0.9)',
                         textAlign: 'center'
                       }}
                     >
                       Date
                     </Typography>
-                    <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+                    <Typography sx={{ 
+                      fontSize: getScaledFontSize(fontSizes.h5), 
+                      textAlign: 'center',
+                      color: '#FFFFFF',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+                    }}>
                       {new Date(currentItem.startDate).toLocaleDateString(undefined, {
                         weekday: 'long',
                         year: 'numeric',
@@ -682,18 +747,32 @@ const ContentCarousel: React.FC = () => {
                 )}
                 
                 {(currentItem.location || currentItem.startDate) && (
-                  <Box>
+                  <Box
+                    sx={{
+                      backdropFilter: 'blur(5px)',
+                      background: 'rgba(255, 255, 255, 0.05)', // More translucent
+                      p: 1,
+                      borderRadius: 1,
+                      flex: 1,
+                      minWidth: '120px'
+                    }}
+                  >
                     <Typography 
                       sx={{ 
                         fontSize: getScaledFontSize(fontSizes.h6),
                         fontWeight: 'bold',
-                        color: 'text.secondary',
+                        color: 'rgba(255, 255, 255, 0.9)',
                         textAlign: 'center'
                       }}
                     >
                       {currentItem.location ? 'Location' : 'Time'}
                     </Typography>
-                    <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+                    <Typography sx={{ 
+                      fontSize: getScaledFontSize(fontSizes.h5), 
+                      textAlign: 'center',
+                      color: '#FFFFFF',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+                    }}>
                       {currentItem.location || (
                         currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
                           hour: '2-digit',
@@ -756,7 +835,8 @@ const ContentCarousel: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            p: screenSize.is720p ? 1 : 2
+            p: screenSize.is720p ? 1 : 2,
+            // No background color to maintain glassmorphic effect
           }}>
             {arabicText && (
               <Typography 
@@ -765,7 +845,9 @@ const ContentCarousel: React.FC = () => {
                   mb: 1,
                   textAlign: 'center',
                   fontWeight: 'bold',
-                  fontFamily: 'Scheherazade New, Arial'
+                  fontFamily: 'Scheherazade New, Arial',
+                  color: '#FFFFFF',
+                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
                 }}
               >
                 {arabicText}
@@ -778,7 +860,9 @@ const ContentCarousel: React.FC = () => {
                   fontSize: getDynamicFontSize(transliteration, 'normal'),
                   mb: 1,
                   textAlign: 'center',
-                  fontWeight: 'medium'
+                  fontWeight: 'medium',
+                  color: '#FFFFFF',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
                 }}
               >
                 {formatTextWithNewlines(transliteration)}
@@ -790,7 +874,9 @@ const ContentCarousel: React.FC = () => {
                 sx={{ 
                   fontSize: getDynamicFontSize(meaning, 'normal'),
                   textAlign: 'center',
-                  whiteSpace: 'pre-line'
+                  whiteSpace: 'pre-line',
+                  color: '#FFFFFF', 
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
                 }}
               >
                 {formatTextWithNewlines(meaning)}
@@ -845,7 +931,8 @@ const ContentCarousel: React.FC = () => {
             flexDirection: 'column',
             justifyContent: 'center',
             p: screenSize.is720p ? 1 : 2,
-            overflow: 'auto'
+            overflow: 'auto',
+            // No background color to maintain glassmorphic effect
           }}>
             {arabicText && (
               <Typography 
@@ -855,7 +942,9 @@ const ContentCarousel: React.FC = () => {
                   textAlign: 'center',
                   fontFamily: 'Scheherazade New, Arial',
                   direction: 'rtl',
-                  lineHeight: 1.7
+                  lineHeight: 1.7,
+                  color: '#FFFFFF',
+                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Enhanced shadow for better readability
                 }}
               >
                 {formatTextWithNewlines(arabicText)}
@@ -868,7 +957,9 @@ const ContentCarousel: React.FC = () => {
                 lineHeight: 1.4,
                 mb: 2,
                 textAlign: 'center',
-                whiteSpace: 'pre-line'
+                whiteSpace: 'pre-line',
+                color: '#FFFFFF',
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Enhanced shadow for better readability
               }}
             >
               {formatTextWithNewlines(englishText)}
@@ -877,10 +968,11 @@ const ContentCarousel: React.FC = () => {
             <Typography 
               sx={{ 
                 fontSize: getScaledFontSize(fontSizes.h6),
-                color: 'text.secondary',
+                color: 'rgba(255, 255, 255, 0.85)',
                 mt: 1,
                 fontStyle: 'italic',
-                textAlign: 'center'
+                textAlign: 'center',
+                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
               }}
             >
               {reference}{grade ? ` - ${grade}` : ''}
@@ -909,7 +1001,8 @@ const ContentCarousel: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            p: screenSize.is720p ? 1 : 2
+            p: screenSize.is720p ? 1 : 2,
+            // No background color to maintain glassmorphic effect
           }}>
             <Typography 
               sx={{ 
@@ -917,7 +1010,9 @@ const ContentCarousel: React.FC = () => {
                 lineHeight: 1.5,
                 textAlign: 'center',
                 fontWeight: announcementText.length > 150 ? 'normal' : 'bold',
-                whiteSpace: 'pre-line'
+                whiteSpace: 'pre-line',
+                color: '#FFFFFF',
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
               }}
             >
               {formatTextWithNewlines(announcementText)}
@@ -934,7 +1029,8 @@ const ContentCarousel: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          p: screenSize.is720p ? 1 : 2
+          p: screenSize.is720p ? 1 : 2,
+          // No background color to maintain glassmorphic effect
         }}>
           <Typography 
             sx={{ 
@@ -946,7 +1042,9 @@ const ContentCarousel: React.FC = () => {
               ),
               lineHeight: 1.5,
               textAlign: 'center',
-              whiteSpace: 'pre-line'
+              whiteSpace: 'pre-line',
+              color: '#FFFFFF',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
             }}
           >
             {formatTextWithNewlines(
@@ -1001,134 +1099,53 @@ const ContentCarousel: React.FC = () => {
   // Main render
   return (
     <>
-      {/* Main content */}
-      <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-        {/* Background pattern for both views */}
-        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-          <IslamicPatternBackground 
-            variant="embossed" 
-            opacity={0.45} 
-            embossStrength="medium"
-          />
-        </Box>
-        
-        {/* Regular content */}
-        <Fade 
-          in={!showPrayerAnnouncement && showContent} 
+      <Box 
+        sx={{ 
+          position: 'relative',
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'stretch',
+          overflow: 'hidden'
+        }}
+      >
+        <Fade
+          in={showContent && !isChangingItem && !showPrayerAnnouncement}
           timeout={FADE_TRANSITION_DURATION}
-          unmountOnExit
         >
-          <Box 
-            sx={{ 
-              height: '100%', 
-              width: '100%', 
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              position: 'relative',
-              zIndex: 1,
-              p: { xs: 1, sm: 2 } // Responsive padding for different screen sizes
-            }}
-          >
-            {/* Glassmorphic Card */}
-            {contentItems.length > 0 && currentItemIndex < contentItems.length && (
-              <Box
-                sx={{
-                  width: '95%',
-                  height: '85vh', // Use even more vertical space
+          <Box sx={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            width: '100%',
+            p: variant === 'landscape' ? 0.5 : 1, // Add slight padding
+          }}>
+            {contentItems.length > 0 && !contentLoading && (
+              <GlassmorphicContentCard
+                orientation={variant || (orientation.toLowerCase() as 'portrait' | 'landscape')}
+                colorType={contentItems[currentItemIndex]?.contentItem?.type 
+                  ? (getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).colorType || 'primary') 
+                  : 'primary'
+                }
+                sx={{ 
+                  height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  background: 'rgba(255, 255, 255, 0.2)', // Slightly more transparent
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)', // For Safari support
-                  borderRadius: '16px',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  overflow: 'hidden',
-                  m: 2,
-                }}
-              >
-                {/* Card Header with type-specific gradient */}
-                <Box
-                  sx={{
-                    background: getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type).titleColor,
-                    color: '#FFFFFF',
-                    p: 2,
-                    pl: 4,
-                    pr: 4,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)'
-                  }}
-                >
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontSize: getScaledFontSize(fontSizes.h4), // Larger font for title
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
-                    }}
-                  >
-                    {contentItems[currentItemIndex]?.contentItem?.title || 
-                      getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type).title}
-                  </Typography>
-                </Box>
-                
-                {/* Card Content with fade transition */}
-                <Fade
-                  in={showContent}
-                  timeout={FADE_TRANSITION_DURATION}
-                >
-                  <Box
-                    sx={{
-                      p: 3,
-                      pt: 4,
-                      pb: 4,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      flex: 1, // Take up all available space
-                      overflow: 'auto',
-                      background: 'rgba(255, 255, 255, 0.7)', // Slightly less transparent for better text readability
-                      width: '100%',
-                    }}
-                  >
-                    {renderContent()}
-                  </Box>
-                </Fade>
-              </Box>
-            )}
-            
-            {(!contentItems.length || currentItemIndex >= contentItems.length) && (
-              <Box
-                sx={{
-                  width: '95%',
-                  height: '85vh',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  borderRadius: '16px',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  m: 2
+                  mb: 0 // Override the bottom margin
                 }}
               >
                 <Box
                   sx={{
-                    background: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)',
-                    color: '#FFFFFF',
-                    p: 2,
+                    width: '100%',
+                    borderTopLeftRadius: 'inherit',
+                    borderTopRightRadius: 'inherit',
+                    p: 1.5, // Reduced padding
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)'
+                    backdropFilter: 'blur(10px)',
+                    background: 'rgba(0, 0, 0, 0.3)',
                   }}
                 >
                   <Typography 
@@ -1140,7 +1157,11 @@ const ContentCarousel: React.FC = () => {
                       textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
                     }}
                   >
-                    Information
+                    {contentItems.length > 0 && currentItemIndex < contentItems.length
+                      ? (contentItems[currentItemIndex]?.contentItem?.title || 
+                         getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).title)
+                      : 'Information'
+                    }
                   </Typography>
                 </Box>
               
@@ -1150,13 +1171,15 @@ const ContentCarousel: React.FC = () => {
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    p: 4,
-                    background: 'rgba(255, 255, 255, 0.7)'
+                    p: { xs: 1.5, sm: 2, md: 3 }, // Responsive padding
+                    backdropFilter: 'blur(5px)',
+                    background: 'rgba(255, 255, 255, 0.05)', // Much more translucent
+                    overflow: 'auto' // Allow scrolling if content is too large
                   }}
                 >
                   {renderContent()}
                 </Box>
-              </Box>
+              </GlassmorphicContentCard>
             )}
           </Box>
         </Fade>
@@ -1179,9 +1202,10 @@ const ContentCarousel: React.FC = () => {
               justifyContent: 'center',
               alignItems: 'center',
               zIndex: 100000, // Extremely high z-index
+              backdropFilter: 'blur(15px)',
               background: isPrayerJamaat 
-                ? 'linear-gradient(135deg, rgba(241, 196, 15, 0.95), rgba(218, 165, 32, 0.85))'
-                : 'linear-gradient(135deg, rgba(42, 157, 143, 0.95), rgba(26, 95, 87, 0.85))',
+                ? 'linear-gradient(135deg, rgba(241, 196, 15, 0.6), rgba(218, 165, 32, 0.5))'
+                : 'linear-gradient(135deg, rgba(42, 157, 143, 0.6), rgba(26, 95, 87, 0.5))',
               overflow: 'hidden'
             }}
           >
@@ -1199,7 +1223,7 @@ const ContentCarousel: React.FC = () => {
                 embossStrength="medium" 
                 patternColor={"#0A2647"}
                 backgroundColor={ '#0A2647'}
-                opacity={0.3}
+                opacity={0.25}
               />
             </Box>
             
@@ -1210,25 +1234,26 @@ const ContentCarousel: React.FC = () => {
                 zIndex: 1,
                 width: '90%',
                 maxWidth: '600px',
+                backdropFilter: 'blur(12px)',
                 background: isPrayerJamaat 
-                  ? 'linear-gradient(135deg, #F1C40F 0%, #DAA520 100%)' 
-                  : 'linear-gradient(135deg, #2A9D8F 0%, #205E56 100%)',
+                  ? 'linear-gradient(135deg, rgba(241, 196, 15, 0.7), rgba(218, 165, 32, 0.6))' 
+                  : 'linear-gradient(135deg, rgba(42, 157, 143, 0.7), rgba(32, 94, 86, 0.6))',
                 color: isPrayerJamaat ? '#0A2647' : '#FFFFFF',
                 borderRadius: '16px',
                 p: screenSize.is720p ? 3 : 5,
                 textAlign: 'center',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-                border: '3px solid',
-                borderColor: isPrayerJamaat ? 'rgba(244, 208, 63, 0.9)' : 'rgba(42, 157, 143, 0.9)',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+                border: '2px solid',
+                borderColor: isPrayerJamaat ? 'rgba(244, 208, 63, 0.5)' : 'rgba(42, 157, 143, 0.5)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 animation: 'pulse 2s infinite ease-in-out',
                 '@keyframes pulse': {
-                  '0%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)' },
-                  '50%': { boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)' },
-                  '100%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)' },
+                  '0%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)' },
+                  '50%': { boxShadow: '0 10px 40px rgba(0, 0, 0, 0.4)' },
+                  '100%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)' },
                 },
               }}
             >
@@ -1237,7 +1262,7 @@ const ContentCarousel: React.FC = () => {
                   fontSize: getScaledFontSize(fontSizes.h2),
                   fontWeight: 'bold',
                   mb: 2,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
                   letterSpacing: '0.5px',
                 }}
               >
@@ -1249,6 +1274,7 @@ const ContentCarousel: React.FC = () => {
                   fontSize: getScaledFontSize(fontSizes.h3),
                   mb: 3,
                   letterSpacing: '0.5px',
+                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
                 }}
               >
                 {isPrayerJamaat 
@@ -1268,8 +1294,9 @@ const ContentCarousel: React.FC = () => {
                 sx={{
                   fontSize: getScaledFontSize(fontSizes.h4),
                   mt: 2,
-                  opacity: 0.9,
+                  opacity: 0.95,
                   letterSpacing: '0.5px',
+                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
                 }}
               >
                 {isPrayerJamaat 
