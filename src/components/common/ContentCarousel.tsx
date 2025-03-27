@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Box, Typography, Fade, CircularProgress } from '@mui/material';
+import { Box, Typography, Fade, CircularProgress, Paper } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import IslamicPatternBackground from './IslamicPatternBackground';
@@ -11,6 +11,9 @@ import localforage from 'localforage';
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
 
+// Additional types for internal handling
+type ExtendedContentItemType = ContentItemType | 'HADITH';
+
 interface ContentItem {
   id: string;
   title: string;
@@ -20,6 +23,62 @@ interface ContentItem {
   reference?: string;
 }
 
+// Helper function to format newlines in text
+const formatTextWithNewlines = (text: string) => {
+  if (!text) return '';
+  return text.split('\n').map((line, index) => (
+    <React.Fragment key={index}>
+      {line}
+      {index < text.split('\n').length - 1 && <br />}
+    </React.Fragment>
+  ));
+};
+
+// Type-specific card title config
+const contentTypeConfig: Record<ExtendedContentItemType, {
+  title: string;
+  titleColor: string;
+  textColor: string;
+}> = {
+  'VERSE_HADITH': {
+    title: 'Verse from the Quran',
+    titleColor: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
+    textColor: '#FFFFFF',
+  },
+  'HADITH': {
+    title: 'Hadith of the Day',
+    titleColor: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
+    textColor: '#FFFFFF',
+  },
+  'ANNOUNCEMENT': {
+    title: 'Announcement',
+    titleColor: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
+    textColor: '#FFFFFF',
+  },
+  'EVENT': {
+    title: 'Upcoming Event',
+    titleColor: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+    textColor: '#FFFFFF',
+  },
+  'ASMA_AL_HUSNA': {
+    title: 'Names of Allah',
+    titleColor: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+    textColor: '#FFFFFF',
+  },
+  'CUSTOM': {
+    title: 'Information',
+    titleColor: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)',
+    textColor: '#FFFFFF',
+  }
+};
+
+// Helper function to get content type config safely
+const getContentTypeConfig = (type: string | undefined): typeof contentTypeConfig[ExtendedContentItemType] => {
+  if (!type || !(type in contentTypeConfig)) {
+    return contentTypeConfig['CUSTOM'];
+  }
+  return contentTypeConfig[type as ExtendedContentItemType];
+};
 
 /**
  * ContentCarousel component
@@ -52,6 +111,7 @@ const ContentCarousel: React.FC = () => {
   const [autoRotate, setAutoRotate] = useState(true);
   const [currentItemDisplayTime, setCurrentItemDisplayTime] = useState(30000); // Default 30 seconds
   const [contentLoading, setContentLoading] = useState(true);
+  const [hasCheckedLocalStorage, setHasCheckedLocalStorage] = useState(false);
   
   // Use refs to manage state without unnecessary rerenders
   const contentItemsRef = useRef<Array<any>>([]);
@@ -91,6 +151,110 @@ const ContentCarousel: React.FC = () => {
     }
   }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
   
+  // Check IndexedDB for content on initialization
+  useEffect(() => {
+    const checkLocalStorage = async () => {
+      try {
+        // Try to load content from IndexedDB
+        const cachedSchedule = await localforage.getItem('schedule');
+        const cachedEvents = await localforage.getItem('events');
+        
+        logger.debug('ContentCarousel: Checking cached content', { 
+          hasCachedSchedule: !!cachedSchedule, 
+          hasCachedEvents: !!cachedEvents 
+        } as Record<string, any>);
+        
+        if (cachedSchedule || cachedEvents) {
+          // Process cached content similar to how we process API content
+          let items = [];
+          
+          // Add schedule items if available
+          if (cachedSchedule && (cachedSchedule as any)?.items && (cachedSchedule as any).items.length > 0) {
+            const scheduleItems = (cachedSchedule as any).items;
+            // Map schedule items to the expected format
+            const mappedItems = scheduleItems.map((item: any, index: number) => {
+              if (!item.contentItem) {
+                const apiItem = item as unknown as { 
+                  id: string; 
+                  type?: string; 
+                  title?: string; 
+                  content?: any; 
+                  duration?: number; 
+                  order?: number;
+                };
+                
+                return {
+                  id: apiItem.id || `item-${index}`,
+                  order: typeof apiItem.order === 'number' ? apiItem.order : index,
+                  contentItem: {
+                    id: `${apiItem.id}-content`,
+                    type: apiItem.type || 'CUSTOM',
+                    title: apiItem.title || 'No Title',
+                    content: apiItem.content || 'No Content',
+                    duration: typeof apiItem.duration === 'number' ? apiItem.duration : 30
+                  }
+                };
+              }
+              
+              const contentItem = item.contentItem;
+              
+              return {
+                id: item.id,
+                order: item.order || 999,
+                contentItem: {
+                  id: contentItem.id,
+                  title: contentItem.title || 'No Title',
+                  content: contentItem.content || 'No Content',
+                  type: contentItem.type || 'CUSTOM',
+                  duration: contentItem.duration || 30
+                }
+              };
+            }).filter(Boolean);
+            
+            if (mappedItems.length > 0) {
+              items.push(...mappedItems);
+            }
+          }
+          
+          // Add cached events if available
+          if (cachedEvents && Array.isArray(cachedEvents) && (cachedEvents as any[]).length > 0) {
+            items.push(...(cachedEvents as any[]).map((event: any) => ({
+              id: event.id,
+              order: 999, // Place events after scheduled content
+              contentItem: {
+                id: event.id,
+                title: event.title || 'Event',
+                content: event.description || 'No description available',
+                type: 'EVENT',
+                duration: 20
+              },
+              startDate: event.startDate,
+              endDate: event.endDate,
+              location: event.location
+            })));
+          }
+          
+          // Sort and update content items
+          if (items.length > 0) {
+            items.sort((a, b) => ((a as any).order || 999) - ((b as any).order || 999));
+            contentItemsRef.current = items;
+            setContentItems(items);
+            setContentLoading(false);
+          }
+        }
+        
+        setHasCheckedLocalStorage(true);
+      } catch (error) {
+        logger.error('ContentCarousel: Error checking IndexedDB for cached content', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        setHasCheckedLocalStorage(true);
+      }
+    };
+    
+    checkLocalStorage();
+  }, []);
+  
   // Refresh content when mounted and when orientation changes
   useEffect(() => {
     // Initial content load
@@ -98,7 +262,9 @@ const ContentCarousel: React.FC = () => {
       logger.info('ContentCarousel: Initial schedule refresh');
       hasRefreshedRef.current = true;
       refreshSchedule().catch((error) => {
-        logger.error('Failed to refresh schedule:', error);
+        logger.error('Failed to refresh schedule:', {
+          error: error instanceof Error ? error.message : String(error)
+        });
       });
     }
     
@@ -111,7 +277,9 @@ const ContentCarousel: React.FC = () => {
       
       // Force a new refresh of content when orientation changes
       refreshSchedule().catch((error) => {
-        logger.error('Failed to refresh schedule after orientation change:', error);
+        logger.error('Failed to refresh schedule after orientation change:', {
+          error: error instanceof Error ? error.message : String(error)
+        });
       });
       
       lastOrientationRef.current = orientation;
@@ -303,6 +471,59 @@ const ContentCarousel: React.FC = () => {
     return `${scaledValue}${unit}`;
   };
 
+  // Get dynamic font size based on content length
+  const getDynamicFontSize = (text: string, type: string) => {
+    if (!text) return getScaledFontSize(fontSizes.h4);
+    
+    const textLength = text.length;
+    const lineCount = (text.match(/\n/g) || []).length + 1;
+    
+    // Special handling for Eid prayers - use extremely large sizes regardless of content length
+    if (type === 'eid-announcement') {
+      if (lineCount <= 2) {
+        return `${3.5}rem`; // Extremely large font for Eid announcements with few lines
+      } else if (lineCount <= 4) {
+        return `${2.8}rem`; // Very large font for Eid announcements with moderate lines
+      } else {
+        return `${2.2}rem`; // Large font for Eid announcements with many lines
+      }
+    }
+    
+    // For very short content, especially event announcements, use larger font sizes
+    if (textLength < 50 && (type === 'event-title' || type === 'announcement-title')) {
+      return getScaledFontSize(fontSizes.huge); // Very large for main titles with minimal text
+    }
+    
+    if (textLength < 80 && type === 'event-content') {
+      return getScaledFontSize(fontSizes.h1); // Larger size for short event content
+    }
+    
+    // Adjust based on both text length and number of lines
+    if (type === 'arabic') {
+      if (textLength > 250 || lineCount > 4) {
+        return getScaledFontSize(fontSizes.h4);
+      } else if (textLength > 150 || lineCount > 2) {
+        return getScaledFontSize(fontSizes.h3);
+      } else {
+        return getScaledFontSize(fontSizes.h2);
+      }
+    }
+    
+    // For regular text - make more responsive to larger content
+    if (textLength > 500 || lineCount > 6) {
+      return getScaledFontSize(fontSizes.h6);
+    } else if (textLength > 350 || lineCount > 4) {
+      return getScaledFontSize(fontSizes.h5);
+    } else if (textLength > 200 || lineCount > 2) {
+      return getScaledFontSize(fontSizes.h4);
+    } else if (textLength > 100) {
+      return getScaledFontSize(fontSizes.h3);
+    } else {
+      // For shorter content, use larger fonts
+      return getScaledFontSize(fontSizes.h2);
+    }
+  };
+
   // Render content based on its type
   const renderContent = () => {
     // Show loading indicator while content is being loaded for the first time
@@ -334,12 +555,12 @@ const ContentCarousel: React.FC = () => {
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          p: screenSize.is720p ? 1 : 2
+          gap: 3
         }}>
-          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h4), mb: 1, fontWeight: 'bold' }}>
+          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h3), fontWeight: 'bold', textAlign: 'center' }}>
             No Content Available
           </Typography>
-          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.body1) }}>
+          <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
             Content will appear here once it's configured.
           </Typography>
         </Box>
@@ -358,6 +579,12 @@ const ContentCarousel: React.FC = () => {
     
     const content = currentItem.contentItem;
     const contentType = content.type;
+
+    // Define which title to show
+    const typeConfig = getContentTypeConfig(contentType);
+    let titleToShow = content.title || typeConfig.title;
+    let titleGradient = typeConfig.titleColor;
+    let titleTextColor = typeConfig.textColor;
     
     try {
       // For EVENT type
@@ -373,91 +600,111 @@ const ContentCarousel: React.FC = () => {
           eventText = JSON.stringify(content.content);
         }
         
-        // Calculate font size based on content length to prevent overflow
-        const textLength = eventText.length;
-        const dynamicFontSize = textLength > 200 ? 
-          getScaledFontSize(fontSizes.h5) : (textLength > 100 ? getScaledFontSize(fontSizes.h4) : getScaledFontSize(fontSizes.h3));
+        // Check if this is an Eid prayer or special announcement
+        const isEidAnnouncement = 
+          content.title?.toLowerCase().includes('eid') || 
+          eventText.toLowerCase().includes('eid prayer');
+        
+        const isPrayerAnnouncement = 
+          content.title?.toLowerCase().includes('prayer') ||
+          eventText.toLowerCase().includes('prayer will be held');
+        
+        const isSpecialAnnouncement = isEidAnnouncement || isPrayerAnnouncement;
+        
+        // Calculate appropriate content type for sizing
+        const fontSizeType = isEidAnnouncement ? 'eid-announcement' : 
+                             (isSpecialAnnouncement ? 'event-content' : 'normal');
         
         return (
           <Box sx={{ 
             display: 'flex', 
             flexDirection: 'column', 
-            gap: screenSize.is720p ? 0.5 : 1, 
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: isSpecialAnnouncement ? 4 : (screenSize.is720p ? 0.5 : 1), 
             textAlign: 'center',
             width: '100%',
-            p: screenSize.is720p ? 0.5 : 1,
+            height: '100%',
+            p: isSpecialAnnouncement ? 4 : (screenSize.is720p ? 1 : 2),
             overflow: 'auto'
           }}>
             <Typography 
               sx={{ 
-                fontSize: dynamicFontSize,
-                mb: 1,
+                fontSize: getDynamicFontSize(eventText, fontSizeType),
+                mb: isSpecialAnnouncement ? 2 : 1,
                 textAlign: 'center',
-                fontWeight: 'medium'
+                fontWeight: isSpecialAnnouncement ? 'bold' : 'medium',
+                whiteSpace: 'pre-line', // Preserve newlines
+                lineHeight: isSpecialAnnouncement ? 2 : 1.5
               }}
             >
-              {eventText}
+              {formatTextWithNewlines(eventText)}
             </Typography>
             
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-around', 
-                flexWrap: 'wrap',
-                gap: 1,
-                mt: 1,
-                bgcolor: 'background.paper',
-                p: 1,
-                borderRadius: 2,
-                width: '100%'
-              }}
-            >
-              {currentItem.startDate && (
-                <Box>
-                  <Typography 
-                    sx={{ 
-                      fontSize: getScaledFontSize(fontSizes.h6),
-                      fontWeight: 'bold',
-                      color: 'text.secondary',
-                      textAlign: 'center'
-                    }}
-                  >
-                    Date
-                  </Typography>
-                  <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
-                    {new Date(currentItem.startDate).toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </Typography>
-                </Box>
-              )}
-              
-              {(currentItem.location || currentItem.startDate) && (
-                <Box>
-                  <Typography 
-                    sx={{ 
-                      fontSize: getScaledFontSize(fontSizes.h6),
-                      fontWeight: 'bold',
-                      color: 'text.secondary',
-                      textAlign: 'center'
-                    }}
-                  >
-                    {currentItem.location ? 'Location' : 'Time'}
-                  </Typography>
-                  <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
-                    {currentItem.location || (
-                      currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    )}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
+            {/* Only show date/location box if not an Eid announcement, to maximize text space */}
+            {(!isEidAnnouncement && (currentItem.startDate || currentItem.location)) && (
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-around', 
+                  flexWrap: 'wrap',
+                  gap: 1,
+                  mt: 1,
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(8px)',
+                  p: 1,
+                  borderRadius: 2,
+                  width: '100%',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                }}
+              >
+                {currentItem.startDate && (
+                  <Box>
+                    <Typography 
+                      sx={{ 
+                        fontSize: getScaledFontSize(fontSizes.h6),
+                        fontWeight: 'bold',
+                        color: 'text.secondary',
+                        textAlign: 'center'
+                      }}
+                    >
+                      Date
+                    </Typography>
+                    <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+                      {new Date(currentItem.startDate).toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </Typography>
+                  </Box>
+                )}
+                
+                {(currentItem.location || currentItem.startDate) && (
+                  <Box>
+                    <Typography 
+                      sx={{ 
+                        fontSize: getScaledFontSize(fontSizes.h6),
+                        fontWeight: 'bold',
+                        color: 'text.secondary',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {currentItem.location ? 'Location' : 'Time'}
+                    </Typography>
+                    <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+                      {currentItem.location || (
+                        currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      )}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
         );
       }
@@ -509,12 +756,12 @@ const ContentCarousel: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            p: screenSize.is720p ? 0.5 : 1
+            p: screenSize.is720p ? 1 : 2
           }}>
             {arabicText && (
               <Typography 
                 sx={{ 
-                  fontSize: getScaledFontSize(fontSizes.h1),
+                  fontSize: getDynamicFontSize(arabicText, 'arabic'),
                   mb: 1,
                   textAlign: 'center',
                   fontWeight: 'bold',
@@ -528,24 +775,25 @@ const ContentCarousel: React.FC = () => {
             {transliteration && (
               <Typography 
                 sx={{ 
-                  fontSize: getScaledFontSize(fontSizes.h3),
+                  fontSize: getDynamicFontSize(transliteration, 'normal'),
                   mb: 1,
                   textAlign: 'center',
                   fontWeight: 'medium'
                 }}
               >
-                {transliteration}
+                {formatTextWithNewlines(transliteration)}
               </Typography>
             )}
             
             {meaning && (
               <Typography 
                 sx={{ 
-                  fontSize: getScaledFontSize(fontSizes.h4),
-                  textAlign: 'center'
+                  fontSize: getDynamicFontSize(meaning, 'normal'),
+                  textAlign: 'center',
+                  whiteSpace: 'pre-line'
                 }}
               >
-                {meaning}
+                {formatTextWithNewlines(meaning)}
               </Typography>
             )}
           </Box>
@@ -558,6 +806,14 @@ const ContentCarousel: React.FC = () => {
         let englishText = '';
         let reference = content.content?.reference || content.reference || '';
         let grade = content.content?.grade || '';
+        let isHadith = reference?.toLowerCase().includes('hadith') || grade || 
+                      (content.title && content.title.toLowerCase().includes('hadith'));
+        
+        // Update the title based on hadith detection
+        if (isHadith) {
+          titleToShow = 'Hadith of the Day';
+          titleGradient = contentTypeConfig['HADITH'].titleColor;
+        }
         
         // Parse content based on its format
         if (typeof content.content === 'string') {
@@ -581,13 +837,6 @@ const ContentCarousel: React.FC = () => {
           }
         }
         
-        // Calculate font size based on content length to prevent overflow
-        const arabicFontSize = arabicText.length > 150 ? 
-          getScaledFontSize(fontSizes.h4) : (arabicText.length > 80 ? getScaledFontSize(fontSizes.h3) : getScaledFontSize(fontSizes.h2));
-        
-        const englishFontSize = englishText.length > 300 ? 
-          getScaledFontSize(fontSizes.h5) : (englishText.length > 150 ? getScaledFontSize(fontSizes.h4) : getScaledFontSize(fontSizes.h3));
-        
         return (
           <Box sx={{ 
             textAlign: 'center', 
@@ -595,13 +844,13 @@ const ContentCarousel: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            p: screenSize.is720p ? 0.5 : 1,
+            p: screenSize.is720p ? 1 : 2,
             overflow: 'auto'
           }}>
             {arabicText && (
               <Typography 
                 sx={{ 
-                  fontSize: arabicFontSize,
+                  fontSize: getDynamicFontSize(arabicText, 'arabic'),
                   mb: 2,
                   textAlign: 'center',
                   fontFamily: 'Scheherazade New, Arial',
@@ -609,19 +858,20 @@ const ContentCarousel: React.FC = () => {
                   lineHeight: 1.7
                 }}
               >
-                {arabicText}
+                {formatTextWithNewlines(arabicText)}
               </Typography>
             )}
             
             <Typography 
               sx={{ 
-                fontSize: englishFontSize,
+                fontSize: getDynamicFontSize(englishText, 'normal'),
                 lineHeight: 1.4,
                 mb: 2,
-                textAlign: 'center'
+                textAlign: 'center',
+                whiteSpace: 'pre-line'
               }}
             >
-              {englishText}
+              {formatTextWithNewlines(englishText)}
             </Typography>
             
             <Typography 
@@ -652,11 +902,6 @@ const ContentCarousel: React.FC = () => {
           announcementText = JSON.stringify(content.content);
         }
         
-        // Calculate font size based on content length to prevent overflow
-        const textLength = announcementText.length;
-        const dynamicFontSize = textLength > 300 ? 
-          getScaledFontSize(fontSizes.h5) : (textLength > 150 ? getScaledFontSize(fontSizes.h4) : getScaledFontSize(fontSizes.h3));
-        
         return (
           <Box sx={{ 
             textAlign: 'center', 
@@ -664,17 +909,18 @@ const ContentCarousel: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            p: screenSize.is720p ? 0.5 : 1
+            p: screenSize.is720p ? 1 : 2
           }}>
             <Typography 
               sx={{ 
-                fontSize: dynamicFontSize,
+                fontSize: getDynamicFontSize(announcementText, 'normal'),
                 lineHeight: 1.5,
                 textAlign: 'center',
-                fontWeight: textLength > 150 ? 'normal' : 'bold'
+                fontWeight: announcementText.length > 150 ? 'normal' : 'bold',
+                whiteSpace: 'pre-line'
               }}
             >
-              {announcementText}
+              {formatTextWithNewlines(announcementText)}
             </Typography>
           </Box>
         );
@@ -688,18 +934,26 @@ const ContentCarousel: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          p: screenSize.is720p ? 0.5 : 1
+          p: screenSize.is720p ? 1 : 2
         }}>
           <Typography 
             sx={{ 
-              fontSize: getScaledFontSize(fontSizes.h4),
+              fontSize: getDynamicFontSize(
+                typeof content.content === 'string' 
+                  ? content.content 
+                  : content.content?.text || JSON.stringify(content.content),
+                'normal'
+              ),
               lineHeight: 1.5,
-              textAlign: 'center'
+              textAlign: 'center',
+              whiteSpace: 'pre-line'
             }}
           >
-            {typeof content.content === 'string' 
-              ? content.content 
-              : content.content?.text || JSON.stringify(content.content)}
+            {formatTextWithNewlines(
+              typeof content.content === 'string' 
+                ? content.content 
+                : content.content?.text || JSON.stringify(content.content)
+            )}
           </Typography>
         </Box>
       );
@@ -715,31 +969,34 @@ const ContentCarousel: React.FC = () => {
   
   // Update loading state based on content and isLoading
   useEffect(() => {
-    // If we have content items, we're no longer loading
+    // Keep showing loading until we've checked IndexedDB and have either loaded content or API loading is complete
     if (contentItems.length > 0) {
+      // If we have content items, we're no longer loading
       setContentLoading(false);
-    } else if (!isLoading && contentLoading) {
-      // If API loading is done but we still don't have content, stop showing the loading indicator
+    } else if (!isLoading && hasCheckedLocalStorage) {
+      // Only stop loading if we've checked IndexedDB and API loading is complete
       setContentLoading(false);
     }
-  }, [contentItems.length, isLoading, contentLoading]);
+  }, [contentItems.length, isLoading, hasCheckedLocalStorage]);
   
   // Force a reload if content is empty after initial load
   useEffect(() => {
     // Wait until loading is complete and check if we actually have content
-    if (!isLoading && !contentItems.length && hasRefreshedRef.current) {
+    if (!isLoading && !contentItems.length && hasRefreshedRef.current && hasCheckedLocalStorage) {
       // Set a short timeout to prevent immediate reloading
       const timeoutId = setTimeout(() => {
         // Try to refresh the schedule
         refreshSchedule().catch((error: unknown) => {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error('Failed to reload schedule:', { errorMessage });
+          logger.error('Failed to reload schedule:', { 
+            error: errorMessage 
+          });
         });
       }, 1000);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [isLoading, contentItems.length, refreshSchedule]);
+  }, [isLoading, contentItems.length, refreshSchedule, hasCheckedLocalStorage]);
   
   // Main render
   return (
@@ -748,7 +1005,11 @@ const ContentCarousel: React.FC = () => {
       <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
         {/* Background pattern for both views */}
         <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-          <IslamicPatternBackground variant="embossed" />
+          <IslamicPatternBackground 
+            variant="embossed" 
+            opacity={0.45} 
+            embossStrength="medium"
+          />
         </Box>
         
         {/* Regular content */}
@@ -766,10 +1027,137 @@ const ContentCarousel: React.FC = () => {
               justifyContent: 'center',
               alignItems: 'center',
               position: 'relative',
-              zIndex: 1
+              zIndex: 1,
+              p: { xs: 1, sm: 2 } // Responsive padding for different screen sizes
             }}
           >
-            {renderContent()}
+            {/* Glassmorphic Card */}
+            {contentItems.length > 0 && currentItemIndex < contentItems.length && (
+              <Box
+                sx={{
+                  width: '95%',
+                  height: '85vh', // Use even more vertical space
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: 'rgba(255, 255, 255, 0.2)', // Slightly more transparent
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)', // For Safari support
+                  borderRadius: '16px',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  overflow: 'hidden',
+                  m: 2,
+                }}
+              >
+                {/* Card Header with type-specific gradient */}
+                <Box
+                  sx={{
+                    background: getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type).titleColor,
+                    color: '#FFFFFF',
+                    p: 2,
+                    pl: 4,
+                    pr: 4,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)'
+                  }}
+                >
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontSize: getScaledFontSize(fontSizes.h4), // Larger font for title
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+                    }}
+                  >
+                    {contentItems[currentItemIndex]?.contentItem?.title || 
+                      getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type).title}
+                  </Typography>
+                </Box>
+                
+                {/* Card Content with fade transition */}
+                <Fade
+                  in={showContent}
+                  timeout={FADE_TRANSITION_DURATION}
+                >
+                  <Box
+                    sx={{
+                      p: 3,
+                      pt: 4,
+                      pb: 4,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      flex: 1, // Take up all available space
+                      overflow: 'auto',
+                      background: 'rgba(255, 255, 255, 0.7)', // Slightly less transparent for better text readability
+                      width: '100%',
+                    }}
+                  >
+                    {renderContent()}
+                  </Box>
+                </Fade>
+              </Box>
+            )}
+            
+            {(!contentItems.length || currentItemIndex >= contentItems.length) && (
+              <Box
+                sx={{
+                  width: '95%',
+                  height: '85vh',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderRadius: '16px',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  m: 2
+                }}
+              >
+                <Box
+                  sx={{
+                    background: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)',
+                    color: '#FFFFFF',
+                    p: 2,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)'
+                  }}
+                >
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontSize: getScaledFontSize(fontSizes.h4),
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+                    }}
+                  >
+                    Information
+                  </Typography>
+                </Box>
+              
+                <Box
+                  sx={{
+                    flex: 1,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    p: 4,
+                    background: 'rgba(255, 255, 255, 0.7)'
+                  }}
+                >
+                  {renderContent()}
+                </Box>
+              </Box>
+            )}
           </Box>
         </Fade>
         

@@ -50,7 +50,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         transform: scale(1.01);
       }
       50% {
-        transform: scale(1.05);
+        transform: scale(1.03);
       }
       100% {
         transform: scale(1.01);
@@ -59,40 +59,37 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     
     @keyframes pulseGlow {
       0% {
-        border-color: rgba(42, 157, 143, 0.7);
-        box-shadow: 0 0 8px rgba(42, 157, 143, 0.5), 0 0 15px rgba(42, 157, 143, 0.3);
+        box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3);
       }
       50% {
-        border-color: rgba(42, 157, 143, 1);
-        box-shadow: 0 0 20px rgba(42, 157, 143, 0.8), 0 0 30px rgba(42, 157, 143, 0.6);
+        box-shadow: 0 4px 18px rgba(42, 157, 143, 0.6), 0 0 25px rgba(42, 157, 143, 0.5);
       }
       100% {
-        border-color: rgba(42, 157, 143, 0.7);
-        box-shadow: 0 0 8px rgba(42, 157, 143, 0.5), 0 0 15px rgba(42, 157, 143, 0.3);
+        box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3);
       }
     }
     
     @keyframes currentPrayerGlow {
       0% {
-        border-color: rgba(20, 66, 114, 0.6);
+        box-shadow: 0 2px 8px rgba(20, 66, 114, 0.4);
       }
       50% {
-        border-color: rgba(20, 66, 114, 0.9);
+        box-shadow: 0 2px 15px rgba(20, 66, 114, 0.7);
       }
       100% {
-        border-color: rgba(20, 66, 114, 0.6);
+        box-shadow: 0 2px 8px rgba(20, 66, 114, 0.4);
       }
     }
     
-    @keyframes pulseBackground {
+    @keyframes pulseOpacity {
       0% {
-        background-color: rgba(42, 157, 143, 0.8);
+        opacity: 0.95;
       }
       50% {
-        background-color: rgba(42, 157, 143, 0.9);
+        opacity: 1;
       }
       100% {
-        background-color: rgba(42, 157, 143, 0.8);
+        opacity: 0.95;
       }
     }
     
@@ -102,6 +99,18 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
       }
       100% {
         background-position: 200% 0;
+      }
+    }
+    
+    @keyframes gradientFlow {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
       }
     }
     
@@ -144,6 +153,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         <Box 
           sx={{ 
             background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
+            backgroundSize: '200% 200%',
+            animation: 'gradientFlow 10s ease infinite',
             color: 'white',
             py: getSizeRem(1.2),
             px: getSizeRem(2.0),
@@ -153,7 +164,6 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             position: 'relative',
             zIndex: 1,
             boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            animation: 'headerBorderGlow 2.5s infinite ease-in-out',
             height: 'auto',
             width: '100%',
             boxSizing: 'border-box',
@@ -371,9 +381,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '0px',
                   borderBottom: index < todaysPrayerTimes.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                   border: prayer.isNext 
-                    ? '2px solid #2A9D8F'
+                    ? '2px solid #1E796F'
                     : prayer.isCurrent
-                      ? '2px solid rgba(20, 66, 114, 0.9)'
+                      ? '2px solid #0A2647'
                       : 'none',
                   transition: 'all 0.3s ease',
                   transform: prayer.isNext 
@@ -389,16 +399,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   overflow: 'visible',
                   mx: prayer.isNext ? getSizeRem(0.4) : 0,
                   my: prayer.isNext ? getSizeRem(0.8) : getSizeRem(0.2),
-                  backgroundColor: prayer.isNext 
-                    ? 'rgba(42, 157, 143, 0.8)'
-                    : prayer.isCurrent
-                      ? 'rgba(20, 66, 114, 0.8)'
-                      : index % 2 === 0 
-                        ? 'rgba(246, 248, 250, 0.5)' 
-                        : 'transparent',
+                  backgroundColor: (!prayer.isNext && !prayer.isCurrent) ? 
+                    (index % 2 === 0 ? 'rgba(246, 248, 250, 0.5)' : 'transparent') : 
+                    'transparent',
                   zIndex: prayer.isNext ? 5 : (prayer.isCurrent ? 4 : 1),
                   animation: prayer.isNext 
-                    ? 'pulseBackground 2s infinite ease-in-out, pulseGlow 2s infinite ease-in-out, pulseScale 3s infinite ease-in-out' 
+                    ? 'pulseGlow 3s infinite ease-in-out, pulseScale 3s infinite ease-in-out' 
                     : prayer.isCurrent
                       ? 'currentPrayerGlow 3s infinite ease-in-out'
                       : 'none',
@@ -410,7 +416,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     width: '200%',
                     height: '100%',
                     background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
-                    animation: 'nextPrayerShine 2.5s infinite linear',
+                    animation: 'nextPrayerShine 3s infinite linear',
                     zIndex: 0
                   } : {},
                   '& .MuiTypography-root': {
@@ -430,9 +436,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       bottom: 0, 
                       zIndex: 0,
                       overflow: 'hidden',
-                      backgroundColor: prayer.isCurrent 
-                        ? 'rgba(20, 66, 114, 0.95)' 
-                        : '#2A9D8F',
+                      background: prayer.isCurrent 
+                        ? 'linear-gradient(90deg, #0A2647 0%, #144272 100%)' 
+                        : 'linear-gradient(90deg, #2A9D8F 0%, #1E796F 100%)',
+                      backgroundSize: '200% 200%',
+                      animation: 'gradientFlow 10s ease infinite',
                     }}
                   >
                     <IslamicPatternBackground 

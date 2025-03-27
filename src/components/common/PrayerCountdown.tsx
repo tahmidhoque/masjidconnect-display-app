@@ -227,7 +227,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             if (displayTimes && timeSinceLoad > 5000) {
               logger.info(`[CRITICAL] ${prayerName} time has just arrived (${prayerTime})`);
               triggerCountdownComplete(false);
-              return;
+              
+              // If there's no jamaat time, return after triggering completion
+              if (!jamaatTime) {
+                return;
+              }
             }
             
             // If we have a jamaatTime and we're not already counting down to it
@@ -240,11 +244,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
                 
                 // If jamaat time is still in the future, switch to counting down to jamaat
                 if (now.isBefore(jamaatMoment)) {
-                  // Trigger transition animation
+                  // Trigger transition animation with a slight delay
                   setTextTransition(true);
                   setTimeout(() => {
                     setCountingDownToJamaat(true);
                     setTextTransition(false);
+                    setDisplayTimes(true); // Ensure display is on for jamaat countdown
                     logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
                   }, 500); // Match fade out duration
                   
@@ -336,7 +341,44 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
               triggerCountdownComplete(true);
             } else {
               logger.info(`[CRITICAL] ${prayerName} time has arrived`);
-              triggerCountdownComplete(false);
+              
+              // If there's a jamaat time, we need to transition to jamaat countdown
+              if (jamaatTime) {
+                // Create moment object for jamaat time
+                const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+                const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
+                
+                if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
+                  jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+                  
+                  // If jamaat time is still in the future
+                  if (now.isBefore(jamaatMoment)) {
+                    // Trigger the prayer time completion but don't hide the countdown
+                    triggerCountdownComplete(false);
+                    
+                    // Transition to jamaat countdown after a short delay
+                    setTimeout(() => {
+                      setTextTransition(true);
+                      
+                      // Change to jamaat countdown after the transition effect
+                      setTimeout(() => {
+                        setCountingDownToJamaat(true);
+                        setTextTransition(false);
+                        logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
+                      }, 500); // Duration for the fade transition
+                    }, 2000); // Wait a bit before transitioning
+                  } else {
+                    // If jamaat time has already passed
+                    triggerCountdownComplete(false);
+                  }
+                } else {
+                  // Invalid jamaat time format
+                  triggerCountdownComplete(false);
+                }
+              } else {
+                // No jamaat time
+                triggerCountdownComplete(false);
+              }
             }
           }
         }
@@ -394,9 +436,13 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     }
     
     // Then update display state after a brief delay
-    setTimeout(() => {
-      setDisplayTimes(false);
-    }, 1000);  // Show zeros for 1 second
+    // If this is for adhan and we have jamaat time, don't update display state
+    // as we'll be transitioning to jamaat countdown
+    if (isForJamaat || !jamaatTime) {
+      setTimeout(() => {
+        setDisplayTimes(false);
+      }, 1000);  // Show zeros for 1 second
+    }
   };
 
   // Format remaining time for console display
@@ -412,7 +458,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         textAlign: 'center',
         color: '#F1C40F',
         my: getSizeRem(1.5),
-        animation: 'pulseScale 1s infinite ease-in-out',
+        animation: 'pulseScale 3s infinite ease-in-out',
       }}>
         {countingDownToJamaat ? `It's ${prayerName} Jamaa't time!` : `It's ${prayerName} time!`}
       </Typography>
