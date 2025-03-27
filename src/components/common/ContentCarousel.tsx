@@ -8,6 +8,7 @@ import logger from '../../utils/logger';
 import { useOrientation } from '../../contexts/OrientationContext';
 import localforage from 'localforage';
 import GlassmorphicContentCard from './GlassmorphicContentCard';
+import GlassmorphicCard from './GlassmorphicCard';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -39,46 +40,47 @@ const formatTextWithNewlines = (text: string) => {
   ));
 };
 
-// Type-specific card title config
+// Update the content type config to use direct color values instead of gradients
 const contentTypeConfig: Record<ExtendedContentItemType, {
   title: string;
   titleColor: string;
   textColor: string;
   colorType?: 'primary' | 'secondary' | 'info';
+  isUrgent?: boolean;
 }> = {
   'VERSE_HADITH': {
     title: 'Verse from the Quran',
-    titleColor: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
+    titleColor: 'rgba(42, 157, 143, 0.3)',
     textColor: '#FFFFFF',
     colorType: 'secondary'
   },
   'HADITH': {
     title: 'Hadith of the Day',
-    titleColor: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
+    titleColor: 'rgba(42, 157, 143, 0.3)',
     textColor: '#FFFFFF',
     colorType: 'secondary'
   },
   'ANNOUNCEMENT': {
     title: 'Announcement',
-    titleColor: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
+    titleColor: 'rgba(59, 130, 246, 0.3)',
     textColor: '#FFFFFF',
     colorType: 'info'
   },
   'EVENT': {
     title: 'Upcoming Event',
-    titleColor: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+    titleColor: 'rgba(139, 92, 246, 0.3)',
     textColor: '#FFFFFF',
     colorType: 'primary'
   },
   'ASMA_AL_HUSNA': {
     title: 'Names of Allah',
-    titleColor: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+    titleColor: 'rgba(245, 158, 11, 0.3)',
     textColor: '#FFFFFF',
     colorType: 'secondary'
   },
   'CUSTOM': {
     title: 'Information',
-    titleColor: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)',
+    titleColor: 'rgba(10, 38, 71, 0.3)',
     textColor: '#FFFFFF',
     colorType: 'primary'
   }
@@ -399,55 +401,51 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   
   // Handle auto-rotation
   useEffect(() => {
-    // Clear any existing timer to prevent memory leaks
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    
-    // Skip rotation if prayer announcement is active
-    if (showPrayerAnnouncement) {
-      return;
-    }
-    
-    if (!autoRotate || contentItems.length <= 1 || hasUserInteracted.current) {
+    // Skip if loading or no items
+    if (contentLoading || contentItems.length === 0) {
       return;
     }
 
-    // Use timer for rotation
-    timerRef.current = setTimeout(() => {
-      // Start transition
-      setIsChangingItem(true);
-      setShowContent(false);
-      
-      // After fade-out, change to next item
-      setTimeout(() => {
-        const nextIndex = (currentItemIndex + 1) % contentItems.length;
-        setCurrentItemIndex(nextIndex);
-        
-        // Reset timer for the next item based on its duration
-        if (contentItems[nextIndex] && contentItems[nextIndex].contentItem) {
-          const nextDuration = contentItems[nextIndex].contentItem.duration || defaultDuration;
-          setCurrentItemDisplayTime(nextDuration * 1000);
-        }
-        
-        // Show new content
-        setShowContent(true);
-        setIsChangingItem(false);
-      }, FADE_TRANSITION_DURATION);
-      
-      // Reset user interaction flag after rotation has occurred
-      if (Date.now() - lastInteractionTime.current > userInteractionTimeout) {
-        hasUserInteracted.current = false;
-      }
-    }, currentItemDisplayTime);
-
-    return () => {
+    // Set up the timer for auto-rotation
+    if (autoRotate && !hasUserInteracted.current) {
+      // Clear any existing timer
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
-    };
-  }, [autoRotate, currentItemIndex, contentItems.length, currentItemDisplayTime, showPrayerAnnouncement, prayerAnnouncementName]);
+      
+      // Get the display time for the current item
+      const currentItem = contentItems[currentItemIndex];
+      const displayTimeSeconds = 
+        currentItem?.displayTime || 
+        currentItem?.contentItem?.displayTime || 
+        defaultDuration;
+      
+      const displayTimeMs = displayTimeSeconds * 1000;
+      setCurrentItemDisplayTime(displayTimeMs);
+      
+      // Start a timer to change to the next item
+      timerRef.current = setTimeout(() => {
+        // Preload next item for smoother transition
+        const nextItemIndex = (currentItemIndex + 1) % contentItems.length;
+        
+        // Signal we're changing items (causes a fade out)
+        setIsChangingItem(true);
+        
+        // Short timeout to allow fade out to complete
+        setTimeout(() => {
+          // Change to the next item
+          setCurrentItemIndex(nextItemIndex);
+          
+          // Short timeout before fading back in with the new item
+          setTimeout(() => {
+            setIsChangingItem(false);
+          }, 50); // Very short delay to ensure DOM update
+        }, FADE_TRANSITION_DURATION - 50); // Slightly less than full transition time
+        
+      }, displayTimeMs);
+      
+    }
+  }, [currentItemIndex, contentItems, autoRotate, contentLoading]);
 
   // Reset display time when content changes
   useEffect(() => {
@@ -994,25 +992,44 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           announcementText = JSON.stringify(content.content);
         }
         
+        const isUrgent = content.urgent === true;
+        
+        // Get optimal font size based on text length
+        const getOptimalFontSize = (text: string): string => {
+          const length = text.length;
+          const lines = text.split('\n').length;
+          
+          if (length < 50) return getScaledFontSize(fontSizes.h2);
+          if (length < 100) return getScaledFontSize(fontSizes.h3);
+          if (length < 200) return getScaledFontSize(fontSizes.h4);
+          if (length < 400) return getScaledFontSize(fontSizes.h5);
+          return getScaledFontSize(fontSizes.h6);
+        };
+        
         return (
           <Box sx={{ 
             textAlign: 'center', 
             width: '100%',
+            height: '100%',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            p: screenSize.is720p ? 1 : 2,
-            // No background color to maintain glassmorphic effect
+            p: screenSize.is720p ? 2 : 3,
           }}>
             <Typography 
               sx={{ 
-                fontSize: getDynamicFontSize(announcementText, 'normal'),
-                lineHeight: 1.5,
+                fontSize: getOptimalFontSize(announcementText),
+                lineHeight: 1.4,
                 textAlign: 'center',
                 fontWeight: announcementText.length > 150 ? 'normal' : 'bold',
                 whiteSpace: 'pre-line',
                 color: '#FFFFFF',
-                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.35)',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
               {formatTextWithNewlines(announcementText)}
@@ -1112,40 +1129,52 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       >
         <Fade
           in={showContent && !isChangingItem && !showPrayerAnnouncement}
-          timeout={FADE_TRANSITION_DURATION}
+          appear={true}
+          timeout={{
+            appear: 50, // Very short appear time - just enough to let the component render
+            enter: FADE_TRANSITION_DURATION,
+            exit: FADE_TRANSITION_DURATION - 50 // Slightly shorter exit to prevent flicker
+          }}
+          mountOnEnter
+          unmountOnExit={false} // Keep DOM nodes to prevent blur recalculation
         >
           <Box sx={{ 
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
             width: '100%',
-            p: variant === 'landscape' ? 0.5 : 1, // Add slight padding
+            p: variant === 'landscape' ? 0.5 : 1,
           }}>
-            {contentItems.length > 0 && !contentLoading && (
+            {(contentItems.length > 0 || contentLoading) && (
               <GlassmorphicContentCard
                 orientation={variant || (orientation.toLowerCase() as 'portrait' | 'landscape')}
                 colorType={contentItems[currentItemIndex]?.contentItem?.type 
                   ? (getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).colorType || 'primary') 
                   : 'primary'
                 }
+                contentTypeColor={contentItems[currentItemIndex]?.contentItem?.type 
+                  ? getContentTypeConfig(contentItems[currentItemIndex]?.contentItem?.type as ExtendedContentItemType).titleColor 
+                  : undefined
+                }
+                isUrgent={contentItems[currentItemIndex]?.contentItem?.urgent || false}
                 sx={{ 
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  mb: 0 // Override the bottom margin
+                  mb: 0
                 }}
               >
+                {/* Title header */}
                 <Box
                   sx={{
                     width: '100%',
-                    borderTopLeftRadius: 'inherit',
-                    borderTopRightRadius: 'inherit',
-                    p: 1.5, // Reduced padding
+                    p: 1.5,
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    backdropFilter: 'blur(10px)',
-                    background: 'rgba(0, 0, 0, 0.3)',
+                    position: 'relative',
+                    zIndex: 1,
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                   }}
                 >
                   <Typography 
@@ -1154,7 +1183,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                       fontSize: getScaledFontSize(fontSizes.h4),
                       fontWeight: 'bold',
                       textAlign: 'center',
-                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+                      letterSpacing: '0.5px',
                     }}
                   >
                     {contentItems.length > 0 && currentItemIndex < contentItems.length
@@ -1165,34 +1195,48 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                   </Typography>
                 </Box>
               
+                {/* Content area */}
                 <Box
                   sx={{
                     flex: 1,
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    p: { xs: 1.5, sm: 2, md: 3 }, // Responsive padding
-                    backdropFilter: 'blur(5px)',
-                    background: 'rgba(255, 255, 255, 0.05)', // Much more translucent
-                    overflow: 'auto' // Allow scrolling if content is too large
+                    p: { xs: 1.5, sm: 2, md: 3 },
+                    overflow: 'auto'
                   }}
                 >
-                  {renderContent()}
+                  {contentLoading ? (
+                    <Box sx={{ 
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 2
+                    }}>
+                      <CircularProgress color="primary" />
+                      <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h5), textAlign: 'center' }}>
+                        Loading content...
+                      </Typography>
+                    </Box>
+                  ) : renderContent()}
                 </Box>
               </GlassmorphicContentCard>
             )}
           </Box>
         </Fade>
         
-        {/* Prayer announcement with hard-coded high z-index */}
+        {/* Prayer announcement with glassmorphic styling */}
         <Fade
           in={showPrayerAnnouncement}
           timeout={FADE_TRANSITION_DURATION}
+          appear={true}
           unmountOnExit
         >
           <Box 
             sx={{ 
-              position: 'fixed', // Use fixed positioning to break out of any stacking contexts
+              position: 'fixed',
               top: 0,
               left: 0,
               width: '100%',
@@ -1201,15 +1245,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              zIndex: 100000, // Extremely high z-index
-              backdropFilter: 'blur(15px)',
-              background: isPrayerJamaat 
-                ? 'linear-gradient(135deg, rgba(241, 196, 15, 0.6), rgba(218, 165, 32, 0.5))'
-                : 'linear-gradient(135deg, rgba(42, 157, 143, 0.6), rgba(26, 95, 87, 0.5))',
+              zIndex: 1000,
+              backdropFilter: 'blur(10px)',
+              backgroundColor: 'rgba(10, 38, 71, 0.7)', // Darker background matching main app
               overflow: 'hidden'
             }}
           >
-            {/* Islamic pattern background for prayer announcement */}
+            {/* Islamic pattern background with reduced opacity */}
             <Box sx={{ 
               position: 'absolute', 
               top: 0, 
@@ -1222,48 +1264,63 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 variant="embossed" 
                 embossStrength="medium" 
                 patternColor={"#0A2647"}
-                backgroundColor={ '#0A2647'}
-                opacity={0.25}
+                backgroundColor={'#0A2647'}
+                opacity={0.3} // Slightly higher opacity for better visibility
               />
             </Box>
             
-            {/* Prayer announcement card */}
-            <Box
+            {/* Larger prayer announcement glassmorphic card */}
+            <GlassmorphicCard
+              opacity={0.2}
+              borderOpacity={0.4}
+              blurIntensity={12}
+              borderRadius={16}
+              borderWidth={2} // Thicker border
+              borderColor={isPrayerJamaat ? 'rgba(244, 208, 63, 0.7)' : 'rgba(42, 157, 143, 0.7)'}
+              bgColor={isPrayerJamaat 
+                ? 'rgba(241, 196, 15, 0.35)'
+                : 'rgba(42, 157, 143, 0.35)'
+              }
+              shadowIntensity={0.35}
+              animateGlow={true}
               sx={{
                 position: 'relative',
-                zIndex: 1,
-                width: '90%',
-                maxWidth: '600px',
-                backdropFilter: 'blur(12px)',
-                background: isPrayerJamaat 
-                  ? 'linear-gradient(135deg, rgba(241, 196, 15, 0.7), rgba(218, 165, 32, 0.6))' 
-                  : 'linear-gradient(135deg, rgba(42, 157, 143, 0.7), rgba(32, 94, 86, 0.6))',
-                color: isPrayerJamaat ? '#0A2647' : '#FFFFFF',
-                borderRadius: '16px',
-                p: screenSize.is720p ? 3 : 5,
+                zIndex: 2,
+                width: '95%', // Take up more width
+                maxWidth: '800px', // Larger max width
+                height: 'auto',
+                minHeight: '65%', // Take up more height
+                maxHeight: '85%',
+                p: { xs: 4, sm: 5, md: 6 }, // More responsive padding
                 textAlign: 'center',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-                border: '2px solid',
-                borderColor: isPrayerJamaat ? 'rgba(244, 208, 63, 0.5)' : 'rgba(42, 157, 143, 0.5)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                animation: 'pulse 2s infinite ease-in-out',
-                '@keyframes pulse': {
-                  '0%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)' },
-                  '50%': { boxShadow: '0 10px 40px rgba(0, 0, 0, 0.4)' },
-                  '100%': { boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)' },
-                },
+                color: '#FFFFFF',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: isPrayerJamaat 
+                    ? 'linear-gradient(135deg, rgba(241, 196, 15, 0.3), rgba(218, 165, 32, 0.2))'
+                    : 'linear-gradient(135deg, rgba(42, 157, 143, 0.3), rgba(26, 95, 87, 0.2))',
+                  zIndex: -1,
+                  borderRadius: 'inherit'
+                }
               }}
             >
               <Typography
                 sx={{
-                  fontSize: getScaledFontSize(fontSizes.h2),
+                  fontSize: { xs: '2.25rem', sm: '3rem', md: '3.5rem' }, // Much larger font size
                   fontWeight: 'bold',
-                  mb: 2,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                  mb: { xs: 3, sm: 4 },
+                  textShadow: '0 3px 6px rgba(0, 0, 0, 0.4)',
                   letterSpacing: '0.5px',
+                  color: isPrayerJamaat ? 'rgba(244, 208, 63, 1)' : '#FFFFFF',
                 }}
               >
                 {isPrayerJamaat ? `${prayerAnnouncementName} Jamaa't Time` : `${prayerAnnouncementName} Time`}
@@ -1271,10 +1328,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               
               <Typography
                 sx={{
-                  fontSize: getScaledFontSize(fontSizes.h3),
-                  mb: 3,
+                  fontSize: { xs: '1.75rem', sm: '2.25rem', md: '2.5rem' }, // Much larger font size
+                  mb: { xs: 4, sm: 5 },
                   letterSpacing: '0.5px',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.4)',
+                  color: '#FFFFFF',
+                  maxWidth: '90%', // Ensure text stays within container
                 }}
               >
                 {isPrayerJamaat 
@@ -1282,28 +1341,52 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                   : 'Please silence your mobile devices'}
               </Typography>
               
-              <Box sx={{ mb: 2, mt: 2 }}>
+              <Box 
+                sx={{ 
+                  mb: { xs: 3, sm: 4 }, 
+                  mt: { xs: 2, sm: 3 },
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  width: { xs: '180px', sm: '220px', md: '260px' }, // Much larger icon container
+                  height: { xs: '180px', sm: '220px', md: '260px' },
+                  borderRadius: '50%',
+                  backdropFilter: 'blur(8px)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+                  border: '2px solid rgba(255, 255, 255, 0.25)'
+                }}
+              >
                 {isPrayerJamaat ? (
-                  <PrayerRowsIcon width="120px" height="120px" fill="#0A2647" />
+                  <PrayerRowsIcon 
+                    width="70%" 
+                    height="70%" 
+                    fill={isPrayerJamaat ? 'rgba(244, 208, 63, 1)' : '#FFFFFF'} 
+                  />
                 ) : (
-                  <NoMobilePhoneIcon width="120px" height="120px" fill="#FFFFFF" />
+                  <NoMobilePhoneIcon 
+                    width="70%" 
+                    height="70%" 
+                    fill="#FFFFFF" 
+                  />
                 )}
               </Box>
               
               <Typography
                 sx={{
-                  fontSize: getScaledFontSize(fontSizes.h4),
-                  mt: 2,
+                  fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }, // Much larger font size
+                  mt: { xs: 2, sm: 3 },
                   opacity: 0.95,
                   letterSpacing: '0.5px',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.4)',
+                  color: '#FFFFFF',
                 }}
               >
                 {isPrayerJamaat 
                   ? 'Jamaa\'t is about to begin' 
                   : 'Adhaan is about to begin'}
               </Typography>
-            </Box>
+            </GlassmorphicCard>
           </Box>
         </Fade>
       </Box>

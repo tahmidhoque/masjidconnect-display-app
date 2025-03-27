@@ -1,5 +1,5 @@
-import React from 'react';
-import { useTheme, alpha, SxProps, Theme } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { useTheme, alpha, SxProps, Theme, Box } from '@mui/material';
 import GlassmorphicCard from './GlassmorphicCard';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 
@@ -8,67 +8,128 @@ interface GlassmorphicContentCardProps {
   children: React.ReactNode;
   colorType?: 'primary' | 'secondary' | 'info';
   headerBgColor?: string;
+  isUrgent?: boolean;
   sx?: SxProps<Theme>;
+  contentTypeColor?: string;
 }
 
 /**
  * GlassmorphicContentCard component
  * 
  * A glassmorphic container for content items like announcements, events, etc.
- * Maintains a colored header with the rest of the card using glassmorphic design.
+ * Uses colored glass effect based on content type throughout the card.
+ * Supports special styling for urgent content.
  */
 const GlassmorphicContentCard: React.FC<GlassmorphicContentCardProps> = ({
   orientation = 'landscape',
   children,
   colorType = 'primary',
   headerBgColor,
+  isUrgent = false,
+  contentTypeColor,
   sx
 }) => {
   const theme = useTheme();
   const { getSizeRem } = useResponsiveFontSize();
+  const [isReady, setIsReady] = useState(false);
+  
+  // Ensure glass effect is ready before displaying content
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure the glass effect is rendered first
+    const timer = requestAnimationFrame(() => {
+      setIsReady(true);
+    });
+    
+    return () => cancelAnimationFrame(timer);
+  }, []);
   
   const isPortrait = orientation === 'portrait';
   
-  // Set the color scheme based on colorType
-  let bgGradient;
-  let borderColor;
+  // Set the color scheme based on colorType with more prominent coloring
+  let accentColor;
+  let bgColor;
   
   switch (colorType) {
     case 'secondary':
-      bgGradient = `linear-gradient(135deg, ${alpha(theme.palette.secondary.dark, 0.5)} 0%, ${alpha(theme.palette.secondary.main, 0.5)} 100%)`;
-      borderColor = alpha(theme.palette.secondary.main, 0.5);
+      accentColor = theme.palette.secondary.main;
+      bgColor = alpha(theme.palette.secondary.main, 0.12);
       break;
     case 'info':
-      bgGradient = `linear-gradient(135deg, ${alpha(theme.palette.info.dark, 0.5)} 0%, ${alpha(theme.palette.info.main, 0.5)} 100%)`;
-      borderColor = alpha(theme.palette.info.main, 0.5);
+      accentColor = theme.palette.info.main;
+      bgColor = alpha(theme.palette.info.main, 0.12);
       break;
     default:
-      bgGradient = `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.5)} 0%, ${alpha(theme.palette.primary.main, 0.5)} 100%)`;
-      borderColor = alpha(theme.palette.primary.main, 0.5);
+      accentColor = theme.palette.primary.main;
+      bgColor = alpha(theme.palette.primary.main, 0.12);
+  }
+  
+  // Emergency/urgent styling override - more prominent
+  if (isUrgent) {
+    accentColor = theme.palette.error.main;
+    bgColor = alpha(theme.palette.error.main, 0.15);
+  }
+
+  // Override with explicit content type color if provided
+  if (contentTypeColor) {
+    // Use the contentTypeColor directly as the background
+    bgColor = contentTypeColor;
   }
   
   return (
     <GlassmorphicCard
-      opacity={0.15}
-      borderOpacity={0.25}
+      opacity={0.25} // Increased opacity for more visible colored glass
+      borderOpacity={0.3}
       blurIntensity={10}
       borderRadius={4}
-      borderWidth={1}
-      borderColor={borderColor}
+      borderWidth={isUrgent ? 2 : 1}
+      borderColor={alpha(accentColor, isUrgent ? 0.5 : 0.4)}
+      bgColor={bgColor}
       sx={{
         width: '100%',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        mb: getSizeRem(1.5),
+        mb: getSizeRem(1.0), // Reduced bottom margin to prevent footer overlap
         color: '#ffffff',
-        backgroundImage: bgGradient,
-        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.1)',
+        boxShadow: isUrgent 
+          ? `0 8px 20px ${alpha(accentColor, 0.25)}, 0 0 15px ${alpha(accentColor, 0.25)}`
+          : '0 8px 20px rgba(0, 0, 0, 0.15)',
+        animation: isUrgent ? 'subtle-pulse 3s infinite ease-in-out' : 'none',
+        '@keyframes subtle-pulse': {
+          '0%': { boxShadow: `0 8px 20px ${alpha(accentColor, 0.25)}, 0 0 15px ${alpha(accentColor, 0.25)}` },
+          '50%': { boxShadow: `0 8px 20px ${alpha(accentColor, 0.35)}, 0 0 15px ${alpha(accentColor, 0.3)}` },
+          '100%': { boxShadow: `0 8px 20px ${alpha(accentColor, 0.25)}, 0 0 15px ${alpha(accentColor, 0.25)}` },
+        },
+        // Metallic effect with accent color tint
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `linear-gradient(135deg, ${alpha(accentColor, 0.1)}, ${alpha(accentColor, 0.05)})`,
+          zIndex: 0,
+          pointerEvents: 'none'
+        },
+        // Force the glass effect to be ready immediately
+        visibility: 'visible',
+        opacity: 1,
+        transition: 'none',
         ...sx
       }}
     >
-      {children}
+      <Box sx={{ 
+        opacity: isReady ? 1 : 0, 
+        transition: 'opacity 0.1s ease-in',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {children}
+      </Box>
     </GlassmorphicCard>
   );
 };

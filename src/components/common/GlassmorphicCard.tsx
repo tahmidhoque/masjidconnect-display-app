@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, BoxProps, useTheme, alpha } from '@mui/material';
+import { Box, BoxProps, useTheme, alpha, SxProps, Theme } from '@mui/material';
 
 export interface GlassmorphicCardProps extends BoxProps {
   /**
@@ -80,21 +80,6 @@ export interface GlassmorphicCardProps extends BoxProps {
  * A reusable card component with a glass morphism effect.
  * This creates a translucent, blurred glass-like appearance.
  */
-// import React from 'react';
-// import { Box, BoxProps, useTheme, alpha } from '@mui/material';
-
-// export interface GlassmorphicCardProps extends BoxProps {
-//   blurIntensity?: number;
-//   opacity?: number;
-//   borderOpacity?: number;
-//   borderWidth?: number;
-//   borderRadius?: number | string;
-//   bgColor?: string;
-//   borderColor?: string;
-//   shadowIntensity?: number;
-//   children?: React.ReactNode;
-// }
-
 const GlassmorphicCard: React.FC<GlassmorphicCardProps> = ({
   blurIntensity = 7.5,
   opacity = 0.3,
@@ -104,6 +89,9 @@ const GlassmorphicCard: React.FC<GlassmorphicCardProps> = ({
   bgColor,
   borderColor,
   shadowIntensity = 0.18,
+  darkMode = false,
+  hoverEffect = false,
+  animateGlow = false,
   children,
   sx,
   ...rest
@@ -126,11 +114,54 @@ const GlassmorphicCard: React.FC<GlassmorphicCardProps> = ({
         border: `${borderWidth}px solid ${effectiveBorderColor}`,
         borderRadius: borderRadius,
         boxShadow: `0 8px 32px 0 rgba(0, 0, 0, ${shadowIntensity})`,
-        // Adding additional glass-like properties
-        borderTop: `1px solid ${alpha('#ffffff', borderOpacity + 0.1)}`,
-        borderLeft: `1px solid ${alpha('#ffffff', borderOpacity + 0.1)}`,
-        transition: 'all 0.3s ease',
-        ...sx
+        borderTopWidth: '1px',
+        borderTopStyle: 'solid',
+        borderTopColor: alpha('#ffffff', borderOpacity + 0.1),
+        borderLeftWidth: '1px',
+        borderLeftStyle: 'solid',
+        borderLeftColor: alpha('#ffffff', borderOpacity + 0.1),
+        visibility: 'visible',
+        opacity: 1,
+        transition: 'none',
+        willChange: 'backdrop-filter, opacity',
+        transform: 'translateZ(0)',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.1) 100%)',
+          pointerEvents: 'none',
+          borderRadius: 'inherit',
+          zIndex: 0
+        },
+        '& > *': {
+          position: 'relative',
+          zIndex: 1
+        },
+        ...(animateGlow && {
+          animation: 'glassGlow 3s infinite alternate',
+          '@keyframes glassGlow': {
+            '0%': { 
+              boxShadow: `0 8px 32px 0 rgba(0, 0, 0, ${shadowIntensity})` 
+            },
+            '100%': { 
+              boxShadow: `0 8px 32px 0 rgba(255, 255, 255, ${shadowIntensity * 0.5})` 
+            }
+          }
+        }),
+        ...(hoverEffect && {
+          '&:hover': {
+            transform: 'translateY(-2px) translateZ(0)',
+            boxShadow: `0 12px 32px 0 rgba(0, 0, 0, ${shadowIntensity * 1.5})`,
+            '&::before': {
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.15) 100%)'
+            }
+          }
+        }),
+        ...(sx as any)
       }}
       {...rest}
     >

@@ -1,10 +1,11 @@
-import React from 'react';
-import { Box, Typography, Divider, useTheme, alpha } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, Typography, useTheme, alpha } from '@mui/material';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import GlassmorphicCard from './GlassmorphicCard';
 import PrayerCountdown from './PrayerCountdown';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
 import { goldGradient } from '../../theme/theme';
+import IslamicPatternBackground from './IslamicPatternBackground';
 
 interface GlassmorphicCombinedPrayerCardProps {
   orientation?: 'portrait' | 'landscape';
@@ -22,7 +23,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
   onCountdownComplete
 }) => {
   const theme = useTheme();
-  const { fontSizes, getSizeRem } = useResponsiveFontSize();
+  const { fontSizes, layout, screenSize, getSizeRem } = useResponsiveFontSize();
   const { 
     todaysPrayerTimes,
     nextPrayer,
@@ -30,8 +31,8 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
     jumuahDisplayTime
   } = usePrayerTimes();
   
-  // Animation for the shimmer effect only
-  const cardAnimation = `
+  // Animation for the shimmer effect
+  const cardAnimation = useMemo(() => `
     @keyframes shimmer {
       0% {
         background-position: -100% 0;
@@ -40,7 +41,39 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
         background-position: 200% 0;
       }
     }
-  `;
+    
+    @keyframes pulseGlow {
+      0% {
+        box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3);
+      }
+      50% {
+        box-shadow: 0 4px 18px rgba(42, 157, 143, 0.6), 0 0 25px rgba(42, 157, 143, 0.5);
+      }
+      100% {
+        box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3);
+      }
+    }
+    
+    @keyframes currentPrayerGlow {
+      0% {
+        box-shadow: 0 2px 8px rgba(20, 66, 114, 0.4);
+      }
+      50% {
+        box-shadow: 0 2px 15px rgba(20, 66, 114, 0.7);
+      }
+      100% {
+        box-shadow: 0 2px 8px rgba(20, 66, 114, 0.4);
+      }
+    }
+  `, []);
+  
+  const isPortrait = orientation === 'portrait';
+  const is720p = screenSize.is720p || screenSize.isSmallerThan720p;
+  
+  // Calculate row height based on screen size
+  const rowHeight = isPortrait 
+    ? (is720p ? getSizeRem(3.2) : getSizeRem(3.5)) 
+    : getSizeRem(2.8);
   
   if (!nextPrayer) {
     return null;
@@ -62,8 +95,8 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
           height: '100%', // Fill available height
           color: '#fff',
           overflow: 'hidden',
-          ml: 1, // Margin left to match header
-          mr: 0.5, // Margin right
+          ml: isPortrait ? 0 : 1, // No left margin in portrait
+          mr: isPortrait ? 0 : 0.5, // No right margin in portrait
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
           borderTop: `1px solid ${alpha('#ffffff', 0.5)}`,
           borderLeft: `1px solid ${alpha('#ffffff', 0.5)}`,
@@ -85,8 +118,8 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
       >
         {/* Countdown Section */}
         <Box sx={{ 
-          p: getSizeRem(1),
-          pb: getSizeRem(0.6),
+          p: isPortrait ? getSizeRem(1.2) : getSizeRem(1),
+          pb: isPortrait ? getSizeRem(0.8) : getSizeRem(0.6),
           borderBottom: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`,
           position: 'relative',
           zIndex: 1,
@@ -94,13 +127,13 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
         }}>
           <Typography 
             sx={{ 
-              fontSize: fontSizes.h5,
+              fontSize: isPortrait ? fontSizes.h4 : fontSizes.h5,
               fontWeight: 700,
               backgroundImage: goldGradient,
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              mb: getSizeRem(0.5),
+              mb: isPortrait ? getSizeRem(0.5) : getSizeRem(0.5),
               fontFamily: "'Poppins', sans-serif",
               letterSpacing: '0.5px',
               textAlign: 'center',
@@ -121,28 +154,33 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
         
         {/* Prayer Times Section */}
         <Box sx={{ 
-          p: getSizeRem(0.8),
-          pt: getSizeRem(0.6),
+          p: isPortrait ? getSizeRem(0.8) : getSizeRem(0.8),
+          pt: isPortrait ? getSizeRem(0.8) : getSizeRem(0.8),
           position: 'relative',
           zIndex: 1,
           flex: 1, // Flexbox to expand and fill available space
           display: 'flex',
           flexDirection: 'column',
+          overflowY: 'auto', // Always allow scrolling if needed
         }}>
           {/* Headers */}
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr 1fr',
-              mb: getSizeRem(0.3),
+              mb: getSizeRem(0.4),
               px: getSizeRem(0.5),
+              backgroundColor: alpha(theme.palette.secondary.dark, 0.15),
+              py: getSizeRem(0.5),
+              borderRadius: '6px',
+              border: 'none',
             }}
           >
             <Typography 
               sx={{ 
-                fontSize: fontSizes.body1,
+                fontSize: isPortrait ? fontSizes.body1 : fontSizes.body2,
                 fontWeight: 700,
-                opacity: 0.85,
+                opacity: 0.95,
                 fontFamily: "'Poppins', sans-serif",
                 textAlign: 'start',
                 color: '#ffffff',
@@ -153,9 +191,9 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
             </Typography>
             <Typography 
               sx={{ 
-                fontSize: fontSizes.body1,
+                fontSize: isPortrait ? fontSizes.body1 : fontSizes.body2,
                 fontWeight: 700,
-                opacity: 0.85,
+                opacity: 0.95,
                 textAlign: 'center',
                 fontFamily: "'Poppins', sans-serif",
                 color: '#ffffff',
@@ -166,9 +204,9 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
             </Typography>
             <Typography 
               sx={{ 
-                fontSize: fontSizes.body1,
+                fontSize: isPortrait ? fontSizes.body1 : fontSizes.body2,
                 fontWeight: 700,
-                opacity: 0.85,
+                opacity: 0.95,
                 textAlign: 'end',
                 fontFamily: "'Poppins', sans-serif",
                 color: '#ffffff',
@@ -179,30 +217,53 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
             </Typography>
           </Box>
           
-          <Divider sx={{ backgroundColor: alpha(theme.palette.warning.main, 0.3), height: '1px', mb: 0.5 }} />
-          
           {/* Prayer Time Rows */}
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <Box sx={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'space-between',
+            gap: 0, // No gap between rows
+            backgroundImage: 'none', // Remove the background pattern
+            mt: getSizeRem(0.2),
+            pb: getSizeRem(0.2),
+          }}>
             {todaysPrayerTimes.map((prayer, index) => (
-              <Box key={prayer.name} sx={{ mb: todaysPrayerTimes.length-1 === index ? 0 : getSizeRem(0.4) }}>
+              <Box key={prayer.name} 
+                sx={{ 
+                  mb: 0, // No margin between rows
+                  transform: prayer.isNext ? 'scale(1.02)' : 'scale(1)',
+                  transition: 'all 0.3s ease',
+                  zIndex: prayer.isNext ? 5 : 1,
+                }}
+              >
                 <Box
                   sx={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr 1fr',
-                    py: getSizeRem(0.4),
-                    px: getSizeRem(0.5),
-                    borderRadius: 1,
+                    py: isPortrait ? getSizeRem(0.5) : getSizeRem(0.4),
+                    px: isPortrait ? getSizeRem(0.5) : getSizeRem(0.5),
+                    borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '4px',
                     backgroundColor: prayer.isNext 
-                      ? alpha(theme.palette.warning.main, 0.15)
+                      ? alpha(theme.palette.warning.main, 0.2)
                       : prayer.isCurrent 
-                        ? alpha(theme.palette.primary.light, 0.1)
+                        ? alpha(theme.palette.secondary.dark, 0.2)
                         : 'transparent',
                     transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    border: prayer.isNext 
+                      ? `1px solid ${alpha(theme.palette.warning.main, 0.3)}`
+                      : prayer.isCurrent
+                        ? `1px solid ${alpha(theme.palette.secondary.dark, 0.3)}`
+                        : 'none',
+                    boxShadow: 'none', // Remove box shadows
+                    height: rowHeight,
                   }}
                 >
                   <Typography 
                     sx={{ 
-                      fontSize: fontSizes.body1,
+                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
                       fontWeight: prayer.isNext || prayer.isCurrent ? 700 : 600,
                       color: prayer.isNext 
                         ? theme.palette.warning.light
@@ -217,7 +278,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
                   
                   <Typography 
                     sx={{ 
-                      fontSize: fontSizes.body1,
+                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
                       textAlign: 'center',
                       fontWeight: prayer.isNext ? 700 : 600,
                       fontFamily: "'Poppins', sans-serif",
@@ -248,7 +309,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
                   
                   <Typography 
                     sx={{ 
-                      fontSize: fontSizes.body1,
+                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
                       textAlign: 'end',
                       fontWeight: prayer.isNext ? 700 : 600,
                       color: prayer.displayJamaat ? '#ffffff' : alpha('#ffffff', 0.5),
@@ -261,6 +322,61 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
                 </Box>
               </Box>
             ))}
+            
+            {/* Jumuah section if applicable */}
+            {isJumuahToday && (
+              <Box sx={{ 
+                mt: getSizeRem(0.2),
+                mb: 0,
+              }}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr',
+                    py: isPortrait ? getSizeRem(0.5) : getSizeRem(0.4),
+                    px: isPortrait ? getSizeRem(0.5) : getSizeRem(0.5),
+                    borderRadius: '8px',
+                    backgroundColor: alpha(theme.palette.warning.light, 0.15),
+                    border: `1px solid ${alpha(theme.palette.warning.light, 0.2)}`,
+                    height: rowHeight,
+                    color: theme.palette.warning.light,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: 'none', // Remove box shadow
+                  }}
+                >
+                  <Typography 
+                    sx={{ 
+                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
+                      fontWeight: 'bold',
+                      textAlign: 'start',
+                      fontFamily: "'Poppins', sans-serif",
+                    }}
+                  >
+                    {jumuahDisplayTime}
+                  </Typography>
+                  
+                  <Typography 
+                    sx={{ 
+                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      fontFamily: "'Poppins', sans-serif",
+                    }}
+                  >
+                    Jumu'ah
+                  </Typography>
+                  
+                  <Typography 
+                    sx={{ 
+                      textAlign: 'end',
+                    }}
+                  >
+                    &nbsp;
+                  </Typography>
+                </Box>
+              </Box>
+            )}
           </Box>
         </Box>
       </GlassmorphicCard>

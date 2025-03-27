@@ -1,4 +1,4 @@
-// Format time string (e.g., "16:30") to display format (e.g., "4:30 PM")
+// Format time string (e.g., "16:30") to display format (e.g., "16:30")
 export const formatTimeToDisplay = (timeString: string): string => {
   if (!timeString) return '';
   
@@ -6,10 +6,8 @@ export const formatTimeToDisplay = (timeString: string): string => {
   
   if (isNaN(hours) || isNaN(minutes)) return timeString;
   
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
-  
-  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  // Use 24-hour format instead of AM/PM
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
 // Parse time string into Date object using moment.js

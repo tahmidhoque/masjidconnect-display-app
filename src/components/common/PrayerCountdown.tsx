@@ -34,6 +34,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const [countingDownToJamaat, setCountingDownToJamaat] = useState(false);
   const [textTransition, setTextTransition] = useState(false);
   const { fontSizes, layout, screenSize, getSizeRem } = useResponsiveFontSize();
+  const isPortrait = screenSize.width < screenSize.height;
   const initializingRef = useRef<boolean>(true);
   const prayerTimePassedRef = useRef<boolean>(false);
   const jamaatTimePassedRef = useRef<boolean>(false);
@@ -474,13 +475,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         transition: 'opacity 0.5s ease',
       }}>
         <Typography sx={{ 
-          fontSize: fontSizes.body1,
-          fontWeight: 500,
+          fontSize: isPortrait 
+            ? (screenSize.is720p ? fontSizes.h5 : fontSizes.h6) 
+            : fontSizes.body1,
+          fontWeight: 600,
           textAlign: 'center',
           opacity: 0.9,
           fontFamily: "'Poppins', sans-serif",
-          mb: getSizeRem(0.3),
+          mb: isPortrait ? getSizeRem(0.4) : getSizeRem(0.3),
           color: '#fff',
+          letterSpacing: '0.5px',
         }}>
           {countingDownToJamaat 
             ? `${prayerName} Jamaa't will be in` 
@@ -491,7 +495,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          gap: getSizeRem(0.1),
+          gap: isPortrait ? getSizeRem(0.1) : getSizeRem(0.1),
         }}>
           {/* Hours */}
           <Box sx={{ 
@@ -499,27 +503,31 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            minWidth: getSizeRem(3),
+            minWidth: isPortrait ? getSizeRem(4) : getSizeRem(3),
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.h3,
+              fontSize: isPortrait 
+                ? (screenSize.is720p ? fontSizes.h2 : fontSizes.h3) 
+                : fontSizes.h3,
               fontWeight: 'bold',
               lineHeight: 1,
               fontFamily: "'Poppins', sans-serif",
               color: '#F1C40F',
               letterSpacing: '0px',
-              textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
             }}>
               {formatTimeDisplay(hours)}
             </Typography>
             <Typography sx={{ 
-              fontSize: fontSizes.caption,
+              fontSize: isPortrait 
+                ? (screenSize.is720p ? fontSizes.body1 : fontSizes.body2) 
+                : fontSizes.caption,
               fontWeight: 'bold',
               textTransform: 'uppercase',
               opacity: 0.9,
-              mt: getSizeRem(-0.1),
-              color: 'rgba(255, 255, 255, 0.8)',
-              letterSpacing: '0.3px',
+              mt: isPortrait ? getSizeRem(-0.2) : getSizeRem(-0.1),
+              color: 'rgba(255, 255, 255, 0.9)',
+              letterSpacing: '0.5px',
             }}>
               HOURS
             </Typography>
@@ -527,7 +535,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           
           {/* Separator */}
           <Typography sx={{ 
-            fontSize: fontSizes.h3,
+            fontSize: isPortrait 
+              ? (screenSize.is720p ? fontSizes.h2 : fontSizes.h3) 
+              : fontSizes.h3,
             fontWeight: 'bold', 
             lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
@@ -535,7 +545,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             alignSelf: 'flex-start',
             mt: getSizeRem(0),
             opacity: 0.9,
-            mx: getSizeRem(0.1),
+            mx: isPortrait ? getSizeRem(0.2) : getSizeRem(0.1),
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
           }}>:</Typography>
           
           {/* Minutes */}
@@ -544,27 +555,31 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            minWidth: getSizeRem(3),
+            minWidth: isPortrait ? getSizeRem(4) : getSizeRem(3),
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.h3,
+              fontSize: isPortrait 
+                ? (screenSize.is720p ? fontSizes.h2 : fontSizes.h3) 
+                : fontSizes.h3,
               fontWeight: 'bold',
               lineHeight: 1,
               fontFamily: "'Poppins', sans-serif",
               color: '#F1C40F',
               letterSpacing: '0px',
-              textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
             }}>
               {formatTimeDisplay(minutes)}
             </Typography>
             <Typography sx={{ 
-              fontSize: fontSizes.caption,
+              fontSize: isPortrait 
+                ? (screenSize.is720p ? fontSizes.body1 : fontSizes.body2) 
+                : fontSizes.caption,
               fontWeight: 'bold',
               textTransform: 'uppercase',
               opacity: 0.9,
-              mt: getSizeRem(-0.1),
-              color: 'rgba(255, 255, 255, 0.8)',
-              letterSpacing: '0.3px',
+              mt: isPortrait ? getSizeRem(-0.2) : getSizeRem(-0.1),
+              color: 'rgba(255, 255, 255, 0.9)',
+              letterSpacing: '0.5px',
             }}>
               MINUTES
             </Typography>
@@ -572,7 +587,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           
           {/* Separator */}
           <Typography sx={{ 
-            fontSize: fontSizes.h3,
+            fontSize: isPortrait 
+              ? (screenSize.is720p ? fontSizes.h2 : fontSizes.h3) 
+              : fontSizes.h3,
             fontWeight: 'bold', 
             lineHeight: 1,
             fontFamily: "'Poppins', sans-serif",
@@ -580,7 +597,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             alignSelf: 'flex-start',
             mt: getSizeRem(0),
             opacity: 0.9,
-            mx: getSizeRem(0.1),
+            mx: isPortrait ? getSizeRem(0.2) : getSizeRem(0.1),
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
           }}>:</Typography>
           
           {/* Seconds */}
@@ -589,27 +607,31 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            minWidth: getSizeRem(3),
+            minWidth: isPortrait ? getSizeRem(4) : getSizeRem(3),
           }}>
             <Typography sx={{ 
-              fontSize: fontSizes.h3,
+              fontSize: isPortrait 
+                ? (screenSize.is720p ? fontSizes.h2 : fontSizes.h3) 
+                : fontSizes.h3,
               fontWeight: 'bold',
               lineHeight: 1,
               fontFamily: "'Poppins', sans-serif",
               color: '#F1C40F',
               letterSpacing: '0px',
-              textShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+              textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
             }}>
               {formatTimeDisplay(seconds)}
             </Typography>
             <Typography sx={{ 
-              fontSize: fontSizes.caption,
+              fontSize: isPortrait 
+                ? (screenSize.is720p ? fontSizes.body1 : fontSizes.body2) 
+                : fontSizes.caption,
               fontWeight: 'bold',
               textTransform: 'uppercase',
               opacity: 0.9,
-              mt: getSizeRem(-0.1),
-              color: 'rgba(255, 255, 255, 0.8)',
-              letterSpacing: '0.3px',
+              mt: isPortrait ? getSizeRem(-0.2) : getSizeRem(-0.1),
+              color: 'rgba(255, 255, 255, 0.9)',
+              letterSpacing: '0.5px',
             }}>
               SECONDS
             </Typography>
@@ -617,12 +639,15 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         </Box>
         
         <Typography sx={{ 
-          fontSize: fontSizes.caption,
+          fontSize: isPortrait 
+            ? (screenSize.is720p ? fontSizes.body1 : fontSizes.body2) 
+            : fontSizes.caption,
           textAlign: 'center',
-          color: 'rgba(255, 255, 255, 0.7)',
-          mt: getSizeRem(0.3),
+          color: 'rgba(255, 255, 255, 0.8)',
+          mt: isPortrait ? getSizeRem(0.4) : getSizeRem(0.3),
           fontStyle: 'italic',
           fontWeight: 500,
+          letterSpacing: '0.3px',
         }}>
           {countingDownToJamaat ? 'Jamaa\'t' : 'Adhan'} Time
         </Typography>

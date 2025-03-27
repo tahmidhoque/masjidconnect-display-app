@@ -37,12 +37,13 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
       borderRadius={isPortrait ? '0 0 4px 4px' : 4}
       borderWidth={1}
       borderOpacity={0.25}
-      borderColor={alpha('#ffffff', 0.25)}
+      borderColor={`linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`}
       shadowIntensity={0.3}
       sx={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
         p: getSizeRem(isPortrait ? 1 : 1.5),
         pb: getSizeRem(isPortrait ? 1.5 : 1.5),
         width: '100%',
@@ -55,6 +56,7 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
         overflow: 'hidden',
         borderTop: `1px solid ${alpha('#ffffff', 0.5)}`,
         borderLeft: `1px solid ${alpha('#ffffff', 0.5)}`,
+        
       }}
     >
       <Box>

@@ -29,7 +29,7 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
       <GlassmorphicCard
         opacity={0.2}
         blurIntensity={8}
-        borderRadius={4}
+        borderRadius={3}
         borderWidth={1}
         borderOpacity={0.25}
         borderColor={alpha('#ffffff', 0.25)}

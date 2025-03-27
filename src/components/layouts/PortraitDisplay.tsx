@@ -32,7 +32,7 @@ const PortraitDisplay: React.FC = () => {
     nextPrayer,
   } = usePrayerTimes();
   
-  const { fontSizes, screenSize } = useResponsiveFontSize();
+  const { fontSizes, screenSize, getSizeRem } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
   const announcementActiveRef = useRef(false);
 
@@ -213,21 +213,38 @@ const PortraitDisplay: React.FC = () => {
           orientation="portrait"
         />
         
-        {/* Combined Prayer Card (Countdown + Times) */}
-        <GlassmorphicCombinedPrayerCard
-          orientation="portrait"
-          onCountdownComplete={handleCountdownComplete}
-        />
-        
-        {/* Content Carousel */}
-        <Box sx={{ 
+        {/* Content Layout Container with proper spacing */}
+        <Box sx={{
           flex: 1,
-          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          mb: 2,
+          overflow: 'hidden',
+          gap: 1.5, // Add gap between prayer card and content
         }}>
-          <ContentCarousel variant="portrait" />
+          {/* Combined Prayer Card (Countdown + Times) - with 50% of available space */}
+          <Box sx={{ 
+            flex: 1, // Takes 50% of the available flex space (changed from 2)
+            display: 'flex',
+            flexDirection: 'column',
+            mb: 1,
+          }}>
+            <GlassmorphicCombinedPrayerCard
+              orientation="portrait"
+              onCountdownComplete={handleCountdownComplete}
+            />
+          </Box>
+          
+          {/* Content Carousel - with 50% of available space */}
+          <Box sx={{ 
+            flex: 1, // Takes 50% of the available flex space
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            mb: 1.5, // Ensure space above footer
+            minHeight: 0, // Important for proper flex behavior
+          }}>
+            <ContentCarousel variant="portrait" />
+          </Box>
         </Box>
         
         {/* Footer with Logo */}
