@@ -21,7 +21,11 @@ import PairingScreenLayout from './pairing/PairingScreenLayout';
  * 
  * Note: This is a non-interactive display, so the pairing is done through another device.
  */
-const PairingScreen: React.FC = () => {
+interface PairingScreenProps {
+  onPairingSuccess?: () => void | Promise<void>;
+}
+
+const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingSuccess }) => {
   const { 
     requestPairingCode, 
     checkPairingStatus, 
@@ -78,6 +82,12 @@ const PairingScreen: React.FC = () => {
         // Force a re-render of the App component by updating the isPaired state in AuthContext
         setIsPaired(true);
         
+        // Call the onPairingSuccess callback if provided
+        if (onPairingSuccess) {
+          console.log('[PairingScreen] Calling onPairingSuccess callback');
+          onPairingSuccess();
+        }
+        
         // Navigate to the display screen
         navigate('/', { replace: true });
       } else {
@@ -89,7 +99,7 @@ const PairingScreen: React.FC = () => {
       pollingRef.current = false;
       setIsPolling(false);
     }
-  }, [checkPairingStatus, setIsPaired, navigate]);
+  }, [checkPairingStatus, setIsPaired, navigate, onPairingSuccess]);
   
   // Handle refresh button click
   const handleRefresh = useCallback(async () => {

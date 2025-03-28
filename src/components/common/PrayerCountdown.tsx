@@ -47,6 +47,13 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       return;
     }
     
+    // Validate prayer time format - must be HH:MM format
+    const isValidTimeFormat = /^\d{1,2}:\d{2}$/.test(prayerTime);
+    if (!isValidTimeFormat) {
+      logger.error(`Invalid prayer time format for ${prayerName}: ${prayerTime}`);
+      return;
+    }
+    
     // Set up initial time using pre-calculated value if available
     if (initializingRef.current && timeUntilNextPrayer) {
       try {
@@ -60,6 +67,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           setHours(h);
           setMinutes(m);
           setSeconds(0);
+          
+          logger.debug(`[PrayerCountdown] Initial time set for ${prayerName} from pre-calculated value: ${h}hr ${m}min`);
         }
         
         // EDGE CASE: Check if we're starting between prayer time and jamaat time
@@ -68,38 +77,57 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         
         // Parse prayer time using moment
         const prayerMoment = moment().hours(0).minutes(0).seconds(0);
+        
+        // Safety check for valid time format 
         const [prayerHours, prayerMinutes] = prayerTime.split(':').map(Number);
         
-        if (!isNaN(prayerHours) && !isNaN(prayerMinutes)) {
-          prayerMoment.hours(prayerHours).minutes(prayerMinutes);
-          
-          // If prayer time has passed but jamaat hasn't
-          if (now.isAfter(prayerMoment) && jamaatTime) {
-            const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
-            const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
-            
-            if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-              jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
-              
-              // Handle after midnight special case
-              if (now.hours() < 6 && prayerName === 'Isha') {
-                if (jamaatMoment.isAfter(prayerMoment)) {
-                  jamaatMoment.subtract(1, 'day');
-                }
-              }
-              
-              if (now.isBefore(jamaatMoment)) {
-                logger.info(`[PrayerCountdown] Starting between ${prayerName} time and jamaat time, entering jamaat countdown mode`);
-                setCountingDownToJamaat(true);
-                prayerTimePassedRef.current = true;
-              }
-            }
-          }
+        if (isNaN(prayerHours) || isNaN(prayerMinutes)) {
+          logger.error(`[PrayerCountdown] Invalid prayer time format for ${prayerName}: ${prayerTime}`);
+          // Provide fallback values to avoid crashing
+          setHours(0);
+          setMinutes(30);
+          setSeconds(0);
+          return;
         }
         
-        initializingRef.current = false;
+        prayerMoment.hours(prayerHours).minutes(prayerMinutes);
+        
+        // Check if the prayer time has already passed
+        if (now.isAfter(prayerMoment) && jamaatTime) {
+          // Parse jamaat time
+          const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+          // Validate jamaat time format
+          const jamaatTimeParts = jamaatTime.split(':');
+          
+          if (jamaatTimeParts.length !== 2) {
+            logger.error(`[PrayerCountdown] Invalid jamaat time format for ${prayerName}: ${jamaatTime}`);
+            return;
+          }
+          
+          const jamaatHours = parseInt(jamaatTimeParts[0], 10);
+          const jamaatMinutes = parseInt(jamaatTimeParts[1], 10);
+          
+          if (isNaN(jamaatHours) || isNaN(jamaatMinutes)) {
+            logger.error(`[PrayerCountdown] Invalid jamaat time values for ${prayerName}: ${jamaatTime}`);
+            return;
+          }
+          
+          jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+          
+          // If now is between prayer time and jamaat time, count down to jamaat
+          if (now.isBefore(jamaatMoment)) {
+            setCountingDownToJamaat(true);
+            logger.info(`[PrayerCountdown] Starting in jamaat countdown mode for ${prayerName}`);
+          }
+        }
       } catch (error) {
-        logger.error('[PrayerCountdown] Error parsing initial time', { error });
+        logger.error('[PrayerCountdown] Error in initialization', { error, prayerName, prayerTime, jamaatTime });
+        // Provide fallback values to avoid crashing
+        setHours(0);
+        setMinutes(20);
+        setSeconds(0);
+      } finally {
+        // Mark initialization as complete either way
         initializingRef.current = false;
       }
     }
@@ -114,6 +142,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         const [prayerHours, prayerMinutes] = prayerTime.split(':').map(Number);
         
         if (isNaN(prayerHours) || isNaN(prayerMinutes)) {
+          logger.error(`[PrayerCountdown] Invalid prayer time parts for ${prayerName}: ${prayerTime}`);
           return;
         }
         
@@ -124,187 +153,114 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         
         // If already counting down to jamaat, continue with jamaat countdown
         if (countingDownToJamaat && jamaatTime) {
-          const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
-          if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-            const jamaatMoment = moment().hours(0).minutes(0).seconds(0)
-              .hours(jamaatHours).minutes(jamaatMinutes);
+          // Don't lose current focus for error logging
+          try {
+            const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
             
-            // Special handling for after midnight
-            const isAfterMidnightBeforeFajr = now.hours() < 6 && prayerName === 'Isha';
-            if (isAfterMidnightBeforeFajr) {
-              // Handle Isha jamaat that's after midnight
-              if (jamaatMoment.hours() < 6) {
-                // If jamaatTime is small hours (like 01:30), it's meant for today not tomorrow
-                // No adjustment needed
-              } else {
-                // If jamaatTime is in the evening (like 20:30), we've crossed to new day
-                jamaatMoment.subtract(1, 'day');
-              }
-              
-              // If jamaat is in the past, mark as passed
-              if (now.isAfter(jamaatMoment) && !jamaatTimePassedRef.current) {
-                jamaatTimePassedRef.current = true;
-                logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed (${jamaatTime})`);
-                
-                // Only trigger events if not during initial page load
-                const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
-                if (displayTimes && timeSinceLoad > 5000) {
-                  triggerCountdownComplete(true);
-                  return;
-                }
-              }
-            } else {
-              // Regular jamaat time check for non-midnight scenario
-              if (now.isAfter(jamaatMoment) && !jamaatTimePassedRef.current) {
-                jamaatTimePassedRef.current = true;
-                
-                // Trigger callback only once and not during initial load
-                const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
-                if (displayTimes && timeSinceLoad > 5000) {
-                  logger.info(`[CRITICAL] ${prayerName} jamaat time has just arrived (${jamaatTime})`);
-                  triggerCountdownComplete(true);
-                  return;
-                }
-              }
+            if (isNaN(jamaatHours) || isNaN(jamaatMinutes)) {
+              logger.error(`[PrayerCountdown] Invalid jamaat time for ${prayerName}: ${jamaatTime}`);
+              return;
             }
             
+            const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+            jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+            
+            // Use jamaat time as the target
             targetMoment = jamaatMoment.clone();
             
-            // If target is in the past, set it for tomorrow
+            // If jamaat time has passed, switch to next day's prayer time
+            if (now.isAfter(targetMoment)) {
+              logger.debug(`[PrayerCountdown] Jamaat time passed for ${prayerName}, using tomorrow's prayer time`);
+              targetMoment.add(1, 'day');
+            }
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error 
+              ? error.message 
+              : 'Unknown error processing jamaat time';
+              
+            logger.error(`[PrayerCountdown] Error processing jamaat time: ${errorMessage}`, {
+              prayerName,
+              jamaatTime,
+              countingDownToJamaat
+            });
+            
+            // Since we can't modify countingDownToJamaat directly, we'll set it
+            // on the next render cycle using a state update
+            setCountingDownToJamaat(false);
+            
+            // Use prayer time as fallback
+            targetMoment = prayerMoment.clone();
             if (now.isAfter(targetMoment)) {
               targetMoment.add(1, 'day');
             }
           }
-        }
-        // Not counting down to jamaat yet, handle prayer/jamaat transitions
-        else {
-          // Check if prayer time has already passed today
-          const prayerHasPassed = now.isAfter(prayerMoment);
-          
-          // Special handling for Isha after midnight when Fajr is next
-          const isAfterMidnightBeforeFajr = now.hours() < 6 && prayerName === 'Isha';
-          
-          if (isAfterMidnightBeforeFajr) {
-            prayerTimePassedRef.current = true;
-            
-            // If this is Isha after midnight and Isha jamaat has passed
-            if (jamaatTime) {
-              const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
-              const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
+        } else { // Counting down to prayer time (adhan)
+          // If prayer time has already passed today
+          if (now.isAfter(prayerMoment)) {
+            // Check if we should transition to jamaat time, but only if we haven't already
+            if (!prayerTimePassedRef.current && jamaatTime) {
+              prayerTimePassedRef.current = true;
+              logger.info(`[PrayerCountdown] Prayer time passed for ${prayerName}, checking jamaat countdown`);
               
-              if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-                jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+              try {
+                const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
+                const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
                 
-                // Adjust jamaat time for after midnight scenario
-                if (jamaatMoment.hours() >= 18) { // If jamaat is PM time
-                  jamaatMoment.subtract(1, 'day'); // It was from yesterday
-                }
-                
-                // If we're after jamaat, mark it as passed if we haven't already
-                if (now.isAfter(jamaatMoment) && !jamaatTimePassedRef.current) {
-                  jamaatTimePassedRef.current = true;
-                  logger.info(`[CRITICAL] After midnight: ${prayerName} jamaat time has passed (${jamaatTime})`);
-                  
-                  // Only trigger events if not during initial page load
-                  const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
-                  if (displayTimes && timeSinceLoad > 5000) {
-                    triggerCountdownComplete(true);
-                    return;
-                  }
-                }
-              }
-            }
-            
-            // Set up for tomorrow's prayer
-            targetMoment = prayerMoment.clone().add(1, 'day');
-          }
-          // Regular flow for regular times
-          else if (prayerHasPassed && !prayerTimePassedRef.current) {
-            // Prayer time has just passed
-            prayerTimePassedRef.current = true;
-            
-            // Trigger completion callback for prayer time - but not during initial page load
-            const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
-            if (displayTimes && timeSinceLoad > 5000) {
-              logger.info(`[CRITICAL] ${prayerName} time has just arrived (${prayerTime})`);
-              triggerCountdownComplete(false);
-              
-              // If there's no jamaat time, return after triggering completion
-              if (!jamaatTime) {
-                return;
-              }
-            }
-            
-            // If we have a jamaatTime and we're not already counting down to it
-            if (jamaatTime) {
-              const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
-              const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
-              
-              if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-                jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
-                
-                // If jamaat time is still in the future, switch to counting down to jamaat
-                if (now.isBefore(jamaatMoment)) {
-                  // Trigger transition animation with a slight delay
-                  setTextTransition(true);
-                  setTimeout(() => {
-                    setCountingDownToJamaat(true);
-                    setTextTransition(false);
-                    setDisplayTimes(true); // Ensure display is on for jamaat countdown
-                    logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
-                  }, 500); // Match fade out duration
-                  
-                  targetMoment = jamaatMoment.clone();
-                } else {
-                  // Both prayer and jamaat times have passed
-                  jamaatTimePassedRef.current = true;
-                  
-                  // Trigger countdown completion for jamaat if it just passed - not during initial load
-                  const jamaatJustPassed = Math.abs(now.diff(jamaatMoment, 'milliseconds')) <= 30000;
-                  const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
-                  if (jamaatJustPassed && displayTimes && timeSinceLoad > 5000) {
-                    logger.info(`[CRITICAL] ${prayerName} jamaat time has just passed (${jamaatTime})`);
-                    triggerCountdownComplete(true);
-                    return; // Stop execution
-                  }
-                  
-                  // Set future prayer time for tomorrow
+                if (isNaN(jamaatHours) || isNaN(jamaatMinutes)) {
+                  logger.error(`[PrayerCountdown] Invalid jamaat time format for ${prayerName}: ${jamaatTime}`);
+                  // Set target to tomorrow's prayer
                   targetMoment = prayerMoment.clone().add(1, 'day');
+                } else {
+                  jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
+                  
+                  // If jamaat time is still in the future, switch to counting down to jamaat
+                  if (now.isBefore(jamaatMoment)) {
+                    // Trigger transition animation with a slight delay
+                    setTextTransition(true);
+                    setTimeout(() => {
+                      setCountingDownToJamaat(true);
+                      setTextTransition(false);
+                      setDisplayTimes(true); // Ensure display is on for jamaat countdown
+                      logger.info(`[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`);
+                    }, 500); // Match fade out duration
+                    
+                    targetMoment = jamaatMoment.clone();
+                  } else {
+                    // Both prayer and jamaat times have passed
+                    jamaatTimePassedRef.current = true;
+                    
+                    // Trigger countdown completion for jamaat if it just passed - not during initial load
+                    const jamaatJustPassed = Math.abs(now.diff(jamaatMoment, 'milliseconds')) <= 30000;
+                    const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
+                    if (jamaatJustPassed && displayTimes && timeSinceLoad > 5000) {
+                      logger.info(`[CRITICAL] ${prayerName} jamaat time has just passed (${jamaatTime})`);
+                      triggerCountdownComplete(true);
+                      return; // Stop execution
+                    }
+                    
+                    // Set future prayer time for tomorrow
+                    targetMoment = prayerMoment.clone().add(1, 'day');
+                  }
                 }
-              }
-            } else {
-              // Set future prayer time for tomorrow if no jamaat time
-              targetMoment = prayerMoment.clone().add(1, 'day');
-            }
-          } else if (prayerTimePassedRef.current && !jamaatTimePassedRef.current && !countingDownToJamaat && jamaatTime) {
-            // Late transition to jamaat countdown if needed
-            const jamaatMoment = moment().hours(0).minutes(0).seconds(0);
-            const [jamaatHours, jamaatMinutes] = jamaatTime.split(':').map(Number);
-            
-            if (!isNaN(jamaatHours) && !isNaN(jamaatMinutes)) {
-              jamaatMoment.hours(jamaatHours).minutes(jamaatMinutes);
-              
-              if (now.isBefore(jamaatMoment)) {
-                // Explicitly transition to jamaat countdown
-                setTextTransition(true);
-                setTimeout(() => {
-                  setCountingDownToJamaat(true);
-                  setTextTransition(false);
-                  logger.info(`[PrayerCountdown] Late transition to ${prayerName} jamaat countdown`);
-                }, 500);
-                
-                targetMoment = jamaatMoment.clone();
-              } else {
-                // Jamaat time has passed, prepare for tomorrow
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error 
+                  ? error.message 
+                  : 'Unknown error in prayer-to-jamaat transition';
+                  
+                logger.error(`[PrayerCountdown] Error handling prayer-to-jamaat transition: ${errorMessage}`, {
+                  prayerName,
+                  prayerTime,
+                  jamaatTime
+                });
+                // Default to tomorrow's prayer time on error
                 targetMoment = prayerMoment.clone().add(1, 'day');
               }
+            } else {
+              // Set target to tomorrow if:
+              // - There's no jamaat time, OR
+              // - We've already processed the prayer-to-jamaat transition
+              targetMoment = prayerMoment.clone().add(1, 'day');
             }
-          } else if (!prayerHasPassed) {
-            // Simple case: prayer time is still in the future
-            targetMoment = prayerMoment.clone();
-          } else {
-            // Default: set to tomorrow's prayer time
-            targetMoment = prayerMoment.clone().add(1, 'day');
           }
         }
         

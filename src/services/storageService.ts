@@ -1,6 +1,18 @@
 import localforage from 'localforage';
 import { ScreenContent, PrayerTimes, PrayerStatus, Event, ApiCredentials, Schedule, EmergencyAlert } from '../api/models';
 
+// Check if we're running in Electron
+const isElectron = () => {
+  return typeof window !== 'undefined' && window.electron !== undefined;
+};
+
+// Access the Electron store through the contextBridge
+const electronStore = isElectron() && window.electron?.store ? window.electron.store : null;
+
+if (electronStore) {
+  console.log('Electron store initialized successfully through preload bridge');
+}
+
 // Initialize DB
 localforage.config({
   name: 'MasjidConnect',
@@ -22,14 +34,62 @@ enum StorageKeys {
 
 // Storage Service
 class StorageService {
+  // Generic save method that uses electron-store when available, falls back to localforage
+  private async saveItem<T>(key: string, value: T): Promise<void> {
+    // Log storage operation
+    console.log(`StorageService: Saving ${key} using ${electronStore ? 'electron-store' : 'localforage'}`);
+    
+    // Save to electron-store if available
+    if (electronStore) {
+      try {
+        electronStore.set(key, value);
+        console.log(`Saved to electron-store: ${key}`);
+      } catch (error) {
+        console.error(`Error saving to electron-store: ${key}`, error);
+        // Fall back to localforage on error
+        await localforage.setItem(key, value);
+      }
+    } else {
+      // Use localforage in browser environment
+      await localforage.setItem(key, value);
+    }
+  }
+
+  // Generic retrieve method that uses electron-store when available, falls back to localforage
+  private async getItem<T>(key: string): Promise<T | null> {
+    // Log retrieval operation
+    console.log(`StorageService: Getting ${key} using ${electronStore ? 'electron-store' : 'localforage'}`);
+    
+    // Try electron-store first if available
+    if (electronStore) {
+      try {
+        const value = electronStore.get(key, null);
+        console.log(`Retrieved from electron-store: ${key}`, value ? 'found' : 'not found');
+        return value;
+      } catch (error) {
+        console.error(`Error retrieving from electron-store: ${key}`, error);
+        // Fall back to localforage on error
+        return localforage.getItem<T>(key);
+      }
+    } else {
+      // Use localforage in browser environment
+      return localforage.getItem<T>(key);
+    }
+  }
+
+  // Add TypeScript global window declaration
+  private hasElectronStore(): boolean {
+    return electronStore !== null;
+  }
+
   // Screen Content
   async saveScreenContent(content: ScreenContent): Promise<void> {
-    await localforage.setItem(StorageKeys.SCREEN_CONTENT, content);
+    await this.saveItem(StorageKeys.SCREEN_CONTENT, content);
     await this.updateLastUpdated(StorageKeys.SCREEN_CONTENT);
   }
 
   async getScreenContent(): Promise<ScreenContent | null> {
-    return localforage.getItem<ScreenContent>(StorageKeys.SCREEN_CONTENT);
+    return this.getItem<ScreenContent>(StorageKeys.SCREEN_CONTENT);
   }
 
   // Schedule
@@ -38,15 +98,15 @@ class StorageService {
     // If it's a single object with a data property that's an array, store that object directly
     if (!Array.isArray(schedule) && schedule && 'data' in schedule && Array.isArray(schedule.data)) {
       console.log('Saving schedule with nested data structure', schedule);
-      await localforage.setItem(StorageKeys.SCHEDULE, schedule);
+      await this.saveItem(StorageKeys.SCHEDULE, schedule);
     } else if (Array.isArray(schedule)) {
       // If it's already an array, save it directly
       console.log('Saving schedule array', schedule);
-      await localforage.setItem(StorageKeys.SCHEDULE, schedule);
+      await this.saveItem(StorageKeys.SCHEDULE, schedule);
     } else {
       // Single schedule object
       console.log('Saving single schedule object', schedule);
-      await localforage.setItem(StorageKeys.SCHEDULE, schedule);
+      await this.saveItem(StorageKeys.SCHEDULE, schedule);
     }
     await this.updateLastUpdated(StorageKeys.SCHEDULE);
   }
@@ -54,7 +114,7 @@ class StorageService {
   async getSchedule(): Promise<Schedule[] | Schedule | null> {
     try {
       console.log('StorageService: Retrieving schedule from storage');
-      const result = await localforage.getItem<Schedule[] | Schedule>(StorageKeys.SCHEDULE);
+      const result = await this.getItem<Schedule[] | Schedule>(StorageKeys.SCHEDULE);
       
       // Add more detailed debugging to see the structure
       console.log('StorageService: Schedule retrieved from storage:', {
@@ -180,42 +240,55 @@ class StorageService {
     // If it's a single object with a data property that's an array, store that object directly
     if (!Array.isArray(prayerTimes) && prayerTimes && 'data' in prayerTimes && Array.isArray(prayerTimes.data)) {
       console.log('Saving prayer times with nested data structure', prayerTimes);
-      await localforage.setItem(StorageKeys.PRAYER_TIMES, prayerTimes);
+      await this.saveItem(StorageKeys.PRAYER_TIMES, prayerTimes);
     } else if (Array.isArray(prayerTimes)) {
       // If it's already an array, save it directly
       console.log('Saving prayer times array', prayerTimes);
-      await localforage.setItem(StorageKeys.PRAYER_TIMES, prayerTimes);
+      await this.saveItem(StorageKeys.PRAYER_TIMES, prayerTimes);
     } else {
       // Single prayer time object, convert to array
       console.log('Saving single prayer time object as array', prayerTimes);
-      await localforage.setItem(StorageKeys.PRAYER_TIMES, [prayerTimes]);
+      await this.saveItem(StorageKeys.PRAYER_TIMES, [prayerTimes]);
     }
     await this.updateLastUpdated(StorageKeys.PRAYER_TIMES);
   }
 
   async getPrayerTimes(): Promise<PrayerTimes[] | PrayerTimes | null> {
-    return localforage.getItem<PrayerTimes[] | PrayerTimes>(StorageKeys.PRAYER_TIMES);
+    return this.getItem<PrayerTimes[] | PrayerTimes>(StorageKeys.PRAYER_TIMES);
   }
 
   // Events
   async saveEvents(events: Event[]): Promise<void> {
-    await localforage.setItem(StorageKeys.EVENTS, events);
+    await this.saveItem(StorageKeys.EVENTS, events);
     await this.updateLastUpdated(StorageKeys.EVENTS);
   }
 
   async getEvents(): Promise<Event[] | null> {
-    return localforage.getItem<Event[]>(StorageKeys.EVENTS);
+    return this.getItem<Event[]>(StorageKeys.EVENTS);
   }
 
   // Credentials
   async saveCredentials(credentials: ApiCredentials): Promise<void> {
-    await localStorage.setItem(StorageKeys.API_KEY, credentials.apiKey);
-    await localStorage.setItem(StorageKeys.SCREEN_ID, credentials.screenId);
+    if (electronStore) {
+      electronStore.set(StorageKeys.API_KEY, credentials.apiKey);
+      electronStore.set(StorageKeys.SCREEN_ID, credentials.screenId);
+    } else {
+      localStorage.setItem(StorageKeys.API_KEY, credentials.apiKey);
+      localStorage.setItem(StorageKeys.SCREEN_ID, credentials.screenId);
+    }
   }
 
   async getCredentials(): Promise<ApiCredentials | null> {
-    const apiKey = localStorage.getItem(StorageKeys.API_KEY);
-    const screenId = localStorage.getItem(StorageKeys.SCREEN_ID);
+    let apiKey: string | null = null;
+    let screenId: string | null = null;
+    
+    if (electronStore) {
+      apiKey = electronStore.get(StorageKeys.API_KEY, null);
+      screenId = electronStore.get(StorageKeys.SCREEN_ID, null);
+    } else {
+      apiKey = localStorage.getItem(StorageKeys.API_KEY);
+      screenId = localStorage.getItem(StorageKeys.SCREEN_ID);
+    }
     
     if (apiKey && screenId) {
       return { apiKey, screenId };
@@ -225,47 +298,68 @@ class StorageService {
   }
 
   async clearCredentials(): Promise<void> {
-    localStorage.removeItem(StorageKeys.API_KEY);
-    localStorage.removeItem(StorageKeys.SCREEN_ID);
+    if (electronStore) {
+      electronStore.delete(StorageKeys.API_KEY);
+      electronStore.delete(StorageKeys.SCREEN_ID);
+    } else {
+      localStorage.removeItem(StorageKeys.API_KEY);
+      localStorage.removeItem(StorageKeys.SCREEN_ID);
+    }
   }
 
   // Last Updated Timestamps
   private async updateLastUpdated(key: string): Promise<void> {
     const lastUpdated = await this.getLastUpdated() || {};
     lastUpdated[key] = new Date().toISOString();
-    await localforage.setItem(StorageKeys.LAST_UPDATED, lastUpdated);
+    await this.saveItem(StorageKeys.LAST_UPDATED, lastUpdated);
   }
 
   async getLastUpdated(): Promise<Record<string, string> | null> {
-    return localforage.getItem<Record<string, string>>(StorageKeys.LAST_UPDATED);
+    return this.getItem<Record<string, string>>(StorageKeys.LAST_UPDATED);
   }
 
   // Emergency Alert
   async saveEmergencyAlert(alert: EmergencyAlert): Promise<void> {
-    await localforage.setItem(StorageKeys.EMERGENCY_ALERT, alert);
+    await this.saveItem(StorageKeys.EMERGENCY_ALERT, alert);
   }
 
   async getEmergencyAlert(): Promise<EmergencyAlert | null> {
-    return localforage.getItem<EmergencyAlert>(StorageKeys.EMERGENCY_ALERT);
+    return this.getItem<EmergencyAlert>(StorageKeys.EMERGENCY_ALERT);
   }
 
   async removeEmergencyAlert(): Promise<void> {
-    await localforage.removeItem(StorageKeys.EMERGENCY_ALERT);
+    if (electronStore) {
+      electronStore.delete(StorageKeys.EMERGENCY_ALERT);
+    } else {
+      await localforage.removeItem(StorageKeys.EMERGENCY_ALERT);
+    }
   }
 
   // Clear all data
   async clearAll(): Promise<void> {
-    await localforage.clear();
+    if (electronStore) {
+      electronStore.clear();
+    } else {
+      await localforage.clear();
+    }
+    // Clear credentials regardless of storage method
     localStorage.removeItem(StorageKeys.API_KEY);
     localStorage.removeItem(StorageKeys.SCREEN_ID);
   }
 
   // Check if storage is empty (first run)
   async isStorageEmpty(): Promise<boolean> {
-    const keys = await localforage.keys();
-    return keys.length === 0;
+    if (electronStore) {
+      const keys = electronStore.keys();
+      return keys.length === 0 || (keys.length <= 2 && keys.every(k => 
+        k === StorageKeys.API_KEY || k === StorageKeys.SCREEN_ID));
+    } else {
+      const keys = await localforage.keys();
+      return keys.length === 0;
+    }
   }
 }
 
+// Create and export a singleton instance
 const storageService = new StorageService();
 export default storageService; 

@@ -235,7 +235,9 @@ export interface ApiResponse<T> {
   error?: string;
   cached?: boolean;
   offlineFallback?: boolean;
-  status?: number; // Add status code property for error responses
+  timestamp?: number;
+  cacheAge?: number;
+  status?: number;
 }
 
 // Predefined alert color values matching ALERT_COLOR_SCHEMES

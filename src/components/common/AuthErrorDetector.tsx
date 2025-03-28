@@ -64,9 +64,12 @@ const AuthErrorDetector: React.FC = () => {
           logger.info('Authentication working again after previous errors');
           setConsecutiveErrors(0);
         }
-      } else if (response.status === 401) {
+      } else if (response?.status === 401) {
         // Authentication error
-        logger.warn('Authentication error detected', { status: response.status, error: response.error });
+        logger.warn('Authentication error detected', { 
+          status: response?.status, 
+          error: response.error 
+        });
         setConsecutiveErrors(prev => prev + 1);
         
         // If we've had 3 consecutive auth errors, force logout

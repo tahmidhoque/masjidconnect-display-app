@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import { useOrientation } from '../../contexts/OrientationContext';
 import useRotationHandling from '../../hooks/useRotationHandling';
+import useContentUpdates from '../../hooks/useContentUpdates';
 import LandscapeDisplay from '../layouts/LandscapeDisplay';
 import PortraitDisplay from '../layouts/PortraitDisplay';
 import LoadingScreen from './LoadingScreen';
@@ -14,15 +15,13 @@ const TRANSITION_STYLES = {
     width: '100vw', 
     height: '100vh',
     overflow: 'hidden',
-    transition: 'opacity 0.5s ease-in-out, transform 0.8s ease-in-out',
-    position: 'relative',
-    willChange: 'transform, opacity'
+    transition: 'opacity 0.3s ease, transform 0.3s ease',
+    position: 'relative'
   },
   content: {
     width: '100%',
     height: '100%',
-    transition: 'opacity 0.5s ease-in-out, transform 0.8s ease-in-out',
-    willChange: 'transform, opacity'
+    transition: 'opacity 0.3s ease, transform 0.3s ease'
   },
   rotated: {
     width: '100vh',
@@ -31,8 +30,7 @@ const TRANSITION_STYLES = {
     top: '50%',
     left: '50%',
     transformOrigin: 'center',
-    transition: 'transform 0.8s ease-in-out, opacity 0.5s ease-in-out',
-    willChange: 'transform, opacity'
+    transition: 'transform 0.3s ease, opacity 0.3s ease'
   }
 };
 
@@ -49,6 +47,10 @@ const DisplayScreen: React.FC = () => {
     masjidName,
     screenContent
   } = useContent();
+  
+  // Use the content updates hook for real-time content refreshing
+  // Set to refresh every 5 minutes (300000ms)
+  const { forceRefresh } = useContentUpdates(300000);
   
   const { orientation, setAdminOrientation } = useOrientation();
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -160,6 +162,23 @@ const DisplayScreen: React.FC = () => {
     }
   }, [screenContent, setAdminOrientation, orientation]);
   
+  // Add an effect to force content refresh when the window gains focus
+  // This ensures content stays up-to-date when the device wakes from sleep or returns from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        logger.info('Display became visible - refreshing content');
+        forceRefresh();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [forceRefresh]);
+  
   // Use rotation handling hook to determine if we need to rotate
   const rotationInfo = useRotationHandling(orientation);
   const shouldRotate = rotationInfo.shouldRotate;
@@ -189,8 +208,11 @@ const DisplayScreen: React.FC = () => {
       window.dispatchEvent(resizeEvent);
     }, 100);
     
+    // Initial content refresh when the component mounts
+    forceRefresh();
+    
     return () => clearTimeout(forceReflowTimeout);
-  }, []);
+  }, [forceRefresh]);
 
   // If content is still loading, show loading screen
   if (isLoading) {
@@ -201,8 +223,8 @@ const DisplayScreen: React.FC = () => {
     <Box 
       sx={{ 
         ...TRANSITION_STYLES.container,
-        opacity: isTransitioning ? 0.6 : 1,
-        transform: isTransitioning ? 'scale(0.98)' : 'scale(1)',
+        opacity: isTransitioning ? 0.95 : 1,
+        transform: isTransitioning ? 'scale(0.995)' : 'scale(1)',
       }}
     >
       {shouldRotate ? (
@@ -210,14 +232,14 @@ const DisplayScreen: React.FC = () => {
         <Box
           sx={{
             ...TRANSITION_STYLES.rotated,
-            transform: `translate(-50%, -50%) rotate(90deg) ${isTransitioning ? 'scale(0.95)' : 'scale(1)'}`,
-            opacity: isTransitioning ? 0.6 : 1,
+            transform: `translate(-50%, -50%) rotate(90deg) ${isTransitioning ? 'scale(0.99)' : 'scale(1)'}`,
+            opacity: isTransitioning ? 0.95 : 1,
           }}
         >
           <Box sx={{
             ...TRANSITION_STYLES.content,
-            opacity: isTransitioning ? 0.8 : 1,
-            transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
+            opacity: isTransitioning ? 0.98 : 1,
+            transform: isTransitioning ? 'translateY(2px)' : 'translateY(0)',
           }}>
             {DisplayComponent}
           </Box>
@@ -226,8 +248,8 @@ const DisplayScreen: React.FC = () => {
         // No rotation needed
         <Box sx={{
           ...TRANSITION_STYLES.content,
-          opacity: isTransitioning ? 0.8 : 1,
-          transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
+          opacity: isTransitioning ? 0.98 : 1,
+          transform: isTransitioning ? 'translateY(2px)' : 'translateY(0)',
         }}>
           {DisplayComponent}
         </Box>

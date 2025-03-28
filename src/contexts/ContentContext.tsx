@@ -208,67 +208,147 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     }
   }, [masjidName, masjidTimezone, normalizeScheduleData]);
 
-  // Simplified function to process prayer times without causing rerender loops
-  const processPrayerTimes = useCallback((times: PrayerTimes | PrayerTimes[]): void => {
-    if (!times) return;
+  // Use memoized processPrayerTimes to avoid dependency cycles
+  const processPrayerTimes = useCallback((prayerTimesData: PrayerTimes | PrayerTimes[] | null) => {
+    if (!prayerTimesData) return;
     
     try {
-      // Single batch update to reduce rerenders
-      if (Array.isArray(times)) {
-        // If it's an array, use the first entry
-        if (times.length > 0) {
-          setPrayerTimes(times[0]);
+      // Handle both array and single object formats
+      if (Array.isArray(prayerTimesData)) {
+        // If it's an array, use the first item
+        if (prayerTimesData.length > 0) {
+          setPrayerTimes(prayerTimesData[0]);
         }
       } else {
-        // It's a single PrayerTimes object
-        setPrayerTimes(times);
+        // If it's a single object, use it directly
+        setPrayerTimes(prayerTimesData);
       }
     } catch (error) {
-      logger.error("Error processing prayer times", { error });
+      logger.error("ContentContext: Error processing prayer times data", { error });
     }
   }, []);
 
-  // Simplified refreshContent to prevent rerender loops
-  const refreshContent = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
-    // Skip if already updating or if throttled
+  // Simplified refreshPrayerTimes to prevent rerender loops
+  const refreshPrayerTimes = useCallback(async (): Promise<void> => {
     if (isUpdatingRef.current) {
+      logger.debug("ContentContext: Skipping prayer times refresh - already updating");
+      return;
+    }
+    
+    const now = Date.now();
+    // Reduce the throttle time to ensure we don't miss updates 
+    // but still prevent hammering the API
+    if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+      logger.debug("ContentContext: Throttling prayer times refresh");
+      return;
+    }
+    
+    logger.info("ContentContext: Refreshing prayer times");
+    isUpdatingRef.current = true;
+    lastRefreshTimeRef.current = now;
+
+    try {
+      // First, check localStorage for existing prayer times
+      const storedPrayerTimes = await storageService.getPrayerTimes();
+      
+      // Use data sync service to sync prayer times with force refresh
+      logger.info("ContentContext: Fetching fresh prayer times from API");
+      await dataSyncService.syncPrayerTimes(true);
+      
+      // Get updated prayer times from storage after sync
+      const updatedPrayerTimes = await storageService.getPrayerTimes();
+      if (updatedPrayerTimes) {
+        logger.info("ContentContext: Successfully retrieved updated prayer times");
+        processPrayerTimes(updatedPrayerTimes);
+        setLastUpdated(new Date());
+      } else if (storedPrayerTimes) {
+        logger.warn("ContentContext: API prayer times fetch failed, using stored data");
+        processPrayerTimes(storedPrayerTimes);
+      } else {
+        logger.error("ContentContext: No prayer times available, using fallback");
+        processPrayerTimes(createFallbackPrayerTimes());
+      }
+    } catch (error) {
+      logger.error("ContentContext: Error refreshing prayer times", { error });
+      
+      try {
+        // Fall back to stored data if API fails
+        const storedPrayerTimes = await storageService.getPrayerTimes();
+        if (storedPrayerTimes) {
+          processPrayerTimes(storedPrayerTimes);
+          logger.info("ContentContext: Using stored prayer times as fallback");
+        } else {
+          processPrayerTimes(createFallbackPrayerTimes());
+          logger.info("ContentContext: Using generated fallback prayer times");
+        }
+      } catch (fallbackError) {
+        logger.error("ContentContext: Failed to load fallback prayer times", { error: fallbackError });
+      }
+    } finally {
+      isUpdatingRef.current = false;
+    }
+  }, [processPrayerTimes]);
+
+  // Refresh content with improved cache handling
+  const refreshContent = useCallback(async (forceRefresh = false): Promise<void> => {
+    if (!isAuthenticated) {
+      logger.debug("ContentContext: Not refreshing content - not authenticated");
+      return;
+    }
+    
+    if (isUpdatingRef.current && !forceRefresh) {
+      logger.debug("ContentContext: Already updating content and force refresh not requested");
       return;
     }
     
     const now = Date.now();
     if (!forceRefresh && now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+      logger.debug("ContentContext: Throttling content refresh");
       return;
     }
     
+    logger.info(`ContentContext: Refreshing content (forceRefresh: ${forceRefresh})`);
+    setIsLoading(true);
     isUpdatingRef.current = true;
     lastRefreshTimeRef.current = now;
     
     try {
-      setIsLoading(true);
-      
+      // If forcing a refresh, invalidate caches
       if (forceRefresh) {
-        // When forcing a refresh, invalidate the cache
         masjidDisplayClient.invalidateAllCaches();
       }
-
-      // Start sync using dataSyncService
+      
+      // Use data sync service to sync all data
       await dataSyncService.syncAllData(forceRefresh);
       
-      // Load updated content from storage
-      const updatedContent = await storageService.getScreenContent();
-      if (updatedContent) {
-        processScreenContent(updatedContent);
-      }
+      // Get the updated content from storage
+      const storedContent = await storageService.getScreenContent();
       
-      // Update last updated time
-      setLastUpdated(new Date());
+      if (storedContent) {
+        logger.info("ContentContext: Successfully fetched screen content");
+        processScreenContent(storedContent);
+        setLastUpdated(new Date());
+      } else {
+        logger.error("ContentContext: No content available after sync");
+      }
     } catch (error) {
-      logger.error("Error refreshing content:", { error });
+      logger.error("ContentContext: Error refreshing content", { error });
+      
+      try {
+        // Fall back to stored content if API fails
+        const storedContent = await storageService.getScreenContent();
+        if (storedContent) {
+          processScreenContent(storedContent);
+          logger.info("ContentContext: Using stored content as fallback");
+        }
+      } catch (fallbackError) {
+        logger.error("ContentContext: Failed to load fallback content", { error: fallbackError });
+      }
     } finally {
       setIsLoading(false);
       isUpdatingRef.current = false;
     }
-  }, [processScreenContent]);
+  }, [isAuthenticated, processScreenContent]);
 
   // Memoize loadContent to prevent rerenders
   const loadContent = useCallback(async (): Promise<void> => {
@@ -281,15 +361,41 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       
       // First try to load from storage
       const storedContent = await storageService.getScreenContent();
+      const storedPrayerTimes = await storageService.getPrayerTimes();
+      
+      let hasData = false;
+      
+      // Process stored prayer times first to ensure they're available
+      if (storedPrayerTimes) {
+        logger.info("ContentContext: Loaded prayer times from storage");
+        processPrayerTimes(storedPrayerTimes);
+        hasData = true;
+      } else {
+        logger.warn("ContentContext: No prayer times found in storage");
+        
+        // Use fallback times if nothing is found
+        logger.info("ContentContext: Using fallback prayer times");
+        const fallbackTimes = createFallbackPrayerTimes();
+        processPrayerTimes(fallbackTimes);
+        
+        // Store the fallback in storage for next time
+        try {
+          await storageService.savePrayerTimes(fallbackTimes);
+          hasData = true;
+        } catch (e) {
+          logger.error("ContentContext: Error storing fallback prayer times", { error: e });
+        }
+      }
+      
+      // Process stored content after prayer times
       if (storedContent) {
         processScreenContent(storedContent);
         logger.info("ContentContext: Loaded content from storage");
       }
       
-      // Load prayer times directly
-      const storedPrayerTimes = await storageService.getPrayerTimes();
-      if (storedPrayerTimes) {
-        processPrayerTimes(storedPrayerTimes);
+      // Switch loading state off once we have at least prayer times
+      if (hasData) {
+        setIsLoading(false);
       }
       
       // Always try to fetch fresh data when app loads
@@ -299,49 +405,25 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
         setTimeout(() => {
           if (!initializedRef.current) {
             initializedRef.current = true;
-            refreshContent(true);
+            refreshContent(true).then(() => {
+              // After content is refreshed, explicitly refresh prayer times
+              refreshPrayerTimes();
+              // Ensure loading state is off
+              setIsLoading(false);
+            });
           }
         }, 100);
+      } else {
+        // Ensure loading state is off even if offline
+        setIsLoading(false);
       }
     } catch (error) {
       logger.error("ContentContext: Error loading initial content", { error });
-    } finally {
       setIsLoading(false);
-      isUpdatingRef.current = false;
-    }
-  }, [processScreenContent, processPrayerTimes, refreshContent]);
-
-  // Simplified refreshPrayerTimes to prevent rerender loops
-  const refreshPrayerTimes = useCallback(async (): Promise<void> => {
-    if (isUpdatingRef.current || !isAuthenticated) return;
-    
-    const now = Date.now();
-    if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
-      logger.debug("ContentContext: Throttling prayer times refresh");
-      return;
-    }
-    
-    isUpdatingRef.current = true;
-    lastRefreshTimeRef.current = now;
-
-    try {
-      // Use data sync service to sync prayer times
-      await dataSyncService.syncPrayerTimes(true);
-      
-      // Get updated prayer times from storage
-      const updatedPrayerTimes = await storageService.getPrayerTimes();
-      if (updatedPrayerTimes) {
-        processPrayerTimes(updatedPrayerTimes);
-        
-        // Update last updated time
-        setLastUpdated(new Date());
-      }
-    } catch (error) {
-      logger.error("ContentContext: Error refreshing prayer times", { error });
     } finally {
       isUpdatingRef.current = false;
     }
-  }, [isAuthenticated, processPrayerTimes]);
+  }, [processScreenContent, processPrayerTimes, refreshContent, refreshPrayerTimes]);
 
   // Helper function to fetch schedule directly from the API
   const fetchScheduleFromAPI = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
@@ -598,7 +680,29 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     }
   }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
 
-  // Initial setup - runs once when component mounts
+  // Add visibility change handler
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === 'visible') {
+      logger.info("ContentContext: App became visible, refreshing data");
+      refreshContent(true); // Force refresh when coming back to focus
+      refreshPrayerTimes();
+    }
+  }, [refreshContent, refreshPrayerTimes]);
+
+  // Run once on mount to set up visibility change listener
+  useEffect(() => {
+    logger.info("ContentContext: Setting up visibility change listener");
+    
+    // Add visibility change listener
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [handleVisibilityChange]);
+  
+  // Set up initial data loading
   useEffect(() => {
     // Use refs to ensure this only runs once
     if (isAuthenticated && !initializedRef.current) {

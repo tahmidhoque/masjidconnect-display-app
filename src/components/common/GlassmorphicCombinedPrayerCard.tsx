@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
-import { Box, Typography, useTheme, alpha } from '@mui/material';
+import React, { useMemo, useCallback, useEffect, useState, useRef } from 'react';
+import { Box, Typography, useTheme, alpha, CircularProgress } from '@mui/material';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import GlassmorphicCard from './GlassmorphicCard';
 import PrayerCountdown from './PrayerCountdown';
@@ -34,8 +34,157 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
     jumuahKhutbahTime
   } = usePrayerTimes();
   
-  const { refreshPrayerTimes, prayerTimes } = useContent();
+  const { refreshPrayerTimes, prayerTimes, isLoading } = useContent();
   
+  // Local state to handle initial loading and retry logic
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [localLoading, setLocalLoading] = useState(true);
+  
+  // Use refs to track component state between renders
+  const lastRefreshTimeRef = useRef<number>(Date.now());
+  const dataCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const MIN_REFRESH_INTERVAL = 5000; // 5 seconds minimum between refreshes
+
+  // Effect to handle retry logic if prayer times don't load properly
+  useEffect(() => {
+    // Clean up any existing timeout to prevent multiple refreshes
+    if (dataCheckTimeoutRef.current) {
+      clearTimeout(dataCheckTimeoutRef.current);
+      dataCheckTimeoutRef.current = null;
+    }
+
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+    
+    // Check if we have the necessary data, if not, retry the refresh
+    if (!isLoading && (!nextPrayer || !todaysPrayerTimes.length)) {
+      logger.warn('[GlassmorphicCombinedPrayerCard] Prayer times data missing or incomplete', {
+        retryCount,
+        hasPrayerTimes: !!prayerTimes,
+        hasNextPrayer: !!nextPrayer,
+        hasFormattedTimes: todaysPrayerTimes.length,
+        prayerTimesData: prayerTimes ? JSON.stringify(prayerTimes).substring(0, 100) + '...' : 'null',
+        timeSinceLastRefresh: `${Math.round(timeSinceLastRefresh / 1000)}s`
+      });
+      
+      // Only retry if sufficient time has passed since last refresh
+      if (timeSinceLastRefresh > MIN_REFRESH_INTERVAL) {
+        setIsRetrying(true);
+        lastRefreshTimeRef.current = now;
+        
+        // Add a delay before retrying that increases with retry count, but keep trying indefinitely
+        // This is important for kiosk mode where manual intervention is not possible
+        const retryDelay = Math.min(1000 * Math.min(retryCount + 1, 10), 10000); // Exponential backoff, max 10 seconds
+        
+        dataCheckTimeoutRef.current = setTimeout(() => {
+          logger.info(`[GlassmorphicCombinedPrayerCard] Executing refresh attempt ${retryCount + 1}`);
+          // Force-clear the cache on retries to avoid stale data
+          refreshPrayerTimes();
+          setRetryCount(prev => prev + 1);
+          setIsRetrying(false);
+        }, retryDelay);
+      } else {
+        // If we're trying to refresh too frequently, wait a bit
+        logger.debug(`[GlassmorphicCombinedPrayerCard] Throttling refresh, will retry in ${Math.ceil((MIN_REFRESH_INTERVAL - timeSinceLastRefresh) / 1000)}s`);
+        
+        dataCheckTimeoutRef.current = setTimeout(() => {
+          // This will trigger a re-run of this effect
+          setIsRetrying(prev => !prev);
+        }, MIN_REFRESH_INTERVAL - timeSinceLastRefresh + 100);
+      }
+    } else {
+      // Once we have data, switch local loading off
+      if (!isLoading && (nextPrayer || todaysPrayerTimes.length)) {
+        logger.info('[GlassmorphicCombinedPrayerCard] Prayer times loaded successfully', {
+          hasNextPrayer: !!nextPrayer,
+          prayerTimesCount: todaysPrayerTimes.length,
+          retryCount
+        });
+        setLocalLoading(false);
+        
+        // Reset retry count when successful
+        if (retryCount > 0) {
+          setRetryCount(0);
+        }
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      if (dataCheckTimeoutRef.current) {
+        clearTimeout(dataCheckTimeoutRef.current);
+        dataCheckTimeoutRef.current = null;
+      }
+    };
+  }, [isLoading, nextPrayer, todaysPrayerTimes, retryCount, refreshPrayerTimes, prayerTimes]);
+
+  // Force refresh when mounted to ensure we have fresh data
+  useEffect(() => {
+    logger.info('[GlassmorphicCombinedPrayerCard] Component mounted, triggering initial data refresh');
+    lastRefreshTimeRef.current = Date.now();
+    refreshPrayerTimes();
+    
+    // Set up visibility change listener - important for focus/blur cycles
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        logger.info('[GlassmorphicCombinedPrayerCard] Window became visible, refreshing data');
+        lastRefreshTimeRef.current = Date.now();
+        refreshPrayerTimes();
+      }
+    };
+    
+    // Add visibility and focus event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    
+    // Cleanup on unmount
+    return () => {
+      if (dataCheckTimeoutRef.current) {
+        clearTimeout(dataCheckTimeoutRef.current);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [refreshPrayerTimes]);
+
+  // Listen for content updates
+  useEffect(() => {
+    const handleContentUpdate = (event: CustomEvent) => {
+      if (event.detail.type === 'prayerTimes') {
+        logger.info('[GlassmorphicCombinedPrayerCard] Prayer times update detected', {
+          timestamp: new Date(event.detail.timestamp).toISOString(),
+          hasNextPrayer: !!nextPrayer,
+          hasFormattedTimes: todaysPrayerTimes.length
+        });
+      }
+    };
+
+    window.addEventListener('contentUpdated', handleContentUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('contentUpdated', handleContentUpdate as EventListener);
+    };
+  }, [nextPrayer, todaysPrayerTimes.length]);
+
+  // Periodically check and refresh data if needed - less frequently than before
+  useEffect(() => {
+    // Set up an interval to refresh prayer times every 15 minutes
+    // This ensures the display is always up to date, even if other mechanisms fail
+    const refreshInterval = setInterval(() => {
+      const now = Date.now();
+      if (now - lastRefreshTimeRef.current > 15 * 60 * 1000) { // Only if last refresh was >15 min ago
+        logger.debug('[GlassmorphicCombinedPrayerCard] Performing periodic data refresh check');
+        lastRefreshTimeRef.current = now;
+        refreshPrayerTimes();
+      }
+    }, 15 * 60 * 1000); // 15 minutes
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [refreshPrayerTimes]);
+
   // Animation for the shimmer effect
   const cardAnimation = useMemo(() => `
     @keyframes shimmer {
@@ -151,8 +300,108 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
     return 'none';
   };
   
+  // Early return with loading state
+  if (isLoading || localLoading || isRetrying) {
+    return (
+      <GlassmorphicCard
+        opacity={0.2}
+        blurIntensity={8}
+        borderRadius={4}
+        borderWidth={1}
+        borderOpacity={0.3}
+        borderColor={theme.palette.warning.main}
+        shadowIntensity={0.35}
+        sx={{
+          width: '100%',
+          height: '100%',
+          color: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
+        }}
+      >
+        <CircularProgress color="warning" size={40} thickness={4} />
+        <Typography 
+          sx={{ 
+            mt: 2, 
+            fontSize: fontSizes.h6,
+            fontWeight: 600,
+            textAlign: 'center'
+          }}
+        >
+          Loading Prayer Times...
+        </Typography>
+      </GlassmorphicCard>
+    );
+  }
+  
+  // Fallback for when retries are exhausted but still no data
   if (!nextPrayer) {
-    return null;
+    logger.error('[GlassmorphicCombinedPrayerCard] Failed to load prayer times after retries');
+    return (
+      <GlassmorphicCard
+        opacity={0.2}
+        blurIntensity={8}
+        borderRadius={4}
+        borderWidth={1}
+        borderOpacity={0.3}
+        borderColor={theme.palette.warning.main}
+        shadowIntensity={0.35}
+        sx={{
+          width: '100%',
+          height: '100%',
+          color: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
+          p: 3
+        }}
+      >
+        <Typography 
+          sx={{ 
+            fontSize: fontSizes.h5, 
+            fontWeight: 600,
+            textAlign: 'center',
+            mb: 2
+          }}
+        >
+          Prayer Times Unavailable
+        </Typography>
+        <Typography 
+          sx={{ 
+            fontSize: fontSizes.body1,
+            textAlign: 'center',
+            mb: 2
+          }}
+        >
+          Unable to load prayer times. Please check your connection and try again.
+        </Typography>
+        <Box 
+          onClick={() => {
+            setLocalLoading(true);
+            setRetryCount(0);
+            refreshPrayerTimes();
+          }}
+          sx={{
+            cursor: 'pointer',
+            p: 1,
+            borderRadius: 1,
+            bgcolor: alpha(theme.palette.warning.main, 0.3),
+            '&:hover': {
+              bgcolor: alpha(theme.palette.warning.main, 0.4),
+            }
+          }}
+        >
+          <Typography color="warning.light" fontWeight={600}>
+            Tap to Retry
+          </Typography>
+        </Box>
+      </GlassmorphicCard>
+    );
   }
   
   return (

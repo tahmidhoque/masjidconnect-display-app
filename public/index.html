@@ -9,6 +9,11 @@
       name="description"
       content="MasjidConnect Display App - A digital signage solution for mosques"
     />
+    <!-- Content Security Policy for Electron -->
+    <meta 
+      http-equiv="Content-Security-Policy" 
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.com; img-src 'self' data: https://*.masjidconnect.com;"
+    />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <!--
       manifest.json provides metadata used when your web app is installed on a

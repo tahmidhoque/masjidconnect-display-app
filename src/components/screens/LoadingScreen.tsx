@@ -22,7 +22,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
   const { orientation } = useOrientation();
-  const { masjidName } = useContent();
+  const { masjidName, isLoading: contentLoading, prayerTimes } = useContent();
   const { loadingMessage, initializationStage, isInitializing } = useAppInitialization();
   
   // Animation and content states
@@ -31,6 +31,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
   const [showSpinner, setShowSpinner] = useState(true);
   const [spinnerOpacity, setSpinnerOpacity] = useState(1);
+  const [loadingContentMessage, setLoadingContentMessage] = useState('Initializing...');
   
   // Reference to track if we've already triggered completion
   const hasCompletedRef = useRef(false);
@@ -57,6 +58,15 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       setShowContent(true);
     }, 300);
   }, []);
+  
+  // Update loading message based on content loading status
+  useEffect(() => {
+    if (contentLoading) {
+      setLoadingContentMessage('Loading content...');
+    } else if (prayerTimes) {
+      setLoadingContentMessage('Loading prayer times...');
+    }
+  }, [contentLoading, prayerTimes]);
 
   // Progress through loading stages with timeouts for premium feel
   useEffect(() => {
@@ -102,7 +112,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     };
   }, []); // Empty dependency array ensures this only runs once
 
-  // Get display message based on loading stage and authentication status
+  // Get display message based on loading stage, auth status and data loading
   const getDisplayMessage = () => {
     // For final stage, always show the Salam greeting with mosque name if available
     if (loadingStage === 'complete' || initializationStage === 'complete') {
@@ -118,6 +128,13 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
     }
     
     if (isAuthenticated) {
+      // Show more specific loading messages when authenticated
+      if (contentLoading) {
+        return 'Loading latest content...';
+      } else if (!prayerTimes) {
+        return 'Loading prayer times...';
+      }
+      
       switch (loadingStage) {
         case 'initializing':
           return 'Loading your dashboard...';
