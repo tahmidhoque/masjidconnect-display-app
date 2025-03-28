@@ -79,7 +79,6 @@ const GlassmorphicContentCard: React.FC<GlassmorphicContentCardProps> = ({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        mb: getSizeRem(1.0), // Reduced bottom margin to prevent footer overlap
         color: '#ffffff',
         boxShadow: isUrgent 
           ? `0 8px 20px ${alpha(accentColor, 0.25)}, 0 0 15px ${alpha(accentColor, 0.25)}`

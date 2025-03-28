@@ -153,9 +153,10 @@ const LandscapeDisplay: React.FC = () => {
         flex: 'nowrap',
         height: '100%',
         position: 'relative',
-        gap: 1,
+        gap: 1.5,
         zIndex: 2, // Above the background
-        px: 0.5, // Consistent side padding // Consistent top and bottom padding
+        px: 1.5, // Consistent side padding
+        py: 1.5, // Consistent top and bottom padding
       }}>
         {/* Header */}
         <GlassmorphicHeader
@@ -170,17 +171,16 @@ const LandscapeDisplay: React.FC = () => {
         <Box sx={{ 
           display: 'flex',
           flexGrow: 1,
-          pb: 0.5,
-          gap: 2,
+          gap: 2.5,
           overflow: 'hidden',
-          mb: 1, // Reduced margin before footer
         }}>
           {/* Left Column - Prayer Times */}
           <Box sx={{ 
-            width: '35%', // Slightly increased width for prayer times
+            width: '50%', // Equal width for both columns
             display: 'flex',
             flexDirection: 'column',
             height: '100%', // Full height
+            // overflow: 'hidden',
           }}>
             <GlassmorphicCombinedPrayerCard 
               orientation="landscape"
@@ -190,7 +190,7 @@ const LandscapeDisplay: React.FC = () => {
           
           {/* Right Column - Content Display */}
           <Box sx={{ 
-            width: '65%', // Adjusted width to match prayer column change
+            width: '50%', // Equal width for both columns
             display: 'flex',
             flexDirection: 'column',
             height: '100%', // Ensure full height

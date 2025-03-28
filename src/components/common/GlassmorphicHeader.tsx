@@ -51,13 +51,9 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
         backdropFilter: 'blur(8px)',
         backgroundColor: alpha(theme.palette.primary.dark, 0.3),
         boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
-        mt: getSizeRem(1),
-        // mb: getSizeRem(isPortrait ? 2 : 1),
         overflow: 'hidden',
         borderTop: `1px solid ${alpha('#ffffff', 0.5)}`,
         borderLeft: `1px solid ${alpha('#ffffff', 0.5)}`,
-
-        
       }}
     >
       <Box>

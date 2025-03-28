@@ -200,9 +200,9 @@ const PortraitDisplay: React.FC = () => {
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',
+        gap: 1.5,
         px: 1.5,
-        pt: 0,
-        pb: 1.5,
+        py: 1.5, // Consistent top and bottom padding
       }}>
         {/* Glassmorphic Header */}
         <GlassmorphicHeader
@@ -210,7 +210,7 @@ const PortraitDisplay: React.FC = () => {
           currentDate={currentDate ? new Date(currentDate) : new Date()}
           hijriDate={hijriDate || ''}
           currentTime={currentTime}
-          orientation="portrait"
+          orientation="landscape"
         />
         
         {/* Content Layout Container with proper spacing */}
@@ -219,14 +219,13 @@ const PortraitDisplay: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          gap: 1.5, // Add gap between prayer card and content
+          gap: 1.5, // Add consistent gap between prayer card and content
         }}>
           {/* Combined Prayer Card (Countdown + Times) - with 50% of available space */}
           <Box sx={{ 
             flex: 1, // Takes 50% of the available flex space (changed from 2)
             display: 'flex',
             flexDirection: 'column',
-            mb: 1,
           }}>
             <GlassmorphicCombinedPrayerCard
               orientation="portrait"
@@ -234,16 +233,15 @@ const PortraitDisplay: React.FC = () => {
             />
           </Box>
           
-          {/* Content Carousel - with 50% of available space */}
+          {/* Content Carousel - with 50% of the available flex space */}
           <Box sx={{ 
             flex: 1, // Takes 50% of the available flex space
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            mb: 1.5, // Ensure space above footer
             minHeight: 0, // Important for proper flex behavior
           }}>
-            <ContentCarousel variant="portrait" />
+            <ContentCarousel variant="landscape" />
           </Box>
         </Box>
         

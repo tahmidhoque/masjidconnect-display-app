@@ -20,39 +20,41 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
   return (
     <Box
       sx={{
-        position: 'absolute',
-        bottom: getSizeRem(1.5),
-        right: getSizeRem(1.5),
-        zIndex: 10,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 'auto',
+        py: getSizeRem(0.3),
       }}
     >
       <GlassmorphicCard
-        opacity={0.2}
-        blurIntensity={8}
-        borderRadius={3}
+        opacity={0.12}
+        blurIntensity={5}
+        borderRadius={2}
         borderWidth={1}
-        borderOpacity={0.25}
-        borderColor={alpha('#ffffff', 0.25)}
-        shadowIntensity={0.3}
+        borderOpacity={0.12}
+        borderColor={alpha('#ffffff', 0.12)}
+        shadowIntensity={0.10}
         sx={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: getSizeRem(0.7),
-          px: getSizeRem(1.2),
-          py: getSizeRem(0.6),
+          gap: getSizeRem(0.4),
+          px: getSizeRem(0.7),
+          py: getSizeRem(0.2),
           color: '#fff',
-          backgroundColor: alpha(theme.palette.primary.dark, 0.3),
-          borderTop: `1px solid ${alpha('#ffffff', 0.5)}`,
-          borderLeft: `1px solid ${alpha('#ffffff', 0.5)}`,
+          backgroundColor: alpha(theme.palette.primary.dark, 0.15),
+          borderTop: `1px solid ${alpha('#ffffff', 0.2)}`,
+          borderLeft: `1px solid ${alpha('#ffffff', 0.2)}`,
+          maxWidth: 'fit-content',
         }}
       >
         <Typography
           sx={{
-            fontSize: fontSizes.caption,
-            color: alpha('#fff', 0.85),
+            fontSize: fontSizes.small,
+            color: alpha('#fff', 0.6),
             fontFamily: "'Poppins', sans-serif",
-            fontWeight: 400,
+            fontWeight: 300,
           }}
         >
           Powered by
@@ -62,9 +64,9 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
           src={logoSrc} 
           alt="MasjidConnect Logo" 
           style={{ 
-            height: `${getSizeRem(1.2).replace('rem', '')}rem`,
+            height: `${getSizeRem(0.7).replace('rem', '')}rem`,
             width: 'auto',
-            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))'
+            filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12))'
           }}
         />
       </GlassmorphicCard>

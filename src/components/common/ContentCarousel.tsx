@@ -9,6 +9,7 @@ import { useOrientation } from '../../contexts/OrientationContext';
 import localforage from 'localforage';
 import GlassmorphicContentCard from './GlassmorphicContentCard';
 import GlassmorphicCard from './GlassmorphicCard';
+import { Event } from '../../api/models';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -235,20 +236,58 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           
           // Add cached events if available
           if (cachedEvents && Array.isArray(cachedEvents) && (cachedEvents as any[]).length > 0) {
-            items.push(...(cachedEvents as any[]).map((event: any) => ({
-              id: event.id,
-              order: 999, // Place events after scheduled content
-              contentItem: {
+            items.push(...(cachedEvents as any[]).map((event: any) => {
+              // Extract description properly based on various possible formats
+              let description = '';
+              
+              if (typeof event.description === 'string') {
+                description = event.description;
+              } else if (typeof event.description === 'object' && event.description !== null) {
+                const descObj = event.description as { 
+                  text?: string; 
+                  description?: string;
+                  category?: string;
+                  location?: string;
+                };
+                
+                // Try to extract meaningful text from the description object
+                if (descObj.text) {
+                  description = descObj.text;
+                } else if (descObj.description) {
+                  description = descObj.description;
+                } else {
+                  // Try to extract meaningful text from the object
+                  try {
+                    // Extract only helpful fields for display
+                    const extractedInfo = [];
+                    
+                    if (descObj.category) extractedInfo.push(descObj.category);
+                    if (descObj.description) extractedInfo.push(descObj.description);
+                    if (descObj.location && !event.location) extractedInfo.push(`Location: ${descObj.location}`);
+                    
+                    description = extractedInfo.length > 0 ? extractedInfo.join('\n\n') : 'See event details';
+                  } catch (err) {
+                    description = 'Event information unavailable';
+                    console.error('Error parsing cached event description:', err);
+                  }
+                }
+              }
+              
+              return {
                 id: event.id,
-                title: event.title || 'Event',
-                content: event.description || 'No description available',
-                type: 'EVENT',
-                duration: 20
-              },
-              startDate: event.startDate,
-              endDate: event.endDate,
-              location: event.location
-            })));
+                order: 999, // Place events after scheduled content
+                contentItem: {
+                  id: event.id,
+                  title: event.title || 'Event',
+                  content: description || 'No description available',
+                  type: 'EVENT',
+                  duration: 20
+                },
+                startDate: event.startDate,
+                endDate: event.endDate,
+                location: event.location
+              };
+            }));
           }
           
           // Sort and update content items
@@ -370,20 +409,58 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     
     // Add upcoming events if available
     if (events && events.length > 0) {
-      items.push(...events.map(event => ({
-        id: event.id,
-        order: 999, // Place events after scheduled content
-        contentItem: {
+      items.push(...events.map((event: Event | any) => {
+        // Extract description properly based on various possible formats
+        let description = '';
+        
+        if (typeof event.description === 'string') {
+          description = event.description;
+        } else if (typeof event.description === 'object' && event.description !== null) {
+          const descObj = event.description as { 
+            text?: string; 
+            description?: string;
+            category?: string;
+            location?: string;
+          };
+          
+          // Try to extract meaningful text from the description object
+          if (descObj.text) {
+            description = descObj.text;
+          } else if (descObj.description) {
+            description = descObj.description;
+          } else {
+            // Try to extract meaningful text from the object
+            try {
+              // Extract only helpful fields for display
+              const extractedInfo = [];
+              
+              if (descObj.category) extractedInfo.push(descObj.category);
+              if (descObj.description) extractedInfo.push(descObj.description);
+              if (descObj.location && !event.location) extractedInfo.push(`Location: ${descObj.location}`);
+              
+              description = extractedInfo.length > 0 ? extractedInfo.join('\n\n') : 'See event details';
+            } catch (err) {
+              description = 'Event information unavailable';
+              console.error('Error parsing event description:', err);
+            }
+          }
+        }
+        
+        return {
           id: event.id,
-          title: event.title || 'Event',
-          content: event.description || 'No description available',
-          type: 'EVENT',
-          duration: 20
-        },
-        startDate: event.startDate,
-        endDate: event.endDate,
-        location: event.location
-      })));
+          order: 999, // Place events after scheduled content
+          contentItem: {
+            id: event.id,
+            title: event.title || 'Event',
+            content: description || 'No description available',
+            type: 'EVENT',
+            duration: 20
+          },
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location
+        };
+      }));
     }
     
     // Sort by order - handle null safety with non-null assertion
@@ -611,8 +688,40 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           eventText = content.content;
         } else if (content.content?.text) {
           eventText = content.content.text;
-        } else if (typeof content.content === 'object') {
-          eventText = JSON.stringify(content.content);
+        } else if (content.content?.description) {
+          // Add handling for when description is directly in the content object
+          eventText = content.content.description;
+        } else if (typeof content.content === 'object' && content.content !== null) {
+          // Try to extract meaningful text from the object before falling back to stringify
+          const contentObj = content.content as {
+            text?: string;
+            description?: string;
+            category?: string;
+            location?: string;
+            eventDate?: string;
+            eventDescription?: string;
+            isHighlighted?: boolean;
+          };
+          
+          if (contentObj.eventDescription || contentObj.description) {
+            eventText = contentObj.eventDescription || contentObj.description || '';
+          } else {
+            // Only stringify as a last resort, and try to make it readable
+            try {
+              // Extract only helpful fields for display rather than showing the full JSON
+              const extractedInfo = [];
+              
+              if (contentObj.category) extractedInfo.push(contentObj.category);
+              if (contentObj.description) extractedInfo.push(contentObj.description);
+              if (contentObj.location) extractedInfo.push(`Location: ${contentObj.location}`);
+              
+              // If we have extracted info, use that instead of full JSON
+              eventText = extractedInfo.length > 0 ? extractedInfo.join('\n\n') : 'Event information';
+            } catch (err) {
+              eventText = 'Event information unavailable';
+              console.error('Error parsing event content:', err);
+            }
+          }
         }
         
         // Check if this is an Eid prayer or special announcement
@@ -1138,7 +1247,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           flexDirection: 'column',
           height: '100%',
           width: '100%',
-          p: variant === 'landscape' ? 0.5 : 1,
+          p: variant === 'landscape' ? 0 : 0,
           visibility: (showContent && !showPrayerAnnouncement) ? 'visible' : 'hidden'
         }}>
           {(contentItems.length > 0 || contentLoading) && (
