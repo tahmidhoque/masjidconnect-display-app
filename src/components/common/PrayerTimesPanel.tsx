@@ -155,7 +155,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
             backgroundSize: '200% 200%',
             animation: 'gradientFlow 10s ease infinite',
-            color: 'white',
+            color: '#fff',
             py: getSizeRem(1.2),
             px: getSizeRem(2.0),
             textAlign: 'center',

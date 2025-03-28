@@ -1,6 +1,9 @@
 import { createTheme } from '@mui/material/styles';
 import { TypographyProps } from '@mui/material/Typography';
 
+// Define a consistent gold gradient to use across the app
+export const goldGradient = 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)';
+
 // Extend Typography variant types to include our custom variants
 declare module '@mui/material/Typography' {
   interface TypographyPropsVariantOverrides {

@@ -67,7 +67,7 @@ const PrayerTimesDisplay: React.FC<PrayerTimesDisplayProps> = ({ simplified = fa
                 p: screenSize.is720p ? 0.5 : 1, 
                 textAlign: 'center',
                 bgcolor: prayer.isNext ? '#2A9D8F' : prayer.isCurrent ? 'primary.main' : 'background.paper',
-                color: (prayer.isNext || prayer.isCurrent) ? 'white' : 'inherit',
+                color: (prayer.isNext || prayer.isCurrent) ? '#fff' : 'inherit',
                 borderRadius: 1,
                 transform: prayer.isNext ? 'scale(1.05)' : 'none',
                 transition: 'transform 0.2s ease-in-out',

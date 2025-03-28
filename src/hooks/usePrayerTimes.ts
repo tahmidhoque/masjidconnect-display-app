@@ -33,6 +33,7 @@ interface PrayerTimesHook {
   isJumuahToday: boolean;
   jumuahTime: string | null;
   jumuahDisplayTime: string | null;
+  jumuahKhutbahTime: string | null;
 }
 
 const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Zuhr', 'Asr', 'Maghrib', 'Isha'];
@@ -51,6 +52,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [isJumuahToday, setIsJumuahToday] = useState<boolean>(false);
   const [jumuahTime, setJumuahTime] = useState<string | null>(null);
   const [jumuahDisplayTime, setJumuahDisplayTime] = useState<string | null>(null);
+  const [jumuahKhutbahTime, setJumuahKhutbahTime] = useState<string | null>(null);
   
   // Use refs to track internal state without causing rerenders
   const initializedRef = useRef<boolean>(false);
@@ -507,6 +509,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       if (isJumuahToday && todayData && todayData.jummahJamaat) {
         setJumuahTime(todayData.jummahJamaat);
         setJumuahDisplayTime(formatTimeToDisplay(todayData.jummahJamaat));
+        
+        // Set Khutbah time if available
+        if (todayData.jummahKhutbah) {
+          setJumuahKhutbahTime(formatTimeToDisplay(todayData.jummahKhutbah));
+        }
       }
     } catch (error) {
       logger.error('Error processing prayer times', { error });
@@ -578,5 +585,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     isJumuahToday,
     jumuahTime,
     jumuahDisplayTime,
+    jumuahKhutbahTime,
   };
 }; 
