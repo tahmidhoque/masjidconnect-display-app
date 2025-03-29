@@ -5,15 +5,17 @@ import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { format } from 'date-fns';
 import logoGold from '../../assets/logos/logo-notext-gold.svg';
 import ContentCarousel from '../common/ContentCarousel';
-import PrayerTimesPanel from '../common/PrayerTimesPanel';
+import IslamicPatternBackgroundDark from '../common/IslamicPatternBackgroundDark';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
-import IslamicPatternBackground from '../common/IslamicPatternBackground';
 import logger from '../../utils/logger';
+import GlassmorphicHeader from '../common/GlassmorphicHeader';
+import GlassmorphicCombinedPrayerCard from '../common/GlassmorphicCombinedPrayerCard';
+import GlassmorphicFooter from '../common/GlassmorphicFooter';
 
 /**
  * PortraitDisplay component
  * 
- * Main display layout for portrait orientation.
+ * Main display layout for portrait orientation with glassmorphic UI design.
  * Provides a complete view with all required elements.
  */
 const PortraitDisplay: React.FC = () => {
@@ -30,7 +32,7 @@ const PortraitDisplay: React.FC = () => {
     nextPrayer,
   } = usePrayerTimes();
   
-  const { fontSizes, screenSize } = useResponsiveFontSize();
+  const { fontSizes, screenSize, getSizeRem } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
   const announcementActiveRef = useRef(false);
 
@@ -184,197 +186,71 @@ const PortraitDisplay: React.FC = () => {
       width: '100%', 
       display: 'flex',
       flexDirection: 'column',
-      background: `linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)), url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='2' stroke-opacity='0.5'%3E%3Cpath d='M0,50 L50,0 L100,50 L50,100 Z' /%3E%3Cpath d='M25,25 L75,25 L75,75 L25,75 Z' /%3E%3Ccircle cx='50' cy='50' r='25' /%3E%3Ccircle cx='50' cy='50' r='12.5' /%3E%3Cpath d='M25,25 L75,75 M25,75 L75,25' /%3E%3C/g%3E%3C/svg%3E")`,
-      backgroundPosition: 'center',
-      backgroundSize: 'cover',
-      overflow: 'hidden',
       position: 'relative',
+      overflow: 'hidden',
     }}>
+      {/* Dark Islamic Pattern Background */}
+      <IslamicPatternBackgroundDark />
       
-      {/* Decorative Islamic Pattern at top */}
-      <Box 
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '80px',
-          background: `url("data:image/svg+xml,%3Csvg width='120' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='1.2' stroke-opacity='0.3'%3E%3Cpath d='M0,40 L40,0 L80,40 L120,0 M0,40 L40,80 L80,40 L120,80'/%3E%3Cpath d='M20,40 L40,60 L60,40 L40,20 Z M60,40 L80,60 L100,40 L80,20 Z'/%3E%3Ccircle cx='40' cy='40' r='10' /%3E%3Ccircle cx='80' cy='40' r='10' /%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat-x',
-          backgroundPosition: 'center',
-          zIndex: 0,
-          opacity: 0.7,
-        }}
-      />
-      
-      {/* Logo Watermark */}
-      <Box 
-        component="img"
-        src={logoGold}
-        alt="MasjidConnect"
-        sx={{
-          position: 'absolute',
-          width: '50%',
-          maxWidth: '600px',
-          opacity: 0.08,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          pointerEvents: 'none',
-          filter: 'drop-shadow(0 0 8px rgba(218, 165, 32, 0.3))',
-        }}
-      />
-      
-      {/* Header */}
-      <Box 
-        sx={{ 
-          background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
-          color: 'white',
-          p: 2,
-          borderBottom: '3px solid',
-          borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              component="img"
-              src={logoGold}
-              alt=""
-              sx={{ height: '28px', width: 'auto', marginRight: 1 }}
-            />
-            <Typography 
-              sx={{ 
-                fontWeight: 'bold',
-                fontSize: fontSizes.h4,
-                fontFamily: "'Poppins', sans-serif",
-                background: 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)',
-                backgroundClip: 'text',
-                textFillColor: 'transparent',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                letterSpacing: '0.5px',
-                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-              }}
-            >
-              {masjidName || 'Masjid Name'}
-            </Typography>
-          </Box>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            mt: 0.5,
-            pl: 0.5,
-          }}>
-            <Typography sx={{ 
-              fontSize: fontSizes.caption,
-              fontStyle: 'italic',
-              opacity: 0.9,
-              mr: 1,
-              color: 'rgba(255, 255, 255, 0.85)',
-            }}>
-              {hijriDate}
-            </Typography>
-            <Box sx={{ 
-              height: '3px', 
-              width: '3px', 
-              borderRadius: '50%', 
-              bgcolor: '#DAA520',
-              opacity: 0.9, 
-              mx: 0.75 
-            }} />
-            <Typography sx={{ 
-              fontSize: fontSizes.caption,
-              opacity: 0.9,
-              color: 'rgba(255, 255, 255, 0.85)',
-            }}>
-              {currentDate}
-            </Typography>
-          </Box>
-        </Box>
-        
-        <Typography 
-          sx={{ 
-            fontWeight: 'bold',
-            fontSize: fontSizes.h2,
-            fontFamily: "'Poppins', sans-serif",
-            color: '#F1C40F',
-            letterSpacing: '1px',
-            lineHeight: 1.1,
-            textShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
-          }}
-        >
-          {format(currentTime, 'HH:mm')}
-        </Typography>
-      </Box>
-      
-      {/* Main Content Area */}
+      {/* Main Content Container */}
       <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        flexGrow: 1,
-        overflow: 'hidden',
+        height: '100%',
+        width: '100%',
         position: 'relative',
-        zIndex: 1,
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.5,
+        px: 1.5,
+        py: 1.5, // Consistent top and bottom padding
       }}>
-        {/* Prayer Times Panel */}
-        <Box 
-          sx={{ 
-            width: '100%',
+        {/* Glassmorphic Header */}
+        <GlassmorphicHeader
+          masjidName={masjidName || 'Masjid Connect'}
+          currentDate={currentDate ? new Date(currentDate) : new Date()}
+          hijriDate={hijriDate || ''}
+          currentTime={currentTime}
+          orientation="landscape"
+        />
+        
+        {/* Content Layout Container with proper spacing */}
+        <Box sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          gap: 1.5, // Add consistent gap between prayer card and content
+        }}>
+          {/* Combined Prayer Card (Countdown + Times) - with 50% of available space */}
+          <Box sx={{ 
+            flex: 1, // Takes 50% of the available flex space (changed from 2)
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          <PrayerTimesPanel 
-            variant="portrait" 
-            onCountdownComplete={handleCountdownComplete} 
-          />
-        </Box>
-        
-        {/* Main Content */}
-        <Box 
-          sx={{ 
-            flex: 1,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            minHeight: 0,
-          }}
-        >
-          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-            <IslamicPatternBackground variant="embossed" />
+          }}>
+            <GlassmorphicCombinedPrayerCard
+              orientation="portrait"
+              onCountdownComplete={handleCountdownComplete}
+            />
           </Box>
           
-          <ContentCarousel />
+          {/* Content Carousel - with 50% of the available flex space */}
+          <Box sx={{ 
+            flex: 1, // Takes 50% of the available flex space
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0, // Important for proper flex behavior
+          }}>
+            <ContentCarousel variant="landscape" />
+          </Box>
         </Box>
+        
+        {/* Footer with Logo */}
+        <GlassmorphicFooter
+          logoSrc={logoGold}
+          orientation="portrait"
+        />
       </Box>
-      
-      {/* Decorative Islamic Pattern at bottom */}
-      <Box 
-        sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '80px',
-          background: `url("data:image/svg+xml,%3Csvg width='160' height='90' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='2.5' stroke-opacity='0.6'%3E%3Cpath d='M0,45 L40,5 L80,45 L120,5 L160,45 M0,45 L40,85 L80,45 L120,85 L160,45'/%3E%3Cpath d='M20,45 L40,65 L60,45 L40,25 Z M60,45 L80,65 L100,45 L80,25 Z M100,45 L120,65 L140,45 L120,25 Z'/%3E%3Ccircle cx='40' cy='45' r='15' /%3E%3Ccircle cx='80' cy='45' r='15' /%3E%3Ccircle cx='120' cy='45' r='15' /%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat-x',
-          backgroundPosition: 'center',
-          zIndex: 0,
-          opacity: 0.6,
-          transform: 'rotate(180deg)',
-        }}
-      />
     </Box>
   );
 };

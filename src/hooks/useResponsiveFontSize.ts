@@ -111,19 +111,34 @@ const useResponsiveFontSize = () => {
     body1: getSizeRem(1.0),
     body2: getSizeRem(0.9),
     caption: getSizeRem(0.8),
+    small: getSizeRem(0.7),
     
-    // Prayer times specific sizes
-    prayerName: getSizeRem(1.0),
-    prayerTime: getSizeRem(1.1),
-    prayerJamaat: getSizeRem(1.0),
+    // Prayer times specific sizes - increased for better visibility
+    prayerName: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(1.3) // Larger in portrait 720p
+      : getSizeRem(1.0),
+    prayerTime: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(1.4) // Larger in portrait 720p
+      : getSizeRem(1.1),
+    prayerJamaat: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(1.3) // Larger in portrait 720p
+      : getSizeRem(1.0),
     
-    // Countdown sizes - significantly reduced
-    countdownDigit: getSizeRem(2.2),
-    countdownLabel: getSizeRem(0.65),
+    // Countdown sizes - significantly increased for 720p
+    countdownDigit: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(2.8) // Larger in portrait 720p
+      : getSizeRem(2.2),
+    countdownLabel: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(0.8) // Larger in portrait 720p
+      : getSizeRem(0.65),
     
     // UI elements and headers
-    nextPrayerTitle: getSizeRem(1.2),
-    headerText: getSizeRem(1.1),
+    nextPrayerTitle: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(1.6) // Larger in portrait 720p
+      : getSizeRem(1.2),
+    headerText: screenSize.is720p && !screenSize.isLandscape 
+      ? getSizeRem(1.3) // Larger in portrait 720p
+      : getSizeRem(1.1),
   };
   
   // Calculate a proportional sidebar width based on screen resolution

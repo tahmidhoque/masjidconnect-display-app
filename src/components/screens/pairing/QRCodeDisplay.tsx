@@ -31,7 +31,7 @@ const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           width: 280,
           height: 280,
           mx: 'auto',
-          bgcolor: 'white',
+          bgcolor: '#fff',
           borderRadius: 2,
           p: 2,
           display: 'flex',

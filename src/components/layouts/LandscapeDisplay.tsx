@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button } from '@mui/material';
+import { Box } from '@mui/material';
 import { useContent } from '../../contexts/ContentContext';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
-import { format } from 'date-fns';
 import logoGold from '../../assets/logos/logo-notext-gold.svg';
 import ContentCarousel from '../common/ContentCarousel';
-import PrayerTimesPanel from '../common/PrayerTimesPanel';
+import IslamicPatternBackgroundDark from '../common/IslamicPatternBackgroundDark';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
-import IslamicPatternBackground from '../common/IslamicPatternBackground';
 import logger from '../../utils/logger';
+import GlassmorphicHeader from '../common/GlassmorphicHeader';
+import GlassmorphicCombinedPrayerCard from '../common/GlassmorphicCombinedPrayerCard';
+import GlassmorphicFooter from '../common/GlassmorphicFooter';
 
 /**
  * LandscapeDisplay component
  * 
- * Main display layout for landscape orientation.
+ * Main display layout for landscape orientation with glassmorphic UI design.
  * Provides a complete view with all required elements.
  */
 const LandscapeDisplay: React.FC = () => {
@@ -33,11 +34,6 @@ const LandscapeDisplay: React.FC = () => {
   const { fontSizes, screenSize, layout } = useResponsiveFontSize();
   const [currentTime, setCurrentTime] = useState(new Date());
   const announcementActiveRef = useRef(false);
-
-  // Log masjid name for debugging
-  useEffect(() => {
-    console.log("LandscapeDisplay: Masjid name =", masjidName);
-  }, [masjidName]);
 
   // Update current time every second
   useEffect(() => {
@@ -138,284 +134,77 @@ const LandscapeDisplay: React.FC = () => {
     }, 10);
   };
 
-  // Function to manually trigger prayer announcement for testing
-  const showDebugAnnouncement = () => {
-    logger.info('Debug button clicked - manually showing prayer announcement');
-    
-    if (announcementActiveRef.current) {
-      logger.info('Announcement is already active, resetting it first');
-      setPrayerAnnouncement(false);
-      setTimeout(() => {
-        announcementActiveRef.current = false;
-        // Show prayer announcement after brief delay
-        triggerManualAnnouncement();
-      }, 500);
-    } else {
-      triggerManualAnnouncement();
-    }
-  };
-  
-  const triggerManualAnnouncement = () => {
-    // Use nextPrayer if available, otherwise use a fallback
-    const prayerToShow = nextPrayer?.name || "Fajr";
-    const isJamaatTest = true; // Test with Jamaat mode
-    
-    announcementActiveRef.current = true;
-    logger.info(`Manually showing announcement for ${prayerToShow}, isJamaat: ${isJamaatTest}`);
-    
-    // Set the prayer announcement
-    setPrayerAnnouncement(true, prayerToShow, isJamaatTest);
-    
-    // Automatically hide after 10 seconds
-    setTimeout(() => {
-      logger.info('Auto-hiding debug announcement');
-      setPrayerAnnouncement(false);
-      
-      // Reset flag after a short delay
-      setTimeout(() => {
-        announcementActiveRef.current = false;
-      }, 500);
-    }, 10000); // Show for 10 seconds
-  };
-
   return (
     <Box sx={{ 
       height: '100%', 
       width: '100%', 
       display: 'flex',
       flexDirection: 'column',
-      background: `linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)), url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='2' stroke-opacity='0.5'%3E%3Cpath d='M0,50 L50,0 L100,50 L50,100 Z' /%3E%3Cpath d='M25,25 L75,25 L75,75 L25,75 Z' /%3E%3Ccircle cx='50' cy='50' r='25' /%3E%3Ccircle cx='50' cy='50' r='12.5' /%3E%3Cpath d='M25,25 L75,75 M25,75 L75,25' /%3E%3C/g%3E%3C/svg%3E")`,
-      backgroundPosition: 'center',
-      backgroundSize: 'cover',
-      overflow: 'hidden',
       position: 'relative',
+      overflow: 'hidden',
     }}>
-
+      {/* Dark Islamic Pattern Background */}
+      <IslamicPatternBackgroundDark />
       
-      {/* Decorative Islamic Pattern at top */}
-      <Box 
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '80px',
-          background: `url("data:image/svg+xml,%3Csvg width='120' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='1.2' stroke-opacity='0.3'%3E%3Cpath d='M0,40 L40,0 L80,40 L120,0 M0,40 L40,80 L80,40 L120,80'/%3E%3Cpath d='M20,40 L40,60 L60,40 L40,20 Z M60,40 L80,60 L100,40 L80,20 Z'/%3E%3Ccircle cx='40' cy='40' r='10' /%3E%3Ccircle cx='80' cy='40' r='10' /%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat-x',
-          backgroundPosition: 'center',
-          zIndex: 0,
-          opacity: 0.7,
-        }}
-      />
-      
-      {/* Decorative Islamic Pattern at bottom */}
-      <Box 
-        sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '80px',
-          background: `url("data:image/svg+xml,%3Csvg width='160' height='90' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23DAA520' stroke-width='2.5' stroke-opacity='0.6'%3E%3Cpath d='M0,45 L40,5 L80,45 L120,5 L160,45 M0,45 L40,85 L80,45 L120,85 L160,45'/%3E%3Cpath d='M20,45 L40,65 L60,45 L40,25 Z M60,45 L80,65 L100,45 L80,25 Z M100,45 L120,65 L140,45 L120,25 Z'/%3E%3Ccircle cx='40' cy='45' r='15' /%3E%3Ccircle cx='80' cy='45' r='15' /%3E%3Ccircle cx='120' cy='45' r='15' /%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat-x',
-          backgroundPosition: 'center',
-          zIndex: 0,
-          opacity: 0.85,
-          transform: 'rotate(180deg)',
-        }}
-      />
-      
-      {/* Logo Watermark */}
-      <Box 
-        component="img"
-        src={logoGold}
-        alt="MasjidConnect"
-        sx={{
-          position: 'absolute',
-          width: '40%',
-          maxWidth: '600px',
-          opacity: 0.08,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          pointerEvents: 'none',
-          filter: 'drop-shadow(0 0 8px rgba(218, 165, 32, 0.3))',
-        }}
-      />
-      
-      {/* Header */}
-      <Box 
-        sx={{ 
-          background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
-          color: 'white',
-          p: 2.5,
-          pb: 2,
-          borderBottom: '3px solid',
-          borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              component="img"
-              src={logoGold}
-              alt=""
-              sx={{ height: '32px', width: 'auto', marginRight: 1 }}
-            />
-            <Typography 
-              sx={{ 
-                fontWeight: 'bold',
-                fontSize: fontSizes.h3,
-                fontFamily: "'Poppins', sans-serif",
-                background: 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)',
-                backgroundClip: 'text',
-                textFillColor: 'transparent',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                letterSpacing: '0.5px',
-                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-              }}
-            >
-              {masjidName || 'Masjid Name'}
-            </Typography>
-          </Box>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            mt: 0.75,
-            pl: 0.5,
-          }}>
-            <Typography sx={{ 
-              fontSize: fontSizes.body2,
-              fontStyle: 'italic',
-              opacity: 0.9,
-              mr: 1,
-              color: 'rgba(255, 255, 255, 0.85)',
-            }}>
-              {hijriDate}
-            </Typography>
-            <Box sx={{ 
-              height: '4px', 
-              width: '4px', 
-              borderRadius: '50%', 
-              bgcolor: '#DAA520',
-              opacity: 0.9, 
-              mx: 0.75 
-            }} />
-            <Typography sx={{ 
-              fontSize: fontSizes.body2,
-              opacity: 0.9,
-              color: 'rgba(255, 255, 255, 0.85)',
-            }}>
-              {currentDate}
-            </Typography>
-          </Box>
-        </Box>
-        
-        <Typography 
-          sx={{ 
-            fontWeight: 'bold',
-            fontSize: fontSizes.h1,
-            fontFamily: "'Poppins', sans-serif",
-            color: '#F1C40F',
-            letterSpacing: '2px',
-            lineHeight: 1.1,
-            textShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-          }}
-        >
-          {format(currentTime, 'HH:mm')}
-        </Typography>
-      </Box>
-      
-      {/* Main Content Area */}
+      {/* Main Content Container */}
       <Box sx={{ 
-        display: 'flex', 
-        flexGrow: 1,
-        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 'nowrap',
+        height: '100%',
         position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        boxSizing: 'border-box',
+        gap: 1.5,
+        zIndex: 2, // Above the background
+        px: 1.5, // Consistent side padding
+        py: 1.5, // Consistent top and bottom padding
       }}>
-        {/* Prayer Times Sidebar */}
-        <Box 
-          sx={{ 
-            width: layout.sidebarWidth,
-            maxWidth: layout.sidebarWidth,
-            minWidth: layout.sidebarWidth,
+        {/* Header */}
+        <GlassmorphicHeader
+          masjidName={masjidName || 'Masjid Connect'}
+          currentDate={new Date()}
+          hijriDate={hijriDate || ''}
+          currentTime={currentTime}
+          orientation="landscape"
+        />
+
+        {/* Main Content */}
+        <Box sx={{ 
+          display: 'flex',
+          flexGrow: 1,
+          gap: 2.5,
+          overflow: 'hidden',
+        }}>
+          {/* Left Column - Prayer Times */}
+          <Box sx={{ 
+            width: '50%', // Equal width for both columns
             display: 'flex',
             flexDirection: 'column',
-            position: 'relative',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <PrayerTimesPanel 
-            variant="landscape" 
-            onCountdownComplete={handleCountdownComplete} 
-          />
-        </Box>
-        
-        {/* Main Content */}
-        <Box 
-          sx={{ 
-            flex: 1,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            minHeight: 0,
-            p: 0,
-          }}
-        >
-          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
-            <IslamicPatternBackground variant="embossed" />
+            height: '100%', // Full height
+            // overflow: 'hidden',
+          }}>
+            <GlassmorphicCombinedPrayerCard 
+              orientation="landscape"
+              onCountdownComplete={handleCountdownComplete}
+            />
           </Box>
           
-          <ContentCarousel />
-        </Box>
-      </Box>
-      
-      {/* Footer */}
-      <Box 
-        sx={{ 
-          background: 'linear-gradient(90deg, #0A2647 0%, #144272 100%)',
-          color: 'white',
-          p: 1.5,
-          borderTop: '3px solid',
-          borderImage: 'linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        <Box 
-          sx={{ 
+          {/* Right Column - Content Display */}
+          <Box sx={{ 
+            width: '50%', // Equal width for both columns
             display: 'flex',
-            alignItems: 'center',
-            mr: 2,
-          }}
-        >
-          <Box 
-            component="img"
-            src={logoGold}
-            alt=""
-            sx={{
-              height: '30px',
-              marginRight: 1,
-            }}
-          />
-
+            flexDirection: 'column',
+            height: '100%', // Ensure full height
+            overflow: 'hidden',
+          }}>
+            <ContentCarousel variant="landscape" />
+          </Box>
         </Box>
+
+        {/* Footer */}
+        <GlassmorphicFooter
+          logoSrc={logoGold}
+          orientation="landscape"
+        />
       </Box>
     </Box>
   );
