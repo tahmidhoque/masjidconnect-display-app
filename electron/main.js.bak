@@ -8,22 +8,48 @@ const log = require('electron-log');
 log.transports.file.level = 'info';
 log.info('App starting...');
 
-// Performance optimization flags - optimized for Raspberry Pi
-log.info('Setting up performance optimizations for Raspberry Pi');
-
-// Enable hardware acceleration with controlled settings to prevent thermal throttling
+// Performance optimization flags - simplified
 app.commandLine.appendSwitch('enable-features', 'HardwareAcceleration');
+// Removed excessive flags that cause performance issues
+// app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+// app.commandLine.appendSwitch('enable-zero-copy');
+// app.commandLine.appendSwitch('disable-frame-rate-limit');
+// app.commandLine.appendSwitch('disable-gpu-vsync');
+// app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.disableHardwareAcceleration = false;
+
+// Performance optimization flags - Raspberry Pi specific
+app.commandLine.appendSwitch('enable-features', 'HardwareAcceleration');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+// The following flags help with Raspberry Pi performance
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('num-raster-threads', '2'); // Limit raster threads on low-power devices
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+// Avoid thermal throttling by limiting frame rate on RPi
+app.commandLine.appendSwitch('force-gpu-rasterization');
+// Balance between performance and temperature
+app.commandLine.appendSwitch('use-gl', 'desktop'); // Use OpenGL ES for better performance on RPi
+app.disableHardwareAcceleration = false;
+
+// Performance optimization flags - optimized for Raspberry Pi
+log.info('Setting up Raspberry Pi specific optimizations');
+
+// Enable hardware acceleration but with optimal settings for Raspberry Pi
+app.commandLine.appendSwitch('enable-features', 'HardwareAcceleration');
+
+// Enable GPU acceleration with controlled settings for lower thermal impact
 app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
-// Limit resource usage to prevent overheating
-app.commandLine.appendSwitch('num-raster-threads', '2');  // Limit threads on RPi
-app.commandLine.appendSwitch('renderer-process-limit', '1');  // Limit processes
+// Optimize GPU usage to prevent thermal throttling
+app.commandLine.appendSwitch('num-raster-threads', '2');  // Limit to 2 threads on RPi
+app.commandLine.appendSwitch('renderer-process-limit', '1');  // Limit renderer processes
 app.commandLine.appendSwitch('max-active-webgl-contexts', '4');
 
 // Use appropriate GL implementation for Raspberry Pi
-app.commandLine.appendSwitch('use-gl', 'desktop');  // Better for RPi
+app.commandLine.appendSwitch('use-gl', 'desktop');  // Use OpenGL for better RPi performance
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 // Explicitly enable hardware acceleration
@@ -107,7 +133,7 @@ function createWindow() {
     // By default, start fullscreen for display purposes
     fullscreen: !isDev,
     // Kiosk mode for Raspberry Pi deployments (uncomment for production)
-    kiosk: !isDev,
+    // kiosk: !isDev,
     // Hide menu bar in production
     autoHideMenuBar: !isDev,
     // Ensure app doesn't show in taskbar in production

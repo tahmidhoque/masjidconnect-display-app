@@ -2,12 +2,9 @@
   "name": "masjidconnect-display-app",
   "version": "0.1.0",
   "private": true,
-  "main": "build/electron/main.js",
+  "main": "electron/main.js",
   "description": "MasjidConnect Display App - Digital signage solution for mosques",
-  "author": {
-    "name": "MasjidConnect",
-    "email": "support@masjidconnect.com"
-  },
+  "author": "MasjidConnect",
   "homepage": "./",
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -45,17 +42,17 @@
   },
   "scripts": {
     "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build && mkdir -p build/electron && cp -r electron/* build/electron/",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on --timeout 60000 http://localhost:3001 && cross-env ELECTRON_DEBUG=true electron .\"",
     "electron:build": "npm run build && electron-builder build --publish never",
     "electron:build:publish": "npm run build && electron-builder build --publish always",
     "electron:start": "electron .",
-    "electron:build:armhf": "npm run build && electron-builder build --linux zip --armv7l --config.linux.icon=false && node electron-after-build.js",
-    "electron:build:arm64": "npm run build && electron-builder build --linux deb --arm64 && node electron-after-build.js",
-    "electron:build:pi": "npm run build && electron-builder build --linux deb --armv7l --arm64 && node electron-after-build.js",
-    "electron:build:pi:publish": "npm run build && electron-builder build --linux deb --armv7l --arm64 --publish always && node electron-after-build.js"
+    "electron:build:armhf": "npm run build && electron-builder build --linux deb --armv7l",
+    "electron:build:arm64": "npm run build && electron-builder build --linux deb --arm64",
+    "electron:build:pi": "npm run build && electron-builder build --linux deb --armv7l --arm64",
+    "electron:build:pi:publish": "npm run build && electron-builder build --linux deb --armv7l --arm64 --publish always"
   },
   "eslintConfig": {
     "extends": [
@@ -90,12 +87,8 @@
       "electron/**/*",
       "node_modules/**/*"
     ],
-    "extraMetadata": {
-      "main": "build/electron/main.js"
-    },
     "directories": {
-      "buildResources": "assets",
-      "output": "dist"
+      "buildResources": "assets"
     },
     "mac": {
       "category": "public.app-category.utilities",
@@ -125,6 +118,7 @@
       "compression": "xz",
       "fpm": ["--deb-no-default-config-files", "--after-install=build/after-install.sh"]
     },
+    "afterPack": "./build/afterPack.js",
     "publish": {
       "provider": "github",
       "owner": "masjidSolutions",
