@@ -67,8 +67,8 @@ function createWindow() {
           'Content-Security-Policy': [
             "default-src 'self' http://localhost:* ws://localhost:*; " +
             "script-src 'self' 'unsafe-eval' 'unsafe-inline' http://localhost:*; " +
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-            "font-src 'self' https://fonts.gstatic.com; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "font-src 'self'; " +
             "connect-src 'self' ws://localhost:* http://localhost:* https://localhost:* http://localhost:3000 https://localhost:3000 https://*.masjidconnect.com https://api.aladhan.com; " +
             "img-src 'self' data: https://*.masjidconnect.com;"
           ]

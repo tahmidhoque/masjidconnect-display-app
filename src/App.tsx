@@ -21,7 +21,6 @@ import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
 import useKioskMode from './hooks/useKioskMode';
 import ErrorScreen from './components/screens/ErrorScreen';
-import moment from 'moment';
 import { fetchHijriDateElectronSafe, calculateApproximateHijriDate } from './utils/dateUtils';
 
 // Create a simple AuthenticatedRoute component

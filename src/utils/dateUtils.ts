@@ -1,5 +1,12 @@
-// Import moment at the top of the file
-import moment from 'moment';
+// Import dayjs and plugins instead of moment
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat'; // For parsing specific formats like 'h:mm A'
+import duration from 'dayjs/plugin/duration'; // For diff calculations
+import relativeTime from 'dayjs/plugin/relativeTime'; // For human-readable durations
+
+dayjs.extend(customParseFormat);
+dayjs.extend(duration);
+dayjs.extend(relativeTime);
 
 // Format time string (e.g., "16:30") to display format (e.g., "16:30")
 export const formatTimeToDisplay = (timeString: string): string => {
@@ -13,37 +20,36 @@ export const formatTimeToDisplay = (timeString: string): string => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
-// Parse time string into Date object using moment.js
+// Parse time string into Date object using dayjs
 export const parseTimeString = (timeString: string, referenceDate: Date = new Date()): Date => {
   if (!timeString) return new Date();
   
   try {
-    // Use moment for more robust handling
-    const refMoment = moment(referenceDate);
+    // Use dayjs
     const [hours, minutes] = timeString.split(':').map(Number);
     
     if (isNaN(hours) || isNaN(minutes)) return new Date();
     
-    const timeMoment = moment(referenceDate)
-      .hours(hours)
-      .minutes(minutes)
-      .seconds(0)
-      .milliseconds(0);
+    const timeDayjs = dayjs(referenceDate)
+      .hour(hours)
+      .minute(minutes)
+      .second(0)
+      .millisecond(0);
     
-    return timeMoment.toDate();
+    return timeDayjs.toDate();
   } catch (error) {
     console.error('Error parsing time string:', error);
     return new Date();
   }
 };
 
-// Calculate time difference in minutes between two times
+// Calculate time difference in minutes between two times using dayjs
 export const getTimeDifferenceInMinutes = (time1: string, time2: string): number => {
-  const moment1 = moment(parseTimeString(time1));
-  const moment2 = moment(parseTimeString(time2));
+  const dayjs1 = dayjs(parseTimeString(time1));
+  const dayjs2 = dayjs(parseTimeString(time2));
   
   // Calculate the difference in minutes
-  return moment2.diff(moment1, 'minutes');
+  return dayjs2.diff(dayjs1, 'minutes');
 };
 
 // Format minutes to hours and minutes display
@@ -83,16 +89,27 @@ export const formatDateToDisplay = (dateString: string): string => {
   });
 };
 
-// Convert 12-hour time string to 24-hour time string
+// Convert 12-hour time string to 24-hour time string using dayjs
 export const convertTo24Hour = (timeString: string): string => {
   if (!timeString) return '';
   
   // Check if the time is already in 24-hour format
   if (!timeString.includes('AM') && !timeString.includes('PM')) {
-    return timeString;
+    // Validate if it's potentially a 24h format before returning
+    if (/^([01]\d|2[0-3]):([0-5]\d)$/.test(timeString)) {
+      return timeString;
+    }
+    // Handle potentially invalid formats gracefully
+    console.warn(`convertTo24Hour received potentially invalid time format: ${timeString}`);
+    return ''; // Or handle as appropriate
   }
-  
-  return moment(timeString, 'h:mm A').format('HH:mm');
+  // Use dayjs for conversion, requires customParseFormat plugin
+  const parsedTime = dayjs(timeString, 'h:mm A');
+  if (!parsedTime.isValid()) {
+     console.warn(`convertTo24Hour failed to parse time: ${timeString}`);
+     return ''; // Or handle invalid parse
+  }
+  return parsedTime.format('HH:mm');
 };
 
 // Calculate the next prayer time
@@ -119,8 +136,8 @@ export const getNextPrayerTime = (
   // Sort prayers by time
   prayers.sort((a, b) => a.time.localeCompare(b.time));
   
-  const currentMoment = moment(currentTime);
-  const currentTimeString = currentMoment.format('HH:mm');
+  const currentDayjs = dayjs(currentTime); // Use dayjs
+  const currentTimeString = currentDayjs.format('HH:mm');
   
   console.log("Current time:", currentTimeString);
   console.log("Prayer times available:", prayers.map(p => `${p.name}: ${p.time}`).join(', '));
@@ -145,59 +162,66 @@ export const getNextPrayerTime = (
   return { name: '', time: '' };
 };
 
-// Calculate time until next prayer using moment.js
+// Calculate time until next prayer using dayjs
 export const getTimeUntilNextPrayer = (nextPrayerTime: string, forceTomorrow: boolean = false): string => {
   if (!nextPrayerTime) return '';
   
   try {
-    const now = moment();
+    const now = dayjs();
     
-    // Create the prayer time for today
-    let prayerMoment = moment().hours(0).minutes(0).seconds(0);
+    // Create the prayer time for today using dayjs
     const [prayerHours, prayerMinutes] = nextPrayerTime.split(':').map(Number);
     
-    if (isNaN(prayerHours) || isNaN(prayerMinutes)) {
+    if (isNaN(prayerHours) || isNaN(prayerMinutes) || prayerHours < 0 || prayerHours > 23 || prayerMinutes < 0 || prayerMinutes > 59) {
+      console.error(`Invalid prayer time format received: ${nextPrayerTime}`);
       return '';
     }
     
-    prayerMoment.hours(prayerHours).minutes(prayerMinutes);
+    let prayerDayjs = dayjs().hour(prayerHours).minute(prayerMinutes).second(0).millisecond(0);
     
     // Debug information
     console.log(`Calculating time until prayer at ${nextPrayerTime}`);
     console.log(`Current time: ${now.format('HH:mm:ss')}`);
-    console.log(`Parsed prayer time: ${prayerMoment.format('HH:mm:ss')}`);
+    console.log(`Parsed prayer time today: ${prayerDayjs.format('HH:mm:ss')}`);
     
     // If next prayer time is earlier than current time or forceTomorrow is true,
     // it means it's for tomorrow
-    if (prayerMoment.isBefore(now) || forceTomorrow) {
-      prayerMoment.add(1, 'day');
-      console.log(`Prayer time adjusted to tomorrow: ${prayerMoment.format('HH:mm:ss')}`);
+    if (prayerDayjs.isBefore(now) || forceTomorrow) {
+      prayerDayjs = prayerDayjs.add(1, 'day');
+      console.log(`Prayer time adjusted to tomorrow: ${prayerDayjs.format('YYYY-MM-DD HH:mm:ss')}`);
     }
     
     // Calculate diff in seconds
-    const diffSeconds = prayerMoment.diff(now, 'seconds');
+    const diffSeconds = prayerDayjs.diff(now, 'second');
     
     if (diffSeconds <= 0) {
+      // If difference is zero or negative, it means the time has just passed or is now.
+      // Avoid returning '0 mins' which might be confusing.
+      // Consider returning 'Now' or a minimal positive duration like '1 min' depending on desired UX.
+      // For now, returning '0 sec' for consistency.
       console.log(`Time until prayer is zero or negative: ${diffSeconds}s`);
-      return '0 mins';
+      return '0 sec';
     }
     
-    // Format time in a way that's both human-readable and parseable by the countdown component
+    // Format time using custom logic for display consistency
     const diffHours = Math.floor(diffSeconds / 3600);
     const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
-    const diffSeconds2 = diffSeconds % 60;
+    const diffSecondsRemainder = diffSeconds % 60;
     
-    console.log(`Time until prayer: ${diffHours}h ${diffMinutes}m ${diffSeconds2}s`);
+    console.log(`Time until prayer: ${diffHours}h ${diffMinutes}m ${diffSecondsRemainder}s`);
     
     // For longer times (> 1 hour), return a more human-readable format
     if (diffHours > 0) {
       return `${diffHours} hr${diffHours > 1 ? 's' : ''} ${diffMinutes} min${diffMinutes > 1 ? 's' : ''}`;
-    } 
-    // For shorter times, include seconds in a more precise format
+    }
+    // For shorter times (< 1 hour but > 0 minutes), include minutes and seconds
     else if (diffMinutes > 0) {
-      return `${diffMinutes} min${diffMinutes > 1 ? 's' : ''} ${diffSeconds2} sec${diffSeconds2 > 1 ? 's' : ''}`;
-    } else {
-      return `${diffSeconds2} sec${diffSeconds2 > 1 ? 's' : ''}`;
+       // Only show seconds if minutes > 0 for brevity, consistent with old logic? Let's keep seconds.
+      return `${diffMinutes} min${diffMinutes > 1 ? 's' : ''} ${diffSecondsRemainder} sec${diffSecondsRemainder !== 1 ? 's' : ''}`;
+    }
+    // For times less than 1 minute
+    else {
+      return `${diffSecondsRemainder} sec${diffSecondsRemainder !== 1 ? 's' : ''}`;
     }
   } catch (error) {
     console.error('Error calculating time until next prayer:', error, nextPrayerTime);

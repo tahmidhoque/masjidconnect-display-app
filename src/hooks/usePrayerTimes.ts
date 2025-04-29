@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PrayerTimes } from '../api/models';
 import { useContent } from '../contexts/ContentContext';
-import moment from 'moment';
 import { 
   formatTimeToDisplay, 
   getNextPrayerTime, 
@@ -59,7 +58,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Use refs to track internal state without causing rerenders
   const initializedRef = useRef<boolean>(false);
   const lastPrayerTimesDataRef = useRef<any>(null);
-  const currentDayRef = useRef<number>(moment().date());
+  const currentDayRef = useRef<number>(dayjs().date());
   const calculationsRef = useRef<{
     lastProcessTime: number;
     nextPrayerName: string;
@@ -237,7 +236,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       logger.info('Cleared cached Hijri date to ensure fresh calculation');
       
       // Use our Electron-safe function to get the Hijri date
-      const formattedDate = moment().format('DD-MM-YYYY');
+      const formattedDate = dayjs().format('DD-MM-YYYY');
       logger.info(`Using Electron-safe method to fetch Hijri date for ${formattedDate}`);
       
       const hijriDateStr = await fetchHijriDateElectronSafe(formattedDate);
@@ -276,7 +275,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
   // Check for day change and refresh data if needed - memoized
   const checkForDayChange = useCallback(() => {
-    const now = moment();
+    const now = dayjs();
     const newDay = now.date();
     
     // If the day has changed, force refresh the prayer data
@@ -293,7 +292,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Update date information
       setCurrentDate(now.format('dddd, MMMM D, YYYY'));
       
-      // Check if today is Friday (5)
+      // Check if today is Friday (Friday is 5 for dayjs, Sunday is 0)
       setIsJumuahToday(now.day() === 5);
       
       // Refresh Hijri date
@@ -340,7 +339,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     let nextIndex = -1;
     
     // Get current time for comparison
-    const now = moment();
+    const now = dayjs();
     const currentTimeStr = now.format('HH:mm');
     
     logger.debug(`[calculatePrayersAccurately] Calculating prayer status at ${currentTimeStr}`, {
@@ -364,7 +363,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       sortedPrayers.map(p => `${p.name}: ${p.time}${p.jamaat ? ` (Jamaat: ${p.jamaat})` : ''}`));
     
     // Special case: if near midnight, handle Isha prayer specially
-    if (now.hours() >= 22 || now.hours() < 3) {
+    if (now.hour() >= 22 || now.hour() < 3) {
       // Check if Isha is one of our prayers
       const ishaIndex = prayers.findIndex(p => p.name === 'Isha');
       const fajrIndex = prayers.findIndex(p => p.name === 'Fajr');
@@ -636,7 +635,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       const nextPrayer = prayers[nextIndex];
       
       // Current time for comparison
-      const now = moment();
+      const now = dayjs();
       const currentTimeStr = now.format('HH:mm');
       
       // If next prayer has jamaat time and it's after the adhan time and current time is between adhan and jamaat
@@ -652,18 +651,20 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         nextPrayer.isCurrent = false;
       } else {
         // Check if this prayer's time has already passed today
-        const prayerTime = moment().hours(0).minutes(0).seconds(0);
+        const prayerTime = dayjs().hour(0).minute(0).second(0).millisecond(0);
         const [prayerHours, prayerMinutes] = nextPrayer.time.split(':').map(Number);
-        prayerTime.hours(prayerHours).minutes(prayerMinutes);
+        prayerTime.hour(prayerHours).minute(prayerMinutes);
         
         // If prayer time has passed today, it means we're counting down to tomorrow's occurrence
-        if (now.isAfter(prayerTime) && !(now.hours() < 6 && nextPrayer.name === 'Fajr')) {
+        // Need to be careful comparing dayjs objects
+        // Only consider it passed if it's truly *before* now on the same day
+        if (now.isAfter(prayerTime) && !(now.hour() < 6 && nextPrayer.name === 'Fajr')) {
           logger.info(`Prayer time ${nextPrayer.time} is in the past, adjusting to tomorrow`);
           nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time, true); // Pass flag to force tomorrow
         } else {
           // Special handling for after midnight scenario with Isha prayer
-          if (now.hours() < 6 && nextPrayer.name === 'Fajr') {
-            // Use moment to properly calculate time until
+          if (now.hour() < 6 && nextPrayer.name === 'Fajr') {
+            // Use the utility function directly
             nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
             logger.info(`Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time}) - early morning hours`);
           } else {
@@ -700,10 +701,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   useEffect(() => {
     try {
       // Set current date
-      const date = moment();
+      const date = dayjs();
       setCurrentDate(date.format('dddd, MMMM D, YYYY'));
 
-      // Check if today is Friday (5)
+      // Check if today is Friday (5 for dayjs)
       setIsJumuahToday(date.day() === 5);
 
       // Initial force refresh on component mount to ensure fresh data
