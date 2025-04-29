@@ -44,7 +44,7 @@ The MasjidConnect Display App is designed to be run on screens throughout a mosq
    ```
 3. Create a `.env` file with the following variables:
    ```
-   REACT_APP_API_URL=https://api.masjidconnect.com
+   REACT_APP_API_URL=https://portal.masjidconnect.co.uk
    ```
 4. Start the development server:
    ```
@@ -128,7 +128,7 @@ This project is proprietary software owned by MasjidConnect.
 
 ## Contact
 
-For support or inquiries, contact support@masjidconnect.com
+For support or inquiries, contact support@masjidconnect.co.uk
 
 # Raspberry Pi Optimization
 

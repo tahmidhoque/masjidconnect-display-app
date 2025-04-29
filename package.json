@@ -52,10 +52,10 @@
     "electron:build": "npm run build && electron-builder build --publish never",
     "electron:build:publish": "npm run build && electron-builder build --publish always",
     "electron:start": "electron .",
-    "electron:build:armhf": "npm run build && electron-builder build --linux zip --armv7l --config.linux.icon=false && node electron-after-build.js",
-    "electron:build:arm64": "npm run build && electron-builder build --linux deb --arm64 && node electron-after-build.js",
-    "electron:build:pi": "npm run build && electron-builder build --linux deb --armv7l --arm64 && node electron-after-build.js",
-    "electron:build:pi:publish": "npm run build && electron-builder build --linux deb --armv7l --arm64 --publish always && node electron-after-build.js"
+    "electron:build:rpi": "npm run build && electron-builder build --linux deb tar.gz --armv7l --config.linux.icon=false --publish never",
+    "electron:build:rpi:arm64": "npm run build && electron-builder build --linux deb tar.gz --arm64 --config.linux.icon=false --publish never",
+    "electron:build:rpi:publish": "npm run build && electron-builder build --linux deb tar.gz --armv7l --arm64 --config.linux.icon=false --publish always",
+    "electron:build:rpi:noicon": "npm run build && electron-builder build --linux deb tar.gz --armv7l --config.linux.icon=false --publish never"
   },
   "eslintConfig": {
     "extends": [
@@ -90,6 +90,12 @@
       "electron/**/*",
       "node_modules/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      }
+    ],
     "extraMetadata": {
       "main": "build/electron/main.js"
     },
@@ -106,8 +112,8 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "deb", 
+        "tar.gz"
       ],
       "category": "Utility",
       "executableName": "masjidconnect-display",
@@ -122,8 +128,8 @@
       }
     },
     "deb": {
-      "compression": "xz",
-      "fpm": ["--deb-no-default-config-files", "--after-install=build/after-install.sh"]
+      "afterInstall": "after-install.sh",
+      "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libgbm1"]
     },
     "publish": {
       "provider": "github",
