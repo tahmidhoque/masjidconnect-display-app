@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
 const path = require('path');
 const url = require('url');
 const { autoUpdater } = require('electron-updater');
@@ -11,11 +11,17 @@ log.info('App starting...');
 // Performance optimization flags - optimized for Raspberry Pi
 log.info('Setting up performance optimizations for Raspberry Pi');
 
-// Enable hardware acceleration with controlled settings to prevent thermal throttling
-app.commandLine.appendSwitch('enable-features', 'HardwareAcceleration');
-app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
+// Improve performance on low-powered devices like Raspberry Pi
+app.commandLine.appendSwitch('disable-smooth-scrolling');  // Disable smooth scrolling
+app.commandLine.appendSwitch('disable-gpu-vsync');  // Can improve frame rates by disabling vsync
+app.commandLine.appendSwitch('disable-reading-from-canvas');  // Avoid expensive canvas operations
+app.commandLine.appendSwitch('disable-accelerated-video-decode');  // Disable video hardware acceleration
+app.commandLine.appendSwitch('disable-compositor-animation-timelines');  // Simpler animations
+app.commandLine.appendSwitch('disable-features', 'HardwareAcceleration,Vulkan');  // Disable hardware acceleration
+app.disableHardwareAcceleration();  // Explicitly disable hardware acceleration
+
+// Use software rendering on Raspberry Pi - more reliable performance
+app.commandLine.appendSwitch('use-gl', 'swiftshader');
 
 // Limit resource usage to prevent overheating
 app.commandLine.appendSwitch('num-raster-threads', '2');  // Limit threads on RPi
@@ -183,6 +189,10 @@ function checkForUpdates() {
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
   log.info('App ready, creating window');
+  
+  // Disable the application menu
+  Menu.setApplicationMenu(null);
+  
   createWindow();
   
   // Setup scheduled update checks

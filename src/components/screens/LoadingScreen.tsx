@@ -9,6 +9,7 @@ import logoGold from '../../assets/logos/logo-gold.svg';
 
 interface LoadingScreenProps {
   onComplete?: () => void;
+  isSuspenseFallback?: boolean;
 }
 
 /**
@@ -18,7 +19,7 @@ interface LoadingScreenProps {
  * while the app checks pairing status and fetches content.
  * Shows different messages based on authentication status.
  */
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete, isSuspenseFallback = false }) => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
   const { orientation } = useOrientation();
@@ -106,14 +107,29 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       }, 50); // Update every 50ms for smooth animation
     }, 7500));
     
+    if (isSuspenseFallback) {
+      // If used as a Suspense fallback, keep showing the spinner indefinitely
+      setShowSpinner(true);
+      setSpinnerOpacity(1);
+      setLoadingStage('initializing');
+      
+      // Ensure cleanup doesn't hide spinner
+      return () => {};
+    }
+
     // Clean up all timers on unmount
     return () => {
       stageTimers.forEach(timer => clearTimeout(timer));
     };
-  }, []); // Empty dependency array ensures this only runs once
+  }, [isSuspenseFallback]);
 
   // Get display message based on loading stage, auth status and data loading
   const getDisplayMessage = () => {
+    // If used as Suspense fallback, show a simple message
+    if (isSuspenseFallback) {
+      return 'Loading...';
+    }
+
     // For final stage, always show the Salam greeting with mosque name if available
     if (loadingStage === 'complete' || initializationStage === 'complete') {
       if (isAuthenticated && masjidName) {
