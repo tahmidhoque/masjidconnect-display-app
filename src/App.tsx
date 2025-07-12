@@ -18,9 +18,11 @@ import EmergencyAlert from './components/common/EmergencyAlert';
 import theme from './theme/theme';
 import useAppInitialization from './hooks/useAppInitialization';
 import useKioskMode from './hooks/useKioskMode';
+import usePerformanceOptimization from './hooks/usePerformanceOptimization';
 import ErrorScreen from './components/screens/ErrorScreen';
 import { fetchHijriDateElectronSafe, calculateApproximateHijriDate } from './utils/dateUtils';
 import storageService from './services/storageService';
+import { optimizeAppPerformance } from './utils/performanceUtils';
 
 // Verify database health early in the app lifecycle
 try {
@@ -52,6 +54,9 @@ const AppRoutes: React.FC = () => {
   const [showContent, setShowContent] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const initializationAttemptedRef = useRef(false);
+  
+  // Initialize performance optimization
+  const { isLowPower, getTransitionDuration } = usePerformanceOptimization();
   
   // Initialize kiosk mode - this will handle refresh scheduling and focus events
   useKioskMode();
@@ -105,19 +110,25 @@ const AppRoutes: React.FC = () => {
     }
   }, [isInitializing, dataLoaded, initializeAppData]);
   
+  // Apply performance optimizations
+  useEffect(() => {
+    // Apply global performance optimizations
+    optimizeAppPerformance();
+  }, []);
+  
   // Always render LoadingScreen, but it will fade out based on isInitializing state
   return (
     <>
       <LoadingScreen />
       
-      {/* Main content with simpler transitions */}
+      {/* Main content with performance-optimized transitions */}
         <Box sx={{ 
           opacity: showContent ? 1 : 0,
           width: '100%', 
           height: '100%',
           position: 'relative',
-        // Simpler transition for performance
-        transition: 'opacity 0.3s ease',
+          // Use optimized transition duration
+          transition: `opacity ${getTransitionDuration()}ms ease`,
         }}>
           <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
           <UpdateNotification position={{ vertical: 'bottom', horizontal: 'right' }} />
@@ -147,6 +158,9 @@ const MemoizedAppRoutes = memo(AppRoutes);
  * Root component that sets up providers and theme.
  */
 const App: React.FC = () => {
+  // Initialize performance optimization
+  const { isLowPower } = usePerformanceOptimization();
+  
   // Fetch Hijri date early in the app lifecycle, but limit the frequency
   useEffect(() => {
     console.log('Pre-fetching Hijri date from App component...');
@@ -219,6 +233,8 @@ const App: React.FC = () => {
                             left: 0,
                             overflow: 'hidden',
                             bgcolor: 'background.default',
+                            // Add performance optimization classes
+                            className: isLowPower ? 'low-power-device hardware-accelerated' : 'hardware-accelerated',
                           }}
                         >
                           <MemoizedAppRoutes />

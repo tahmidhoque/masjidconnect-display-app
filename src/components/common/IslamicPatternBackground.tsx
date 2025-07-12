@@ -1,5 +1,6 @@
-import React from 'react';
-import { Box, useTheme, alpha } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, useTheme } from '@mui/material';
+import { isLowPowerDevice } from '../../utils/performanceUtils';
 
 interface IslamicPatternBackgroundProps {
   width?: string | number;
@@ -25,6 +26,7 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
   children,
 }) => {
   const theme = useTheme();
+  const isLowPower = isLowPowerDevice();
   
   // Define preset configurations based on variants
   const variantConfig = {
@@ -49,7 +51,6 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
       opacity: 0.2,
     },
     embossed: {
-      // Use colors that will create better emboss effect
       patternColor: patternColor || theme.palette.warning.main,
       backgroundColor: 'rgba(255, 255, 255, 0.98)',
       opacity: 0.6,
@@ -71,14 +72,46 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
         ...(opacity !== undefined && { opacity }),
       };
 
-  // Define effective emboss strength, stronger for embossed variant
-  const effectiveEmbossStrength = variant === 'embossed' 
-    ? 'strong' 
-    : embossStrength;
+  // For low-power devices, use simplified CSS gradients instead of complex SVG
+  const backgroundStyle = useMemo(() => {
+    if (isLowPower) {
+      // Use simple CSS gradients for better performance
+      return {
+        background: `
+          linear-gradient(45deg, ${config.patternColor}22 25%, transparent 25%, transparent 75%, ${config.patternColor}22 75%),
+          linear-gradient(-45deg, ${config.patternColor}22 25%, transparent 25%, transparent 75%, ${config.patternColor}22 75%)
+        `,
+        backgroundSize: `${patternSize}px ${patternSize}px`,
+        backgroundPosition: '0 0, 0 0',
+        opacity: config.opacity,
+      };
+    }
 
-  // Create unique IDs
-  const patternId = React.useMemo(() => `islamic-pattern-${Math.random().toString(36).substr(2, 9)}`, []);
-  const embossFilterId = React.useMemo(() => `emboss-filter-${Math.random().toString(36).substr(2, 9)}`, []);
+    // For more powerful devices, use the original SVG pattern
+    return {};
+  }, [isLowPower, config.patternColor, config.opacity, patternSize]);
+
+  // For low-power devices, return a simplified version
+  if (isLowPower) {
+    return (
+      <Box
+        sx={{
+          width,
+          height,
+          position: 'relative',
+          overflow: 'hidden',
+          backgroundColor: config.backgroundColor,
+          ...backgroundStyle,
+        }}
+      >
+        {children}
+      </Box>
+    );
+  }
+
+  // Original complex SVG implementation for more powerful devices
+  const patternId = useMemo(() => `islamic-pattern-${Math.random().toString(36).substr(2, 9)}`, []);
+  const embossFilterId = useMemo(() => `emboss-filter-${Math.random().toString(36).substr(2, 9)}`, []);
 
   // Emboss settings based on strength
   const embossConfig = {
@@ -88,7 +121,7 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
     strong: { elevation: 5, blur: 2.5, specular: 0.6 },
   };
 
-  const currentEmboss = embossConfig[effectiveEmbossStrength];
+  const currentEmboss = embossConfig[embossStrength as keyof typeof embossConfig];
 
   return (
     <Box
@@ -115,7 +148,7 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
       >
         <defs>
           {/* Emboss filter */}
-          {effectiveEmbossStrength !== 'none' && variant === 'embossed' ? (
+          {embossStrength !== 'none' && variant === 'embossed' ? (
             // Special emboss filter for embossed variant
             <filter id={embossFilterId} x="-50%" y="-50%" width="200%" height="200%">
               {/* Base blur for the pattern */}
@@ -139,7 +172,7 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
               </feMerge>
             </filter>
           ) : (
-            effectiveEmbossStrength !== 'none' && (
+            embossStrength !== 'none' && (
               <filter id={embossFilterId} x="-50%" y="-50%" width="200%" height="200%">
                 {/* Emboss effect created with two components: 
                     1. Base shadow for depth
@@ -198,74 +231,23 @@ const IslamicPatternBackground: React.FC<IslamicPatternBackgroundProps> = ({
           >
             <g 
               fill="none" 
-              stroke={config.patternColor} 
-              strokeWidth={variant === 'embossed' ? 25 : 20}
-              strokeLinecap="square"
+              stroke={config.patternColor}
+              strokeWidth="1"
               opacity={config.opacity}
-              filter={effectiveEmbossStrength !== 'none' ? `url(#${embossFilterId})` : undefined}
-              transform={`scale(${patternSize / 800})`}
+              filter={embossStrength !== 'none' ? `url(#${embossFilterId})` : undefined}
             >
-              {/* Quarter pattern */}
-              <g>
-                <path d="M0,165.685L217.157,75.736L400,258.579L359.175,300L40.825,300L0,400" />
-                <path d="M165.685,0L75.736,217.157L258.579,400L300,359.175L300,40.825L400,0" />
-              </g>
-              <g transform="rotate(90 400 400)">
-                <path d="M0,165.685L217.157,75.736L400,258.579L359.175,300L40.825,300L0,400" />
-                <path d="M165.685,0L75.736,217.157L258.579,400L300,359.175L300,40.825L400,0" />
-              </g>
-              <g transform="rotate(180 400 400)">
-                <path d="M0,165.685L217.157,75.736L400,258.579L359.175,300L40.825,300L0,400" />
-                <path d="M165.685,0L75.736,217.157L258.579,400L300,359.175L300,40.825L400,0" />
-              </g>
-              <g transform="rotate(270 400 400)">
-                <path d="M0,165.685L217.157,75.736L400,258.579L359.175,300L40.825,300L0,400" />
-                <path d="M165.685,0L75.736,217.157L258.579,400L300,359.175L300,40.825L400,0" />
-              </g>
-              
-              {/* Sun pattern */}
-              <path
-                d="M300,300L359.175,300L400,258.579L440.825,300L500,300L500,359.175L541.421,400L500,440.825L500,500L440.825,500L400,541.421L359.175,500L300,500L300,440.825L258.579,400L300,359.175L300,300"
-              />
-              
-              {/* Dart patterns */}
-              {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-                <path
-                  key={`dart-${i}`}
-                  d="M158.579,300L300,300L300,359.175L258.579,400L158.579,300"
-                  transform={`rotate(${angle} 400 400)`}
-                />
-              ))}
-              
-              {/* Petal patterns */}
-              {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-                <path
-                  key={`petal-${i}`}
-                  d="M117.157,117.157L217.157,75.736L300,158.579L300,300L158.579,300L75.736,217.157L117.157,117.157"
-                  transform={`rotate(${angle} 400 400)`}
-                />
-              ))}
+              {/* Simplified geometric pattern for better performance */}
+              <path d={`M 0 0 L ${patternSize} 0 L ${patternSize} ${patternSize} L 0 ${patternSize} Z`} />
+              <path d={`M ${patternSize/2} 0 L ${patternSize/2} ${patternSize}`} />
+              <path d={`M 0 ${patternSize/2} L ${patternSize} ${patternSize/2}`} />
+              <circle cx={patternSize/2} cy={patternSize/2} r={patternSize/8} />
             </g>
           </pattern>
         </defs>
-        <rect 
-          width="100%" 
-          height="100%" 
-          fill={`url(#${patternId})`} 
-        />
+        
+        <rect width="100%" height="100%" fill={`url(#${patternId})`} />
       </svg>
-      {children && (
-        <Box
-          sx={{
-            position: 'relative',
-            width: '100%',
-            height: '100%',
-            zIndex: 1,
-          }}
-        >
-          {children}
-        </Box>
-      )}
+      {children}
     </Box>
   );
 };

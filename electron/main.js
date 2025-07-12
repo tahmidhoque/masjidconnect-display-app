@@ -12,29 +12,33 @@ log.info('App starting...');
 // Performance optimization flags - optimized for Raspberry Pi
 log.info('Setting up performance optimizations for Raspberry Pi');
 
-// Fully disable GPU features to prevent GpuControl.CreateCommandBuffer errors
-// app.disableHardwareAcceleration();
-// app.commandLine.appendSwitch('disable-gpu');
-// app.commandLine.appendSwitch('disable-gpu-compositing');
-// app.commandLine.appendSwitch('disable-gpu-rasterization');
-// app.commandLine.appendSwitch('disable-gpu-sandbox');
-// app.commandLine.appendSwitch('disable-software-rasterizer');
+// Enable hardware acceleration optimizations for Raspberry Pi
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-software-rasterizer');
 
-// // Force software rendering
-// app.commandLine.appendSwitch('use-gl', 'swiftshader');
-// app.commandLine.appendSwitch('disable-direct-composition');
+// Force software rendering for consistent performance
+app.commandLine.appendSwitch('use-gl', 'swiftshader');
+app.commandLine.appendSwitch('disable-direct-composition');
 
-// // Disable other features that might depend on GPU
-// app.commandLine.appendSwitch('disable-smooth-scrolling');
-// app.commandLine.appendSwitch('disable-reading-from-canvas');
-// app.commandLine.appendSwitch('disable-accelerated-video-decode');
-// app.commandLine.appendSwitch('disable-accelerated-video-encode');
-// app.commandLine.appendSwitch('disable-accelerated-2d-canvas');
-// app.commandLine.appendSwitch('disable-webgl');
+// Disable other features that might depend on GPU
+app.commandLine.appendSwitch('disable-smooth-scrolling');
+app.commandLine.appendSwitch('disable-reading-from-canvas');
+app.commandLine.appendSwitch('disable-accelerated-video-decode');
+app.commandLine.appendSwitch('disable-accelerated-video-encode');
+app.commandLine.appendSwitch('disable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('disable-webgl');
 
-// Memory optimization
-// app.commandLine.appendSwitch('num-raster-threads', '1');
-// app.commandLine.appendSwitch('renderer-process-limit', '1');
+// Memory optimization for Raspberry Pi
+app.commandLine.appendSwitch('num-raster-threads', '1');
+app.commandLine.appendSwitch('renderer-process-limit', '1');
+app.commandLine.appendSwitch('max-old-space-size', '512');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;

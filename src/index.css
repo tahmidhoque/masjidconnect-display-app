@@ -2,12 +2,12 @@
 
 body {
   margin: 0;
-  font-family: 'Poppins', 'Amiri', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* Prevent scrolling on display screens */
+  overflow: hidden;
 }
 
 /* Arabic text specific styles */
@@ -21,34 +21,162 @@ code {
     monospace;
 }
 
-/* Full-screen app styles */
-html, body, #root {
-  height: 100%;
-  width: 100%;
+/* Performance optimizations for low-power devices */
+.low-power-device {
+  /* Reduce animation complexity */
+  --transition-duration: 0.1s !important;
+  --animation-duration: 0.5s !important;
+  
+  /* Disable complex effects */
+  --box-shadow: none !important;
+  --filter: none !important;
+  --backdrop-filter: none !important;
 }
 
-/* Prevent text selection on display screens */
-.no-select {
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
+.low-power-device * {
+  /* Simplify transitions */
+  transition-duration: var(--transition-duration) !important;
+  animation-duration: var(--animation-duration) !important;
+  
+  /* Reduce transform complexity */
+  transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  perspective: none !important;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+.low-power-device .MuiPaper-root {
+  /* Simplify paper effects */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+.low-power-device .MuiFade-root {
+  /* Faster fade transitions */
+  transition-duration: 0.15s !important;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+.low-power-device .MuiCircularProgress-root {
+  /* Simpler loading animations */
+  animation-duration: 1s !important;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+/* Optimize for Raspberry Pi rendering */
+@media (max-width: 1920px) {
+  /* Reduce visual complexity on smaller screens */
+  .low-power-device .MuiBox-root {
+    border-radius: 4px !important;
+  }
+  
+  .low-power-device .MuiTypography-root {
+    /* Optimize text rendering */
+    text-rendering: optimizeSpeed !important;
+    font-smooth: never !important;
+  }
+}
+
+/* Hardware acceleration hints */
+.hardware-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* Reduce motion for accessibility and performance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Optimize for touch devices (like Raspberry Pi touchscreens) */
+@media (pointer: coarse) {
+  /* Increase touch targets */
+  button, 
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Reduce hover effects on touch devices */
+  *:hover {
+    transform: none !important;
+  }
+}
+
+/* Memory optimization */
+* {
+  /* Prevent memory leaks from large images */
+  max-width: 100%;
+  height: auto;
+}
+
+img {
+  /* Optimize image rendering */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Reduce repaints and reflows */
+.container-optimized {
+  contain: layout style paint;
+}
+
+/* Optimize scrolling performance */
+.scroll-optimized {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Reduce GPU memory usage */
+.gpu-optimized {
+  will-change: auto;
+  transform: translateZ(0);
+}
+
+/* Disable complex effects on low-power devices */
+.low-power-device .glassmorphic {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.low-power-device .blur-effect {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+/* Optimize SVG rendering */
+.low-power-device svg {
+  shape-rendering: crispEdges;
+  text-rendering: optimizeSpeed;
+}
+
+/* Reduce font loading impact */
+@font-face {
+  font-display: swap;
+}
+
+/* Optimize for specific Raspberry Pi models */
+@media (max-device-width: 800px) {
+  /* Further reduce complexity on smaller Pi screens */
+  .low-power-device {
+    --transition-duration: 0.05s !important;
+    --animation-duration: 0.3s !important;
+  }
+  
+  .low-power-device .MuiTypography-h1 {
+    font-size: 1.5rem !important;
+  }
+  
+  .low-power-device .MuiTypography-h2 {
+    font-size: 1.25rem !important;
+  }
+  
+  .low-power-device .MuiTypography-h3 {
+    font-size: 1.125rem !important;
+  }
 } 

@@ -33,6 +33,73 @@ export const isLowPowerDevice = (): boolean => {
 };
 
 /**
+ * Performance monitoring class for tracking frame rates and rendering performance
+ */
+export class PerformanceMonitor {
+  private frameCount = 0;
+  private lastTime = performance.now();
+  private fps = 0;
+  private frameTimes: number[] = [];
+  private maxFrameTimes = 60; // Keep last 60 frames for averaging
+  
+  constructor() {
+    this.startMonitoring();
+  }
+  
+  private startMonitoring() {
+    const measureFrame = () => {
+      const currentTime = performance.now();
+      const deltaTime = currentTime - this.lastTime;
+      
+      this.frameCount++;
+      this.frameTimes.push(deltaTime);
+      
+      // Keep only the last N frame times
+      if (this.frameTimes.length > this.maxFrameTimes) {
+        this.frameTimes.shift();
+      }
+      
+      // Calculate FPS every 60 frames
+      if (this.frameCount % 60 === 0) {
+        const avgFrameTime = this.frameTimes.reduce((sum, time) => sum + time, 0) / this.frameTimes.length;
+        this.fps = Math.round(1000 / avgFrameTime);
+        
+        // Log performance metrics
+        if (this.fps < 30) {
+          console.warn(`Low FPS detected: ${this.fps}fps`);
+        }
+      }
+      
+      this.lastTime = currentTime;
+      requestAnimationFrame(measureFrame);
+    };
+    
+    requestAnimationFrame(measureFrame);
+  }
+  
+  getFPS(): number {
+    return this.fps;
+  }
+  
+  getAverageFrameTime(): number {
+    if (this.frameTimes.length === 0) return 0;
+    return this.frameTimes.reduce((sum, time) => sum + time, 0) / this.frameTimes.length;
+  }
+  
+  getMemoryUsage(): any {
+    if (window.performance && (window.performance as any).memory) {
+      const memory = (window.performance as any).memory;
+      return {
+        used: Math.round(memory.usedJSHeapSize / 1024 / 1024 * 100) / 100,
+        total: Math.round(memory.totalJSHeapSize / 1024 / 1024 * 100) / 100,
+        limit: Math.round(memory.jsHeapSizeLimit / 1024 / 1024 * 100) / 100
+      };
+    }
+    return null;
+  }
+}
+
+/**
  * Enables hardware acceleration for the element by applying CSS properties
  * that trigger GPU acceleration, but only what's necessary based on device capability.
  * 
@@ -184,4 +251,26 @@ export const throttle = <T extends (...args: any[]) => any>(
 export const scheduleUpdate = (callback: () => void): () => void => {
   const frameId = requestAnimationFrame(callback);
   return () => cancelAnimationFrame(frameId);
+};
+
+/**
+ * Creates a performance monitor instance
+ */
+export const createPerformanceMonitor = (): PerformanceMonitor => {
+  return new PerformanceMonitor();
+};
+
+/**
+ * Logs current performance metrics
+ */
+export const logPerformanceMetrics = (): void => {
+  const monitor = createPerformanceMonitor();
+  const memory = monitor.getMemoryUsage();
+  
+  console.log('Performance Metrics:', {
+    fps: monitor.getFPS(),
+    avgFrameTime: monitor.getAverageFrameTime(),
+    memory: memory,
+    isLowPower: isLowPowerDevice()
+  });
 }; 
