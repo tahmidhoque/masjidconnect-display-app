@@ -20,6 +20,16 @@ import useAppInitialization from './hooks/useAppInitialization';
 import useKioskMode from './hooks/useKioskMode';
 import ErrorScreen from './components/screens/ErrorScreen';
 import { fetchHijriDateElectronSafe, calculateApproximateHijriDate } from './utils/dateUtils';
+import storageService from './services/storageService';
+
+// Verify database health early in the app lifecycle
+try {
+  storageService.verifyDatabaseHealth().catch(err => {
+    console.error('Failed to verify database health:', err);
+  });
+} catch (error) {
+  console.error('Error starting database health check:', error);
+}
 
 // Lazy load screen components
 const DisplayScreen = lazy(() => import('./components/screens/DisplayScreen'));
@@ -53,9 +63,29 @@ const AppRoutes: React.FC = () => {
     
     try {
       console.log('Initializing app data...');
-      // Load essential data first
-      await refreshContent(true); // Force refresh to get latest data
+      
+      // First verify database health
+      await storageService.verifyDatabaseHealth();
+      
+      // Then load essential data
+      await refreshContent(false); // Less aggressive refresh to prevent flashing
       await refreshPrayerTimes(); // Get latest prayer times
+      
+      // Access refreshSchedule from the context directly
+      const { refreshSchedule } = useContent();
+      
+      // Specific fetch of schedule
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        // Try to refresh the schedule, but don't block on it
+        await Promise.race([
+          refreshSchedule(false),
+          new Promise(resolve => setTimeout(resolve, 3000))
+        ]);
+      } catch (scheduleError) {
+        console.error('Error refreshing schedule:', scheduleError);
+      }
+      
       setDataLoaded(true);
       
       // Show content immediately without delay for better performance
@@ -81,29 +111,29 @@ const AppRoutes: React.FC = () => {
       <LoadingScreen />
       
       {/* Main content with simpler transitions */}
-      <Box sx={{ 
-        opacity: showContent ? 1 : 0,
-        width: '100%', 
-        height: '100%',
-        position: 'relative',
+        <Box sx={{ 
+          opacity: showContent ? 1 : 0,
+          width: '100%', 
+          height: '100%',
+          position: 'relative',
         // Simpler transition for performance
         transition: 'opacity 0.3s ease',
-      }}>
-        <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
-        <UpdateNotification position={{ vertical: 'bottom', horizontal: 'right' }} />
-        <AuthErrorDetector />
-        <EmergencyAlert />
-        {/* Wrap Routes in Suspense for lazy loading */}
-        <Suspense fallback={<LoadingScreen isSuspenseFallback={true} />}>
-          <Routes>
-            <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
-            <Route path="/pair" element={<PairingScreen onPairingSuccess={initializeAppData} />} />
-            <Route path="/loading" element={<LoadingScreen />} />
-            <Route path="/error" element={<ErrorScreen />} />
-            <Route path="*" element={<Navigate replace to="/" />} />
-          </Routes>
-        </Suspense>
-      </Box>
+        }}>
+          <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
+          <UpdateNotification position={{ vertical: 'bottom', horizontal: 'right' }} />
+          <AuthErrorDetector />
+          <EmergencyAlert />
+          {/* Wrap Routes in Suspense for lazy loading */}
+          <Suspense fallback={<LoadingScreen isSuspenseFallback={true} />}>
+            <Routes>
+              <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
+              <Route path="/pair" element={<PairingScreen onPairingSuccess={initializeAppData} />} />
+              <Route path="/loading" element={<LoadingScreen />} />
+              <Route path="/error" element={<ErrorScreen />} />
+              <Route path="*" element={<Navigate replace to="/" />} />
+            </Routes>
+          </Suspense>
+        </Box>
     </>
   );
 };
@@ -144,25 +174,25 @@ const App: React.FC = () => {
     
     // Use a timeout to defer this non-critical operation
     setTimeout(() => {
-      // Use our utility function to get the Hijri date
-      fetchHijriDateElectronSafe(today)
-        .then(hijriDate => {
-          console.log('Successfully pre-fetched Hijri date:', hijriDate);
-          localStorage.setItem('hijriDate', hijriDate);
+    // Use our utility function to get the Hijri date
+    fetchHijriDateElectronSafe(today)
+      .then(hijriDate => {
+        console.log('Successfully pre-fetched Hijri date:', hijriDate);
+        localStorage.setItem('hijriDate', hijriDate);
+        localStorage.setItem('hijriDateTimestamp', Date.now().toString());
+      })
+      .catch(error => {
+        console.error('Error pre-fetching Hijri date:', error);
+        // Fall back to calculation method
+        try {
+          const approximateDate = calculateApproximateHijriDate();
+          console.log('Using approximate Hijri date calculation:', approximateDate);
+          localStorage.setItem('hijriDate', approximateDate);
           localStorage.setItem('hijriDateTimestamp', Date.now().toString());
-        })
-        .catch(error => {
-          console.error('Error pre-fetching Hijri date:', error);
-          // Fall back to calculation method
-          try {
-            const approximateDate = calculateApproximateHijriDate();
-            console.log('Using approximate Hijri date calculation:', approximateDate);
-            localStorage.setItem('hijriDate', approximateDate);
-            localStorage.setItem('hijriDateTimestamp', Date.now().toString());
-          } catch (calcError) {
-            console.error('Failed to calculate approximate date:', calcError);
-          }
-        });
+        } catch (calcError) {
+          console.error('Failed to calculate approximate date:', calcError);
+        }
+      });
     }, 2000); // Defer by 2 seconds to prioritize UI rendering
   }, []);
 

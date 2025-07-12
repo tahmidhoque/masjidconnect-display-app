@@ -32,5 +32,18 @@ cp /usr/share/applications/masjidconnect-display.desktop /etc/xdg/autostart/
 echo "Setting permissions..." | tee -a $LOGFILE
 chmod +x /opt/masjidconnect-display/masjidconnect-display
 
+# Install fonts system-wide for proper Arabic text rendering
+echo "Installing Arabic fonts..." | tee -a $LOGFILE
+FONTS_DIR="/usr/local/share/fonts/masjidconnect"
+mkdir -p "$FONTS_DIR"
+
+# Copy fonts from the app directory to system fonts
+cp -r /opt/masjidconnect-display/resources/app/build/static/fonts/* "$FONTS_DIR" 2>/dev/null || true
+cp -r /opt/masjidconnect-display/resources/app/src/assets/fonts/* "$FONTS_DIR" 2>/dev/null || true
+
+# Set proper permissions for font files
+chmod 644 "$FONTS_DIR"/*
+fc-cache -f
+
 echo "Post-installation completed successfully!" | tee -a $LOGFILE
 exit 0

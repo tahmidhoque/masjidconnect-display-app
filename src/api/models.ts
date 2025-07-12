@@ -146,8 +146,12 @@ export interface ScreenContent {
     name: string;
     orientation: 'LANDSCAPE' | 'PORTRAIT';
     contentConfig: any;
+    masjid?: {
+      name: string;
+      timezone: string;
+    };
   };
-  masjid: {
+  masjid?: {
     name: string;
     timezone: string;
   };
@@ -170,6 +174,10 @@ export interface ScreenContent {
       name: string;
       orientation: 'LANDSCAPE' | 'PORTRAIT';
       contentConfig?: any;
+      masjid?: {
+        name: string;
+        timezone: string;
+      };
     };
     events?: Event[] | { data: Event[] };
   };

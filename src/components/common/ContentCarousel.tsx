@@ -9,7 +9,9 @@ import { useOrientation } from '../../contexts/OrientationContext';
 import localforage from 'localforage';
 import GlassmorphicContentCard from './GlassmorphicContentCard';
 import GlassmorphicCard from './GlassmorphicCard';
-import { Event } from '../../api/models';
+import { Event, Schedule } from '../../api/models';
+import storageService from '../../services/storageService';
+import GlassmorphicContentCardWrapper from './GlassmorphicContentCardWrapper';
 
 // Define content types enum to match API
 type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
@@ -46,7 +48,7 @@ const MemoizedFormattedText = memo(({ text }: { text: string }) => (
   <>{formatTextWithNewlines(text)}</>
 ));
 
-// Update the content type config to use direct color values instead of gradients
+// Use direct color values for content types
 const contentTypeConfig: Record<ExtendedContentItemType, {
   title: string;
   titleColor: string;
@@ -56,37 +58,37 @@ const contentTypeConfig: Record<ExtendedContentItemType, {
 }> = {
   'VERSE_HADITH': {
     title: 'Verse from the Quran',
-    titleColor: 'rgba(42, 157, 143, 0.3)',
+    titleColor: '#2A9D8F',
     textColor: '#FFFFFF',
     colorType: 'secondary'
   },
   'HADITH': {
     title: 'Hadith of the Day',
-    titleColor: 'rgba(42, 157, 143, 0.3)',
+    titleColor: '#2A9D8F',
     textColor: '#FFFFFF',
     colorType: 'secondary'
   },
   'ANNOUNCEMENT': {
     title: 'Announcement',
-    titleColor: 'rgba(59, 130, 246, 0.3)',
+    titleColor: '#3B82F6',
     textColor: '#FFFFFF',
     colorType: 'info'
   },
   'EVENT': {
     title: 'Upcoming Event',
-    titleColor: 'rgba(139, 92, 246, 0.3)',
+    titleColor: '#8B5CF6',
     textColor: '#FFFFFF',
     colorType: 'primary'
   },
   'ASMA_AL_HUSNA': {
     title: 'Names of Allah',
-    titleColor: 'rgba(245, 158, 11, 0.3)',
+    titleColor: '#F59E0B',
     textColor: '#FFFFFF',
     colorType: 'secondary'
   },
   'CUSTOM': {
     title: 'Information',
-    titleColor: 'rgba(10, 38, 71, 0.3)',
+    titleColor: '#0A2647',
     textColor: '#FFFFFF',
     colorType: 'primary'
   }
@@ -99,6 +101,23 @@ const getContentTypeConfig = (type: string | undefined): typeof contentTypeConfi
   }
   return contentTypeConfig[type as ExtendedContentItemType];
 };
+
+// Map schedule item to component props
+interface ScheduleItem {
+  id: string;
+  order: number;
+  contentItem: ContentItem;
+}
+
+// Define prayer announcement UI options
+interface AnnouncementConfig {
+  prayerName: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  color: string;
+  variant: 'jamaat' | 'adhan';
+}
 
 /**
  * ContentCarousel component
@@ -113,6 +132,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     events, 
     refreshSchedule,
     isLoading,
+    // Masjid info
+    masjidName,
+    masjidTimezone,
     // Prayer announcement states
     showPrayerAnnouncement,
     prayerAnnouncementName,
@@ -151,343 +173,133 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   // Preload next content item to avoid flashing
   const [nextItemIndex, setNextItemIndex] = useState<number | null>(null);
   
-  // Log when prayer announcement state changes
+  // Log when content context changes
   useEffect(() => {
-    // Track last state for comparison
-    lastAnnouncementState.current = showPrayerAnnouncement;
+    logger.debug('ContentCarousel: Content context data updated', {
+      hasSchedule: !!schedule,
+      scheduleItemsCount: schedule?.items?.length || 0,
+      scheduleId: schedule?.id || 'unknown',
+      scheduleName: schedule?.name || 'unknown',
+      eventsCount: events?.length || 0,
+      masjidName: masjidName || 'unknown'
+    });
     
-    // When prayer announcement changes, handle content rotation
-    if (showPrayerAnnouncement) {
-      // If announcement is showing, pause rotation
-      setAutoRotate(false);
-      
-      // Cancel any existing rotation timer
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    } else {
-      // When announcement ends, resume rotation (unless user has interacted)
-      if (!hasUserInteracted.current) {
-        setAutoRotate(true);
-      }
-    }
-  }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
+    setHasCheckedLocalStorage(true);
+  }, [schedule, events, masjidName]);
   
-  // Check IndexedDB for content on initialization
-  useEffect(() => {
-    const checkLocalStorage = async () => {
-      try {
-        // Try to load content from IndexedDB
-        const cachedSchedule = await localforage.getItem('schedule');
-        const cachedEvents = await localforage.getItem('events');
-        
-        logger.debug('ContentCarousel: Checking cached content', { 
-          hasCachedSchedule: !!cachedSchedule, 
-          hasCachedEvents: !!cachedEvents 
-        } as Record<string, any>);
-        
-        if (cachedSchedule || cachedEvents) {
-          // Process cached content similar to how we process API content
-          let items = [];
-          
-          // Add schedule items if available
-          if (cachedSchedule && (cachedSchedule as any)?.items && (cachedSchedule as any).items.length > 0) {
-            const scheduleItems = (cachedSchedule as any).items;
-            // Map schedule items to the expected format
-            const mappedItems = scheduleItems.map((item: any, index: number) => {
-              if (!item.contentItem) {
-                const apiItem = item as unknown as { 
-                  id: string; 
-                  type?: string; 
-                  title?: string; 
-                  content?: any; 
-                  duration?: number; 
-                  order?: number;
-                };
-                
-                return {
-                  id: apiItem.id || `item-${index}`,
-                  order: typeof apiItem.order === 'number' ? apiItem.order : index,
-                  contentItem: {
-                    id: `${apiItem.id}-content`,
-                    type: apiItem.type || 'CUSTOM',
-                    title: apiItem.title || 'No Title',
-                    content: apiItem.content || 'No Content',
-                    duration: typeof apiItem.duration === 'number' ? apiItem.duration : 30
-                  }
-                };
-              }
-              
-              const contentItem = item.contentItem;
-              
-              return {
-                id: item.id,
-                order: item.order || 999,
-                contentItem: {
-                  id: contentItem.id,
-                  title: contentItem.title || 'No Title',
-                  content: contentItem.content || 'No Content',
-                  type: contentItem.type || 'CUSTOM',
-                  duration: contentItem.duration || 30
-                }
-              };
-            }).filter(Boolean);
-            
-            if (mappedItems.length > 0) {
-              items.push(...mappedItems);
-            }
-          }
-          
-          // Add cached events if available
-          if (cachedEvents && Array.isArray(cachedEvents) && (cachedEvents as any[]).length > 0) {
-            items.push(...(cachedEvents as any[]).map((event: any) => {
-              // Extract description properly based on various possible formats
-              let description = '';
-              
-              if (typeof event.description === 'string') {
-                description = event.description;
-              } else if (typeof event.description === 'object' && event.description !== null) {
-                const descObj = event.description as { 
-                  text?: string; 
-                  description?: string;
-                  category?: string;
-                  location?: string;
-                };
-                
-                // Try to extract meaningful text from the description object
-                if (descObj.text) {
-                  description = descObj.text;
-                } else if (descObj.description) {
-                  description = descObj.description;
-                } else {
-                  // Try to extract meaningful text from the object
-                  try {
-                    // Extract only helpful fields for display
-                    const extractedInfo = [];
-                    
-                    if (descObj.category) extractedInfo.push(descObj.category);
-                    if (descObj.description) extractedInfo.push(descObj.description);
-                    if (descObj.location && !event.location) extractedInfo.push(`Location: ${descObj.location}`);
-                    
-                    description = extractedInfo.length > 0 ? extractedInfo.join('\n\n') : 'See event details';
-                  } catch (err) {
-                    description = 'Event information unavailable';
-                    console.error('Error parsing cached event description:', err);
-                  }
-                }
-              }
-              
-              return {
-                id: event.id,
-                order: 999, // Place events after scheduled content
-                contentItem: {
-                  id: event.id,
-                  title: event.title || 'Event',
-                  content: description || 'No description available',
-                  type: 'EVENT',
-                  duration: 20
-                },
-                startDate: event.startDate,
-                endDate: event.endDate,
-                location: event.location
-              };
-            }));
-          }
-          
-          // Sort and update content items
-          if (items.length > 0) {
-            items.sort((a, b) => ((a as any).order || 999) - ((b as any).order || 999));
-            contentItemsRef.current = items;
-            setContentItems(items);
-            setContentLoading(false);
-          }
-        }
-        
-        setHasCheckedLocalStorage(true);
-      } catch (error) {
-        logger.error('ContentCarousel: Error checking IndexedDB for cached content', {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        setHasCheckedLocalStorage(true);
-      }
-    };
-    
-    checkLocalStorage();
-  }, []);
-  
-  // Refresh content when mounted and when orientation changes
-  useEffect(() => {
-    // Initial content load
-    if (!hasRefreshedRef.current) {
-      logger.info('ContentCarousel: Initial schedule refresh');
-      hasRefreshedRef.current = true;
-      refreshSchedule().catch((error) => {
-        logger.error('Failed to refresh schedule:', {
-          error: error instanceof Error ? error.message : String(error)
-        });
-      });
-    }
-    
-    // Handle orientation changes - refresh content when orientation changes
-    if (lastOrientationRef.current !== orientation) {
-      logger.info('ContentCarousel: Orientation changed, refreshing schedule', {
-        from: lastOrientationRef.current,
-        to: orientation
-      });
-      
-      // Force a new refresh of content when orientation changes
-      refreshSchedule().catch((error) => {
-        logger.error('Failed to refresh schedule after orientation change:', {
-          error: error instanceof Error ? error.message : String(error)
-        });
-      });
-      
-      lastOrientationRef.current = orientation;
-    }
-    
-    return () => {
-      isComponentMountedRef.current = false;
-      // Clean up timer on unmount
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [refreshSchedule, orientation]);
-  
-  // Prepare content items for carousel
+  // Process the schedule and events into content items
   useEffect(() => {
     if (!isComponentMountedRef.current) return;
     
-    let items = [];
+    let processedItems: any[] = [];
     
-    // Add schedule items if available
+    // Process schedule items if available
     if (schedule?.items && schedule.items.length > 0) {
-      // Map schedule items to the expected format
-      const mappedItems = schedule.items.map((item, index) => {
-        // If item doesn't have contentItem property, create it from the item's properties
+      logger.debug('ContentCarousel: Processing schedule items', { 
+        count: schedule.items.length
+      });
+      
+      // Map schedule items to content items
+      const scheduleItems = schedule.items.map((item: any, index: number) => {
         if (!item.contentItem) {
-          // Use type assertion to handle API format with top-level properties
-          const apiItem = item as unknown as { 
-            id: string; 
-            type?: string; 
-            title?: string; 
-            content?: any; 
-            duration?: number; 
-            order?: number;
-          };
-          
-          return {
-            id: apiItem.id || `item-${index}`,
-            order: typeof apiItem.order === 'number' ? apiItem.order : index,
-            contentItem: {
-              id: `${apiItem.id}-content`,
-              type: apiItem.type || 'CUSTOM',
-              title: apiItem.title || 'No Title',
-              content: apiItem.content || 'No Content',
-              duration: typeof apiItem.duration === 'number' ? apiItem.duration : 30
-            }
-          };
+          logger.debug(`ContentCarousel: Item ${index} missing contentItem property`, { item });
+          return null;
         }
         
         const contentItem = item.contentItem;
         
         return {
-          id: item.id,
-          order: item.order || 999,
+          id: item.id || `schedule-item-${index}`,
+          order: item.order || index,
           contentItem: {
-            id: contentItem.id,
+            id: contentItem.id || `content-${index}`,
             title: contentItem.title || 'No Title',
             content: contentItem.content || 'No Content',
-            // Ensure type is set correctly (API might use different field names)
             type: contentItem.type || 'CUSTOM',
-            // Ensure duration has a fallback value
             duration: contentItem.duration || 30
           }
         };
       }).filter(Boolean);
       
-      if (mappedItems.length > 0) {
-        items.push(...mappedItems);
+      if (scheduleItems.length > 0) {
+        processedItems = [...scheduleItems];
+        logger.debug('ContentCarousel: Added schedule items', { count: scheduleItems.length });
       }
+    } else {
+      logger.debug('ContentCarousel: No schedule items available');
     }
     
-    // Add upcoming events if available
+    // Add event items if available
     if (events && events.length > 0) {
-      items.push(...events.map((event: Event | any) => {
-        // Extract description properly based on various possible formats
-        let description = '';
-        
-        if (typeof event.description === 'string') {
-          description = event.description;
-        } else if (typeof event.description === 'object' && event.description !== null) {
-          const descObj = event.description as { 
-            text?: string; 
-            description?: string;
-            category?: string;
-            location?: string;
-          };
-          
-          // Try to extract meaningful text from the description object
-          if (descObj.text) {
-            description = descObj.text;
-          } else if (descObj.description) {
-            description = descObj.description;
-          } else {
-            // Try to extract meaningful text from the object
-            try {
-              // Extract only helpful fields for display
-              const extractedInfo = [];
-              
-              if (descObj.category) extractedInfo.push(descObj.category);
-              if (descObj.description) extractedInfo.push(descObj.description);
-              if (descObj.location && !event.location) extractedInfo.push(`Location: ${descObj.location}`);
-              
-              description = extractedInfo.length > 0 ? extractedInfo.join('\n\n') : 'See event details';
-            } catch (err) {
-              description = 'Event information unavailable';
-              console.error('Error parsing event description:', err);
-            }
-          }
-        }
-        
+      const eventItems = events.map((event, index) => {
         return {
-          id: event.id,
+          id: event.id || `event-${index}`,
           order: 999, // Place events after scheduled content
           contentItem: {
-            id: event.id,
+            id: event.id || `event-content-${index}`,
             title: event.title || 'Event',
-            content: description || 'No description available',
-            type: 'EVENT',
+            content: typeof event.description === 'string' ? event.description : 'No description available',
+            type: 'EVENT', 
             duration: 20
           },
           startDate: event.startDate,
           endDate: event.endDate,
           location: event.location
         };
-      }));
+      });
+      
+      processedItems = [...processedItems, ...eventItems];
+      logger.debug('ContentCarousel: Added event items', { count: eventItems.length });
     }
     
-    // Sort by order - handle null safety with non-null assertion
-    items = items.filter(Boolean); // Remove any null/undefined items first
-    items.sort((a, b) => {
-      // At this point we know items are not null due to filter
-      return ((a as any).order || 999) - ((b as any).order || 999);
-    });
+    // Sort items by order
+    processedItems.sort((a, b) => (a.order || 0) - (b.order || 0));
     
-    // Only update if the items have actually changed
-    if (JSON.stringify(items) !== JSON.stringify(contentItemsRef.current)) {
-      contentItemsRef.current = items;
-      setContentItems(items);
-      // Reset to first item when content changes
+    // Update content items if they've changed
+    if (processedItems.length > 0 && 
+        JSON.stringify(processedItems) !== JSON.stringify(contentItemsRef.current)) {
+      logger.debug('ContentCarousel: Updating content items', { count: processedItems.length });
+      contentItemsRef.current = processedItems;
+      setContentItems(processedItems);
       setCurrentItemIndex(0);
+      setContentLoading(false);
+    } else if (processedItems.length === 0 && contentItems.length === 0) {
+      // Still set loading to false if there are no items to show
+      setContentLoading(false);
     }
   }, [schedule, events]);
+  
+  // Initial content refresh
+  useEffect(() => {
+    if (!hasRefreshedRef.current) {
+      logger.info('ContentCarousel: Initial schedule refresh');
+      hasRefreshedRef.current = true;
+      refreshSchedule(true).catch(error => {
+        logger.error('Failed to refresh schedule:', error);
+      });
+    }
+    
+    return () => {
+      isComponentMountedRef.current = false;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [refreshSchedule]);
   
   // Handle auto-rotation
   useEffect(() => {
     // Skip if loading or no items
     if (contentLoading || contentItems.length === 0) {
+      return;
+    }
+
+    // Skip rotation during prayer announcements
+    if (showPrayerAnnouncement) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       return;
     }
 
@@ -501,8 +313,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       // Get the display time for the current item
       const currentItem = contentItems[currentItemIndex];
       const displayTimeSeconds = 
-        currentItem?.displayTime || 
-        currentItem?.contentItem?.displayTime || 
+        currentItem?.contentItem?.duration || 
         defaultDuration;
       
       const displayTimeMs = displayTimeSeconds * 1000;
@@ -510,6 +321,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       
       // Start a timer to change to the next item
       timerRef.current = setTimeout(() => {
+        // Only proceed if we have more than one item
+        if (contentItems.length <= 1) return;
+
         // Preload next item for smoother transition
         const nextIdx = (currentItemIndex + 1) % contentItems.length;
         setNextItemIndex(nextIdx);
@@ -532,7 +346,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       }, displayTimeMs);
       
     }
-  }, [currentItemIndex, contentItems, autoRotate, contentLoading]);
+
+    // Cleanup function
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [currentItemIndex, contentItems, autoRotate, contentLoading, showPrayerAnnouncement, defaultDuration]);
 
   // Reset display time when content changes
   useEffect(() => {
@@ -554,55 +375,40 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       setCurrentItemDisplayTime(defaultDuration * 1000);
     }
   }, [currentItemIndex, contentItems, defaultDuration, showPrayerAnnouncement]);
-  
-  // Add a helper function to scale down font sizes
-  const getScaledFontSize = (baseSize: string) => {
-    // Extract the numeric value and unit from the font size
-    const match = baseSize.match(/^([\d.]+)(.*)$/);
-    if (!match) return baseSize;
-    
-    const [, value, unit] = match;
-    // Scale down by 20% for 720p, 15% for larger screens
-    const scaleFactor = screenSize.is720p ? 0.8 : 0.85;
-    const scaledValue = parseFloat(value) * scaleFactor;
-    return `${scaledValue}${unit}`;
-  };
 
+  // Function to scale font size based on viewport
+  const getScaledFontSize = (baseSize: string) => {
+    return baseSize;
+  };
+  
   // Get dynamic font size based on content length
   const getDynamicFontSize = (text: string, type: string) => {
     if (!text) return getScaledFontSize(fontSizes.h4);
     
     const textLength = text.length;
-    const lineCount = (text.match(/\n/g) || []).length + 1;
+    const lineCount = text.split('\n').length;
     
-    // Special handling for Eid prayers - use extremely large sizes regardless of content length
-    if (type === 'eid-announcement') {
-      if (lineCount <= 2) {
-        return `${3.5}rem`; // Extremely large font for Eid announcements with few lines
-      } else if (lineCount <= 4) {
-        return `${2.8}rem`; // Very large font for Eid announcements with moderate lines
+    // Adjust font size for Names of Allah
+    if (type === 'ASMA_AL_HUSNA') {
+      if (textLength > 200) {
+        return getScaledFontSize(fontSizes.h5);
+      } else if (textLength > 100) {
+        return getScaledFontSize(fontSizes.h4);
       } else {
-        return `${2.2}rem`; // Large font for Eid announcements with many lines
+        return getScaledFontSize(fontSizes.h3);
       }
     }
     
-    // For very short content, especially event announcements, use larger font sizes
-    if (textLength < 50 && (type === 'event-title' || type === 'announcement-title')) {
-      return getScaledFontSize(fontSizes.huge); // Very large for main titles with minimal text
-    }
-    
-    if (textLength < 80 && type === 'event-content') {
-      return getScaledFontSize(fontSizes.h1); // Larger size for short event content
-    }
-    
-    // Adjust based on both text length and number of lines
-    if (type === 'arabic') {
-      if (textLength > 250 || lineCount > 4) {
-        return getScaledFontSize(fontSizes.h4);
-      } else if (textLength > 150 || lineCount > 2) {
-        return getScaledFontSize(fontSizes.h3);
+    // Adjust for Quranic verses (usually longer)
+    if (type === 'VERSE_HADITH') {
+      if (textLength > 500 || lineCount > 8) {
+        return getScaledFontSize(fontSizes.body1);
+      } else if (textLength > 300 || lineCount > 5) {
+        return getScaledFontSize(fontSizes.h6);
+      } else if (textLength > 150 || lineCount > 3) {
+        return getScaledFontSize(fontSizes.h5);
       } else {
-        return getScaledFontSize(fontSizes.h2);
+        return getScaledFontSize(fontSizes.h4);
       }
     }
     
@@ -638,6 +444,67 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     transition: 'transform 300ms ease, opacity 300ms ease',
   }), [showContent]);
   
+  // Process and format verse/hadith content correctly
+  const formatVerseHadithContent = useCallback((content: any): string => {
+    if (typeof content === 'string') {
+      // If it's already a JSON string, return it as is
+      if (content.startsWith('{') && content.includes('"type"')) {
+        return content;
+      }
+      
+      // Otherwise, it's a regular string
+      return content;
+    }
+    
+    try {
+      // If it's an object with verse/hadith structure
+      if (content.type === 'QURAN_VERSE' || 
+          content.type === 'HADITH' || 
+          content.arabicText || 
+          content.translation) {
+        // Return the whole object as a JSON string
+        return JSON.stringify(content);
+      }
+      
+      // Legacy format
+      if (content.verse || content.text) {
+        const verse = content.verse || content.text || '';
+        const reference = content.reference || content.source || '';
+        
+        // Try to combine into a JSON format for better display
+        if (content.arabicText) {
+          return JSON.stringify({
+            type: 'QURAN_VERSE',
+            arabicText: content.arabicText,
+            translation: verse,
+            reference: reference
+          });
+        }
+        
+        return reference ? `${verse}\n\n${reference}` : verse;
+      } else if (content.hadith) {
+        const hadith = content.hadith || '';
+        const source = content.source || content.reference || '';
+        
+        return source ? `${hadith}\n\n${source}` : hadith;
+      } else if (typeof content === 'object') {
+        // Try to extract meaningful content from object
+        if (content.content) {
+          return typeof content.content === 'string' 
+            ? content.content 
+            : JSON.stringify(content.content);
+        }
+        // If we can't parse in a specific way, return the JSON
+        return JSON.stringify(content);
+      }
+    } catch (e) {
+      console.error('Error formatting verse/hadith content:', e);
+    }
+    
+    // Fallback
+    return typeof content === 'string' ? content : 'Error displaying content';
+  }, []);
+  
   // Content rendering with performance optimization
   const renderContent = useCallback(() => {
     if (contentLoading) {
@@ -655,7 +522,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         </Box>
       );
     }
-
+    
     if (!contentItems.length) {
       return (
         <Box
@@ -675,580 +542,301 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
     // Get current content item
     const currentItem = contentItems[currentItemIndex];
-    if (!currentItem) return null;
-
-    const typeConfig = getCurrentTypeConfig(currentItem.type);
-
-    // Define which title to show
-    let titleToShow = currentItem.contentItem?.title || typeConfig.title;
-    let titleGradient = typeConfig.titleColor;
-    let titleTextColor = typeConfig.textColor;
-    
-    try {
-      // For EVENT type
-      if (currentItem.type === 'EVENT') {
-        let eventText = '';
-        
-        // Parse content based on its format
-        if (typeof currentItem.content === 'string') {
-          eventText = currentItem.content;
-        } else if (currentItem.content?.text) {
-          eventText = currentItem.content.text;
-        } else if (currentItem.content?.description) {
-          // Add handling for when description is directly in the content object
-          eventText = currentItem.content.description;
-        } else if (typeof currentItem.content === 'object' && currentItem.content !== null) {
-          // Try to extract meaningful text from the object before falling back to stringify
-          const contentObj = currentItem.content as {
-            text?: string;
-            description?: string;
-            category?: string;
-            location?: string;
-            eventDate?: string;
-            eventDescription?: string;
-            isHighlighted?: boolean;
-          };
-          
-          if (contentObj.eventDescription || contentObj.description) {
-            eventText = contentObj.eventDescription || contentObj.description || '';
-          } else {
-            // Only stringify as a last resort, and try to make it readable
-            try {
-              // Extract only helpful fields for display rather than showing the full JSON
-              const extractedInfo = [];
-              
-              if (contentObj.category) extractedInfo.push(contentObj.category);
-              if (contentObj.description) extractedInfo.push(contentObj.description);
-              if (contentObj.location) extractedInfo.push(`Location: ${contentObj.location}`);
-              
-              // If we have extracted info, use that instead of full JSON
-              eventText = extractedInfo.length > 0 ? extractedInfo.join('\n\n') : 'Event information';
-            } catch (err) {
-              eventText = 'Event information unavailable';
-              console.error('Error parsing event content:', err);
-            }
-          }
-        }
-        
-        // Check if this is an Eid prayer or special announcement
-        const isEidAnnouncement = 
-          currentItem.title?.toLowerCase().includes('eid') || 
-          eventText.toLowerCase().includes('eid prayer');
-        
-        const isPrayerAnnouncement = 
-          currentItem.title?.toLowerCase().includes('prayer') ||
-          eventText.toLowerCase().includes('prayer will be held');
-        
-        const isSpecialAnnouncement = isEidAnnouncement || isPrayerAnnouncement;
-        
-        // Calculate appropriate content type for sizing
-        const fontSizeType = isEidAnnouncement ? 'eid-announcement' : 
-                             (isSpecialAnnouncement ? 'event-content' : 'normal');
-        
-        // Special handling for Eid prayer - ensure it has translucent background
-        if (isEidAnnouncement) {
-          return (
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 3,
-              textAlign: 'center',
-              width: '100%',
-              height: '100%',
-              p: 2,
-              overflow: 'auto',
-              // No background color here to maintain glassmorphic effect
-            }}>
-              <Typography 
-                variant="h2"
-                sx={{ 
-                  fontSize: getDynamicFontSize(eventText, 'eid-announcement'),
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  whiteSpace: 'pre-line',
-                  lineHeight: 2,
-                  color: '#FFFFFF',
-                  textShadow: '0 2px 5px rgba(0, 0, 0, 0.5)', // Stronger text shadow for better contrast
-                  mb: 2
-                }}
-              >
-                <MemoizedFormattedText text={eventText} />
-              </Typography>
-            </Box>
-          );
-        }
-        
-        // Return normal event rendering
-        return (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
+    if (!currentItem || !currentItem.contentItem) {
+      return (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: isSpecialAnnouncement ? 4 : (screenSize.is720p ? 0.5 : 1), 
-            textAlign: 'center',
-            width: '100%',
             height: '100%',
-            p: isSpecialAnnouncement ? 4 : (screenSize.is720p ? 1 : 2),
-            overflow: 'auto'
-          }}>
-            <Typography 
-              sx={{ 
-                fontSize: getDynamicFontSize(eventText, fontSizeType),
-                mb: isSpecialAnnouncement ? 2 : 1,
-                textAlign: 'center',
-                fontWeight: isSpecialAnnouncement ? 'bold' : 'medium',
-                whiteSpace: 'pre-line', // Preserve newlines
-                lineHeight: isSpecialAnnouncement ? 2 : 1.5,
-                color: '#FFFFFF',
-                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
-              }}
-            >
-              <MemoizedFormattedText text={eventText} />
-            </Typography>
-            
-            {/* Only show date/location box if not an Eid announcement, to maximize text space */}
-            {(!isEidAnnouncement && (currentItem.startDate || currentItem.location)) && (
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-around', 
-                  flexWrap: 'wrap',
-                  gap: 1,
-                  mt: 1,
-                  backdropFilter: 'blur(10px)',
-                  background: 'rgba(0, 0, 0, 0.15)', // More translucent
-                  p: 1.5,
-                  borderRadius: 2,
-                  width: '100%',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }}
-              >
-                {currentItem.startDate && (
-                  <Box
-                    sx={{
-                      backdropFilter: 'blur(5px)',
-                      background: 'rgba(255, 255, 255, 0.05)', // More translucent
-                      p: 1,
-                      borderRadius: 1,
-                      flex: 1,
-                      minWidth: '120px'
-                    }}
-                  >
-                    <Typography 
-                      sx={{ 
-                        fontSize: getScaledFontSize(fontSizes.h6),
-                        fontWeight: 'bold',
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        textAlign: 'center'
-                      }}
-                    >
-                      Date
-                    </Typography>
-                    <Typography sx={{ 
-                      fontSize: getScaledFontSize(fontSizes.h5), 
-                      textAlign: 'center',
-                      color: '#FFFFFF',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-                    }}>
-                      {new Date(currentItem.startDate).toLocaleDateString(undefined, {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </Typography>
-                  </Box>
-                )}
-                
-                {(currentItem.location || currentItem.startDate) && (
-                  <Box
-                    sx={{
-                      backdropFilter: 'blur(5px)',
-                      background: 'rgba(255, 255, 255, 0.05)', // More translucent
-                      p: 1,
-                      borderRadius: 1,
-                      flex: 1,
-                      minWidth: '120px'
-                    }}
-                  >
-                    <Typography 
-                      sx={{ 
-                        fontSize: getScaledFontSize(fontSizes.h6),
-                        fontWeight: 'bold',
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        textAlign: 'center'
-                      }}
-                    >
-                      {currentItem.location ? 'Location' : 'Time'}
-                    </Typography>
-                    <Typography sx={{ 
-                      fontSize: getScaledFontSize(fontSizes.h5), 
-                      textAlign: 'center',
-                      color: '#FFFFFF',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-                    }}>
-                      {currentItem.location || (
-                        currentItem.startDate && new Date(currentItem.startDate).toLocaleTimeString(undefined, {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })
-                      )}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-        );
-      }
-      
-      // For ASMA_AL_HUSNA type
-      if (currentItem.type === 'ASMA_AL_HUSNA') {
-        let displayContent = currentItem.content;
-        let nameToDisplay = null;
-        let arabicText = '';
-        let transliteration = '';
-        let meaning = '';
+            width: '100%'
+          }}
+        >
+          <Typography variant="h6">Invalid content item</Typography>
+        </Box>
+      );
+    }
+
+    const contentType = currentItem.contentItem.type || 'CUSTOM';
+    const typeConfig = getCurrentTypeConfig(contentType);
+
+    // Define which title to show
+    let titleToShow = currentItem.contentItem.title || typeConfig.title;
+    let titleGradient = typeConfig.titleColor;
+    
+    // Get content
+    let contentToShow: string;
+    
+    // Format content based on type
+    switch (contentType) {
+      case 'VERSE_HADITH':
+        contentToShow = formatVerseHadithContent(currentItem.contentItem.content);
+        break;
         
-        // Enhanced structure handling for different API formats
-        // Case 1: selectedNames array format (new format)
-        if (displayContent?.selectedNames && Array.isArray(displayContent.selectedNames) && displayContent.selectedNames.length > 0) {
-          const nameIndex = 0; // Default to first item
-          nameToDisplay = displayContent.selectedNames[nameIndex];
-          arabicText = nameToDisplay?.arabic || '';
-          transliteration = nameToDisplay?.transliteration || '';
-          meaning = nameToDisplay?.meaning || nameToDisplay?.translation || '';
+      case 'ANNOUNCEMENT':
+        if (typeof currentItem.contentItem.content === 'object' && currentItem.contentItem.content.text) {
+          contentToShow = currentItem.contentItem.content.text;
+        } else {
+          contentToShow = typeof currentItem.contentItem.content === 'string' 
+            ? currentItem.contentItem.content
+            : 'No announcement text';
         }
-        // Case 2: nameDetails array format (old format) 
-        else if (displayContent?.nameDetails && Array.isArray(displayContent.nameDetails) && displayContent.nameDetails.length > 0) {
-          const nameIndex = 0; // Default to first item
-          nameToDisplay = displayContent.nameDetails[nameIndex];
-          arabicText = nameToDisplay?.arabic || '';
-          transliteration = nameToDisplay?.transliteration || '';
-          meaning = nameToDisplay?.meaning || nameToDisplay?.translation || '';
-        } 
-        // Case 3: Direct array format
-        else if (Array.isArray(displayContent)) {
-          const nameIndex = 0; // Use first item instead of random for consistency
-          nameToDisplay = displayContent[nameIndex];
-          arabicText = nameToDisplay?.arabic || '';
-          transliteration = nameToDisplay?.transliteration || '';
-          meaning = nameToDisplay?.meaning || nameToDisplay?.translation || '';
-        }
-        // Case 4: Direct object format
-        else if (typeof displayContent === 'object' && displayContent !== null) {
-          arabicText = displayContent.arabic || displayContent.arabicText || '';
-          transliteration = displayContent.transliteration || '';
-          meaning = displayContent.meaning || displayContent.translation || '';
-        }
+        break;
         
-        return (
-          <Box sx={{ 
-            textAlign: 'center', 
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            p: screenSize.is720p ? 1 : 2,
-            // No background color to maintain glassmorphic effect
-          }}>
-            {arabicText && (
-              <Typography 
-                sx={{ 
-                  fontSize: getDynamicFontSize(arabicText, 'arabic'),
-                  mb: 1,
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  fontFamily: 'Scheherazade New, Arial',
-                  color: '#FFFFFF',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
-                }}
-              >
-                <MemoizedFormattedText text={arabicText} />
-              </Typography>
-            )}
-            
-            {transliteration && (
-              <Typography 
-                sx={{ 
-                  fontSize: getDynamicFontSize(transliteration, 'normal'),
-                  mb: 1,
-                  textAlign: 'center',
-                  fontWeight: 'medium',
-                  color: '#FFFFFF',
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
-                }}
-              >
-                <MemoizedFormattedText text={transliteration} />
-              </Typography>
-            )}
-            
-            {meaning && (
-              <Typography 
-                sx={{ 
-                  fontSize: getDynamicFontSize(meaning, 'normal'),
-                  textAlign: 'center',
-                  whiteSpace: 'pre-line',
-                  color: '#FFFFFF', 
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
-                }}
-              >
-                <MemoizedFormattedText text={meaning} />
-              </Typography>
-            )}
-          </Box>
-        );
-      }
-      
-      // For VERSE_HADITH type
-      if (currentItem.type === 'VERSE_HADITH') {
-        let arabicText = '';
-        let englishText = '';
-        let reference = currentItem.content?.reference || currentItem.reference || '';
-        let grade = currentItem.content?.grade || '';
-        let isHadith = reference?.toLowerCase().includes('hadith') || grade || 
-                      (currentItem.title && currentItem.title.toLowerCase().includes('hadith'));
+      case 'EVENT':
+        // Format event content with date/time
+        const description = typeof currentItem.contentItem.content === 'string' 
+          ? currentItem.contentItem.content 
+          : (currentItem.contentItem.content?.description || 'No event description');
         
-        // Update the title based on hadith detection
-        if (isHadith) {
-          titleToShow = 'Hadith of the Day';
-          titleGradient = contentTypeConfig['HADITH'].titleColor;
-        }
-        
-        // Parse content based on its format
-        if (typeof currentItem.content === 'string') {
-          englishText = currentItem.content;
-        } else if (currentItem.content?.text) {
-          englishText = currentItem.content.text;
-        } else if (currentItem.content?.arabic && currentItem.content?.translation) {
-          arabicText = currentItem.content.arabic;
-          englishText = currentItem.content.translation;
-        } else if (typeof currentItem.content === 'object') {
-          // Handle JSON format
+        let eventDetails = '';
+        if (currentItem.startDate) {
           try {
-            const contentObj = currentItem.content;
-            arabicText = contentObj.arabicText || contentObj.arabic || '';
-            englishText = contentObj.translation || contentObj.text || JSON.stringify(contentObj);
-            grade = contentObj.grade || grade;
-            reference = contentObj.reference || reference;
+            const startDate = new Date(currentItem.startDate);
+            const formattedDate = startDate.toLocaleDateString(undefined, {
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric'
+            });
+            const formattedTime = startDate.toLocaleTimeString(undefined, {
+              hour: 'numeric', 
+              minute: '2-digit'
+            });
+            eventDetails = `${formattedDate} at ${formattedTime}`;
+            
+            if (currentItem.location) {
+              eventDetails += `\nLocation: ${currentItem.location}`;
+            }
           } catch (e) {
-            console.error('Error parsing VERSE_HADITH content:', e);
-            englishText = JSON.stringify(currentItem.content);
+            console.error('Error formatting event date:', e);
           }
         }
         
-        return (
-          <Box sx={{ 
-            textAlign: 'center', 
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            p: screenSize.is720p ? 1 : 2,
-            overflow: 'auto',
-            // No background color to maintain glassmorphic effect
-          }}>
-            {arabicText && (
-              <Typography 
-                sx={{ 
-                  fontSize: getDynamicFontSize(arabicText, 'arabic'),
-                  mb: 2,
-                  textAlign: 'center',
-                  fontFamily: 'Scheherazade New, Arial',
-                  direction: 'rtl',
-                  lineHeight: 1.7,
-                  color: '#FFFFFF',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Enhanced shadow for better readability
-                }}
-              >
-                <MemoizedFormattedText text={arabicText} />
-              </Typography>
-            )}
-            
-            <Typography 
-              sx={{ 
-                fontSize: getDynamicFontSize(englishText, 'normal'),
-                lineHeight: 1.4,
-                mb: 2,
-                textAlign: 'center',
-                whiteSpace: 'pre-line',
-                color: '#FFFFFF',
-                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' // Enhanced shadow for better readability
-              }}
-            >
-              <MemoizedFormattedText text={englishText} />
-            </Typography>
-            
-            <Typography 
-              sx={{ 
-                fontSize: getScaledFontSize(fontSizes.h6),
-                color: 'rgba(255, 255, 255, 0.85)',
-                mt: 1,
-                fontStyle: 'italic',
-                textAlign: 'center',
-                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
-              }}
-            >
-              {reference}{grade ? ` - ${grade}` : ''}
-            </Typography>
-          </Box>
-        );
-      }
-      
-      // For ANNOUNCEMENT type
-      if (currentItem.type === 'ANNOUNCEMENT') {
-        let announcementText = '';
+        contentToShow = eventDetails ? `${description}\n\n${eventDetails}` : description;
+        break;
         
-        // Parse content based on its format
-        if (typeof currentItem.content === 'string') {
-          announcementText = currentItem.content;
-        } else if (currentItem.content?.text) {
-          announcementText = currentItem.content.text;
-        } else if (typeof currentItem.content === 'object') {
-          announcementText = JSON.stringify(currentItem.content);
+      case 'ASMA_AL_HUSNA':
+        // Format Names of Allah content
+        const content = currentItem.contentItem.content;
+        const name = content.name || content.arabic || '';
+        const transliteration = content.transliteration || '';
+        const meaning = content.meaning || '';
+        
+        // Add better spacing and formatting for Names of Allah
+        const formattedName = name ? `${name}` : '';
+        const formattedTransliteration = transliteration ? `${transliteration}` : '';
+        const formattedMeaning = meaning ? `"${meaning}"` : '';
+        
+        // Filter out empty parts and join with newlines
+        contentToShow = [formattedName, formattedTransliteration, formattedMeaning]
+          .filter(part => part)
+          .join('\n\n');
+        break;
+        
+      default:
+        // Default handling for other content types
+        if (typeof currentItem.contentItem.content === 'string') {
+          contentToShow = currentItem.contentItem.content;
+        } else if (currentItem.contentItem.content && typeof currentItem.contentItem.content === 'object') {
+          try {
+            if (currentItem.contentItem.content.text) {
+              contentToShow = currentItem.contentItem.content.text;
+            } else {
+              const contentParts = [];
+              if (currentItem.contentItem.content.title) contentParts.push(currentItem.contentItem.content.title);
+              if (currentItem.contentItem.content.description) contentParts.push(currentItem.contentItem.content.description);
+              if (currentItem.contentItem.content.details) contentParts.push(currentItem.contentItem.content.details);
+              
+              contentToShow = contentParts.length > 0 
+                ? contentParts.join('\n\n')
+                : JSON.stringify(currentItem.contentItem.content, null, 2);
+            }
+          } catch (e) {
+            contentToShow = 'Error displaying content';
+            console.error('Error formatting content object:', e);
+          }
+        } else {
+          contentToShow = 'No content available';
         }
-        
-        const isUrgent = currentItem.urgent === true;
-        
-        // Get optimal font size based on text length
-        const getOptimalFontSize = (text: string): string => {
-          const length = text.length;
-          const lines = text.split('\n').length;
-          
-          if (length < 50) return getScaledFontSize(fontSizes.h2);
-          if (length < 100) return getScaledFontSize(fontSizes.h3);
-          if (length < 200) return getScaledFontSize(fontSizes.h4);
-          if (length < 400) return getScaledFontSize(fontSizes.h5);
-          return getScaledFontSize(fontSizes.h6);
-        };
-        
-        return (
-          <Box sx={{ 
-            textAlign: 'center', 
-            width: '100%',
-            height: '100%',
+    }
+    
+    const fontSize = getDynamicFontSize(String(contentToShow), contentType);
+    
+    return (
+      <GlassmorphicContentCardWrapper
+        title={titleToShow}
+        titleGradient={titleGradient}
+        content={contentToShow}
+        fontSize={fontSize}
+        variant={variant || 'landscape'}
+        itemType={contentType}
+      />
+    );
+  }, [contentItems, currentItemIndex, contentLoading, getCurrentTypeConfig, getDynamicFontSize, variant, formatVerseHadithContent]);
+
+  // Render prayer announcement
+  const renderPrayerAnnouncement = useCallback(() => {
+    if (!showPrayerAnnouncement) return null;
+    
+    // Set up announcement configuration based on prayer and whether it's time for jamaat
+    const config: AnnouncementConfig = {
+      prayerName: prayerAnnouncementName,
+      title: isPrayerJamaat ? "Prayer Time" : "Prayer Time",
+      subtitle: isPrayerJamaat ? "Jamaat is starting now" : "Adhan is being called",
+      description: isPrayerJamaat 
+        ? "Please proceed to prayer area" 
+        : "Please prepare for prayer",
+      color: isPrayerJamaat ? "#4caf50" : "#2196f3",
+      variant: isPrayerJamaat ? "jamaat" : "adhan"
+    };
+    
+    return (
+      <Fade in={showPrayerAnnouncement} timeout={{ enter: 500, exit: 300 }}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             display: 'flex',
             flexDirection: 'column',
+            alignItems: 'center',
             justifyContent: 'center',
-            p: screenSize.is720p ? 2 : 3,
-          }}>
-            <Typography 
-              sx={{ 
-                fontSize: getOptimalFontSize(announcementText),
-                lineHeight: 1.4,
-                textAlign: 'center',
-                fontWeight: announcementText.length > 150 ? 'normal' : 'bold',
-                whiteSpace: 'pre-line',
-                color: '#FFFFFF',
-                textShadow: '0 1px 3px rgba(0, 0, 0, 0.35)',
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <MemoizedFormattedText text={announcementText} />
-            </Typography>
-          </Box>
-        );
-      }
-      
-      // Default for any other content type
-      return (
-        <Box sx={{ 
-          textAlign: 'center', 
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          p: screenSize.is720p ? 1 : 2,
-          // No background color to maintain glassmorphic effect
-        }}>
-          <Typography 
-            sx={{ 
-              fontSize: getDynamicFontSize(
-                typeof currentItem.content === 'string' 
-                  ? currentItem.content 
-                  : currentItem.content?.text || JSON.stringify(currentItem.content),
-                'normal'
-              ),
-              lineHeight: 1.5,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 20,
+            p: 3,
+            borderRadius: 2,
+          }}
+        >
+          <Box
+            sx={{
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
               textAlign: 'center',
-              whiteSpace: 'pre-line',
-              color: '#FFFFFF',
-              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)' // Add text shadow for better readability
+              maxWidth: '80%',
             }}
           >
-            <MemoizedFormattedText text={
-              typeof currentItem.content === 'string' 
-                ? currentItem.content 
-                : currentItem.content?.text || JSON.stringify(currentItem.content)
-            } />
-          </Typography>
+            <Typography
+              variant="h3"
+              sx={{
+                fontSize: fontSizes.h1,
+                fontWeight: 'bold',
+                mb: 2,
+                color: 'white',
+                textShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              {config.prayerName} {config.title}
+            </Typography>
+            
+            <Typography
+              variant="h5"
+              sx={{
+                fontSize: fontSizes.h3,
+                mb: 3,
+                color: config.color,
+                textShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              {config.subtitle}
+            </Typography>
+            
+            <Box 
+              sx={{ 
+                mb: 4,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '100%'
+              }}
+            >
+              <PrayerRowsIcon 
+                style={{ 
+                  width: variant === 'portrait' ? '180px' : '250px', 
+                  height: 'auto',
+                  fill: config.color,
+                  filter: 'drop-shadow(0 0 10px rgba(0, 0, 0, 0.3))'
+                }} 
+              />
+            </Box>
+            
+            <Typography
+              variant="h6"
+              sx={{
+                fontSize: fontSizes.h4,
+                color: 'white',
+                opacity: 0.9,
+                maxWidth: '600px',
+                textShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              {config.description}
+            </Typography>
+          </Box>
         </Box>
-      );
-    } catch (error) {
-      console.error('Error rendering content:', error);
-      return (
-        <Typography sx={{ fontSize: getScaledFontSize(fontSizes.h4), textAlign: 'center', color: 'error.main' }}>
-          Error displaying content
-        </Typography>
-      );
-    }
-  }, [contentLoading, currentItemIndex, getCurrentTypeConfig, variant, fontSizes, screenSize]);
+      </Fade>
+    );
+  }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat, fontSizes, variant]);
 
-  // Memoize the entire content display to reduce re-renders
-  const contentDisplay = useMemo(() => {
-    return renderContent();
-  }, [renderContent]);
-  
-  // Update loading state based on content and isLoading
+  // Handle orientation change
   useEffect(() => {
-    // Keep showing loading until we've checked IndexedDB and have either loaded content or API loading is complete
-    if (contentItems.length > 0) {
-      // If we have content items, we're no longer loading
-      setContentLoading(false);
-    } else if (!isLoading && hasCheckedLocalStorage) {
-      // Only stop loading if we've checked IndexedDB and API loading is complete
-      setContentLoading(false);
-    }
-  }, [contentItems.length, isLoading, hasCheckedLocalStorage]);
-  
-  // Force a reload if content is empty after initial load
-  useEffect(() => {
-    // Wait until loading is complete and check if we actually have content
-    if (!isLoading && !contentItems.length && hasRefreshedRef.current && hasCheckedLocalStorage) {
-      // Set a short timeout to prevent immediate reloading
-      const timeoutId = setTimeout(() => {
-        // Try to refresh the schedule
-        refreshSchedule().catch((error: unknown) => {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error('Failed to reload schedule:', { 
-            error: errorMessage 
-          });
-        });
-      }, 1000);
+    if (orientation !== lastOrientationRef.current) {
+      // Reset timer when orientation changes
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       
-      return () => clearTimeout(timeoutId);
+      lastOrientationRef.current = orientation;
+      logger.debug('ContentCarousel: Orientation changed, resetting timer');
     }
-  }, [isLoading, contentItems.length, refreshSchedule, hasCheckedLocalStorage]);
+  }, [orientation]);
+
+  // Main content display
+  const contentDisplay = useMemo(() => {
+    // Skip rendering entirely if we have a prayer announcement
+    if (showPrayerAnnouncement) {
+      return renderPrayerAnnouncement();
+    }
+    
+    // Otherwise show normal content
+    return (
+      <Fade in={!isChangingItem} timeout={{ enter: 800, exit: 400 }}>
+        <Box
+          sx={{ 
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'relative',
+            padding: 0 // Remove padding to maintain original dimensions
+          }}
+        >
+          {renderContent()}
+        </Box>
+      </Fade>
+    );
+  }, [isChangingItem, renderContent, renderPrayerAnnouncement, showPrayerAnnouncement]);
   
   return (
-    <Box
-      sx={{
+    <Box 
+      sx={{ 
         width: '100%',
-        height: '100%',
+        height: '100%', // Maintain original height
         overflow: 'hidden',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 0 // Remove padding to maintain original dimensions
       }}
     >
       {contentDisplay}
@@ -1257,4 +845,4 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 };
 
 // Export as memoized component to prevent unnecessary re-renders
-export default memo(ContentCarousel); 
+export default ContentCarousel; 

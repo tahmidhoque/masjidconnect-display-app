@@ -95,8 +95,18 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Process the prayer times data only if we need to (time has changed)
       if (prayerTimes && !calculationsRef.current.isProcessing) {
         processPrayerTimes();
+      } else if (!prayerTimes && !calculationsRef.current.isProcessing) {
+        // If no prayer times data, try to refresh
+        logger.warn("No prayer times data available, requesting refresh");
+        refreshPrayerTimes();
       }
     }, 60000); // Every minute
+
+    // Perform an immediate check for prayer times data
+    if (!prayerTimes) {
+      logger.info("Immediate check: No prayer times data available, requesting refresh");
+      refreshPrayerTimes();
+    }
 
     return () => {
       clearInterval(minuteInterval);

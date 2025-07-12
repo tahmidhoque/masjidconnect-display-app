@@ -6,7 +6,7 @@ import logger from '../utils/logger';
  * Custom hook to handle kiosk mode-specific behaviors
  * 
  * This hook ensures that an Electron app running in kiosk mode stays responsive
- * and refreshes content automatically, even when there's no user interaction.
+ * and refreshes content periodically, but avoids unnecessary refreshes that cause flashing.
  */
 export const useKioskMode = () => {
   const { refreshPrayerTimes, refreshContent, prayerTimes } = useContent();
@@ -15,16 +15,32 @@ export const useKioskMode = () => {
   // Track initialization state
   const initializedRef = useRef<boolean>(false);
   
-  // Function to refresh all data
+  // Function to refresh all data - with smoother refresh to avoid flashing
   const refreshData = useCallback(async () => {
     try {
-      logger.info('[KioskMode] Refreshing data...');
-      await Promise.all([
-        refreshPrayerTimes(),
-        refreshContent(true) // Force refresh content
-      ]);
-      logger.info('[KioskMode] Data refreshed successfully');
-      lastRefreshTimeRef.current = Date.now();
+      const currentTime = Date.now();
+      const timeSinceLastRefresh = currentTime - lastRefreshTimeRef.current;
+      
+      // Don't refresh if it's been less than 2 minutes since last refresh
+      if (timeSinceLastRefresh < 2 * 60 * 1000) {
+        logger.info('[KioskMode] Skipping refresh - last refresh was less than 2 minutes ago');
+        return;
+      }
+      
+      logger.info('[KioskMode] Refreshing data gently...');
+      
+      // Stagger the refreshes to prevent both happening at once, which causes flashing
+      // First refresh prayer times
+      await refreshPrayerTimes();
+      
+      // Wait a moment before refreshing content
+      setTimeout(async () => {
+        // Use regular refresh instead of force refresh to avoid full remount
+        await refreshContent(false);
+        logger.info('[KioskMode] Data refreshed successfully');
+      }, 5000);
+      
+      lastRefreshTimeRef.current = currentTime;
     } catch (error) {
       logger.error('[KioskMode] Error refreshing data:', error as Record<string, any>);
     }
@@ -33,8 +49,11 @@ export const useKioskMode = () => {
   // Handle visibility change (tab focus/blur)
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
-      logger.info('[KioskMode] App became visible, refreshing data...');
-      refreshData();
+      logger.info('[KioskMode] App became visible, scheduling refresh...');
+      // Delay refresh slightly to prevent immediate flash when switching tabs
+      setTimeout(() => {
+        refreshData();
+      }, 2000);
     }
   }, [refreshData]);
 
@@ -47,36 +66,35 @@ export const useKioskMode = () => {
     
     // Add event listeners for visibility and focus
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', refreshData);
     
-    // Initial refresh
-    refreshData();
+    // Initial refresh with a slight delay
+    setTimeout(() => {
+      refreshData();
+    }, 5000);
     
     // Set up a backup polling mechanism
-    // This will check every minute if we haven't refreshed in 5 minutes
+    // This will check every 10 minutes if we haven't refreshed in 30 minutes
     const backupInterval = setInterval(() => {
-      const fiveMinutesMs = 5 * 60 * 1000;
+      const thirtyMinutesMs = 30 * 60 * 1000;
       const timeSinceLastRefresh = Date.now() - lastRefreshTimeRef.current;
       
-      if (timeSinceLastRefresh > fiveMinutesMs) {
-        logger.info('[KioskMode] Backup polling: No refresh in 5 minutes, triggering refresh');
+      if (timeSinceLastRefresh > thirtyMinutesMs) {
+        logger.info('[KioskMode] Backup polling: No refresh in 30 minutes, triggering refresh');
         refreshData();
       }
-    }, 60 * 1000); // Check every minute
+    }, 10 * 60 * 1000); // Check every 10 minutes
     
-    // For Electron kiosk mode where visibility might not change,
-    // simulate a visibility change every 15 minutes to force refresh
-    const kioskRefreshInterval = setInterval(() => {
-      logger.info('[KioskMode] Periodic kiosk refresh triggered');
+    // For data updates, use smaller interval but don't reload the page
+    const dataRefreshInterval = setInterval(() => {
+      logger.info('[KioskMode] Periodic data refresh triggered');
       refreshData();
-    }, 15 * 60 * 1000); // Every 15 minutes
+    }, 30 * 60 * 1000); // Every 30 minutes
     
     return () => {
       // Clean up all event listeners and intervals
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', refreshData);
       clearInterval(backupInterval);
-      clearInterval(kioskRefreshInterval);
+      clearInterval(dataRefreshInterval);
     };
   }, [refreshData, handleVisibilityChange]);
   

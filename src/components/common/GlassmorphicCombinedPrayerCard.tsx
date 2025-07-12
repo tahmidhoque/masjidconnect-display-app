@@ -302,39 +302,45 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
   
   // Early return with loading state
   if (isLoading || localLoading || isRetrying) {
-    return (
-      <GlassmorphicCard
-        opacity={0.2}
-        blurIntensity={8}
-        borderRadius={4}
-        borderWidth={1}
-        borderOpacity={0.3}
-        borderColor={theme.palette.warning.main}
-        shadowIntensity={0.35}
-        sx={{
-          width: '100%',
-          height: '100%',
-          color: '#fff',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
-        }}
-      >
-        <CircularProgress color="warning" size={40} thickness={4} />
-        <Typography 
-          sx={{ 
-            mt: 2, 
-            fontSize: fontSizes.h6,
-            fontWeight: 600,
-            textAlign: 'center'
+    // Important fix: if we have the data already, show it instead of the loading spinner
+    if (nextPrayer && todaysPrayerTimes.length > 0) {
+      setLocalLoading(false);
+      // Immediately exit the loading state condition
+    } else {
+      return (
+        <GlassmorphicCard
+          opacity={0.2}
+          blurIntensity={8}
+          borderRadius={4}
+          borderWidth={1}
+          borderOpacity={0.3}
+          borderColor={theme.palette.warning.main}
+          shadowIntensity={0.35}
+          sx={{
+            width: '100%',
+            height: '100%',
+            color: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.7)} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
           }}
         >
-          Loading Prayer Times...
-        </Typography>
-      </GlassmorphicCard>
-    );
+          <CircularProgress color="warning" size={40} thickness={4} />
+          <Typography 
+            sx={{ 
+              mt: 2, 
+              fontSize: fontSizes.h6,
+              fontWeight: 600,
+              textAlign: 'center'
+            }}
+          >
+            Loading Prayer Times...
+          </Typography>
+        </GlassmorphicCard>
+      );
+    }
   }
   
   // Fallback for when retries are exhausted but still no data
@@ -479,27 +485,30 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
         
         {/* Prayer Times Section */}
         <Box sx={{ 
-          p: isPortrait ? getSizeRem(0.8) : getSizeRem(0.8),
-          pt: isPortrait ? getSizeRem(0.8) : getSizeRem(0.8),
+          px: isPortrait ? getSizeRem(0.8) : getSizeRem(0.8),
+          pt: isPortrait ? getSizeRem(0.8) : getSizeRem(0.6),
+          pb: isPortrait ? getSizeRem(0.6) : getSizeRem(0.3),
           position: 'relative',
           zIndex: 1,
-          flex: 1, // Flexbox to expand and fill available space
+          flex: 1, 
           display: 'flex',
           flexDirection: 'column',
-          overflowY: 'hidden', // Always allow scrolling if needed
+          overflow: 'hidden', // Prevent overflow entirely
+          // Use space-evenly for more even distribution
+          justifyContent: 'space-evenly',
         }}>
           {/* Headers */}
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr 1fr',
-              mb: getSizeRem(0.4),
+              mb: getSizeRem(0.2),
               ...commonPadding,
               backgroundColor: alpha(theme.palette.info.main, 0.25), // Sky blue header
               borderRadius: '6px',
               border: 'none',
               alignItems: 'center', // Vertically center content
-              height: rowHeight,
+              height: isPortrait ? getSizeRem(2.4) : getSizeRem(2.2), // Adjusted height for headers
             }}
           >
             <Typography 
@@ -516,7 +525,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
                 height: '100%',
               }}
             >
-              Start Time
+              Prayer
             </Typography>
             <Typography 
               sx={{ 
@@ -533,7 +542,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
                 height: '100%',
               }}
             >
-              Prayer
+              Start Time
             </Typography>
             <Typography 
               sx={{ 
@@ -554,160 +563,108 @@ const GlassmorphicCombinedPrayerCard: React.FC<GlassmorphicCombinedPrayerCardPro
             </Typography>
           </Box>
           
-          {/* Prayer Time Rows */}
+          {/* Prayer Time Rows Container */}
           <Box sx={{ 
-            flex: 1, 
             display: 'flex', 
-            flexDirection: 'column', 
-            justifyContent: 'space-between',
-            gap: 0, // No gap between rows
-            backgroundImage: 'none', // Remove the background pattern
-            mt: getSizeRem(0.2),
-            pb: getSizeRem(0.2),
+            flexDirection: 'column',
+            justifyContent: 'space-evenly', // Even spacing
+            overflow: 'visible', // Allow visibility for highlighting/growth
+            position: 'relative',
+            height: '100%', // Take full height
+            pb: getSizeRem(0.2), // Bottom padding
           }}>
             {todaysPrayerTimes.map((prayer, index) => (
               <Box key={prayer.name} 
                 sx={{ 
-                  mb: getSizeRem(0.3), // Add spacing between rows
+                  flexShrink: 0, // Prevent shrinking
                   transition: 'all 0.3s ease',
                   zIndex: prayer.isNext ? 5 : 1,
+                  mb: getSizeRem(0.1), // Reduced margin between rows
                 }}
               >
                 <Box
                   sx={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr 1fr',
-                    ...commonPadding,
-                    borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '4px',
+                    px: getSizeRem(0.8), // Reduce horizontal padding
+                    py: getSizeRem(0.3), // Increase vertical padding slightly
+                    borderRadius: prayer.isNext || prayer.isCurrent ? '6px' : '4px',
                     backgroundColor: getPrayerBackgroundColor(prayer),
                     transition: 'all 0.3s ease',
                     position: 'relative',
                     overflow: 'hidden',
                     border: getPrayerBorder(prayer),
-                    boxShadow: prayer.isNext ? `0 2px 12px ${alpha(theme.palette.warning.main, 0.35)}` : 'none', // Add shadow for next prayer
-                    height: rowHeight,
+                    boxShadow: prayer.isNext ? `0 2px 12px ${alpha(theme.palette.warning.main, 0.35)}` : 'none',
+                    height: isPortrait ? getSizeRem(2.2) : getSizeRem(2.0), // Adjusted row height
                     alignItems: 'center', // Vertically center content
-                    animation: prayer.isNext ? 'subtlePulse 3s infinite ease-in-out' : 'none', // Add pulse animation for next prayer
+                    transform: 'scale(1)', // Default scale
+                    '&:hover': {
+                      transform: 'scale(1.01)', // Subtle scale on hover
+                    },
                   }}
                 >
-                  <Box 
-                    sx={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      height: '100%',
-                      gap: getSizeRem(0.5),
-                    }}
-                  >
-                    <Typography 
-                      sx={{ 
-                        fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
-                        fontWeight: (prayer.isNext || prayer.isCurrent || (prayer.name === 'Zuhr' && isJumuahToday && hasJumuahData)) ? 700 : 600,
-                        color: prayer.isNext 
-                          ? theme.palette.warning.light
-                          : prayer.name === 'Zuhr' && isJumuahToday && hasJumuahData
-                          ? theme.palette.warning.light
-                          : '#ffffff',
-                        fontFamily: "'Poppins', sans-serif",
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
-                        textAlign: 'start',
-                      }}
-                    >
-                      {prayer.name === 'Zuhr' && isJumuahToday && hasJumuahData && jumuahKhutbahTime 
-                        ? jumuahKhutbahTime
-                        : prayer.displayTime}
-                    </Typography>
-                    
-                    {prayer.name === 'Zuhr' && isJumuahToday && (
-                      <GlassmorphicCard
-                        opacity={0.15}
-                        blurIntensity={6}
-                        borderRadius={8}
-                        borderWidth={1}
-                        borderOpacity={0.3}
-                        borderColor={theme.palette.warning.main}
-                        shadowIntensity={0.2}
-                        sx={{ 
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          px: getSizeRem(0.6),
-                          py: getSizeRem(0.1),
-                          background: `linear-gradient(135deg, ${alpha(theme.palette.warning.dark, 0.4)} 0%, ${alpha(theme.palette.warning.main, 0.4)} 100%)`,
-                        }}
-                      >
-                        <Typography sx={{ 
-                          fontSize: fontSizes.caption,
-                          color: theme.palette.warning.light,
-                          fontWeight: 700,
-                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
-                        }}>
-                          Khutbah
-                        </Typography>
-                      </GlassmorphicCard>
-                    )}
-                  </Box>
-                  
-                  <Typography 
-                    sx={{ 
-                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
-                      textAlign: 'center',
-                      fontWeight: prayer.isNext || (prayer.name === 'Zuhr' && isJumuahToday && hasJumuahData) ? 700 : 600,
+                  {/* Prayer Name - First column */}
+                  <Typography
+                    sx={{
+                      fontWeight: 'bold',
+                      fontSize: isPortrait ? fontSizes.body2 : fontSizes.small, // Use existing font size
                       fontFamily: "'Poppins', sans-serif",
-                      color: '#ffffff',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                      letterSpacing: '0.2px',
+                      color: prayer.isNext || prayer.isCurrent ? '#fff' : '#f0f0f0',
+                      textShadow: prayer.isNext || prayer.isCurrent ? '0 1px 2px rgba(0,0,0,0.5)' : 'none',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: isPortrait ? getSizeRem(1) : getSizeRem(0.8), // Increased gap for Jumu'ah tag
                       height: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {prayer.name}
-                    {prayer.name === 'Zuhr' && isJumuahToday && (
-                      <GlassmorphicCard
-                        opacity={0.15}
-                        blurIntensity={6}
-                        borderRadius={8}
-                        borderWidth={1}
-                        borderOpacity={0.3}
-                        borderColor={theme.palette.warning.main}
-                        shadowIntensity={0.2}
-                        sx={{ 
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          px: getSizeRem(0.6),
-                          py: getSizeRem(0.1),
-                          background: `linear-gradient(135deg, ${alpha(theme.palette.warning.dark, 0.4)} 0%, ${alpha(theme.palette.warning.main, 0.4)} 100%)`,
-                        }}
-                      >
-                        <Typography sx={{ 
-                          fontSize: fontSizes.caption,
-                          color: theme.palette.warning.light,
-                          fontWeight: 700,
-                          textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
-                        }}>
-                          Jumu'ah
-                        </Typography>
-                      </GlassmorphicCard>
-                    )}
                   </Typography>
-                  
-                  <Typography 
-                    sx={{ 
-                      fontSize: isPortrait ? fontSizes.h6 : fontSizes.body1,
-                      textAlign: 'end',
-                      fontWeight: prayer.isNext || (prayer.name === 'Zuhr' && isJumuahToday && hasJumuahData) ? 700 : 600,
-                      color: (prayer.displayJamaat || (prayer.name === 'Zuhr' && isJumuahToday && jumuahDisplayTime)) ? '#ffffff' : alpha('#ffffff', 0.5),
+
+                  {/* Prayer Time - Second column */}
+                  <Typography
+                    sx={{
+                      fontWeight: prayer.isNext || prayer.isCurrent ? 'bold' : 'normal',
+                      fontSize: isPortrait ? fontSizes.body2 : fontSizes.small, // Use existing font size
                       fontFamily: "'Poppins', sans-serif",
-                      textShadow: (prayer.displayJamaat || (prayer.name === 'Zuhr' && isJumuahToday && jumuahDisplayTime)) ? '0 1px 2px rgba(0, 0, 0, 0.3)' : 'none',
+                      textAlign: 'center',
+                      color: prayer.isNext || prayer.isCurrent ? '#fff' : '#f0f0f0',
+                      textShadow: prayer.isNext || prayer.isCurrent ? '0 1px 2px rgba(0,0,0,0.5)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {prayer.displayTime}
+                  </Typography>
+
+                  {/* Jamaat Time - Third column */}
+                  <Typography
+                    sx={{
+                      fontWeight: prayer.displayJamaat ? (prayer.isNext || prayer.isCurrent ? 'bold' : 'normal') : 'normal',
+                      fontSize: isPortrait ? fontSizes.body2 : fontSizes.small, // Use existing font size
+                      opacity: prayer.displayJamaat ? 1 : 0.7,
+                      fontStyle: prayer.displayJamaat ? 'normal' : 'italic',
+                      textAlign: 'right',
+                      fontFamily: "'Poppins', sans-serif",
+                      color: prayer.isNext || prayer.isCurrent ? '#fff' : '#f0f0f0',
+                      textShadow: prayer.isNext || prayer.isCurrent ? '0 1px 2px rgba(0,0,0,0.5)' : 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'flex-end',
                       height: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {prayer.name === 'Zuhr' && isJumuahToday && jumuahDisplayTime ? jumuahDisplayTime : prayer.displayJamaat || 'N/A'}
+                    {prayer.displayJamaat || 'N/A'}
                   </Typography>
                 </Box>
               </Box>

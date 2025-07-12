@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu, protocol } = require('electron');
 const path = require('path');
 const url = require('url');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
+const fs = require('fs');
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -11,29 +12,29 @@ log.info('App starting...');
 // Performance optimization flags - optimized for Raspberry Pi
 log.info('Setting up performance optimizations for Raspberry Pi');
 
-// Improve performance on low-powered devices like Raspberry Pi
-app.commandLine.appendSwitch('disable-smooth-scrolling');  // Disable smooth scrolling
-app.commandLine.appendSwitch('disable-gpu-vsync');  // Can improve frame rates by disabling vsync
-app.commandLine.appendSwitch('disable-reading-from-canvas');  // Avoid expensive canvas operations
-app.commandLine.appendSwitch('disable-accelerated-video-decode');  // Disable video hardware acceleration
-app.commandLine.appendSwitch('disable-compositor-animation-timelines');  // Simpler animations
-app.commandLine.appendSwitch('disable-features', 'HardwareAcceleration,Vulkan');  // Disable hardware acceleration
-app.disableHardwareAcceleration();  // Explicitly disable hardware acceleration
+// Fully disable GPU features to prevent GpuControl.CreateCommandBuffer errors
+// app.disableHardwareAcceleration();
+// app.commandLine.appendSwitch('disable-gpu');
+// app.commandLine.appendSwitch('disable-gpu-compositing');
+// app.commandLine.appendSwitch('disable-gpu-rasterization');
+// app.commandLine.appendSwitch('disable-gpu-sandbox');
+// app.commandLine.appendSwitch('disable-software-rasterizer');
 
-// Use software rendering on Raspberry Pi - more reliable performance
-app.commandLine.appendSwitch('use-gl', 'swiftshader');
+// // Force software rendering
+// app.commandLine.appendSwitch('use-gl', 'swiftshader');
+// app.commandLine.appendSwitch('disable-direct-composition');
 
-// Limit resource usage to prevent overheating
-app.commandLine.appendSwitch('num-raster-threads', '2');  // Limit threads on RPi
-app.commandLine.appendSwitch('renderer-process-limit', '1');  // Limit processes
-app.commandLine.appendSwitch('max-active-webgl-contexts', '4');
+// // Disable other features that might depend on GPU
+// app.commandLine.appendSwitch('disable-smooth-scrolling');
+// app.commandLine.appendSwitch('disable-reading-from-canvas');
+// app.commandLine.appendSwitch('disable-accelerated-video-decode');
+// app.commandLine.appendSwitch('disable-accelerated-video-encode');
+// app.commandLine.appendSwitch('disable-accelerated-2d-canvas');
+// app.commandLine.appendSwitch('disable-webgl');
 
-// Use appropriate GL implementation for Raspberry Pi
-app.commandLine.appendSwitch('use-gl', 'desktop');  // Better for RPi
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
-
-// Explicitly enable hardware acceleration
-app.disableHardwareAcceleration = false;
+// Memory optimization
+// app.commandLine.appendSwitch('num-raster-threads', '1');
+// app.commandLine.appendSwitch('renderer-process-limit', '1');
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
@@ -42,71 +43,196 @@ let mainWindow;
 const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000;
 
 // Configure auto updater options
-autoUpdater.autoDownload = true;         // Download updates automatically
-autoUpdater.allowDowngrade = false;      // Prevent downgrading to older versions
-autoUpdater.allowPrerelease = false;     // Ignore pre-release versions
-autoUpdater.autoInstallOnAppQuit = true; // Install when app quits
+autoUpdater.autoDownload = false;      // Disable auto download for now
+autoUpdater.allowDowngrade = false;    // Prevent downgrading to older versions
+autoUpdater.allowPrerelease = false;   // Ignore pre-release versions
+autoUpdater.autoInstallOnAppQuit = false; // Don't auto install on quit
+
+// Find the best path for a resource
+function findResourcePath(resourcePath) {
+  const possibleBasePaths = [
+    path.join(app.getAppPath(), 'build'),
+    path.join(app.getAppPath(), 'resources', 'build'),
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'build'),
+    path.join(path.dirname(app.getPath('exe')), 'build'),
+    path.join(app.getAppPath())
+  ];
+
+  for (const basePath of possibleBasePaths) {
+    const fullPath = path.join(basePath, resourcePath);
+    if (fs.existsSync(fullPath)) {
+      log.info(`Found resource at: ${fullPath}`);
+      return fullPath;
+    }
+  }
+
+  // Fallback to electron directory
+  const electronPath = path.join(app.getAppPath(), 'electron', resourcePath);
+  if (fs.existsSync(electronPath)) {
+    log.info(`Found resource in electron dir: ${electronPath}`);
+    return electronPath;
+  }
+
+  log.warn(`Resource not found: ${resourcePath}`);
+  return null;
+}
+
+// Register protocol handler before app is ready
+app.whenReady().then(() => {
+  // Register protocol handler with better path resolution
+  protocol.registerFileProtocol('app', (request, callback) => {
+    const url = request.url.substr(6); // Remove 'app://'
+    
+    const resolvedPath = findResourcePath(url);
+    if (resolvedPath) {
+      callback({ path: resolvedPath });
+    } else {
+      // If no path exists, log error
+      log.error(`Protocol handler failed to resolve: ${url}`);
+      callback({ error: -2 /* net::FAILED */ });
+    }
+  });
+  
+  log.info('App ready, creating window');
+  
+  // Disable the application menu
+  Menu.setApplicationMenu(null);
+  
+  createWindow();
+  
+  // Setup scheduled update checks
+  setupUpdateChecks();
+  
+  app.on('activate', function () {
+    // On macOS it's common to re-create a window when the dock icon is clicked
+    if (mainWindow === null) {
+      log.info('Re-creating window (macOS activate)');
+      createWindow();
+    }
+  });
+});
 
 function createWindow() {
   log.info('Creating browser window...');
   
   // In development mode, explicitly use the dev server URL
   const isDev = process.env.ELECTRON_DEBUG === 'true';
-  const startUrl = isDev 
-    ? 'http://localhost:3001'
-    : url.format({
-        pathname: path.join(__dirname, '../build/index.html'),
-        protocol: 'file:',
-        slashes: true
-      });
   
-  log.info(`Running in ${isDev ? 'development' : 'production'} mode`);
-  log.info(`Will load: ${startUrl}`);
-
-  // Set up CSP for development
-  if (isDev) {
-    log.info('Setting up CSP for development environment');
-    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          'Content-Security-Policy': [
-            "default-src 'self' http://localhost:* ws://localhost:*; " +
-            "script-src 'self' 'unsafe-eval' 'unsafe-inline' http://localhost:*; " +
-            "style-src 'self' 'unsafe-inline'; " +
-            "font-src 'self'; " +
-            "connect-src 'self' ws://localhost:* http://localhost:* https://localhost:* http://localhost:3000 https://localhost:3000 https://*.masjidconnect.com https://api.aladhan.com; " +
-            "img-src 'self' data: https://*.masjidconnect.com;"
-          ]
+  // Get the app directory and ensure we can find our files
+  const appDirectory = app.getAppPath();
+  log.info(`App directory: ${appDirectory}`);
+  
+  // Log the contents of some key directories for debugging
+  const possibleBuildDirs = [
+    path.join(appDirectory, 'build'),
+    path.join(appDirectory, 'dist/build'),
+    path.join(path.dirname(app.getPath('exe')), 'build'),
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'build'),
+    path.join(appDirectory, 'resources', 'build')
+  ];
+  
+  for (const dir of possibleBuildDirs) {
+    if (fs.existsSync(dir)) {
+      log.info(`Found build directory: ${dir}`);
+      try {
+        const files = fs.readdirSync(dir);
+        log.info(`Files in ${dir}: ${files.join(', ')}`);
+        
+        // Also log static directory contents if it exists
+        const staticDir = path.join(dir, 'static');
+        if (fs.existsSync(staticDir)) {
+          const staticFiles = fs.readdirSync(staticDir);
+          log.info(`Static directory found with: ${staticFiles.join(', ')}`);
+          
+          // Log JS and CSS directories
+          const jsDir = path.join(staticDir, 'js');
+          const cssDir = path.join(staticDir, 'css');
+          
+          if (fs.existsSync(jsDir)) {
+            const jsFiles = fs.readdirSync(jsDir);
+            log.info(`JS files: ${jsFiles.join(', ')}`);
+          }
+          
+          if (fs.existsSync(cssDir)) {
+            const cssFiles = fs.readdirSync(cssDir);
+            log.info(`CSS files: ${cssFiles.join(', ')}`);
+          }
+        } else {
+          log.warn(`No static directory found in ${dir}`);
         }
-      });
-    });
+      } catch (err) {
+        log.error(`Error reading directory ${dir}: ${err.message}`);
+      }
+    }
   }
   
-  // Allow specific external API requests in both dev and production
-  log.info('Setting up permissions for external API requests');
-  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-    const url = details.url;
-    
-    // Allow Hijri date API requests
-    if (url.includes('api.aladhan.com')) {
-      log.info(`Allowing external API request to: ${url}`);
-      callback({ cancel: false });
-    } else {
-      callback({ cancel: false });
-    }
-  });
+  // Use a direct file path approach without protocol
+  let indexPath = null;
+  let indexContent = null;
   
+  // First, check the standard build directory
+  const standardBuildPath = path.join(appDirectory, 'build/index.html');
+  if (fs.existsSync(standardBuildPath)) {
+    indexPath = `file://${standardBuildPath}`;
+    log.info(`Using standard build path: ${standardBuildPath}`);
+    
+    try {
+      indexContent = fs.readFileSync(standardBuildPath, 'utf8');
+      log.info(`Index.html content length: ${indexContent.length} bytes`);
+    } catch (err) {
+      log.error(`Error reading index.html: ${err.message}`);
+    }
+  } else {
+    // Try finding the index.html in various locations
+    const possibleIndexPaths = [
+      path.join(appDirectory, 'build/index.html'),
+      path.join(appDirectory, 'build/main.html'),
+      path.join(appDirectory, 'electron/index.html'),
+      path.join(appDirectory, 'index.html'),
+      path.join(path.dirname(app.getPath('exe')), 'resources/app/build/index.html'),
+      path.join(path.dirname(app.getPath('exe')), 'resources/app/build/main.html'),
+      path.join(path.dirname(app.getPath('exe')), 'resources/app/electron/index.html')
+    ];
+    
+    for (const idxPath of possibleIndexPaths) {
+      if (fs.existsSync(idxPath)) {
+        indexPath = `file://${idxPath}`;
+        log.info(`Found index.html at: ${idxPath}`);
+        
+        try {
+          indexContent = fs.readFileSync(idxPath, 'utf8');
+          log.info(`Index.html content length: ${indexContent.length} bytes`);
+        } catch (err) {
+          log.error(`Error reading index.html: ${err.message}`);
+        }
+        
+        break;
+      }
+    }
+    
+    // If still not found, use a fallback
+    if (!indexPath) {
+      indexPath = `file://${path.join(appDirectory, 'electron/index.html')}`;
+      log.warn(`No index.html found, using fallback: ${indexPath}`);
+    }
+  }
+  
+  // For development, use the localhost URL
+  if (isDev) {
+    indexPath = 'http://localhost:3001';
+    log.info(`Using development server: ${indexPath}`);
+  }
+
   // Create the browser window
   mainWindow = new BrowserWindow({
-    width: 1024,
-    height: 768,
+    width: 1280,
+    height: 720,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       // Add devTools support in development
-      devTools: isDev,
+      devTools: true, // Temporarily enable devTools in all modes for debugging
       // Allow mixed content (http/https)
       webSecurity: !isDev
     },
@@ -125,34 +251,92 @@ function createWindow() {
     show: false // Don't show window until it's ready
   });
 
-  // and load the index.html of the app
-  log.info(`Loading URL: ${startUrl}`);
-  mainWindow.loadURL(startUrl);
-
-  // Open DevTools if in debug mode
-  if (isDev) {
-    log.info('Opening DevTools (debug mode)');
-    mainWindow.webContents.openDevTools();
+  // Register custom protocols for assets if needed
+  if (!protocol.isProtocolRegistered('static')) {
+    protocol.registerFileProtocol('static', (request, callback) => {
+      const url = request.url.substr(9); // Remove 'static://'
+      const resolvedPath = findResourcePath(`static/${url}`);
+      
+      if (resolvedPath) {
+        callback({ path: resolvedPath });
+      } else {
+        // Try electron/static as fallback
+        const electronStaticPath = path.join(app.getAppPath(), 'electron/static', url);
+        if (fs.existsSync(electronStaticPath)) {
+          callback({ path: electronStaticPath });
+        } else {
+          callback({ error: -2 /* net::FAILED */ });
+        }
+      }
+    });
   }
-
-  // Only show the window when it's fully loaded to avoid flicker
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+  
+  // Set up content security policy
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': ["default-src 'self' 'unsafe-inline' file: data: static:; script-src 'self' 'unsafe-inline' file: static:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com file: static:; font-src 'self' https://fonts.gstatic.com static:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.co.uk; img-src 'self' data: https://*.masjidconnect.co.uk file: static:;"]
+      }
+    });
   });
 
-  // Emitted when the window is closed
-  mainWindow.on('closed', function () {
-    log.info('Main window closed');
-    // Dereference the window object
-    mainWindow = null;
-  });
-
-  // Check for updates only in production mode
-  if (!isDev) {
-    sendStatusToWindow('Checking for updates...');
-    checkForUpdates();
-  } else {
-    log.info('Skipping update check in development mode');
+  // Load the app
+  log.info(`Loading URL: ${indexPath}`);
+  
+  try {
+    // Open DevTools immediately for troubleshooting
+    if (!isDev) {
+      mainWindow.webContents.openDevTools();
+      log.info("Developer tools opened for debugging");
+    }
+    
+    // Show window when ready
+    mainWindow.webContents.on('did-finish-load', () => {
+      log.info('Window finished loading');
+      mainWindow.show();
+    });
+    
+    // Log any console messages from the renderer
+    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      const levels = ['debug', 'info', 'warning', 'error'];
+      log.info(`[${levels[level] || 'info'}] ${message} (${sourceId}:${line})`);
+    });
+    
+    // Check if we need to fix the index.html content for static paths
+    if (indexContent && !isDev) {
+      // Check if paths need fixing
+      if (indexContent.includes('src="/static/') || indexContent.includes('href="/static/')) {
+        log.info('Fixing static asset paths in index.html content');
+        
+        // Fix static asset paths to be relative
+        const fixedContent = indexContent
+          .replace(/src="\/static\//g, 'src="./static/')
+          .replace(/href="\/static\//g, 'href="./static/');
+          
+        // Add base tag if not present
+        const hasBaseTag = fixedContent.includes('<base href="./"/>') || 
+                          fixedContent.includes('<base href="./">');
+                          
+        let finalContent = fixedContent;
+        if (!hasBaseTag) {
+          finalContent = fixedContent.replace('</head>', '<base href="./" /></head>');
+        }
+        
+        // Load the fixed content directly
+        log.info('Loading index.html with fixed paths');
+        mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(finalContent)}`);
+      } else {
+        // Use normal loading if paths look correct
+        mainWindow.loadURL(indexPath);
+      }
+    } else {
+      // Normal loading if no content or in dev mode
+      mainWindow.loadURL(indexPath);
+    }
+  } catch (err) {
+    log.error(`Failed to load application: ${err.message}`);
+    displayErrorInWindow(mainWindow, `Failed to load application: ${err.message}`);
   }
 }
 
@@ -179,33 +363,17 @@ function setupUpdateChecks() {
 // Check for updates
 function checkForUpdates() {
   try {
-    log.info('Checking for updates...');
-    autoUpdater.checkForUpdatesAndNotify();
+    // Only check for updates when running in actual production environment
+    if (process.env.NODE_ENV === 'production' && !process.env.DISABLE_UPDATES) {
+      log.info('Checking for updates...');
+      autoUpdater.checkForUpdatesAndNotify();
+    } else {
+      log.info('Update checks disabled in development or testing environment');
+    }
   } catch (error) {
     log.error('Error checking for updates:', error);
   }
 }
-
-// This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
-  log.info('App ready, creating window');
-  
-  // Disable the application menu
-  Menu.setApplicationMenu(null);
-  
-  createWindow();
-  
-  // Setup scheduled update checks
-  setupUpdateChecks();
-  
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window when the dock icon is clicked
-    if (mainWindow === null) {
-      log.info('Re-creating window (macOS activate)');
-      createWindow();
-    }
-  });
-});
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', function () {
@@ -269,4 +437,45 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('restart-app', async () => {
   log.info('App restart requested to install update');
   autoUpdater.quitAndInstall();
-}); 
+});
+
+// Function to display errors directly in the window
+function displayErrorInWindow(window, errorMessage) {
+  if (!window) return;
+  
+  const errorHTML = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>MasjidConnect Display - Error</title>
+        <style>
+          body {
+            font-family: sans-serif;
+            background-color: black;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+          }
+          h1 { color: #f1c40f; }
+          .error { color: #e74c3c; margin: 20px 0; }
+          .info { margin-top: 30px; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <h1>MasjidConnect Display</h1>
+        <div class="error">${errorMessage}</div>
+        <div class="info">Please check the application logs or reinstall the application.</div>
+      </body>
+    </html>
+  `;
+  
+  window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHTML)}`).catch(err => {
+    log.error(`Failed to display error page: ${err.message}`);
+  });
+} 

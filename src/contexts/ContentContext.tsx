@@ -9,6 +9,7 @@ import logger from '../utils/logger';
 // Constants
 const MIN_REFRESH_INTERVAL = 10 * 1000; // 10 seconds
 const SKIP_PRAYERS = ['Sunrise']; // Prayers to skip in announcements
+const DEFAULT_MASJID_NAME = 'Masjid Connect'; // Default masjid name if none is found
 
 // Define the ContentContext type
 export interface ContentContextType {
@@ -50,6 +51,62 @@ export const useContent = (): ContentContextType => {
   return context;
 };
 
+// Helper function to create a fallback schedule
+const createFallbackSchedule = (): Schedule => {
+  return {
+    id: 'fallback-schedule',
+    name: 'Default Schedule',
+    items: []
+  };
+};
+
+// Helper function to create fallback prayer times
+const createFallbackPrayerTimes = (): PrayerTimes => {
+  const now = new Date();
+  return {
+    date: now.toISOString().split('T')[0],
+    fajr: '05:00',
+    sunrise: '06:30',
+    zuhr: '12:00',
+    asr: '15:30',
+    maghrib: '18:00',
+    isha: '19:30',
+    fajrJamaat: '05:30',
+    zuhrJamaat: '12:30',
+    asrJamaat: '16:00',
+    maghribJamaat: '18:10',
+    ishaJamaat: '20:00'
+  };
+};
+
+// Helper function to extract masjid name from various API response formats
+const extractMasjidName = (content: ScreenContent): string | null => {
+  // Try to find masjid name in all possible locations
+  if (content?.masjid?.name) {
+    return content.masjid.name;
+  }
+  
+  if (content?.data?.masjid?.name) {
+    return content.data.masjid.name;
+  }
+  
+  if (content?.screen?.masjid?.name) {
+    return content.screen.masjid.name;
+  }
+  
+  if (content?.data?.screen?.masjid?.name) {
+    return content.data.screen.masjid.name;
+  }
+  
+  // Look in screen properties
+  if (content?.screen?.name) {
+    return content.screen.name;
+  }
+  
+  // If nothing found, return default
+  return DEFAULT_MASJID_NAME;
+};
+
 export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -57,10 +114,10 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [events, setEvents] = useState<Event[] | null>(null);
-  const [masjidName, setMasjidName] = useState<string | null>(null);
+  const [masjidName, setMasjidName] = useState<string | null>(DEFAULT_MASJID_NAME);
   const [masjidTimezone, setMasjidTimezone] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [carouselTime, setCarouselTime] = useState<number>(0);
+  const [carouselTime, setCarouselTime] = useState<number>(30); // Default 30 seconds
   
   // Prayer announcement states
   const [showPrayerAnnouncement, setShowPrayerAnnouncement] = useState<boolean>(false);
@@ -72,28 +129,36 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   const lastRefreshTimeRef = useRef(0);
   const isUpdatingRef = useRef(false);
 
-  // Helper function to normalize schedule data from API to app expected format
+  // Normalize schedule data function - outside dependency cycle
   const normalizeScheduleData = useCallback((schedule: any): Schedule => {
     if (!schedule) return createFallbackSchedule();
     
     try {
-      // Check if the schedule already has the expected format
-      if (schedule.items && schedule.items.length > 0 && 
-          schedule.items[0].contentItem && 
-          typeof schedule.items[0].contentItem === 'object') {
-        return schedule as Schedule;
-      }
-      
-      // Create a new schedule object with the expected format
+      // Create a normalized structure
       const normalizedSchedule: Schedule = {
         id: schedule.id || 'normalized-schedule',
         name: schedule.name || 'Schedule',
         items: []
       };
       
-      // Convert items from API format to app format
-      if (schedule.items && Array.isArray(schedule.items)) {
-        normalizedSchedule.items = schedule.items.map((item: any, index: number) => {
+      // Handle different schedule data formats
+      if (Array.isArray(schedule)) {
+        // Direct array of items
+        normalizedSchedule.items = schedule;
+      } else if ('data' in schedule && Array.isArray(schedule.data)) {
+        // New API format with data array
+        normalizedSchedule.items = schedule.data;
+      } else if ('items' in schedule && Array.isArray(schedule.items)) {
+        // Format with items property
+        normalizedSchedule.items = schedule.items;
+      } else {
+        logger.error("ContentContext: Invalid schedule format", { schedule });
+        return createFallbackSchedule();
+      }
+      
+      // Normalize each item to ensure it has the required structure
+      if (normalizedSchedule.items.length > 0) {
+        normalizedSchedule.items = normalizedSchedule.items.map((item: any, index: number) => {
           // Check if this item has a contentItem
           if (item.contentItem && typeof item.contentItem === 'object') {
             // Already has contentItem, use as is but ensure it has all required fields
@@ -134,8 +199,21 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
 
   // Memoize processScreenContent to avoid dependency issues
   const processScreenContent = useCallback((content: ScreenContent): void => {
-    if (!content) return;
+    if (!content) {
+      logger.error("ContentContext: processScreenContent called with null content");
+      return;
+    }
     
+    logger.debug("ContentContext: Processing screen content", { 
+      hasScreen: !!content.screen,
+      hasMasjid: !!content.masjid,
+      hasDataMasjid: !!(content.data && content.data.masjid),
+      hasPrayerTimes: !!content.prayerTimes,
+      hasSchedule: !!content.schedule,
+      hasEvents: !!content.events
+    });
+    
+    // Update screen content state
     setScreenContent(content);
     
     // Handle prayer times, which might be in the new format with a data array
@@ -160,16 +238,27 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       }
     }
     
-    // Handle masjid info from the content response
-    if (content.masjid) {
-      setMasjidName(content.masjid.name);
-      setMasjidTimezone(content.masjid.timezone || null);
+    // Extract and update masjid name using helper function
+    const extractedMasjidName = extractMasjidName(content);
+    if (extractedMasjidName) {
+      logger.debug("ContentContext: Using masjid name", { name: extractedMasjidName });
+      setMasjidName(extractedMasjidName);
     }
     
-    // Additional handling for direct masjid data format from API
-    if (content.data && content.data.masjid) {
-      setMasjidName(content.data.masjid.name || masjidName);
-      setMasjidTimezone(content.data.masjid.timezone || masjidTimezone);
+    // Extract and update masjid timezone
+    let foundTimezone = null;
+    
+    // Check all possible locations for timezone
+    if (content.masjid?.timezone) {
+      foundTimezone = content.masjid.timezone;
+    } else if (content.data?.masjid?.timezone) {
+      foundTimezone = content.data.masjid.timezone;
+    } else if (content.screen?.masjid?.timezone) {
+      foundTimezone = content.screen.masjid.timezone;
+    }
+    
+    if (foundTimezone) {
+      setMasjidTimezone(foundTimezone);
     }
     
     // Process schedule data if available
@@ -181,19 +270,27 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       if ('data' in content.schedule && Array.isArray(content.schedule.data)) {
         // Extract items into a normalized format for the app
         normalizedSchedule = normalizeScheduleData(content.schedule);
+        logger.debug("ContentContext: Normalized schedule from data array", { 
+          itemCount: normalizedSchedule.items.length 
+        });
       } else if (Array.isArray(content.schedule)) {
         // Handle legacy format
-        normalizedSchedule = {
-          id: 'normalized-schedule',
-          name: 'Schedule',
-          items: content.schedule
-        };
+        normalizedSchedule = normalizeScheduleData(content.schedule);
+        logger.debug("ContentContext: Normalized schedule from array", { 
+          itemCount: normalizedSchedule.items.length 
+        });
       } else {
         // Just use the schedule as is
         normalizedSchedule = content.schedule;
+        logger.debug("ContentContext: Using schedule as is", { 
+          hasItems: Array.isArray(normalizedSchedule.items),
+          itemCount: Array.isArray(normalizedSchedule.items) ? normalizedSchedule.items.length : 'unknown' 
+        });
       }
       
       setSchedule(normalizedSchedule);
+    } else {
+      logger.warn("ContentContext: No schedule found in content");
     }
     
     // Process events if available
@@ -204,9 +301,19 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
         : content.events;
         
       // Ensure we're only setting an array of events
-      setEvents(Array.isArray(eventsData) ? eventsData : null);
+      if (Array.isArray(eventsData)) {
+        setEvents(eventsData);
+        logger.debug("ContentContext: Processed events", { count: eventsData.length });
+      } else {
+        logger.warn("ContentContext: Events data is not an array", { 
+          eventsType: typeof content.events 
+        });
+        setEvents(null);
+      }
+    } else {
+      logger.debug("ContentContext: No events found in content");
     }
-  }, [masjidName, masjidTimezone, normalizeScheduleData]);
+  }, [normalizeScheduleData]);
 
   // Use memoized processPrayerTimes to avoid dependency cycles
   const processPrayerTimes = useCallback((prayerTimesData: PrayerTimes | PrayerTimes[] | null) => {
@@ -218,78 +325,136 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
         // If it's an array, use the first item
         if (prayerTimesData.length > 0) {
           setPrayerTimes(prayerTimesData[0]);
+          logger.debug("ContentContext: Processed prayer times from array", { 
+            date: prayerTimesData[0].date 
+          });
         }
       } else {
         // If it's a single object, use it directly
         setPrayerTimes(prayerTimesData);
+        logger.debug("ContentContext: Processed prayer times from object", { 
+          date: prayerTimesData.date 
+        });
       }
     } catch (error) {
       logger.error("ContentContext: Error processing prayer times data", { error });
     }
   }, []);
 
-  // Simplified refreshPrayerTimes to prevent rerender loops
+  // Memoize refreshPrayerTimes to prevent dependency cycles
   const refreshPrayerTimes = useCallback(async (): Promise<void> => {
+    if (!isAuthenticated) {
+      logger.debug("ContentContext: Cannot refresh prayer times - not authenticated");
+      return;
+    }
+    
     if (isUpdatingRef.current) {
-      logger.debug("ContentContext: Skipping prayer times refresh - already updating");
+      logger.debug("ContentContext: Already updating, skipping prayer times refresh");
       return;
     }
     
-    const now = Date.now();
-    // Reduce the throttle time to ensure we don't miss updates 
-    // but still prevent hammering the API
-    if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
-      logger.debug("ContentContext: Throttling prayer times refresh");
-      return;
-    }
-    
-    logger.info("ContentContext: Refreshing prayer times");
-    isUpdatingRef.current = true;
-    lastRefreshTimeRef.current = now;
-
     try {
-      // First, check localStorage for existing prayer times
-      const storedPrayerTimes = await storageService.getPrayerTimes();
+      const now = Date.now();
+      if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+        logger.debug("ContentContext: Throttling prayer times refresh");
+        return;
+      }
       
-      // Use data sync service to sync prayer times with force refresh
-      logger.info("ContentContext: Fetching fresh prayer times from API");
+      logger.info("ContentContext: Refreshing prayer times");
+      isUpdatingRef.current = true;
+      
+      // Set a timeout to use fallback times if API request takes too long
+      const fallbackTimer = setTimeout(() => {
+        if (isUpdatingRef.current && !prayerTimes) {
+          logger.warn("ContentContext: Prayer times refresh timeout, using fallback");
+          const fallbackTimes = createFallbackPrayerTimes();
+          processPrayerTimes(fallbackTimes);
+          isUpdatingRef.current = false;
+        }
+      }, 10000); // 10 second timeout
+      
+      // Use the data sync service to refresh prayer times
       await dataSyncService.syncPrayerTimes(true);
       
-      // Get updated prayer times from storage after sync
-      const updatedPrayerTimes = await storageService.getPrayerTimes();
-      if (updatedPrayerTimes) {
-        logger.info("ContentContext: Successfully retrieved updated prayer times");
-        processPrayerTimes(updatedPrayerTimes);
-        setLastUpdated(new Date());
-      } else if (storedPrayerTimes) {
-        logger.warn("ContentContext: API prayer times fetch failed, using stored data");
+      // Get the updated prayer times from storage
+      const storedPrayerTimes = await storageService.getPrayerTimes();
+      
+      // Clear the fallback timer since we got a response
+      clearTimeout(fallbackTimer);
+      
+      if (storedPrayerTimes) {
         processPrayerTimes(storedPrayerTimes);
+        logger.info("ContentContext: Successfully refreshed prayer times");
       } else {
-        logger.error("ContentContext: No prayer times available, using fallback");
-        processPrayerTimes(createFallbackPrayerTimes());
+        logger.error("ContentContext: No prayer times available after refresh");
+        // Use fallback times if no data is available
+        const fallbackTimes = createFallbackPrayerTimes();
+        processPrayerTimes(fallbackTimes);
+        // Store the fallback for future use
+        await storageService.savePrayerTimes(fallbackTimes);
       }
     } catch (error) {
       logger.error("ContentContext: Error refreshing prayer times", { error });
-      
-      try {
-        // Fall back to stored data if API fails
-        const storedPrayerTimes = await storageService.getPrayerTimes();
-        if (storedPrayerTimes) {
-          processPrayerTimes(storedPrayerTimes);
-          logger.info("ContentContext: Using stored prayer times as fallback");
-        } else {
-          processPrayerTimes(createFallbackPrayerTimes());
-          logger.info("ContentContext: Using generated fallback prayer times");
-        }
-      } catch (fallbackError) {
-        logger.error("ContentContext: Failed to load fallback prayer times", { error: fallbackError });
-      }
+      // Use fallback times on error
+      const fallbackTimes = createFallbackPrayerTimes();
+      processPrayerTimes(fallbackTimes);
+      // Store the fallback for future use
+      await storageService.savePrayerTimes(fallbackTimes);
     } finally {
       isUpdatingRef.current = false;
     }
-  }, [processPrayerTimes]);
+  }, [isAuthenticated, processPrayerTimes]);
 
-  // Refresh content with improved cache handling
+  // Memoize refreshSchedule to prevent dependency cycles
+  const refreshSchedule = useCallback(async (forceRefresh = false): Promise<void> => {
+    if (!isAuthenticated) {
+      logger.debug("ContentContext: Cannot refresh schedule - not authenticated");
+      return;
+    }
+    
+    if (isUpdatingRef.current && !forceRefresh) {
+      logger.debug("ContentContext: Already updating, skipping schedule refresh");
+      return;
+    }
+    
+    try {
+      const now = Date.now();
+      if (!forceRefresh && now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+        logger.debug("ContentContext: Throttling schedule refresh");
+        return;
+      }
+      
+      logger.info("ContentContext: Refreshing schedule", { forceRefresh });
+      isUpdatingRef.current = true;
+      
+      // If forcing a refresh, invalidate caches
+      if (forceRefresh) {
+        masjidDisplayClient.invalidateCache('/api/screens/content');
+      }
+      
+      // Use the data sync service to refresh the schedule
+      await dataSyncService.syncSchedule(forceRefresh);
+      
+      // Get the updated schedule from storage
+      const storedSchedule = await storageService.getSchedule();
+      
+      if (storedSchedule) {
+        const normalizedSchedule = normalizeScheduleData(storedSchedule);
+        setSchedule(normalizedSchedule);
+        logger.info("ContentContext: Successfully refreshed schedule", {
+          itemCount: normalizedSchedule.items.length
+        });
+      } else {
+        logger.error("ContentContext: No schedule available after refresh");
+      }
+    } catch (error) {
+      logger.error("ContentContext: Error refreshing schedule", { error });
+    } finally {
+      isUpdatingRef.current = false;
+    }
+  }, [isAuthenticated, normalizeScheduleData]);
+
+  // Memoize refreshContent to prevent dependency cycles
   const refreshContent = useCallback(async (forceRefresh = false): Promise<void> => {
     if (!isAuthenticated) {
       logger.debug("ContentContext: Not refreshing content - not authenticated");
@@ -391,6 +556,9 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       if (storedContent) {
         processScreenContent(storedContent);
         logger.info("ContentContext: Loaded content from storage");
+        hasData = true;
+      } else {
+        logger.warn("ContentContext: No content found in storage");
       }
       
       // Switch loading state off once we have at least prayer times
@@ -424,169 +592,6 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       isUpdatingRef.current = false;
     }
   }, [processScreenContent, processPrayerTimes, refreshContent, refreshPrayerTimes]);
-
-  // Helper function to fetch schedule directly from the API
-  const fetchScheduleFromAPI = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
-    try {
-      logger.info('ContentContext: Fetching schedule from API');
-      console.log('🔍 FETCHING SCHEDULE FROM API');
-      
-      // Use data sync service to sync schedule
-      await dataSyncService.syncSchedule(forceRefresh);
-      
-      // Get updated schedule from storage
-      const updatedSchedule = await storageService.getSchedule();
-      if (updatedSchedule) {
-        console.log('🔍 SCHEDULE FETCHED FROM API:', updatedSchedule);
-        const normalizedSchedule = normalizeScheduleData(updatedSchedule as any);
-        setSchedule(normalizedSchedule);
-        
-        // Update last updated time
-        setLastUpdated(new Date());
-      } else {
-        console.log('🔍 NO SCHEDULE RETURNED FROM API');
-      }
-    } catch (error) {
-      logger.error('ContentContext: Error fetching schedule from API', { error });
-      console.error('🔍 ERROR FETCHING SCHEDULE FROM API:', error);
-    }
-  }, [normalizeScheduleData]);
-
-  // Refresh schedule content
-  const refreshSchedule = useCallback(async (forceRefresh: boolean = false): Promise<void> => {
-    if (isUpdatingRef.current) {
-      logger.info('ContentContext: Already refreshing schedule, skipping request');
-      return;
-    }
-    
-    const now = Date.now();
-    if (!forceRefresh && now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
-      logger.info('ContentContext: Refresh throttled, skipping request');
-      return;
-    }
-    
-    logger.info('ContentContext: Refreshing schedule', { forceRefresh });
-    console.log('🔍 REFRESHING SCHEDULE, forceRefresh:', forceRefresh);
-    
-    isUpdatingRef.current = true;
-    
-    try {
-      // First try loading from local storage
-      let scheduleData = await storageService.getSchedule();
-      console.log('🔍 SCHEDULE FROM STORAGE:', scheduleData);
-      
-      if (scheduleData) {
-        logger.info('ContentContext: Schedule loaded from storage');
-        
-        // Log the shape of the data to help debug
-        console.log('🔍 SCHEDULE DATA TYPE:', typeof scheduleData);
-        console.log('🔍 SCHEDULE IS ARRAY:', Array.isArray(scheduleData));
-        console.log('🔍 SCHEDULE HAS ITEMS:', !!(scheduleData as any).items);
-        
-        if (Array.isArray(scheduleData)) {
-          // If it's an array, create a schedule object
-          console.log('🔍 CONVERTING ARRAY TO SCHEDULE OBJECT');
-          scheduleData = {
-            id: 'local-schedule',
-            name: 'Schedule',
-            items: scheduleData as any // Cast to any to avoid type errors
-          };
-        } else if (typeof scheduleData === 'object' && scheduleData !== null) {
-          // If it's an object but doesn't have an items property, it might be in a nested format
-          if (!(scheduleData as any).items && (scheduleData as any).data) {
-            console.log('🔍 SCHEDULE HAS NESTED DATA:', !!(scheduleData as any).data);
-            
-            if (Array.isArray((scheduleData as any).data)) {
-              console.log('🔍 NESTED DATA IS ARRAY WITH LENGTH:', (scheduleData as any).data.length);
-              // Use the data array as items
-              scheduleData = {
-                id: (scheduleData as any).id || 'local-schedule',
-                name: (scheduleData as any).name || 'Schedule',
-                items: (scheduleData as any).data
-              };
-            }
-          }
-        }
-        
-        // If we have a valid schedule object with items, process it
-        if (typeof scheduleData === 'object' && scheduleData !== null && (scheduleData as any).items) {
-          console.log('🔍 NORMALIZED SCHEDULE HAS ITEMS:', (scheduleData as any).items.length);
-          setSchedule(normalizeScheduleData(scheduleData as Schedule));
-        } else {
-          console.log('🔍 INVALID SCHEDULE STRUCTURE, FETCHING FROM API');
-          // If local storage doesn't have a valid format, try the API
-          await fetchScheduleFromAPI(forceRefresh);
-        }
-      } else {
-        logger.info('ContentContext: No schedule in storage, fetching from API');
-        console.log('🔍 NO SCHEDULE IN STORAGE, FETCHING FROM API');
-        await fetchScheduleFromAPI(forceRefresh);
-      }
-    } catch (error) {
-      logger.error('ContentContext: Error refreshing schedule', { error });
-      console.error('🔍 ERROR REFRESHING SCHEDULE:', error);
-    } finally {
-      isUpdatingRef.current = false;
-      lastRefreshTimeRef.current = Date.now();
-    }
-  }, [fetchScheduleFromAPI, normalizeScheduleData]);
-
-  // Create fallback prayer times data to use when no data is available
-  const createFallbackPrayerTimes = (): PrayerTimes => {
-    // Generate fallback data based on UTC times
-    const now = new Date();
-    const date = now.toISOString().split('T')[0];
-    
-    return {
-      date,
-      fajr: '05:30',
-      sunrise: '06:45',
-      zuhr: '12:30',
-      asr: '15:45',
-      maghrib: '18:30',
-      isha: '20:00',
-      fajrJamaat: '06:00',
-      zuhrJamaat: '13:00',
-      asrJamaat: '16:15',
-      maghribJamaat: '18:35',
-      ishaJamaat: '20:30',
-      data: [{
-        date,
-        fajr: '05:30',
-        sunrise: '06:45',
-        zuhr: '12:30',
-        asr: '15:45',
-        maghrib: '18:30',
-        isha: '20:00',
-        fajrJamaat: '06:00',
-        zuhrJamaat: '13:00',
-        asrJamaat: '16:15',
-        maghribJamaat: '18:35',
-        ishaJamaat: '20:30',
-      }]
-    };
-  };
-
-  // Create fallback schedule to use when no data is available
-  const createFallbackSchedule = (): Schedule => {
-    return {
-      id: 'fallback-schedule',
-      name: 'Default Schedule',
-      items: [
-        {
-          id: 'fallback-item-1',
-          order: 1,
-          contentItem: {
-            id: 'fallback-content-1',
-            type: 'CUSTOM',
-            title: 'Prayer Times',
-            content: {},
-            duration: 30
-          }
-        }
-      ]
-    };
-  };
 
   // Prayer announcement management function
   const setPrayerAnnouncement = useCallback((
@@ -683,11 +688,21 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
   // Add visibility change handler
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
-      logger.info("ContentContext: App became visible, refreshing data");
-      refreshContent(true); // Force refresh when coming back to focus
-      refreshPrayerTimes();
+      logger.info("ContentContext: App became visible, checking data freshness");
+      // Instead of force refreshing, check how long it's been since last update
+      const now = Date.now();
+      const fiveMinutesMs = 5 * 60 * 1000;
+      
+      if (now - lastRefreshTimeRef.current > fiveMinutesMs) {
+        // Only do a gentle refresh if it's been more than 5 minutes
+        logger.info("ContentContext: Data older than 5 minutes, refreshing gently");
+        // Use false to avoid force refresh that causes flashing
+        refreshContent(false);
+      } else {
+        logger.info("ContentContext: Data is fresh enough, skipping refresh");
+      }
     }
-  }, [refreshContent, refreshPrayerTimes]);
+  }, [refreshContent]);
 
   // Run once on mount to set up visibility change listener
   useEffect(() => {
@@ -720,6 +735,11 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
       dataSyncService.cleanup();
     };
   }, [isAuthenticated, loadContent]);
+
+  // Add debug logging for masjid name changes
+  useEffect(() => {
+    logger.debug("ContentContext: masjidName updated", { masjidName });
+  }, [masjidName]);
 
   // Exposed context value
   const contextValue = useMemo(() => ({
@@ -758,7 +778,11 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({ children }) =>
     carouselTime,
     showPrayerAnnouncement,
     prayerAnnouncementName,
-    isPrayerJamaat
+    isPrayerJamaat,
+    setPrayerAnnouncement,
+    setShowPrayerAnnouncement,
+    setPrayerAnnouncementName,
+    setIsPrayerJamaat
   ]);
 
   return (

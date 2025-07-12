@@ -2,7 +2,7 @@
   "name": "masjidconnect-display-app",
   "version": "0.1.0",
   "private": true,
-  "main": "build/electron/main.js",
+  "main": "electron/main.js",
   "description": "MasjidConnect Display App - Digital signage solution for mosques",
   "author": {
     "name": "MasjidConnect",
@@ -43,17 +43,19 @@
   },
   "scripts": {
     "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build && mkdir -p build/electron && cp -r electron/* build/electron/",
+    "build": "react-scripts build",
+    "build:fix-paths": "react-scripts build && ./fix-paths.sh",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on --timeout 60000 http://localhost:3001 && cross-env ELECTRON_DEBUG=true electron .\"",
-    "electron:build": "npm run build && electron-builder build --publish never",
-    "electron:build:publish": "npm run build && electron-builder build --publish always",
+    "electron:build": "npm run build:fix-paths && electron-builder build --publish never",
+    "electron:build:publish": "npm run build:fix-paths && electron-builder build --publish always",
     "electron:start": "electron .",
-    "electron:build:rpi": "npm run build && electron-builder build --linux deb tar.gz --armv7l --config.linux.icon=false --publish never",
-    "electron:build:rpi:arm64": "npm run build && electron-builder build --linux deb tar.gz --arm64 --config.linux.icon=false --publish never",
-    "electron:build:rpi:publish": "npm run build && electron-builder build --linux deb tar.gz --armv7l --arm64 --config.linux.icon=false --publish always",
-    "electron:build:rpi:noicon": "npm run build && electron-builder build --linux deb tar.gz --armv7l --config.linux.icon=false --publish never"
+    "install:fonts": "./scripts/install-fonts.sh",
+    "electron:build:rpi": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb --armv7l --publish never",
+    "electron:build:rpi:arm64": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb tar.gz --arm64 --config.linux.icon=false --publish never",
+    "electron:build:rpi:publish": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb tar.gz --armv7l --arm64 --config.linux.icon=false --publish always",
+    "electron:build:rpi:noicon": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb tar.gz --armv7l --config.linux.icon=false --publish never"
   },
   "eslintConfig": {
     "extends": [
@@ -76,8 +78,10 @@
   "devDependencies": {
     "concurrently": "^6.5.1",
     "cross-env": "^7.0.3",
+    "customize-cra": "^1.0.0",
     "electron": "^35.1.2",
     "electron-builder": "^24.13.3",
+    "react-app-rewired": "^2.2.1",
     "wait-on": "^6.0.1"
   },
   "build": {
@@ -86,21 +90,35 @@
     "files": [
       "build/**/*",
       "electron/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "package.json"
     ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist",
+      "app": "."
+    },
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
     "extraResources": [
       {
         "from": "assets",
         "to": "assets"
+      },
+      {
+        "from": "build",
+        "to": "build"
+      },
+      {
+        "from": "node_modules/electron-store",
+        "to": "node_modules/electron-store"
       }
     ],
-    "extraMetadata": {
-      "main": "build/electron/main.js"
-    },
-    "directories": {
-      "buildResources": "assets",
-      "output": "dist"
-    },
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/electron-store/**/*"
+    ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
@@ -110,8 +128,12 @@
     },
     "linux": {
       "target": [
-        "deb", 
-        "tar.gz"
+        {
+          "target": "deb",
+          "arch": [
+            "armv7l"
+          ]
+        }
       ],
       "category": "Utility",
       "executableName": "masjidconnect-display",
@@ -127,7 +149,29 @@
     },
     "deb": {
       "afterInstall": "after-install.sh",
-      "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libgbm1"]
+      "depends": [
+        "libasound2 (>= 1.1.3)",
+        "libatk-bridge2.0-0",
+        "libatk1.0-0",
+        "libatspi2.0-0",
+        "libcups2",
+        "libdrm2",
+        "libgbm1",
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libx11-xcb1",
+        "libxcb-dri3-0",
+        "libxcomposite1",
+        "libxdamage1",
+        "libxfixes3",
+        "libxkbcommon0",
+        "libxrandr2",
+        "libxss1",
+        "libxtst6",
+        "libuuid1",
+        "xdg-utils"
+      ]
     },
     "publish": {
       "provider": "github",
