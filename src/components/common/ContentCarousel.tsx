@@ -383,10 +383,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   
   // Get dynamic font size based on content length
   const getDynamicFontSize = (text: string, type: string) => {
-    if (!text) return getScaledFontSize(fontSizes.h4);
+    // Ensure text is always a string to prevent split() errors
+    const safeText = typeof text === 'string' ? text : String(text || '');
+    if (!safeText) return getScaledFontSize(fontSizes.h4);
     
-    const textLength = text.length;
-    const lineCount = text.split('\n').length;
+    const textLength = safeText.length;
+    const lineCount = safeText.split('\n').length;
     
     // Adjust font size for Names of Allah
     if (type === 'ASMA_AL_HUSNA') {
@@ -446,6 +448,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   
   // Process and format verse/hadith content correctly
   const formatVerseHadithContent = useCallback((content: any): string => {
+    // Handle null/undefined content
+    if (!content) {
+      return 'No content available';
+    }
+    
+    // Handle string content
     if (typeof content === 'string') {
       // If it's already a JSON string, return it as is
       if (content.startsWith('{') && content.includes('"type"')) {
@@ -456,53 +464,74 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       return content;
     }
     
-    try {
-      // If it's an object with verse/hadith structure
-      if (content.type === 'QURAN_VERSE' || 
-          content.type === 'HADITH' || 
-          content.arabicText || 
-          content.translation) {
-        // Return the whole object as a JSON string
-        return JSON.stringify(content);
-      }
-      
-      // Legacy format
-      if (content.verse || content.text) {
-        const verse = content.verse || content.text || '';
-        const reference = content.reference || content.source || '';
-        
-        // Try to combine into a JSON format for better display
-        if (content.arabicText) {
-          return JSON.stringify({
-            type: 'QURAN_VERSE',
-            arabicText: content.arabicText,
-            translation: verse,
-            reference: reference
-          });
+    // Handle object content
+    if (typeof content === 'object' && content !== null) {
+      try {
+        // If it's an object with verse/hadith structure
+        if (content.type === 'QURAN_VERSE' || 
+            content.type === 'HADITH' || 
+            content.arabicText || 
+            content.translation) {
+          // Return the whole object as a JSON string
+          return JSON.stringify(content);
         }
         
-        return reference ? `${verse}\n\n${reference}` : verse;
-      } else if (content.hadith) {
-        const hadith = content.hadith || '';
-        const source = content.source || content.reference || '';
-        
-        return source ? `${hadith}\n\n${source}` : hadith;
-      } else if (typeof content === 'object') {
-        // Try to extract meaningful content from object
-        if (content.content) {
-          return typeof content.content === 'string' 
-            ? content.content 
-            : JSON.stringify(content.content);
+        // Legacy format handling
+        if (content.verse || content.text) {
+          const verse = content.verse || content.text || '';
+          const reference = content.reference || content.source || '';
+          
+          // Try to combine into a JSON format for better display
+          if (content.arabicText) {
+            return JSON.stringify({
+              type: 'QURAN_VERSE',
+              arabicText: content.arabicText,
+              translation: verse,
+              reference: reference
+            });
+          }
+          
+          return reference ? `${verse}\n\n${reference}` : verse;
+        } else if (content.hadith) {
+          const hadith = content.hadith || '';
+          const source = content.source || content.reference || '';
+          
+          return source ? `${hadith}\n\n${source}` : hadith;
+        } else if (content.description) {
+          // Handle content with description property
+          const description = content.description;
+          const reference = content.reference || content.source || '';
+          
+          return reference ? `${description}\n\n${reference}` : description;
+        } else if (content.content) {
+          // Handle nested content property
+          if (typeof content.content === 'string') {
+            return content.content;
+          } else if (typeof content.content === 'object') {
+            return JSON.stringify(content.content);
+          }
+        } else {
+          // Try to extract any meaningful text from the object
+          const textParts = [];
+          if (content.text) textParts.push(content.text);
+          if (content.description) textParts.push(content.description);
+          if (content.title) textParts.push(content.title);
+          
+          if (textParts.length > 0) {
+            return textParts.join('\n\n');
+          }
+          
+          // If we can't parse in a specific way, return the JSON
+          return JSON.stringify(content);
         }
-        // If we can't parse in a specific way, return the JSON
-        return JSON.stringify(content);
+      } catch (e) {
+        console.error('Error formatting verse/hadith content:', e);
+        return 'Error displaying content';
       }
-    } catch (e) {
-      console.error('Error formatting verse/hadith content:', e);
     }
     
     // Fallback
-    return typeof content === 'string' ? content : 'Error displaying content';
+    return 'No content available';
   }, []);
   
   // Content rendering with performance optimization
@@ -566,18 +595,30 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     let titleToShow = currentItem.contentItem.title || typeConfig.title;
     let titleGradient = typeConfig.titleColor;
     
-    // Get content
+    // Get content and ensure it's properly formatted as a string
     let contentToShow: string;
     
-    // Format content based on type
+    // Format content based on type with proper error handling
     switch (contentType) {
       case 'VERSE_HADITH':
+        // Use the specialized formatter for verse/hadith content
         contentToShow = formatVerseHadithContent(currentItem.contentItem.content);
         break;
         
       case 'ANNOUNCEMENT':
-        if (typeof currentItem.contentItem.content === 'object' && currentItem.contentItem.content.text) {
-          contentToShow = currentItem.contentItem.content.text;
+        // Handle announcement content with proper object/string handling
+        if (typeof currentItem.contentItem.content === 'object') {
+          if (currentItem.contentItem.content.text) {
+            contentToShow = currentItem.contentItem.content.text;
+          } else if (currentItem.contentItem.content.description) {
+            contentToShow = currentItem.contentItem.content.description;
+          } else if (currentItem.contentItem.content.content) {
+            contentToShow = typeof currentItem.contentItem.content.content === 'string' 
+              ? currentItem.contentItem.content.content
+              : JSON.stringify(currentItem.contentItem.content.content);
+          } else {
+            contentToShow = 'No announcement text';
+          }
         } else {
           contentToShow = typeof currentItem.contentItem.content === 'string' 
             ? currentItem.contentItem.content
@@ -586,11 +627,28 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         break;
         
       case 'EVENT':
-        // Format event content with date/time
-        const description = typeof currentItem.contentItem.content === 'string' 
-          ? currentItem.contentItem.content 
-          : (currentItem.contentItem.content?.description || 'No event description');
+        // Handle event content with proper structure handling
+        let eventDescription = '';
+        if (typeof currentItem.contentItem.content === 'string') {
+          eventDescription = currentItem.contentItem.content;
+        } else if (currentItem.contentItem.content && typeof currentItem.contentItem.content === 'object') {
+          // Handle different event content structures
+          if (currentItem.contentItem.content.description) {
+            eventDescription = currentItem.contentItem.content.description;
+          } else if (currentItem.contentItem.content.text) {
+            eventDescription = currentItem.contentItem.content.text;
+          } else if (currentItem.contentItem.content.content) {
+            eventDescription = typeof currentItem.contentItem.content.content === 'string'
+              ? currentItem.contentItem.content.content
+              : 'No event description';
+          } else {
+            eventDescription = 'No event description';
+          }
+        } else {
+          eventDescription = 'No event description';
+        }
         
+        // Add event details (date, time, location)
         let eventDetails = '';
         if (currentItem.startDate) {
           try {
@@ -614,36 +672,48 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           }
         }
         
-        contentToShow = eventDetails ? `${description}\n\n${eventDetails}` : description;
+        contentToShow = eventDetails ? `${eventDescription}\n\n${eventDetails}` : eventDescription;
         break;
         
       case 'ASMA_AL_HUSNA':
-        // Format Names of Allah content
-        const content = currentItem.contentItem.content;
-        const name = content.name || content.arabic || '';
-        const transliteration = content.transliteration || '';
-        const meaning = content.meaning || '';
-        
-        // Add better spacing and formatting for Names of Allah
-        const formattedName = name ? `${name}` : '';
-        const formattedTransliteration = transliteration ? `${transliteration}` : '';
-        const formattedMeaning = meaning ? `"${meaning}"` : '';
-        
-        // Filter out empty parts and join with newlines
-        contentToShow = [formattedName, formattedTransliteration, formattedMeaning]
-          .filter(part => part)
-          .join('\n\n');
+        // Handle Asma Al Husna content with proper object structure
+        const asmaContent = currentItem.contentItem.content;
+        if (typeof asmaContent === 'object' && asmaContent !== null) {
+          const name = asmaContent.name || asmaContent.arabic || '';
+          const transliteration = asmaContent.transliteration || '';
+          const meaning = asmaContent.meaning || '';
+          
+          // Format with proper spacing
+          const formattedName = name ? `${name}` : '';
+          const formattedTransliteration = transliteration ? `${transliteration}` : '';
+          const formattedMeaning = meaning ? `"${meaning}"` : '';
+          
+          // Filter out empty parts and join with newlines
+          contentToShow = [formattedName, formattedTransliteration, formattedMeaning]
+            .filter(part => part)
+            .join('\n\n');
+        } else {
+          contentToShow = typeof asmaContent === 'string' ? asmaContent : 'No content available';
+        }
         break;
         
       default:
-        // Default handling for other content types
+        // Default handling for other content types with robust error handling
         if (typeof currentItem.contentItem.content === 'string') {
           contentToShow = currentItem.contentItem.content;
         } else if (currentItem.contentItem.content && typeof currentItem.contentItem.content === 'object') {
           try {
+            // Try to extract meaningful content from object
             if (currentItem.contentItem.content.text) {
               contentToShow = currentItem.contentItem.content.text;
+            } else if (currentItem.contentItem.content.description) {
+              contentToShow = currentItem.contentItem.content.description;
+            } else if (currentItem.contentItem.content.content) {
+              contentToShow = typeof currentItem.contentItem.content.content === 'string'
+                ? currentItem.contentItem.content.content
+                : JSON.stringify(currentItem.contentItem.content.content);
             } else {
+              // Try to combine available properties
               const contentParts = [];
               if (currentItem.contentItem.content.title) contentParts.push(currentItem.contentItem.content.title);
               if (currentItem.contentItem.content.description) contentParts.push(currentItem.contentItem.content.description);
@@ -651,7 +721,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               
               contentToShow = contentParts.length > 0 
                 ? contentParts.join('\n\n')
-                : JSON.stringify(currentItem.contentItem.content, null, 2);
+                : 'No content available';
             }
           } catch (e) {
             contentToShow = 'Error displaying content';

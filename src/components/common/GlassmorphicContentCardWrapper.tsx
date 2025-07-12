@@ -56,10 +56,13 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
   
   // Try to parse content if it's a JSON string
   const formatVerseHadithContent = () => {
+    // Ensure content is always a string to prevent errors
+    const safeContent = typeof content === 'string' ? content : String(content || '');
+    
     try {
       // Check if the content is JSON string
-      if (content.startsWith('{') && content.includes('"type"')) {
-        const parsedContent = JSON.parse(content);
+              if (safeContent.startsWith('{') && safeContent.includes('"type"')) {
+          const parsedContent = JSON.parse(safeContent);
         const arabicText = parsedContent.arabicText || '';
         const translation = parsedContent.translation || '';
         const reference = parsedContent.reference || parsedContent.source || '';
@@ -129,6 +132,9 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
   
   // Format content based on type
   const formatContent = () => {
+    // Ensure content is always a string to prevent errors
+    const safeContent = typeof content === 'string' ? content : String(content || '');
+    
     if (itemType === 'VERSE_HADITH') {
       // Try JSON parsing first
       const jsonContent = formatVerseHadithContent();
@@ -139,23 +145,23 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
       let reference = '';
       
       // Try different parsing approaches
-      if (content.includes('\n\n')) {
+      if (safeContent.includes('\n\n')) {
         // Standard format with double newline
-        const parts = content.split('\n\n');
+        const parts = safeContent.split('\n\n');
         verseText = parts[0];
         reference = parts.slice(1).join('\n\n');
-      } else if (content.includes('\n')) {
+      } else if (safeContent.includes('\n')) {
         // Format with single newlines, use last line as reference
-        const lines = content.split('\n');
+        const lines = safeContent.split('\n');
         if (lines.length > 1) {
           reference = lines.pop() || '';
           verseText = lines.join('\n');
         } else {
-          verseText = content;
+          verseText = safeContent;
         }
       } else {
         // No clear separation, just use the whole content
-        verseText = content;
+        verseText = safeContent;
       }
       
       return (
@@ -207,7 +213,7 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
           fontFamily: "'Poppins', Arial, sans-serif"
         }}
       >
-        {content}
+        {safeContent}
       </Typography>
     );
   };
