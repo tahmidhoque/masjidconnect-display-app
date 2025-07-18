@@ -6,9 +6,17 @@ import { useContent } from '../../contexts/ContentContext';
 import useAppInitialization from '../../hooks/useAppInitialization';
 import useRotationHandling from '../../hooks/useRotationHandling';
 import logoGold from '../../assets/logos/logo-gold.svg';
+import logger from '../../utils/logger';
 
 interface LoadingScreenProps {
   onComplete?: () => void;
+  isSuspenseFallback?: boolean;
+}
+
+// Interface for the display message object
+interface DisplayMessage {
+  text: string;
+  isArabic: boolean;
 }
 
 /**
@@ -18,11 +26,11 @@ interface LoadingScreenProps {
  * while the app checks pairing status and fetches content.
  * Shows different messages based on authentication status.
  */
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete, isSuspenseFallback = false }) => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
   const { orientation } = useOrientation();
-  const { masjidName } = useContent();
+  const { masjidName, isLoading: contentLoading, prayerTimes } = useContent();
   const { loadingMessage, initializationStage, isInitializing } = useAppInitialization();
   
   // Animation and content states
@@ -31,6 +39,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
   const [showSpinner, setShowSpinner] = useState(true);
   const [spinnerOpacity, setSpinnerOpacity] = useState(1);
+  const [loadingContentMessage, setLoadingContentMessage] = useState('Initializing...');
   
   // Reference to track if we've already triggered completion
   const hasCompletedRef = useRef(false);
@@ -57,6 +66,35 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       setShowContent(true);
     }, 300);
   }, []);
+  
+  // Update loading message based on content loading status
+  useEffect(() => {
+    // Set a timeout to move past loading state even if prayer times aren't loaded
+    const loadingTimeout = setTimeout(() => {
+      if (contentLoading === false && loadingStage === 'initializing') {
+        logger.info('Loading timeout reached, proceeding anyway');
+        setLoadingStage('setting-up');
+      }
+    }, 5000); // 5 second timeout
+
+    if (contentLoading) {
+      setLoadingContentMessage('Loading content...');
+    } else if (!prayerTimes) {
+      setLoadingContentMessage('Loading prayer times...');
+      // Even if prayer times aren't loaded, progress the loading stage
+      // to prevent getting stuck on loading screen
+      setLoadingStage(prevStage => 
+        prevStage === 'initializing' ? 'setting-up' : prevStage
+      );
+    } else {
+      // Force progression if all data is loaded
+      setLoadingStage(prevStage => 
+        prevStage === 'initializing' ? 'setting-up' : prevStage
+      );
+    }
+
+    return () => clearTimeout(loadingTimeout);
+  }, [contentLoading, prayerTimes, loadingStage]);
 
   // Progress through loading stages with timeouts for premium feel
   useEffect(() => {
@@ -92,41 +130,69 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
           clearInterval(fadeInterval);
           // Only hide spinner completely after fade completes
           setShowSpinner(false);
+          
+          // Notify parent that loading is complete - ensure we only do this once
+          if (!hasCompletedRef.current && onComplete) {
+            hasCompletedRef.current = true;
+            onComplete();
+          }
         }
       }, 50); // Update every 50ms for smooth animation
     }, 7500));
     
+    if (isSuspenseFallback) {
+      // If used as a Suspense fallback, keep showing the spinner indefinitely
+      setShowSpinner(true);
+      setSpinnerOpacity(1);
+      setLoadingStage('initializing');
+      
+      // Ensure cleanup doesn't hide spinner
+      return () => {};
+    }
+
     // Clean up all timers on unmount
     return () => {
       stageTimers.forEach(timer => clearTimeout(timer));
     };
-  }, []); // Empty dependency array ensures this only runs once
+  }, [isSuspenseFallback]);
 
-  // Get display message based on loading stage and authentication status
-  const getDisplayMessage = () => {
+  // Get display message based on loading stage, auth status and data loading
+  const getDisplayMessage = (): DisplayMessage => {
+    // If used as Suspense fallback, show a simple message
+    if (isSuspenseFallback) {
+      return { text: 'Loading...', isArabic: false };
+    }
+
     // For final stage, always show the Salam greeting with mosque name if available
     if (loadingStage === 'complete' || initializationStage === 'complete') {
       if (isAuthenticated && masjidName) {
-        return `السلام عليكم - ${masjidName}`;
+        return { text: `السلام عليكم - ${masjidName}`, isArabic: true };
       }
-      return 'السلام عليكم';
+      return { text: 'السلام عليكم', isArabic: true };
     }
     
     // For other stages, use app initialization message if available
     if (loadingMessage && initializationStage !== 'complete') {
-      return loadingMessage;
+      return { text: loadingMessage, isArabic: false };
     }
     
     if (isAuthenticated) {
+      // Show more specific loading messages when authenticated
+      if (contentLoading) {
+        return { text: 'Loading latest content...', isArabic: false };
+      } else if (!prayerTimes) {
+        return { text: 'Loading prayer times...', isArabic: false };
+      }
+      
       switch (loadingStage) {
         case 'initializing':
-          return 'Loading your dashboard...';
+          return { text: 'Loading your dashboard...', isArabic: false };
         case 'setting-up':
-          return 'Fetching latest content...';
+          return { text: 'Fetching latest content...', isArabic: false };
         case 'ready':
-          return 'Preparing your display...';
+          return { text: 'Preparing your display...', isArabic: false };
         default:
-          return 'Loading...';
+          return { text: 'Loading...', isArabic: false };
       }
     } else {
       // Not authenticated
@@ -134,13 +200,13 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
       
       switch (loadingStage) {
         case 'initializing':
-          return 'Initializing...';
+          return { text: 'Initializing...', isArabic: false };
         case 'setting-up':
-          return isPaired ? 'Reconnecting to your masjid...' : 'Setting up display...';
+          return { text: isPaired ? 'Reconnecting to your masjid...' : 'Setting up display...', isArabic: false };
         case 'ready':
-          return isPaired ? 'Ready to reconnect' : 'Ready to pair';
+          return { text: isPaired ? 'Ready to reconnect' : 'Ready to pair', isArabic: false };
         default:
-          return 'Loading...';
+          return { text: 'Loading...', isArabic: false };
       }
     }
   };
@@ -306,7 +372,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
           }}
         >
           <Typography
-            variant="body1" 
+            variant={getDisplayMessage().isArabic ? "arabicText" : "body1"}
             sx={{
               color: '#fff',
               textAlign: 'center',
@@ -317,7 +383,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
               textShadow: '0 2px 4px rgba(0,0,0,0.5)', // Add shadow for better visibility
             }}
           >
-            {getDisplayMessage()}
+            {getDisplayMessage().text}
           </Typography>
         </Box>
       </Box>

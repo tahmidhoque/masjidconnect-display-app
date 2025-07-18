@@ -59,10 +59,23 @@ const STORAGE_KEYS = {
   SCREEN_ID: 'masjid_screen_id',
 };
 
+// Check if we're running in Electron
+const isElectron = () => {
+  return typeof window !== 'undefined' && window.electron !== undefined;
+};
+
+// Access the Electron store through the contextBridge
+const electronStore = isElectron() && window.electron?.store ? window.electron.store : null;
+
+if (electronStore) {
+  console.log('Electron store initialized successfully in API client');
+}
+
 // Cache interface
 interface CacheItem<T> {
   data: T;
   expiry: number;
+  timestamp: number; // Change to required property with default
 }
 
 // Add debounce helper
@@ -433,23 +446,36 @@ class MasjidDisplayClient {
     const cachedItem = this.cache.get(cacheKey);
     const isExpired = !cachedItem || (now > cachedItem.expiry);
     
+    // Log cache status for debugging
+    logger.debug(`Cache status for ${normalizedEndpoint}:`, {
+      hasCachedItem: !!cachedItem,
+      isExpired: isExpired,
+      timeSinceExpiry: cachedItem ? Math.round((now - cachedItem.expiry) / 1000) + 's' : 'N/A',
+      isOffline: !navigator.onLine
+    });
+
+    // Force refresh if explicitly requested by setting cache time to 0
+    const forceRefresh = cacheTime === 0;
+    
     // If offline, always use cache regardless of expiration
     if (!navigator.onLine && cachedItem) {
       logger.info(`Using cached data for ${normalizedEndpoint} because device is offline`, {
         cached: true,
         expired: isExpired,
-        offlineMode: true
+        offlineMode: true,
+        dataAge: Math.round((now - cachedItem.timestamp) / 1000 / 60) + ' minutes'
       });
       return normalizeApiResponse({
         data: cachedItem.data,
         success: true,
         cached: true,
-        offlineFallback: true
+        offlineFallback: true,
+        timestamp: cachedItem.timestamp
       });
     }
 
-    // If we have a non-expired cache entry, use it
-    if (cachedItem && !isExpired) {
+    // If we have a non-expired cache entry and not forcing a refresh, use it
+    if (cachedItem && !isExpired && !forceRefresh) {
       logger.debug(`Using cached data for ${normalizedEndpoint}`, { 
         cached: true, 
         expiry: new Date(cachedItem.expiry).toISOString(),
@@ -458,7 +484,8 @@ class MasjidDisplayClient {
       return normalizeApiResponse({
         data: cachedItem.data,
         success: true,
-        cached: true
+        cached: true,
+        timestamp: cachedItem.timestamp
       });
     }
     
@@ -467,17 +494,28 @@ class MasjidDisplayClient {
       // Mark this endpoint as loading
       this.isLoading.set(normalizedEndpoint, true);
       
+      // Signal to debug console that we're making a fresh network request
+      logger.info(`Making fresh network request for ${normalizedEndpoint} (cache expired or force refresh)`, {
+        isExpired,
+        forceRefresh,
+        currentTime: new Date().toISOString()
+      });
+      
       const response = await this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime);
       
-      // If success, update cache
+      // If success, update cache with current timestamp
       if (response.success && response.data) {
         this.cache.set(cacheKey, {
           data: response.data,
-          expiry: now + cacheTime
+          expiry: now + cacheTime,
+          timestamp: now
         });
         
         // Reset backoff for this endpoint
         this.resetBackoff(normalizedEndpoint);
+        
+        // Add timestamp to the response
+        response.timestamp = now;
       }
       
       return validateApiResponse(response);
@@ -488,9 +526,11 @@ class MasjidDisplayClient {
       
       // If we have a cached item, return it even if expired as a fallback
       if (cachedItem) {
+        const cacheAge = Math.round((now - cachedItem.timestamp) / 1000 / 60);
         logger.info(`Falling back to cached data for ${normalizedEndpoint} due to fetch error`, {
           cached: true,
           expired: isExpired,
+          cacheAge: `${cacheAge} minutes old`,
           error: error.message || 'Unknown error'
         });
         
@@ -498,7 +538,9 @@ class MasjidDisplayClient {
           data: cachedItem.data,
           success: true,
           cached: true,
-          offlineFallback: true
+          offlineFallback: true,
+          cacheAge,
+          timestamp: cachedItem.timestamp
         });
       }
       
@@ -547,7 +589,7 @@ class MasjidDisplayClient {
       
       if (!shouldDebounceLog(`response-${normalizedEndpoint}`)) {
         logger.debug(`Response from ${normalizedEndpoint}:`, {
-          status: response.status,
+          status: response?.status,
           hasData: !!response.data
         });
       }
@@ -562,6 +604,7 @@ class MasjidDisplayClient {
         this.cache.set(cacheKey, {
           data: result,
           expiry: Date.now() + cacheTime,
+          timestamp: Date.now() // Add timestamp to the cache item
         });
       }
       
@@ -765,9 +808,20 @@ class MasjidDisplayClient {
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {
-        const storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        let storedTimes: PrayerTimes[] | null = null;
+        
+        // Try electron-store first if available
+        if (electronStore) {
+          storedTimes = electronStore.get('prayerTimes', null);
+        }
+        
+        // Fallback to localforage if not found in electron-store
+        if (!storedTimes) {
+          storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        }
+        
         if (storedTimes) {
-          logger.info('Using stored prayer times from localforage while offline');
+          logger.info('Using stored prayer times while offline');
           return {
             data: storedTimes,
             success: true,
@@ -792,13 +846,20 @@ class MasjidDisplayClient {
       CACHE_EXPIRATION.PRAYER_TIMES
     );
     
-    // If successful, store in localforage for offline use
+    // If successful, store for offline use (in both electron-store and localforage for compatibility)
     if (result.success && result.data) {
       try {
+        // Store in electron-store if available
+        if (electronStore) {
+          electronStore.set('prayerTimes', result.data);
+          logger.debug('Stored prayer times in electron-store for offline use');
+        }
+        
+        // Also store in localforage for browser fallback
         await localforage.setItem('prayerTimes', result.data);
         logger.debug('Stored prayer times in localforage for offline use');
       } catch (error) {
-        logger.error('Failed to store prayer times in localforage', { error });
+        logger.error('Failed to store prayer times', { error });
       }
     }
     

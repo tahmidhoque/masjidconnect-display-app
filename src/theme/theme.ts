@@ -8,6 +8,7 @@ export const goldGradient = 'linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)';
 declare module '@mui/material/Typography' {
   interface TypographyPropsVariantOverrides {
     goldText: true;
+    arabicText: true;
   }
 }
 
@@ -86,6 +87,17 @@ const theme = createTheme({
             WebkitTextFillColor: 'transparent',
             letterSpacing: '0.5px',
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+          },
+        },
+        {
+          props: { variant: 'arabicText' },
+          style: {
+            fontFamily: "'Amiri', 'Poppins', Arial, sans-serif",
+            fontSize: '1.5rem',
+            fontWeight: 400,
+            letterSpacing: '0.01em',
+            lineHeight: 1.8,
+            direction: 'rtl',
           },
         },
       ],

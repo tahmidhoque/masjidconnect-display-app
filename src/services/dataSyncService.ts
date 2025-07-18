@@ -79,13 +79,31 @@ class DataSyncService {
     this.isInitialized = true;
     this.setupNetworkListeners();
     
-    // Start syncing if authenticated
+    // Check if we have valid auth credentials - both in the client and in localStorage
+    const isClientAuthenticated = masjidDisplayClient.isAuthenticated();
+    const hasLocalStorageCredentials = this.checkLocalStorageCredentials();
+    
+    logger.info('Auth status check', {
+      clientAuthenticated: isClientAuthenticated,
+      localStorageCredentials: hasLocalStorageCredentials
+    });
+    
+    // If we have credentials in localStorage but the client isn't authenticated,
+    // try to set the credentials in the client
+    if (!isClientAuthenticated && hasLocalStorageCredentials) {
+      this.setCredentialsFromLocalStorage();
+    }
+    
+    // Start syncing if authenticated after our checks
     if (masjidDisplayClient.isAuthenticated()) {
+      logger.info('DataSyncService authenticated, starting initial sync');
       // Initial sync
-      this.syncAllData();
+      this.syncAllData(true); // Force refresh on initial load
       
       // Then start periodic syncs with proper intervals
       this.startAllSyncs();
+    } else {
+      logger.warn('DataSyncService not authenticated, cannot start syncing');
     }
   }
 
@@ -342,11 +360,14 @@ class DataSyncService {
   }
 
   public async syncPrayerTimes(forceRefresh: boolean = false): Promise<void> {
-    if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) return;
+    if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) {
+      logger.debug('Prayer times sync skipped - offline or not authenticated');
+      return;
+    }
 
     // Apply throttling unless it's a force refresh
     if (!forceRefresh && this.shouldThrottleSync('prayerTimes')) {
-      logger.debug('Throttling prayer times sync - too frequent calls');
+      logger.debug('Throttling prayer times refresh - too frequent calls');
       return;
     }
 
@@ -363,74 +384,89 @@ class DataSyncService {
       }
     }
 
-    try {
-      logger.debug('Syncing prayer times...', { forceRefresh });
-      this.lastSyncTime.prayerTimes = Date.now();
+    // Set up retry mechanism
+    const maxRetries = forceRefresh ? 3 : 1; // More retries for forced refreshes
+    let retryCount = 0;
+    let success = false;
 
-      // Get current date
-      const today = new Date();
-      const startDate = today.toISOString().split('T')[0];
-      
-      // Get date 7 days from now
-      const endDate = new Date(today);
-      endDate.setDate(today.getDate() + 7);
-      const endDateString = endDate.toISOString().split('T')[0];
-
-      // Fetch prayer times
-      const prayerTimesResponse = await masjidDisplayClient.getPrayerTimes(startDate, endDateString, forceRefresh);
-      
-      if (prayerTimesResponse.success && prayerTimesResponse.data) {
-        // Check if the data is in the new format
-        const prayerTimesData = prayerTimesResponse.data;
-        
-        console.log('Prayer times data received:', prayerTimesData);
-        
-        // Determine if this is a single object with data array or already an array
-        if (!Array.isArray(prayerTimesData) && 
-            typeof prayerTimesData === 'object' && 
-            prayerTimesData !== null && 
-            'data' in prayerTimesData && 
-            Array.isArray((prayerTimesData as any).data)) {
-          // This is the new format - object with a data array
-          console.log('Detected new prayer times format (object with data array)');
-          await storageService.savePrayerTimes(prayerTimesData);
-        } else if (Array.isArray(prayerTimesData)) {
-          // This is the legacy format - just an array of prayer times
-          console.log('Detected legacy prayer times format (array)');
-          await storageService.savePrayerTimes(prayerTimesData);
+    while (!success && retryCount <= maxRetries) {
+      try {
+        // If this is a retry, log and add delay
+        if (retryCount > 0) {
+          logger.info(`Retrying prayer times sync (attempt ${retryCount}/${maxRetries})...`);
+          // Add a short delay between retries
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
         } else {
-          // This is a single object without a data array - wrap it in an array
-          console.log('Detected single prayer time object - wrapping in array');
-          await storageService.savePrayerTimes([prayerTimesData]);
+          logger.info('Syncing prayer times...', { forceRefresh });
         }
         
-        logger.debug('Prayer times sync completed successfully');
-      } else {
-        // Don't enter backoff mode if force refresh
-        if (!forceRefresh) {
-          // If server has an error, implement backoff
+        this.lastSyncTime.prayerTimes = Date.now();
+
+        // Clear cache if force refresh or retry
+        if (forceRefresh || retryCount > 0) {
+          logger.info('Clearing prayer times cache before fetch');
+          masjidDisplayClient.invalidateCache('prayerTimes');
+        }
+
+        // Get current date
+        const today = new Date();
+        const startDate = today.toISOString().split('T')[0];
+        
+        // Get date 7 days from now
+        const endDate = new Date(today);
+        endDate.setDate(today.getDate() + 7);
+        const endDateString = endDate.toISOString().split('T')[0];
+
+        // Fetch prayer times
+        const prayerTimesResponse = await masjidDisplayClient.getPrayerTimes(startDate, endDateString, forceRefresh);
+        
+        if (prayerTimesResponse.success && prayerTimesResponse.data) {
+          logger.info('Prayer times data received successfully');
+          
+          // Always save the data exactly as received to avoid format issues
+          await storageService.savePrayerTimes(prayerTimesResponse.data);
+          
+          // Notify success
+          logger.info('Prayer times sync completed and saved to storage');
+          
+          // Dispatch a custom event to notify components about the updated prayer times
+          const updateEvent = new CustomEvent('prayerTimesUpdated', { 
+            detail: { timestamp: Date.now() } 
+          });
+          window.dispatchEvent(updateEvent);
+
+          // Set success flag to exit retry loop
+          success = true;
+        } else {
+          // Increment retry counter if we got a response but no data
+          retryCount++;
+          logger.warn(`Prayer times sync attempt ${retryCount} failed: No data received`, { 
+            error: prayerTimesResponse.error
+          });
+
+          // On last retry, set backoff
+          if (retryCount > maxRetries && !forceRefresh) {
+            this.backoffStatus.prayerTimes.inBackoff = true;
+            this.backoffStatus.prayerTimes.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
+            logger.warn('Prayer times sync exhausted retries, entering backoff mode', { 
+              backoffUntil: new Date(this.backoffStatus.prayerTimes.nextTry).toISOString() 
+            });
+          }
+        }
+      } catch (error) {
+        // Increment retry counter on errors
+        retryCount++;
+        logger.error(`Prayer times sync attempt ${retryCount} error`, { error });
+
+        // On last retry, set backoff
+        if (retryCount > maxRetries && !forceRefresh) {
           this.backoffStatus.prayerTimes.inBackoff = true;
           this.backoffStatus.prayerTimes.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
-          logger.warn('Prayer times sync failed, entering backoff mode', { 
-            error: prayerTimesResponse.error, 
+          logger.error('Prayer times sync exhausted retries, entering backoff mode', { 
+            error, 
             backoffUntil: new Date(this.backoffStatus.prayerTimes.nextTry).toISOString() 
           });
-        } else {
-          logger.warn('Force prayer times sync failed', { error: prayerTimesResponse.error });
         }
-      }
-    } catch (error) {
-      // Don't enter backoff mode if force refresh
-      if (!forceRefresh) {
-        // Error occurred, implement backoff
-        this.backoffStatus.prayerTimes.inBackoff = true;
-        this.backoffStatus.prayerTimes.nextTry = Date.now() + (5 * 60 * 1000); // Wait 5 minutes before next try
-        logger.error('Error syncing prayer times, entering backoff mode', { 
-          error, 
-          backoffUntil: new Date(this.backoffStatus.prayerTimes.nextTry).toISOString() 
-        });
-      } else {
-        logger.error('Error during forced prayer times sync', { error });
       }
     }
   }
@@ -717,7 +753,7 @@ class DataSyncService {
       console.log('DEBUG dataSyncService: getScreenContent response', { 
         success: response.success,
         hasData: !!response.data,
-        status: response.status,
+        status: response?.status,
         error: response.error
       });
       
@@ -790,6 +826,28 @@ class DataSyncService {
       const now = Date.now();
       this.backoffStatus.schedule.inBackoff = true;
       this.backoffStatus.schedule.nextTry = now + 60000; // Try again in 1 minute
+    }
+  }
+
+  // Helper to check if we have credentials in localStorage
+  private checkLocalStorageCredentials(): boolean {
+    const apiKey = localStorage.getItem('masjid_api_key') || localStorage.getItem('apiKey');
+    const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
+    return !!(apiKey && screenId);
+  }
+
+  // Helper to set credentials from localStorage to the client
+  private setCredentialsFromLocalStorage(): void {
+    try {
+      const apiKey = localStorage.getItem('masjid_api_key') || localStorage.getItem('apiKey');
+      const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
+      
+      if (apiKey && screenId) {
+        logger.info('Setting credentials from localStorage to client');
+        masjidDisplayClient.setCredentials({ apiKey, screenId });
+      }
+    } catch (error) {
+      logger.error('Error setting credentials from localStorage', { error });
     }
   }
 

@@ -44,7 +44,7 @@ The MasjidConnect Display App is designed to be run on screens throughout a mosq
    ```
 3. Create a `.env` file with the following variables:
    ```
-   REACT_APP_API_URL=https://api.masjidconnect.com
+   REACT_APP_API_URL=https://portal.masjidconnect.co.uk
    ```
 4. Start the development server:
    ```
@@ -128,4 +128,183 @@ This project is proprietary software owned by MasjidConnect.
 
 ## Contact
 
-For support or inquiries, contact support@masjidconnect.com 
+For support or inquiries, contact support@masjidconnect.co.uk
+
+# Raspberry Pi Optimization
+
+This application has been specifically optimized to run smoothly on Raspberry Pi devices.
+
+## Hardware Acceleration
+
+We've implemented several optimizations to improve performance on Raspberry Pi:
+
+1. **Chromium/Electron Flags**: We've configured optimized Chromium flags that balance hardware acceleration with thermal management:
+   - Enabled GPU rasterization with controlled thread counts
+   - Used OpenGL desktop driver for better RPi compatibility
+   - Limited raster threads and renderer processes to reduce thermal throttling
+
+2. **Client-Side Rendering**: The React application detects low-power devices and:
+   - Reduces animation complexity
+   - Selectively applies hardware acceleration to critical UI elements
+   - Scales down large images
+   - Increases debounce/throttle times for events
+
+3. **Kiosk Mode**: The application runs in fullscreen kiosk mode on Raspberry Pi.
+
+## Building for Raspberry Pi
+
+To build the application for Raspberry Pi:
+
+```bash
+# For Raspberry Pi 3 (armv7l)
+npm run electron:build:armhf
+
+# For Raspberry Pi 4 (arm64)
+npm run electron:build:arm64
+
+# For both architectures
+npm run electron:build:pi
+
+# Build and publish to GitHub releases
+npm run electron:build:pi:publish
+```
+
+## System Optimizations
+
+During installation, the application:
+
+1. Creates autostart entry in `/home/pi/.config/autostart`
+2. Sets proper file permissions
+3. Configures GPU memory (minimum 128MB)
+4. Enables the VC4 GL driver for hardware acceleration
+
+## Troubleshooting
+
+If you experience thermal throttling:
+- Ensure your Raspberry Pi has adequate cooling (heatsink/fan)
+- The app automatically limits GPU usage but may still require cooling
+- For extreme cases, add a small 5V fan connected to the GPIO pins 
+
+# Cross-Compiling for Raspberry Pi
+
+When building for Raspberry Pi (armv7l/arm64) on macOS, there are known issues with electron-builder. Here are two workarounds:
+
+## Method 1: Build on the Raspberry Pi directly
+
+1. Clone the repository on the Raspberry Pi:
+```bash
+git clone https://github.com/masjidSolutions/masjidconnect-display-app.git
+cd masjidconnect-display-app
+npm install
+```
+
+2. Build the application:
+```bash
+npm run electron:build
+```
+
+## Method 2: Use a Docker container for building
+
+Cross-compilation can be more reliable using Docker:
+
+1. Create a Dockerfile for building:
+```dockerfile
+FROM electronuserland/builder:16
+
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build
+RUN electron-builder --linux deb --armv7l
+```
+
+2. Build using Docker:
+```bash
+docker build -t masjidconnect-builder .
+docker run --rm -v ${PWD}/dist:/app/dist masjidconnect-builder
+```
+
+## Method 3: Using the pre-built ZIP
+
+If you're unable to build a proper .deb file, you can:
+
+1. Build a ZIP package: 
+```bash
+npm run electron:build:armhf # This builds a ZIP file
+```
+
+2. Extract on the Raspberry Pi and run the installation script:
+```bash
+unzip masjidconnect-display-0.1.0-armv7l.zip -d /opt/masjidconnect-display
+sudo chmod +x /opt/masjidconnect-display/masjidconnect-display
+sudo bash build/after-install.sh
+```
+
+## Performance Optimizations
+
+All the performance optimizations for Raspberry Pi are included in the codebase:
+
+1. Hardware acceleration settings in `electron/main.js`
+2. Thermal management with proper GPU flags
+3. Reduced animations in `src/utils/performanceUtils.ts`
+
+# Running on Raspberry Pi
+
+For the best performance on Raspberry Pi devices, follow these recommendations:
+
+## Hardware Requirements
+
+- Raspberry Pi 3B+ or newer (Pi 4 recommended)
+- MicroSD card with at least 16GB
+- Display with HDMI input (portrait or landscape)
+- Active cooling (small heatsink or fan) to prevent thermal throttling
+
+## Software Setup
+
+1. Install Raspberry Pi OS (32-bit or 64-bit)
+2. Update your system:
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+3. Install required dependencies:
+```bash
+sudo apt install -y libglib2.0-0 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libgtk-3-0 libgbm1 libasound2
+```
+
+4. Install application:
+   - Option 1: Get the latest release from GitHub
+   - Option 2: Use the pre-built ZIP and follow the instructions above
+   - Option 3: Build directly on the device
+
+## Optimizing GPU Settings
+
+To ensure optimal performance, modify your `/boot/config.txt`:
+
+```bash
+sudo nano /boot/config.txt
+```
+
+Add/modify these lines:
+```
+gpu_mem=128
+dtoverlay=vc4-kms-v3d
+```
+
+## Autostart at Boot
+
+The application will automatically create an autostart entry during installation. To verify it:
+
+```bash
+ls -la /home/pi/.config/autostart/masjidconnect-display.desktop
+```
+
+## Monitoring Performance
+
+To monitor for thermal throttling:
+```bash
+vcgencmd measure_temp
+vcgencmd get_throttled
+```
+
+If the temperature exceeds 80°C regularly or throttling occurs, improve cooling. 

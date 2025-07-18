@@ -146,8 +146,12 @@ export interface ScreenContent {
     name: string;
     orientation: 'LANDSCAPE' | 'PORTRAIT';
     contentConfig: any;
+    masjid?: {
+      name: string;
+      timezone: string;
+    };
   };
-  masjid: {
+  masjid?: {
     name: string;
     timezone: string;
   };
@@ -170,6 +174,10 @@ export interface ScreenContent {
       name: string;
       orientation: 'LANDSCAPE' | 'PORTRAIT';
       contentConfig?: any;
+      masjid?: {
+        name: string;
+        timezone: string;
+      };
     };
     events?: Event[] | { data: Event[] };
   };
@@ -235,7 +243,9 @@ export interface ApiResponse<T> {
   error?: string;
   cached?: boolean;
   offlineFallback?: boolean;
-  status?: number; // Add status code property for error responses
+  timestamp?: number;
+  cacheAge?: number;
+  status?: number;
 }
 
 // Predefined alert color values matching ALERT_COLOR_SCHEMES

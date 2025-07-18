@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Orientation } from '../contexts/OrientationContext';
 
 /**
@@ -19,21 +19,9 @@ export function useRotationHandling(desiredOrientation: Orientation) {
     physicalOrientation !== desiredOrientation,
   [physicalOrientation, desiredOrientation]);
   
-  // Optimize the orientation update with debounce
-  const updatePhysicalOrientation = useCallback(() => {
-    const isPortrait = window.innerHeight > window.innerWidth;
-    const newOrientation: Orientation = isPortrait ? 'PORTRAIT' : 'LANDSCAPE';
-    
-    if (newOrientation !== physicalOrientation) {
-      // Remove console log to reduce spam
-      setPhysicalOrientation(newOrientation);
-    }
-  }, [physicalOrientation]);
-  
-  // Update physical orientation on window resize with debounce
+  // Update physical orientation on window resize with simple debounce
   useEffect(() => {
-    // Debounce resize events to avoid frequent updates
-    let resizeTimer: NodeJS.Timeout | null = null;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     
     const handleResize = () => {
       // Cancel previous timer
@@ -41,14 +29,19 @@ export function useRotationHandling(desiredOrientation: Orientation) {
         clearTimeout(resizeTimer);
       }
       
-      // Set new timer
+      // Set new timer with simple debounce
       resizeTimer = setTimeout(() => {
-        updatePhysicalOrientation();
-      }, 100); // 100ms debounce
+        const isPortrait = window.innerHeight > window.innerWidth;
+        const newOrientation: Orientation = isPortrait ? 'PORTRAIT' : 'LANDSCAPE';
+        
+        if (newOrientation !== physicalOrientation) {
+          setPhysicalOrientation(newOrientation);
+        }
+      }, 150); // 150ms debounce
     };
     
     // Initial check
-    updatePhysicalOrientation();
+    handleResize();
     
     // Listen for resize events
     window.addEventListener('resize', handleResize);
@@ -60,7 +53,7 @@ export function useRotationHandling(desiredOrientation: Orientation) {
         clearTimeout(resizeTimer);
       }
     };
-  }, [updatePhysicalOrientation]);
+  }, [physicalOrientation]);
   
   return {
     shouldRotate,

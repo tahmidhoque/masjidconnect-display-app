@@ -1,12 +1,160 @@
 import localforage from 'localforage';
 import { ScreenContent, PrayerTimes, PrayerStatus, Event, ApiCredentials, Schedule, EmergencyAlert } from '../api/models';
+import logger from '../utils/logger';
 
-// Initialize DB
-localforage.config({
-  name: 'MasjidConnect',
-  storeName: 'display_storage',
-  description: 'MasjidConnect Display App Storage',
-});
+// Storage interface for consistent API across platforms
+interface StorageAdapter {
+  get<T>(key: string, defaultValue?: T): Promise<T | null>;
+  set<T>(key: string, value: T): Promise<void>;
+  delete(key: string): Promise<void>;
+  has(key: string): Promise<boolean>;
+  clear(): Promise<void>;
+  keys(): Promise<string[]>;
+}
+
+// LocalForage-based storage adapter
+class LocalForageAdapter implements StorageAdapter {
+  constructor() {
+    // Initialize LocalForage
+    localforage.config({
+      name: 'MasjidConnect',
+      storeName: 'display_storage',
+      description: 'MasjidConnect Display App Storage',
+      driver: [localforage.INDEXEDDB, localforage.LOCALSTORAGE]
+    });
+    logger.info('LocalForage storage adapter initialized');
+  }
+
+  async get<T>(key: string, defaultValue?: T): Promise<T | null> {
+    try {
+      const value = await localforage.getItem<T>(key);
+      return value !== null ? value : (defaultValue ?? null);
+    } catch (error) {
+      logger.error('LocalForageAdapter get error', { key, error });
+      return defaultValue ?? null;
+    }
+  }
+
+  async set<T>(key: string, value: T): Promise<void> {
+    try {
+      await localforage.setItem(key, value);
+    } catch (error) {
+      logger.error('LocalForageAdapter set error', { key, error });
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await localforage.removeItem(key);
+    } catch (error) {
+      logger.error('LocalForageAdapter delete error', { key, error });
+    }
+  }
+
+  async has(key: string): Promise<boolean> {
+    try {
+      const value = await localforage.getItem(key);
+      return value !== null;
+    } catch (error) {
+      logger.error('LocalForageAdapter has error', { key, error });
+      return false;
+    }
+  }
+
+  async clear(): Promise<void> {
+    try {
+      await localforage.clear();
+    } catch (error) {
+      logger.error('LocalForageAdapter clear error', { error });
+    }
+  }
+
+  async keys(): Promise<string[]> {
+    try {
+      return await localforage.keys();
+    } catch (error) {
+      logger.error('LocalForageAdapter keys error', { error });
+      return [];
+    }
+  }
+}
+
+// Electron Store adapter
+class ElectronStoreAdapter implements StorageAdapter {
+  private electronStore: any;
+
+  constructor() {
+    // Check if we're running in Electron and have access to the store
+    if (typeof window !== 'undefined' && window.electron?.store) {
+      this.electronStore = window.electron.store;
+      logger.info('ElectronStore adapter initialized');
+    } else {
+      logger.warn('ElectronStore not available, using memory fallback');
+      // Create memory fallback
+      const memoryStore: Record<string, any> = {};
+      this.electronStore = {
+        get: (key: string, defaultValue?: any) => key in memoryStore ? memoryStore[key] : defaultValue,
+        set: (key: string, value: any) => { memoryStore[key] = value; },
+        delete: (key: string) => { delete memoryStore[key]; },
+        has: (key: string) => key in memoryStore,
+        clear: () => { Object.keys(memoryStore).forEach(k => delete memoryStore[k]); },
+        keys: () => Object.keys(memoryStore)
+      };
+    }
+  }
+
+  async get<T>(key: string, defaultValue?: T): Promise<T | null> {
+    try {
+      const value = this.electronStore.get(key, defaultValue ?? null);
+      return value;
+    } catch (error) {
+      logger.error('ElectronStoreAdapter get error', { key, error });
+      return defaultValue ?? null;
+    }
+  }
+
+  async set<T>(key: string, value: T): Promise<void> {
+    try {
+      this.electronStore.set(key, value);
+    } catch (error) {
+      logger.error('ElectronStoreAdapter set error', { key, error });
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      this.electronStore.delete(key);
+    } catch (error) {
+      logger.error('ElectronStoreAdapter delete error', { key, error });
+    }
+  }
+
+  async has(key: string): Promise<boolean> {
+    try {
+      return this.electronStore.has(key);
+    } catch (error) {
+      logger.error('ElectronStoreAdapter has error', { key, error });
+      return false;
+    }
+  }
+
+  async clear(): Promise<void> {
+    try {
+      this.electronStore.clear();
+    } catch (error) {
+      logger.error('ElectronStoreAdapter clear error', { error });
+    }
+  }
+
+  async keys(): Promise<string[]> {
+    try {
+      return this.electronStore.keys();
+    } catch (error) {
+      logger.error('ElectronStoreAdapter keys error', { error });
+      return [];
+    }
+  }
+}
 
 // Storage Keys
 enum StorageKeys {
@@ -22,14 +170,126 @@ enum StorageKeys {
 
 // Storage Service
 class StorageService {
+  private primaryStorage: StorageAdapter;
+  private fallbackStorage: StorageAdapter;
+  private isElectron: boolean;
+
+  constructor() {
+    // Determine environment
+    this.isElectron = typeof window !== 'undefined' && window.electron !== undefined;
+    
+    if (this.isElectron) {
+      logger.info('Initializing storage for Electron environment');
+      // In Electron, use ElectronStore as primary with LocalForage as fallback
+      this.primaryStorage = new ElectronStoreAdapter();
+      this.fallbackStorage = new LocalForageAdapter();
+    } else {
+      logger.info('Initializing storage for web environment');
+      // In browser, use only LocalForage
+      this.primaryStorage = new LocalForageAdapter();
+      this.fallbackStorage = this.primaryStorage; // No separate fallback needed
+    }
+  }
+
+  // Verify database health on app startup
+  async verifyDatabaseHealth(): Promise<void> {
+    logger.info('Verifying database health...');
+    try {
+      // Try to get the current database version
+      const testRequest = indexedDB.open('MasjidConnect');
+      
+      testRequest.onsuccess = (event) => {
+        // @ts-ignore
+        const db = event.target.result;
+        const version = db.version;
+        logger.info('Current database version is', { version });
+        
+        // Check if object store exists
+        if (!db.objectStoreNames.contains('display_storage')) {
+          logger.warn('display_storage object store NOT found! Database may need reset.');
+        } else {
+          logger.info('display_storage object store verified.');
+        }
+        
+        db.close();
+      };
+      
+      testRequest.onerror = (event) => {
+        // @ts-ignore
+        logger.error('Error verifying database:', { error: event.target.error });
+        logger.info('Consider clearing database if issues persist.');
+      };
+    } catch (error) {
+      logger.error('Exception during database health check:', { error });
+    }
+  }
+
+  // Generic save method that tries primary storage first then falls back
+  private async saveItem<T>(key: string, value: T): Promise<void> {
+    try {
+      await this.primaryStorage.set(key, value);
+      logger.info(`Saved ${key} to primary storage`);
+    } catch (error) {
+      logger.error(`Error saving to primary storage: ${key}`, { error });
+      try {
+        // Try fallback storage
+        await this.fallbackStorage.set(key, value);
+        logger.info(`Saved ${key} to fallback storage`);
+      } catch (fallbackError) {
+        logger.error(`Error saving to fallback storage: ${key}`, { error: fallbackError });
+        throw new Error(`Failed to save ${key} to any storage`);
+      }
+    }
+  }
+
+  // Generic retrieve method that tries primary storage first then falls back
+  private async getItem<T>(key: string): Promise<T | null> {
+    try {
+      const value = await this.primaryStorage.get<T>(key);
+      if (value !== null) {
+        logger.info(`Retrieved ${key} from primary storage`);
+        return value;
+      }
+      
+      // Try fallback if primary returns null
+      const fallbackValue = await this.fallbackStorage.get<T>(key);
+      if (fallbackValue !== null) {
+        logger.info(`Retrieved ${key} from fallback storage`);
+        // Sync back to primary for next time
+        this.primaryStorage.set(key, fallbackValue).catch(err => 
+          logger.error(`Error syncing ${key} back to primary storage`, { error: err })
+        );
+        return fallbackValue;
+      }
+      
+      logger.info(`${key} not found in any storage`);
+      return null;
+    } catch (error) {
+      logger.error(`Error retrieving ${key} from primary storage`, { error });
+      
+      try {
+        // Try fallback on error
+        const fallbackValue = await this.fallbackStorage.get<T>(key);
+        if (fallbackValue !== null) {
+          logger.info(`Retrieved ${key} from fallback storage after primary error`);
+          return fallbackValue;
+        }
+        return null;
+      } catch (fallbackError) {
+        logger.error(`Error retrieving ${key} from fallback storage`, { error: fallbackError });
+        return null;
+      }
+    }
+  }
+
   // Screen Content
   async saveScreenContent(content: ScreenContent): Promise<void> {
-    await localforage.setItem(StorageKeys.SCREEN_CONTENT, content);
+    await this.saveItem(StorageKeys.SCREEN_CONTENT, content);
     await this.updateLastUpdated(StorageKeys.SCREEN_CONTENT);
   }
 
   async getScreenContent(): Promise<ScreenContent | null> {
-    return localforage.getItem<ScreenContent>(StorageKeys.SCREEN_CONTENT);
+    return this.getItem<ScreenContent>(StorageKeys.SCREEN_CONTENT);
   }
 
   // Schedule
@@ -37,139 +297,38 @@ class StorageService {
     // Check if schedule is an array or a single object
     // If it's a single object with a data property that's an array, store that object directly
     if (!Array.isArray(schedule) && schedule && 'data' in schedule && Array.isArray(schedule.data)) {
-      console.log('Saving schedule with nested data structure', schedule);
-      await localforage.setItem(StorageKeys.SCHEDULE, schedule);
+      logger.info('Saving schedule with nested data structure');
+      await this.saveItem(StorageKeys.SCHEDULE, schedule);
     } else if (Array.isArray(schedule)) {
       // If it's already an array, save it directly
-      console.log('Saving schedule array', schedule);
-      await localforage.setItem(StorageKeys.SCHEDULE, schedule);
+      logger.info('Saving schedule array');
+      await this.saveItem(StorageKeys.SCHEDULE, schedule);
     } else {
       // Single schedule object
-      console.log('Saving single schedule object', schedule);
-      await localforage.setItem(StorageKeys.SCHEDULE, schedule);
+      logger.info('Saving single schedule object');
+      await this.saveItem(StorageKeys.SCHEDULE, schedule);
     }
     await this.updateLastUpdated(StorageKeys.SCHEDULE);
   }
 
   async getSchedule(): Promise<Schedule[] | Schedule | null> {
     try {
-      console.log('StorageService: Retrieving schedule from storage');
-      const result = await localforage.getItem<Schedule[] | Schedule>(StorageKeys.SCHEDULE);
+      logger.info('Retrieving schedule from storage');
+      const result = await this.getItem<Schedule[] | Schedule>(StorageKeys.SCHEDULE);
       
-      // Add more detailed debugging to see the structure
-      console.log('StorageService: Schedule retrieved from storage:', {
-        type: typeof result,
-        isNull: result === null,
-        isArray: Array.isArray(result),
-        hasItems: !!(result && 'items' in result && (result as Schedule).items),
-        itemsCount: !!(result && 'items' in result) ? (result as Schedule).items?.length || 0 : 'N/A',
-        isNested: !!(result && 'data' in result),
-        resultKeys: result && typeof result === 'object' ? Object.keys(result) : []
-      });
-      
-      // Directly inspect the database to verify the data
-      try {
-        console.log('🔍 DIRECT STORAGE INSPECTION');
-        // Get all keys from localForage
-        const keys = await localforage.keys();
-        console.log('🔍 Available keys in storage:', keys);
-        
-        // Check if our key exists
-        if (keys.includes(StorageKeys.SCHEDULE)) {
-          console.log('🔍 SCHEDULE key found in storage');
-        } else {
-          console.log('🔍 SCHEDULE key NOT found in storage!');
-        }
-        
-        // Check raw database
-        const dbRequest = indexedDB.open('MasjidConnect', 1);
-        dbRequest.onsuccess = (event) => {
-          // @ts-ignore
-          const db = event.target.result;
-          console.log('🔍 Available object stores:', Array.from(db.objectStoreNames));
-          
-          if (db.objectStoreNames.contains('display_storage')) {
-            console.log('🔍 display_storage object store found');
-            try {
-              const transaction = db.transaction('display_storage', 'readonly');
-              const store = transaction.objectStore('display_storage');
-              const scheduleRequest = store.get(StorageKeys.SCHEDULE);
-              
-              scheduleRequest.onsuccess = () => {
-                const data = scheduleRequest.result;
-                console.log('🔍 Raw data from IndexedDB for SCHEDULE:', data);
-                console.log('🔍 Has data?', !!data);
-                if (data) {
-                  console.log('🔍 Data type:', typeof data);
-                  console.log('🔍 Keys:', Object.keys(data));
-                  console.log('🔍 Is array?', Array.isArray(data));
-                  console.log('🔍 Has items?', !!(data.items));
-                  console.log('🔍 Items count:', data.items?.length);
-                }
-              };
-              
-              scheduleRequest.onerror = function(this: IDBRequest) {
-                console.error('🔍 Error reading SCHEDULE from IndexedDB:', this.error);
-              };
-            } catch (error: unknown) {
-              console.error('🔍 Error during IndexedDB inspection:', error);
-            }
-          } else {
-            console.log('🔍 display_storage object store NOT found!');
-          }
-        };
-        
-        dbRequest.onerror = function(this: IDBRequest) {
-          console.error('🔍 Error opening IndexedDB for inspection:', this.error);
-        };
-      } catch (error: unknown) {
-        console.error('🔍 Error during storage inspection:', error);
-      }
-      
+      // Log structure for debugging
       if (result) {
-        // If it's a Schedule object with an 'items' property, log the first item
-        if ('items' in result && Array.isArray(result.items) && result.items.length > 0) {
-          console.log('StorageService: First schedule item:', {
-            hasContentItem: 'contentItem' in result.items[0],
-            contentItemKeys: 'contentItem' in result.items[0] 
-              ? Object.keys(result.items[0].contentItem) 
-              : 'No contentItem',
-            itemKeys: Object.keys(result.items[0])
-          });
-          
-          // Add a force refresh mechanism in case of potential stale data
-          console.log('🔍 CHECKING IF DATA MIGHT BE STALE OR CORRUPTED');
-          let potentiallyCorrupted = false;
-          
-          // Check for common indicators of corrupted data
-          if ('items' in result && Array.isArray(result.items)) {
-            for (let i = 0; i < result.items.length; i++) {
-              const item = result.items[i];
-              if (!item || typeof item !== 'object') {
-                console.log(`🔍 Invalid item at index ${i}:`, item);
-                potentiallyCorrupted = true;
-                break;
-              }
-              
-              if (!('contentItem' in item) || !item.contentItem) {
-                console.log(`🔍 Item at index ${i} missing contentItem:`, item);
-                potentiallyCorrupted = true;
-                break;
-              }
-            }
-          }
-          
-          if (potentiallyCorrupted) {
-            console.log('🔍 POTENTIALLY CORRUPTED DATA DETECTED! Consider clearing storage.');
-          } else {
-            console.log('🔍 Data structure looks valid.');
-          }
-        }
+        logger.debug('Schedule retrieved from storage:', {
+          type: typeof result,
+          isArray: Array.isArray(result),
+          hasData: !!(result && 'data' in result),
+          keys: result && typeof result === 'object' ? Object.keys(result) : []
+        });
       }
       
       return result;
     } catch (error) {
-      console.error('StorageService: Error retrieving schedule from storage:', error);
+      logger.error('Error retrieving schedule from storage:', { error });
       return null;
     }
   }
@@ -179,43 +338,43 @@ class StorageService {
     // Check if prayerTimes is an array or a single object
     // If it's a single object with a data property that's an array, store that object directly
     if (!Array.isArray(prayerTimes) && prayerTimes && 'data' in prayerTimes && Array.isArray(prayerTimes.data)) {
-      console.log('Saving prayer times with nested data structure', prayerTimes);
-      await localforage.setItem(StorageKeys.PRAYER_TIMES, prayerTimes);
+      logger.info('Saving prayer times with nested data structure');
+      await this.saveItem(StorageKeys.PRAYER_TIMES, prayerTimes);
     } else if (Array.isArray(prayerTimes)) {
       // If it's already an array, save it directly
-      console.log('Saving prayer times array', prayerTimes);
-      await localforage.setItem(StorageKeys.PRAYER_TIMES, prayerTimes);
+      logger.info('Saving prayer times array');
+      await this.saveItem(StorageKeys.PRAYER_TIMES, prayerTimes);
     } else {
       // Single prayer time object, convert to array
-      console.log('Saving single prayer time object as array', prayerTimes);
-      await localforage.setItem(StorageKeys.PRAYER_TIMES, [prayerTimes]);
+      logger.info('Saving single prayer time object as array');
+      await this.saveItem(StorageKeys.PRAYER_TIMES, [prayerTimes]);
     }
     await this.updateLastUpdated(StorageKeys.PRAYER_TIMES);
   }
 
   async getPrayerTimes(): Promise<PrayerTimes[] | PrayerTimes | null> {
-    return localforage.getItem<PrayerTimes[] | PrayerTimes>(StorageKeys.PRAYER_TIMES);
+    return this.getItem<PrayerTimes[] | PrayerTimes>(StorageKeys.PRAYER_TIMES);
   }
 
   // Events
   async saveEvents(events: Event[]): Promise<void> {
-    await localforage.setItem(StorageKeys.EVENTS, events);
+    await this.saveItem(StorageKeys.EVENTS, events);
     await this.updateLastUpdated(StorageKeys.EVENTS);
   }
 
   async getEvents(): Promise<Event[] | null> {
-    return localforage.getItem<Event[]>(StorageKeys.EVENTS);
+    return this.getItem<Event[]>(StorageKeys.EVENTS);
   }
 
   // Credentials
   async saveCredentials(credentials: ApiCredentials): Promise<void> {
-    await localStorage.setItem(StorageKeys.API_KEY, credentials.apiKey);
-    await localStorage.setItem(StorageKeys.SCREEN_ID, credentials.screenId);
+    await this.saveItem(StorageKeys.API_KEY, credentials.apiKey);
+    await this.saveItem(StorageKeys.SCREEN_ID, credentials.screenId);
   }
 
   async getCredentials(): Promise<ApiCredentials | null> {
-    const apiKey = localStorage.getItem(StorageKeys.API_KEY);
-    const screenId = localStorage.getItem(StorageKeys.SCREEN_ID);
+    const apiKey = await this.getItem<string>(StorageKeys.API_KEY);
+    const screenId = await this.getItem<string>(StorageKeys.SCREEN_ID);
     
     if (apiKey && screenId) {
       return { apiKey, screenId };
@@ -225,47 +384,87 @@ class StorageService {
   }
 
   async clearCredentials(): Promise<void> {
-    localStorage.removeItem(StorageKeys.API_KEY);
-    localStorage.removeItem(StorageKeys.SCREEN_ID);
+    await this.primaryStorage.delete(StorageKeys.API_KEY);
+    await this.primaryStorage.delete(StorageKeys.SCREEN_ID);
+    
+    // Also clear from fallback if different
+    if (this.fallbackStorage !== this.primaryStorage) {
+      await this.fallbackStorage.delete(StorageKeys.API_KEY);
+      await this.fallbackStorage.delete(StorageKeys.SCREEN_ID);
+    }
   }
 
-  // Last Updated Timestamps
   private async updateLastUpdated(key: string): Promise<void> {
     const lastUpdated = await this.getLastUpdated() || {};
     lastUpdated[key] = new Date().toISOString();
-    await localforage.setItem(StorageKeys.LAST_UPDATED, lastUpdated);
+    await this.saveItem(StorageKeys.LAST_UPDATED, lastUpdated);
   }
 
   async getLastUpdated(): Promise<Record<string, string> | null> {
-    return localforage.getItem<Record<string, string>>(StorageKeys.LAST_UPDATED);
+    return this.getItem<Record<string, string>>(StorageKeys.LAST_UPDATED);
   }
 
   // Emergency Alert
   async saveEmergencyAlert(alert: EmergencyAlert): Promise<void> {
-    await localforage.setItem(StorageKeys.EMERGENCY_ALERT, alert);
+    await this.saveItem(StorageKeys.EMERGENCY_ALERT, alert);
   }
 
   async getEmergencyAlert(): Promise<EmergencyAlert | null> {
-    return localforage.getItem<EmergencyAlert>(StorageKeys.EMERGENCY_ALERT);
+    return this.getItem<EmergencyAlert>(StorageKeys.EMERGENCY_ALERT);
   }
 
   async removeEmergencyAlert(): Promise<void> {
-    await localforage.removeItem(StorageKeys.EMERGENCY_ALERT);
+    try {
+      await this.primaryStorage.delete(StorageKeys.EMERGENCY_ALERT);
+      
+      // Also remove from fallback if different
+      if (this.fallbackStorage !== this.primaryStorage) {
+        await this.fallbackStorage.delete(StorageKeys.EMERGENCY_ALERT);
+      }
+    } catch (error) {
+      logger.error('Error removing emergency alert', { error });
+    }
   }
 
   // Clear all data
   async clearAll(): Promise<void> {
-    await localforage.clear();
-    localStorage.removeItem(StorageKeys.API_KEY);
-    localStorage.removeItem(StorageKeys.SCREEN_ID);
+    try {
+      await this.primaryStorage.clear();
+      logger.info('Primary storage cleared');
+      
+      // Clear fallback if different
+      if (this.fallbackStorage !== this.primaryStorage) {
+        await this.fallbackStorage.clear();
+        logger.info('Fallback storage cleared');
+      }
+    } catch (error) {
+      logger.error('Error clearing storage', { error });
+    }
   }
 
-  // Check if storage is empty (first run)
+  // Check if storage is empty
   async isStorageEmpty(): Promise<boolean> {
-    const keys = await localforage.keys();
-    return keys.length === 0;
+    try {
+      const primaryKeys = await this.primaryStorage.keys();
+      
+      // If primary has keys, not empty
+      if (primaryKeys.length > 0) {
+        return false;
+      }
+      
+      // Check fallback if different
+      if (this.fallbackStorage !== this.primaryStorage) {
+        const fallbackKeys = await this.fallbackStorage.keys();
+        return fallbackKeys.length === 0;
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error('Error checking if storage is empty', { error });
+      return true; // Assume empty on error
+    }
   }
 }
 
-const storageService = new StorageService();
-export default storageService; 
+// Export as singleton
+export default new StorageService(); 

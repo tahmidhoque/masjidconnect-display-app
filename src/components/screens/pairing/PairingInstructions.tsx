@@ -52,7 +52,7 @@ const PairingInstructions: React.FC<PairingInstructionsProps> = ({ adminBaseUrl 
       
       <Box sx={{ mt: 4 }}>
         <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
-          Need help? Visit <a href="https://masjidconnect.com/support" target="_blank" rel="noopener" style={{ color: theme.palette.warning.main }}>masjidconnect.com/support</a>
+          Need help? Visit <a href="https://masjidconnect.co.uk/support" target="_blank" rel="noopener" style={{ color: theme.palette.warning.main }}>masjidconnect.co.uk/support</a>
         </Typography>
       </Box>
     </Box>
