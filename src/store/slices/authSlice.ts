@@ -1,8 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import masjidDisplayClient from '../../api/masjidDisplayClient';
 import { ApiCredentials, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../../api/models';
-import { Orientation } from '../../contexts/OrientationContext';
+// Define Orientation type locally instead of importing from context
+export type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 import logger from '../../utils/logger';
+import dataSyncService from '../../services/dataSyncService';
 
 // State interface
 export interface AuthState {
@@ -356,6 +358,13 @@ const authSlice = createSlice({
           state.pairingCodeExpiresAt = null;
           state.isPairingCodeExpired = false;
           state.isPolling = false;
+          
+          // Initialize dataSyncService when pairing is successful
+          try {
+            dataSyncService.initialize();
+          } catch (error) {
+            logger.error('[Auth] Error initializing dataSyncService after pairing', { error });
+          }
           state.pairingError = null;
           state.lastUpdated = new Date().toISOString();
         }
@@ -381,6 +390,13 @@ const authSlice = createSlice({
           state.pairingCodeExpiresAt = null;
           state.isPairingCodeExpired = false;
           state.isPolling = false;
+          
+          // Initialize dataSyncService when authentication is successful
+          try {
+            dataSyncService.initialize();
+          } catch (error) {
+            logger.error('[Auth] Error initializing dataSyncService', { error });
+          }
         } else if (action.payload.pairingData) {
           state.pairingCode = action.payload.pairingData.pairingCode;
           state.pairingCodeExpiresAt = action.payload.pairingData.expiresAt;

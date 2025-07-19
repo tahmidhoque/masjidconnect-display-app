@@ -1,34 +1,42 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
-import { Box } from '@mui/material';
-import { useContent } from '../../contexts/ContentContext';
-import { useOrientation } from '../../contexts/OrientationContext';
-import useRotationHandling from '../../hooks/useRotationHandling';
-import useContentUpdates from '../../hooks/useContentUpdates';
-import LandscapeDisplay from '../layouts/LandscapeDisplay';
-import PortraitDisplay from '../layouts/PortraitDisplay';
-import LoadingScreen from './LoadingScreen';
-import logger from '../../utils/logger';
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+} from "react";
+import { Box } from "@mui/material";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "../../store";
+import { refreshAllContent } from "../../store/slices/contentSlice";
+import { setOrientation } from "../../store/slices/uiSlice";
+import useRotationHandling from "../../hooks/useRotationHandling";
+import LandscapeDisplay from "../layouts/LandscapeDisplay";
+import PortraitDisplay from "../layouts/PortraitDisplay";
+import LoadingScreen from "./LoadingScreen";
+import logger from "../../utils/logger";
 
 // Simplified CSS styles for transitions
 const TRANSITION_STYLES = {
   container: {
-    width: '100vw', 
-    height: '100vh',
-    overflow: 'hidden',
-    position: 'relative'
+    width: "100vw",
+    height: "100vh",
+    overflow: "hidden",
+    position: "relative",
   },
   content: {
-    width: '100%',
-    height: '100%'
+    width: "100%",
+    height: "100%",
   },
   rotated: {
-    width: '100vh',
-    height: '100vw',
-    position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    transformOrigin: 'center'
-  }
+    width: "100vh",
+    height: "100vw",
+    position: "absolute" as const,
+    top: "50%",
+    left: "50%",
+    transformOrigin: "center",
+  },
 };
 
 // Memoized landscape and portrait components
@@ -37,100 +45,117 @@ const MemoizedPortraitDisplay = memo(PortraitDisplay);
 
 /**
  * DisplayScreen component
- * 
+ *
  * The main display screen shown after successful authentication.
  * Shows prayer times, current content, and other information.
  * Adapts to the screen orientation (portrait/landscape) based on admin settings.
  */
 const DisplayScreen: React.FC = () => {
-  const { 
-    isLoading, 
-    screenContent
-  } = useContent();
-  
-  // Use the content updates hook for real-time content refreshing
-  // Set to refresh every 5 minutes (300000ms)
-  const { forceRefresh } = useContentUpdates(300000);
-  
-  const { orientation, setAdminOrientation } = useOrientation();
+  const dispatch = useDispatch<AppDispatch>();
+
+  // Redux selectors
+  const isLoading = useSelector((state: RootState) => state.content.isLoading);
+  const screenContent = useSelector(
+    (state: RootState) => state.content.screenContent
+  );
+  const orientation = useSelector((state: RootState) => state.ui.orientation);
+
+  // Custom content refresh function to replace useContentUpdates
+  const forceRefresh = useCallback(() => {
+    dispatch(refreshAllContent({ forceRefresh: true }));
+  }, [dispatch]);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const previousOrientationRef = useRef(orientation);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Update orientation from screen content when it changes
   const updateOrientationFromContent = useCallback(() => {
     if (!screenContent) return;
-    
+
     // Check for orientation in both the new data structure and legacy location
     let newOrientation;
-    
+
     if (screenContent?.data?.screen?.orientation) {
       newOrientation = screenContent.data.screen.orientation;
     } else if (screenContent?.screen?.orientation) {
       newOrientation = screenContent.screen.orientation;
     }
-    
+
     // Only update if we found a valid orientation and it's different from current
     if (newOrientation && newOrientation !== orientation) {
       // Check if this update is from initial load vs SSE event
-      const lastSseEvent = localStorage.getItem('last_orientation_sse_event');
+      const lastSseEvent = localStorage.getItem("last_orientation_sse_event");
       if (lastSseEvent) {
         const lastEventTime = parseInt(lastSseEvent, 10);
         const now = Date.now();
-        
+
         // If we've received an SSE event in the last 10 seconds, don't override it with content data
         if (now - lastEventTime < 10000) {
           return;
         }
       }
-      
-      logger.info(`DisplayScreen: Updating orientation from content API: ${newOrientation}`);
-      setAdminOrientation(newOrientation);
+
+      logger.info(
+        `DisplayScreen: Updating orientation from content API: ${newOrientation}`
+      );
+      dispatch(setOrientation(newOrientation));
     }
-  }, [screenContent, setAdminOrientation, orientation]);
-  
+  }, [screenContent, dispatch, orientation]);
+
   // Effect to update orientation when content changes
   useEffect(() => {
     updateOrientationFromContent();
   }, [updateOrientationFromContent]);
-  
+
   // Add an effect to force content refresh when the window gains focus
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        logger.info('Display became visible - refreshing content');
+      if (document.visibilityState === "visible") {
+        logger.info("Display became visible - refreshing content");
         forceRefresh();
       }
     };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [forceRefresh]);
-  
+
+  // Add periodic content refresh (every 5 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      logger.info("Periodic content refresh");
+      forceRefresh();
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [forceRefresh]);
+
   // Add effect to track orientation changes
   useEffect(() => {
     // Only trigger animation if orientation actually changed
     if (previousOrientationRef.current !== orientation) {
-      logger.info(`DisplayScreen: Orientation changed from ${previousOrientationRef.current} to ${orientation}`);
-      
+      logger.info(
+        `DisplayScreen: Orientation changed from ${previousOrientationRef.current} to ${orientation}`
+      );
+
       // Start transition
       setIsTransitioning(true);
-      
+
       // Clear any existing timeout
       if (transitionTimerRef.current) {
         clearTimeout(transitionTimerRef.current);
       }
-      
+
       // After transition completes, clear the transitioning flag
       transitionTimerRef.current = setTimeout(() => {
         setIsTransitioning(false);
         previousOrientationRef.current = orientation;
         transitionTimerRef.current = null;
       }, 500); // Shorter transition duration
-      
+
       return () => {
         if (transitionTimerRef.current) {
           clearTimeout(transitionTimerRef.current);
@@ -138,7 +163,7 @@ const DisplayScreen: React.FC = () => {
       };
     }
   }, [orientation]);
-  
+
   // Use rotation handling hook to determine if we need to rotate
   const rotationInfo = useRotationHandling(orientation);
   const shouldRotate = rotationInfo.shouldRotate;
@@ -146,9 +171,11 @@ const DisplayScreen: React.FC = () => {
   // Memoize the display component based on orientation
   const DisplayComponent = useMemo(() => {
     logger.info(`DisplayScreen: Rendering ${orientation} layout`);
-    return orientation === 'LANDSCAPE' ? 
-      <MemoizedLandscapeDisplay /> : 
-      <MemoizedPortraitDisplay />;
+    return orientation === "LANDSCAPE" ? (
+      <MemoizedLandscapeDisplay />
+    ) : (
+      <MemoizedPortraitDisplay />
+    );
   }, [orientation]);
 
   // Force a layout update when component mounts
@@ -165,8 +192,8 @@ const DisplayScreen: React.FC = () => {
   // Apply simpler transition styles for better performance
   const transitionStyle = isTransitioning ? { opacity: 0.95 } : { opacity: 1 };
   const contentTransitionStyle = {
-    transition: 'opacity 300ms ease',
-    ...transitionStyle
+    transition: "opacity 300ms ease",
+    ...transitionStyle,
   };
 
   return (
@@ -177,12 +204,10 @@ const DisplayScreen: React.FC = () => {
           sx={{
             ...TRANSITION_STYLES.rotated,
             transform: `translate(-50%, -50%) rotate(90deg)`,
-            ...contentTransitionStyle
+            ...contentTransitionStyle,
           }}
         >
-          <Box sx={{ ...TRANSITION_STYLES.content }}>
-            {DisplayComponent}
-          </Box>
+          <Box sx={{ ...TRANSITION_STYLES.content }}>{DisplayComponent}</Box>
         </Box>
       ) : (
         // No rotation needed
@@ -194,4 +219,4 @@ const DisplayScreen: React.FC = () => {
   );
 };
 
-export default memo(DisplayScreen); 
+export default memo(DisplayScreen);

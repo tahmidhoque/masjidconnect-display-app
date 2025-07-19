@@ -1,5 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Orientation } from '../../contexts/OrientationContext';
+
+// Define Orientation type locally instead of importing from context
+export type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 
 // State interface
 export interface UIState {
@@ -52,7 +54,7 @@ export interface UIState {
 
 // Initial state
 const initialState: UIState = {
-  orientation: 'landscape',
+  orientation: 'LANDSCAPE',
   isOffline: false,
   wasOffline: false,
   offlineStartTime: null,

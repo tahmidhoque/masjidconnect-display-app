@@ -6,9 +6,12 @@ import storageService from '../../services/storageService';
 import logger from '../../utils/logger';
 
 // Constants
-const MIN_REFRESH_INTERVAL = 10 * 1000; // 10 seconds
+const MIN_REFRESH_INTERVAL = 30 * 1000; // Increased from 10 to 30 seconds to prevent rapid firing
 const SKIP_PRAYERS = ['Sunrise']; // Prayers to skip in announcements
 const DEFAULT_MASJID_NAME = 'Masjid Connect'; // Default masjid name if none is found
+
+// Debounce map to prevent rapid successive calls
+const debounceMap = new Map<string, number>();
 
 // State interface
 export interface ContentState {
@@ -176,16 +179,29 @@ export const refreshContent = createAsyncThunk(
   'content/refreshContent',
   async ({ forceRefresh = false }: { forceRefresh?: boolean } = {}, { rejectWithValue, getState }) => {
     try {
+      const debounceKey = 'refreshContent';
+      const now = Date.now();
+      const lastCall = debounceMap.get(debounceKey) || 0;
+      
+      // Aggressive debouncing to prevent rapid firing (especially in Electron)
+      if (!forceRefresh && now - lastCall < MIN_REFRESH_INTERVAL) {
+        logger.debug('[Content] Debouncing refresh call - too recent', { 
+          lastCall: new Date(lastCall).toISOString(),
+          timeSince: now - lastCall 
+        });
+        return { skipped: true, reason: 'debounced' };
+      }
+      
+      debounceMap.set(debounceKey, now);
       logger.debug('[Content] Refreshing content...', { forceRefresh });
       
       const state = getState() as { content: ContentState };
-      const now = Date.now();
       const lastUpdate = state.content.lastContentUpdate ? new Date(state.content.lastContentUpdate).getTime() : 0;
       
       // Check if we should skip this refresh due to rate limiting
       if (!forceRefresh && now - lastUpdate < MIN_REFRESH_INTERVAL) {
         logger.debug('[Content] Skipping refresh due to rate limiting');
-        return { skipped: true };
+        return { skipped: true, reason: 'rate_limited' };
       }
       
       // Use data sync service for robust data fetching
@@ -200,19 +216,19 @@ export const refreshContent = createAsyncThunk(
       
       // Extract masjid information
       const masjidName = extractMasjidName(content);
-      const masjidTimezone = content.masjid?.timezone || content.data?.masjid?.timezone || content.prayerTimes?.timezone || null;
+      const masjidTimezone = content.masjid?.timezone || content.data?.masjid?.timezone || null;
       
       // Update carousel time if specified in content
       let carouselTime = 30; // default
-      if (content.settings?.carouselInterval) {
-        carouselTime = Math.max(5, Math.min(300, content.settings.carouselInterval)); // 5-300 seconds
+      if (content.screen?.contentConfig?.carouselInterval) {
+        carouselTime = Math.max(5, Math.min(300, content.screen.contentConfig.carouselInterval)); // 5-300 seconds
       }
       
       return {
-        content,
-        masjidName,
-        masjidTimezone,
-        carouselTime,
+        content: content || null,
+        masjidName: masjidName || null,
+        masjidTimezone: masjidTimezone || null,
+        carouselTime: carouselTime || 30,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
@@ -226,6 +242,20 @@ export const refreshPrayerTimes = createAsyncThunk(
   'content/refreshPrayerTimes',
   async (_, { rejectWithValue }) => {
     try {
+      const debounceKey = 'refreshPrayerTimes';
+      const now = Date.now();
+      const lastCall = debounceMap.get(debounceKey) || 0;
+      
+      // Aggressive debouncing to prevent rapid firing
+      if (now - lastCall < MIN_REFRESH_INTERVAL) {
+        logger.debug('[Content] Debouncing prayer times refresh - too recent', { 
+          lastCall: new Date(lastCall).toISOString(),
+          timeSince: now - lastCall 
+        });
+        return { skipped: true, reason: 'debounced' };
+      }
+      
+      debounceMap.set(debounceKey, now);
       logger.debug('[Content] Refreshing prayer times...');
       
       await dataSyncService.syncPrayerTimes();
@@ -296,7 +326,8 @@ export const refreshEvents = createAsyncThunk(
     try {
       logger.debug('[Content] Refreshing events...');
       
-      const events = await dataSyncService.fetchAndCacheEvents();
+      // Get existing events from storage for now
+      const events = await storageService.getEvents();
       
       return {
         events: events || [],
@@ -416,12 +447,12 @@ const contentSlice = createSlice({
         state.isLoadingContent = false;
         
         if (!action.payload.skipped) {
-          state.screenContent = action.payload.content;
-          state.masjidName = action.payload.masjidName;
-          state.masjidTimezone = action.payload.masjidTimezone;
-          state.carouselTime = action.payload.carouselTime;
-          state.lastContentUpdate = action.payload.timestamp;
-          state.lastUpdated = action.payload.timestamp;
+          state.screenContent = action.payload.content || null;
+          state.masjidName = action.payload.masjidName || null;
+          state.masjidTimezone = action.payload.masjidTimezone || null;
+          state.carouselTime = action.payload.carouselTime || 30;
+          state.lastContentUpdate = action.payload.timestamp || null;
+          state.lastUpdated = action.payload.timestamp || null;
         }
         
         // Update general loading state
@@ -441,9 +472,16 @@ const contentSlice = createSlice({
       })
       .addCase(refreshPrayerTimes.fulfilled, (state, action) => {
         state.isLoadingPrayerTimes = false;
-        state.prayerTimes = action.payload.prayerTimes;
-        state.lastPrayerTimesUpdate = action.payload.timestamp;
-        state.lastUpdated = action.payload.timestamp;
+        // Handle both single PrayerTimes object and array format
+        const prayerTimes = action.payload.prayerTimes;
+        if (Array.isArray(prayerTimes)) {
+          // If it's an array, take the first element (today's prayer times)
+          state.prayerTimes = prayerTimes[0] || null;
+        } else {
+          state.prayerTimes = prayerTimes || null;
+        }
+        state.lastPrayerTimesUpdate = action.payload.timestamp || new Date().toISOString();
+        state.lastUpdated = action.payload.timestamp || new Date().toISOString();
         
         // Update general loading state
         state.isLoading = state.isLoadingContent || state.isLoadingSchedule || state.isLoadingEvents;
@@ -464,9 +502,9 @@ const contentSlice = createSlice({
         state.isLoadingSchedule = false;
         
         if (!action.payload.skipped) {
-          state.schedule = action.payload.schedule;
-          state.lastScheduleUpdate = action.payload.timestamp;
-          state.lastUpdated = action.payload.timestamp;
+          state.schedule = action.payload.schedule || null;
+          state.lastScheduleUpdate = action.payload.timestamp || null;
+          state.lastUpdated = action.payload.timestamp || null;
         }
         
         // Update general loading state

@@ -18,6 +18,8 @@ import {
 } from './models';
 import logger, { setLastError } from '../utils/logger';
 import { createErrorResponse, normalizeApiResponse, validateApiResponse } from '../utils/apiErrorHandler';
+// Note: We'll dispatch errors via a callback to avoid circular dependencies
+// The store will be passed to the client after initialization
 
 // CORS proxy configuration for development
 const USE_CORS_PROXY = process.env.REACT_APP_USE_CORS_PROXY === 'true';
@@ -250,10 +252,7 @@ class MasjidDisplayClient {
         headers: error.config?.headers
       });
       
-      // Store the CORS error for UI display
-      setLastError(`CORS policy error: The API server (${this.baseURL}) does not allow requests from this application. Backend CORS configuration needs to be updated.`);
-      
-      // Emit an event for the UI to handle with more details
+      // Legacy support - still emit event for existing CORS notification
       const corsErrorEvent = new CustomEvent('api:corserror', {
         detail: { 
           endpoint: endpoint, 
@@ -265,27 +264,39 @@ class MasjidDisplayClient {
       });
       window.dispatchEvent(corsErrorEvent);
       
-      // Try to fall back to cached data
       return;
     }
     
     // Handle other types of errors
     if (status === 401) {
       logger.warn(`Authentication error: ${message}`);
-      // Dispatch auth error event
+      
+      // Legacy support - still emit event for existing auth error detection
       const authErrorEvent = new CustomEvent('api:autherror', { 
         detail: { status, message } 
       });
       window.dispatchEvent(authErrorEvent);
+      
     } else if (status === 404) {
       logger.warn(`Resource not found: ${url}`);
+      
     } else if (status >= 500) {
       logger.error(`Server error (${status}): ${message}`);
+      
+    } else if (status === 429) {
+      logger.warn(`Rate limited: Too many requests to ${endpoint}`);
+      
+    } else if (!status && !navigator.onLine) {
+      logger.warn(`Device appears to be offline when accessing ${endpoint}`);
+      
+    } else if (!status) {
+      logger.error(`Failed to connect to API server: ${message}`);
+      
     } else {
       logger.error(`API error: ${message}`, { status, url });
     }
     
-    // Store the most recent error
+    // Store the most recent error (legacy support)
     setLastError(`${message} (${status || 'network error'})`);
   }
 

@@ -7,7 +7,6 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* Prevent scrolling on display screens */
 }
 
 /* Arabic text specific styles */
@@ -51,4 +50,12 @@ html, body, #root {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
-} 
+}
+
+/* Animation for spinning refresh icon */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+ 

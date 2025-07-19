@@ -7,6 +7,7 @@ import authSlice from './slices/authSlice';
 import contentSlice from './slices/contentSlice';
 import uiSlice from './slices/uiSlice';
 import emergencySlice from './slices/emergencySlice';
+import errorSlice from './slices/errorSlice';
 
 // Import middleware
 import { emergencyMiddleware } from './middleware/emergencyMiddleware';
@@ -17,15 +18,18 @@ const rootReducer = combineReducers({
   content: contentSlice,
   ui: uiSlice,
   emergency: emergencySlice,
+  errors: errorSlice,
 });
+
+// Types are defined below to avoid circular dependencies
 
 // Persist config - we want to persist most of the state for offline capability
 const persistConfig = {
   key: 'masjidconnect-root',
   version: 1,
   storage,
-  // Blacklist UI state that should not be persisted
-  blacklist: ['ui'],
+  // Blacklist UI state and error state that should not be persisted
+  blacklist: ['ui', 'errors'],
   // Whitelist critical data that should be persisted
   whitelist: ['auth', 'content', 'emergency']
 };

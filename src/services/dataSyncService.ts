@@ -75,7 +75,7 @@ class DataSyncService {
       return;
     }
     
-    logger.info('Initializing DataSyncService');
+    logger.info('Initializing DataSyncService (Conservative Mode - Redux Controlled)');
     this.isInitialized = true;
     this.setupNetworkListeners();
     
@@ -94,14 +94,12 @@ class DataSyncService {
       this.setCredentialsFromLocalStorage();
     }
     
-    // Start syncing if authenticated after our checks
+    // IMPORTANT: Do NOT start automatic syncing - Redux will handle data updates
+    // This prevents the rapid firing issue in Electron
     if (masjidDisplayClient.isAuthenticated()) {
-      logger.info('DataSyncService authenticated, starting initial sync');
-      // Initial sync
-      this.syncAllData(true); // Force refresh on initial load
-      
-      // Then start periodic syncs with proper intervals
-      this.startAllSyncs();
+      logger.info('DataSyncService authenticated - Redux will handle data updates');
+      // Do initial sync only, no automatic intervals
+      this.syncAllData(true); // Force refresh on initial load only
     } else {
       logger.warn('DataSyncService not authenticated, cannot start syncing');
     }
@@ -119,7 +117,7 @@ class DataSyncService {
     if (masjidDisplayClient.isAuthenticated()) {
       // Sync immediately when coming back online
       this.syncAllData();
-      this.startAllSyncs();
+      // this.startAllSyncs(); // Removed as per conservative mode
     }
   };
 

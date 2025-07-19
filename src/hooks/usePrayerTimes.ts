@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PrayerTimes } from '../api/models';
-import { useContent } from '../contexts/ContentContext';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../store';
+import { refreshPrayerTimes } from '../store/slices/contentSlice';
 import { 
   formatTimeToDisplay, 
   getNextPrayerTime, 
@@ -41,8 +43,14 @@ const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Zuhr', 'Asr', 'Maghrib', 'Isha'];
 const SKIP_PRAYERS = ['Sunrise']; // Prayers to skip in countdown
 
 export const usePrayerTimes = (): PrayerTimesHook => {
-  // Only get prayerTimes and refreshPrayerTimes from ContentContext
-  const { prayerTimes, refreshPrayerTimes } = useContent();
+  // Get prayerTimes from Redux store
+  const dispatch = useDispatch<AppDispatch>();
+  const prayerTimes = useSelector((state: RootState) => state.content.prayerTimes);
+  
+  // Create refresh function wrapper
+  const refreshPrayerTimesHandler = useCallback(() => {
+    dispatch(refreshPrayerTimes());
+  }, [dispatch]);
   
   // State for UI display
   const [todaysPrayerTimes, setTodaysPrayerTimes] = useState<FormattedPrayerTime[]>([]);
@@ -78,7 +86,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   useEffect(() => {
     const handlePrayerTimesUpdate = () => {
       logger.info('Prayer times update detected, refreshing data');
-      refreshPrayerTimes();
+      refreshPrayerTimesHandler();
     };
 
     window.addEventListener('prayerTimesUpdated', handlePrayerTimesUpdate);
@@ -86,7 +94,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     return () => {
       window.removeEventListener('prayerTimesUpdated', handlePrayerTimesUpdate);
     };
-  }, [refreshPrayerTimes]);
+  }, [refreshPrayerTimesHandler]);
 
   // Set up periodic refresh to ensure components always have fresh prayer time data
   useEffect(() => {
@@ -98,20 +106,20 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       } else if (!prayerTimes && !calculationsRef.current.isProcessing) {
         // If no prayer times data, try to refresh
         logger.warn("No prayer times data available, requesting refresh");
-        refreshPrayerTimes();
+        refreshPrayerTimesHandler();
       }
     }, 60000); // Every minute
 
     // Perform an immediate check for prayer times data
     if (!prayerTimes) {
       logger.info("Immediate check: No prayer times data available, requesting refresh");
-      refreshPrayerTimes();
+      refreshPrayerTimesHandler();
     }
 
     return () => {
       clearInterval(minuteInterval);
     };
-  }, [prayerTimes]);
+  }, [prayerTimes, refreshPrayerTimesHandler]);
 
   // Process prayer times data when it changes
   useEffect(() => {
@@ -156,50 +164,40 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         hasZuhr: prayerTimes?.zuhr,
         hasAsr: prayerTimes?.asr
       });
-      refreshPrayerTimes();
+      refreshPrayerTimesHandler();
     }
-  }, [prayerTimes, refreshPrayerTimes]);
+  }, [prayerTimes, refreshPrayerTimesHandler]);
 
-  // Check data validity periodically and refresh if needed
+  // Add effect to check for missing prayer times data
   useEffect(() => {
-    // Check immediately after mounting if we need data
-    const initialCheckTimer = setTimeout(() => {
-      // Check if we have valid data in the expected format
-      const dataIsValid = nextPrayer && todaysPrayerTimes.length > 0 &&
-        todaysPrayerTimes.some(prayer => prayer.name && prayer.time);
-      
-      if (!prayerTimes || !dataIsValid) {
-        logger.warn('Missing or invalid prayer times data after initial load, requesting refresh', {
-          hasPrayerTimes: !!prayerTimes,
-          hasPrayerNames: prayerTimes ? Object.keys(prayerTimes).join(', ') : 'none',
-          nextPrayerName: nextPrayer?.name || 'none',
-          formattedTimesCount: todaysPrayerTimes.length
-        });
-        refreshPrayerTimes();
-      }
-    }, 2000); // Check 2 seconds after mounting
+    // MUCH more conservative validation to prevent rapid firing
+    if (!prayerTimes) {
+      return; // Don't do anything if no data at all
+    }
+
+    // Only check once every 5 minutes, not every 30 seconds
+    const lastCheckTime = localStorage.getItem('lastPrayerTimesCheck');
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
     
-    // Set up periodic check every 30 seconds
-    const periodicCheckTimer = setInterval(() => {
-      // Check if data is still valid
-      const dataIsValid = nextPrayer && todaysPrayerTimes.length > 0 &&
-        todaysPrayerTimes.some(prayer => prayer.name && prayer.time);
-      
-      if (!prayerTimes || !dataIsValid) {
-        logger.warn('Missing or invalid prayer times data in periodic check, requesting refresh', {
-          timestamp: new Date().toISOString(),
-          hasPrayerTimes: !!prayerTimes,
-          nextPrayerName: nextPrayer?.name || 'none'
-        });
-        refreshPrayerTimes();
-      }
-    }, 30000); // Check every 30 seconds
+    if (lastCheckTime && (now - parseInt(lastCheckTime)) < fiveMinutes) {
+      return; // Skip check if we checked recently
+    }
+
+    // Much more lenient validation - only refresh if data is completely broken
+    const hasCriticalData = prayerTimes && 
+                           typeof prayerTimes === 'object' &&
+                           (prayerTimes.fajr || prayerTimes.data);
     
-    return () => {
-      clearTimeout(initialCheckTimer);
-      clearInterval(periodicCheckTimer);
-    };
-  }, [prayerTimes, nextPrayer, todaysPrayerTimes, refreshPrayerTimes]);
+    if (!hasCriticalData) {
+      localStorage.setItem('lastPrayerTimesCheck', now.toString());
+      logger.warn('Critical prayer times data missing, requesting ONE refresh', {
+        hasPrayerTimes: !!prayerTimes,
+        type: typeof prayerTimes
+      });
+      refreshPrayerTimesHandler();
+    }
+  }, [prayerTimes, refreshPrayerTimesHandler]);
 
   // Process prayer times data and update state
   const processPrayerTimes = useCallback(() => {
@@ -297,7 +295,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       masjidDisplayClient.invalidateAllCaches();
       
       // Force refresh prayer times with high priority
-      refreshPrayerTimes();
+      refreshPrayerTimesHandler();
       
       // Update date information
       setCurrentDate(now.format('dddd, MMMM D, YYYY'));
@@ -308,7 +306,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Refresh Hijri date
       fetchHijriDate();
     }
-  }, [refreshPrayerTimes, fetchHijriDate]);
+  }, [refreshPrayerTimesHandler, fetchHijriDate]);
 
   // Helper function to determine current prayer - memoized
   const calculateCurrentPrayer = useCallback((prayersList: {name: string, time: string}[]) => {

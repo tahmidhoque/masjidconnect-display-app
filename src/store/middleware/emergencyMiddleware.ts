@@ -1,5 +1,5 @@
 import { Middleware, MiddlewareAPI, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import type { AppDispatch } from '../index';
+import type { AppDispatch, RootState } from '../index';
 import emergencyAlertService from '../../services/emergencyAlertService';
 import { 
   setCurrentAlert, 

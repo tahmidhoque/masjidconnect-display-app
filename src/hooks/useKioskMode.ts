@@ -1,59 +1,55 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useContent } from '../contexts/ContentContext';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../store';
+import { refreshPrayerTimes, refreshContent } from '../store/slices/contentSlice';
 import logger from '../utils/logger';
 
 /**
  * Custom hook to handle kiosk mode-specific behaviors
  * 
- * This hook ensures that an Electron app running in kiosk mode stays responsive
- * and refreshes content periodically, but avoids unnecessary refreshes that cause flashing.
+ * CONSERVATIVE MODE: Designed to prevent rapid firing in Electron
+ * Uses very infrequent updates to maintain stability
  */
 export const useKioskMode = () => {
-  const { refreshPrayerTimes, refreshContent, prayerTimes } = useContent();
+  const dispatch = useDispatch<AppDispatch>();
+  const prayerTimes = useSelector((state: RootState) => state.content.prayerTimes);
   const lastRefreshTimeRef = useRef<number>(Date.now());
   
   // Track initialization state
   const initializedRef = useRef<boolean>(false);
   
-  // Function to refresh all data - with smoother refresh to avoid flashing
+  // Function to refresh all data - VERY CONSERVATIVE to prevent flashing
   const refreshData = useCallback(async () => {
     try {
       const currentTime = Date.now();
       const timeSinceLastRefresh = currentTime - lastRefreshTimeRef.current;
       
-      // Don't refresh if it's been less than 2 minutes since last refresh
-      if (timeSinceLastRefresh < 2 * 60 * 1000) {
-        logger.info('[KioskMode] Skipping refresh - last refresh was less than 2 minutes ago');
+      // Don't refresh if it's been less than 10 minutes since last refresh (was 2 minutes)
+      if (timeSinceLastRefresh < 10 * 60 * 1000) {
+        logger.info('[KioskMode] Skipping refresh - last refresh was less than 10 minutes ago');
         return;
       }
       
-      logger.info('[KioskMode] Refreshing data gently...');
+      logger.info('[KioskMode] Refreshing data conservatively...');
       
-      // Stagger the refreshes to prevent both happening at once, which causes flashing
-      // First refresh prayer times
-      await refreshPrayerTimes();
-      
-      // Wait a moment before refreshing content
-      setTimeout(async () => {
-        // Use regular refresh instead of force refresh to avoid full remount
-        await refreshContent(false);
-        logger.info('[KioskMode] Data refreshed successfully');
-      }, 5000);
+      // Only refresh prayer times, let Redux handle content updates
+      dispatch(refreshPrayerTimes());
       
       lastRefreshTimeRef.current = currentTime;
+      logger.info('[KioskMode] Prayer times refreshed successfully');
     } catch (error) {
-      logger.error('[KioskMode] Error refreshing data:', error as Record<string, any>);
+      logger.error('[KioskMode] Error refreshing data:', { error });
     }
-  }, [refreshPrayerTimes, refreshContent]);
+  }, [dispatch]);
 
-  // Handle visibility change (tab focus/blur)
+  // Handle visibility change (tab focus/blur) - DEBOUNCED
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
-      logger.info('[KioskMode] App became visible, scheduling refresh...');
-      // Delay refresh slightly to prevent immediate flash when switching tabs
+      logger.info('[KioskMode] App became visible, scheduling conservative refresh...');
+      // Much longer delay to prevent rapid firing (was 2 seconds, now 30 seconds)
       setTimeout(() => {
         refreshData();
-      }, 2000);
+      }, 30000);
     }
   }, [refreshData]);
 
@@ -62,53 +58,40 @@ export const useKioskMode = () => {
     if (initializedRef.current) return;
     initializedRef.current = true;
     
-    logger.info('[KioskMode] Setting up kiosk mode behaviors');
+    logger.info('[KioskMode] Setting up CONSERVATIVE kiosk mode behaviors');
     
     // Add event listeners for visibility and focus
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Initial refresh with a slight delay
+    // Initial refresh with longer delay (was 5 seconds, now 2 minutes)
     setTimeout(() => {
       refreshData();
-    }, 5000);
+    }, 2 * 60 * 1000);
     
-    // Set up a backup polling mechanism
-    // This will check every 10 minutes if we haven't refreshed in 30 minutes
+    // MUCH more conservative backup polling - every 2 hours instead of 10 minutes
     const backupInterval = setInterval(() => {
-      const thirtyMinutesMs = 30 * 60 * 1000;
+      const twoHoursMs = 2 * 60 * 60 * 1000; // 2 hours instead of 30 minutes
       const timeSinceLastRefresh = Date.now() - lastRefreshTimeRef.current;
       
-      if (timeSinceLastRefresh > thirtyMinutesMs) {
-        logger.info('[KioskMode] Backup polling: No refresh in 30 minutes, triggering refresh');
+      if (timeSinceLastRefresh > twoHoursMs) {
+        logger.info('[KioskMode] Backup polling: No refresh in 2 hours, triggering refresh');
         refreshData();
       }
-    }, 10 * 60 * 1000); // Check every 10 minutes
+    }, 60 * 60 * 1000); // Check every hour instead of every 10 minutes
     
-    // For data updates, use smaller interval but don't reload the page
-    const dataRefreshInterval = setInterval(() => {
-      logger.info('[KioskMode] Periodic data refresh triggered');
-      refreshData();
-    }, 30 * 60 * 1000); // Every 30 minutes
+    // REMOVE the frequent data refresh interval that was causing rapid firing
+    // Redux will handle data updates through its own mechanisms
     
     return () => {
       // Clean up all event listeners and intervals
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(backupInterval);
-      clearInterval(dataRefreshInterval);
+      logger.info('[KioskMode] Cleaned up conservative kiosk mode');
     };
-  }, [refreshData, handleVisibilityChange]);
-  
-  // Effect to track prayer times changes and update refresh timestamp
-  useEffect(() => {
-    if (prayerTimes) {
-      lastRefreshTimeRef.current = Date.now();
-    }
-  }, [prayerTimes]);
-  
-  return {
-    refreshData,
-    lastRefreshTime: lastRefreshTimeRef.current
-  };
+  }, [handleVisibilityChange, refreshData]);
+
+  // Return the refresh function for manual use if needed
+  return { refreshData };
 };
 
 export default useKioskMode; 

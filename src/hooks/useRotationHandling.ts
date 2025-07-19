@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Orientation } from '../contexts/OrientationContext';
+// Define Orientation type locally instead of importing from context
+type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 
 /**
  * Custom hook for determining if rotation should be applied
