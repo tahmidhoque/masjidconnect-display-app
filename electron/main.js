@@ -6,7 +6,8 @@ const log = require('electron-log');
 const fs = require('fs');
 
 // Configure logging
-log.transports.file.level = 'info';
+// Reduce log verbosity in production to minimize disk writes
+log.transports.file.level = process.env.ELECTRON_DEBUG === 'true' ? 'info' : 'warn';
 log.info('App starting...');
 
 // Performance optimization flags - optimized for Raspberry Pi
@@ -231,8 +232,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      // Add devTools support in development
-      devTools: true, // Temporarily enable devTools in all modes for debugging
+      // Enable DevTools only during development to reduce overhead in production
+      devTools: isDev,
       // Allow mixed content (http/https)
       webSecurity: !isDev
     },
@@ -285,10 +286,10 @@ function createWindow() {
   log.info(`Loading URL: ${indexPath}`);
   
   try {
-    // Open DevTools immediately for troubleshooting
-    if (!isDev) {
+    // Open DevTools only when running in development mode
+    if (isDev) {
       mainWindow.webContents.openDevTools();
-      log.info("Developer tools opened for debugging");
+      log.info('Developer tools opened for debugging');
     }
     
     // Show window when ready
