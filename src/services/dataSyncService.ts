@@ -1,6 +1,7 @@
 import masjidDisplayClient, { POLLING_INTERVALS } from '../api/masjidDisplayClient';
 import storageService from './storageService';
 import logger, { getLastError } from '../utils/logger';
+import { isLowPowerDevice } from '../utils/performanceUtils';
 
 class DataSyncService {
   private syncIntervals: Record<string, number | null> = {
@@ -43,13 +44,28 @@ class DataSyncService {
     heartbeat: 0
   };
   
-  private readonly MIN_SYNC_INTERVAL: Record<string, number> = {
-    content: 10000, // 10 seconds
-    prayerTimes: 10000, // 10 seconds
-    events: 10000, // 10 seconds
-    schedule: 10000, // 10 seconds,
-    heartbeat: 30000 // 30 seconds (match MIN_HEARTBEAT_INTERVAL)
-  };
+  private readonly MIN_SYNC_INTERVAL: Record<string, number>;
+
+  constructor() {
+    const baseIntervals = {
+      content: 10000,
+      prayerTimes: 10000,
+      events: 10000,
+      schedule: 10000,
+      heartbeat: 30000,
+    };
+    if (isLowPowerDevice()) {
+      this.MIN_SYNC_INTERVAL = {
+        content: baseIntervals.content * 2,
+        prayerTimes: baseIntervals.prayerTimes * 2,
+        events: baseIntervals.events * 2,
+        schedule: baseIntervals.schedule * 2,
+        heartbeat: baseIntervals.heartbeat * 2,
+      };
+    } else {
+      this.MIN_SYNC_INTERVAL = baseIntervals;
+    }
+  }
   
   // Helper method to check if a sync should be throttled
   private shouldThrottleSync(syncType: string): boolean {

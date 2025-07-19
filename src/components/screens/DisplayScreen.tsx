@@ -16,6 +16,7 @@ import LandscapeDisplay from "../layouts/LandscapeDisplay";
 import PortraitDisplay from "../layouts/PortraitDisplay";
 import LoadingScreen from "./LoadingScreen";
 import logger from "../../utils/logger";
+import { isLowPowerDevice } from "../../utils/performanceUtils";
 
 // Simplified CSS styles for transitions
 const TRANSITION_STYLES = {
@@ -123,12 +124,20 @@ const DisplayScreen: React.FC = () => {
     };
   }, [forceRefresh]);
 
-  // Add periodic content refresh (every 5 minutes)
+  // Add periodic content refresh - interval can be tuned for low power devices
   useEffect(() => {
+    const baseInterval = parseInt(
+      process.env.REACT_APP_REFRESH_INTERVAL_MS || "300000",
+      10
+    );
+    const intervalMs = isLowPowerDevice() ? baseInterval * 2 : baseInterval;
+
     const interval = setInterval(() => {
       logger.info("Periodic content refresh");
       forceRefresh();
-    }, 300000); // 5 minutes
+    }, intervalMs);
+
+    logger.info(`Using refresh interval: ${Math.round(intervalMs / 1000)}s`);
 
     return () => clearInterval(interval);
   }, [forceRefresh]);

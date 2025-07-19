@@ -8,10 +8,14 @@ import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import { store, persistor } from './store';
+import { optimizeAppPerformance } from './utils/performanceUtils';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+
+// Apply runtime performance tweaks (e.g., hardware acceleration hints)
+optimizeAppPerformance();
 
 root.render(
   <React.StrictMode>
