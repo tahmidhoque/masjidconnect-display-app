@@ -580,18 +580,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
     if (!contentItems.length) {
       return (
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100%",
-            width: "100%",
-          }}
-        >
-          <Typography variant="h6">No content available</Typography>
-        </Box>
+        <GlassmorphicContentCardWrapper
+          title={`Welcome to ${masjidName || "your masjid"}`}
+          titleGradient="#2A9D8F"
+          content="Please log in to the admin portal to add announcements or events."
+          fontSize={fontSizes.h4}
+          variant={variant || "landscape"}
+          itemType="CUSTOM"
+        />
       );
     }
 

@@ -9,7 +9,12 @@ import {
 import { refreshAllContent } from "../store/slices/contentSlice";
 import { setInitializing } from "../store/slices/uiSlice";
 
-export type InitStage = "checking" | "pairing" | "fetching" | "ready";
+export type InitStage =
+  | "checking"
+  | "welcome"
+  | "pairing"
+  | "fetching"
+  | "ready";
 
 /**
  * useInitializationFlow manages the application startup sequence.
@@ -36,9 +41,12 @@ export default function useInitializationFlow() {
       if (action.payload?.credentials) {
         fetchContent();
       } else {
-        dispatch(requestPairingCode("LANDSCAPE")).then(() => {
-          setStage("pairing");
-        });
+        setStage("welcome");
+        setTimeout(() => {
+          dispatch(requestPairingCode("LANDSCAPE")).then(() => {
+            setStage("pairing");
+          });
+        }, 1500);
       }
     });
   }, [dispatch, fetchContent]);

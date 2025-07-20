@@ -69,7 +69,7 @@ const AppRoutes: React.FC = () => {
   useKioskMode();
   const { stage } = useInitializationFlow();
 
-  if (stage === "checking" || stage === "fetching") {
+  if (stage === "checking" || stage === "welcome" || stage === "fetching") {
     return <LoadingScreen />;
   }
 

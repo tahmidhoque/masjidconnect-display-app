@@ -6,7 +6,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
-import { Box } from "@mui/material";
+import { Box, Fade } from "@mui/material";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { refreshAllContent } from "../../store/slices/contentSlice";
@@ -68,6 +68,7 @@ const DisplayScreen: React.FC = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const previousOrientationRef = useRef(orientation);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [visible, setVisible] = useState(false);
 
   // Update orientation from screen content when it changes
   const updateOrientationFromContent = useCallback(() => {
@@ -107,6 +108,11 @@ const DisplayScreen: React.FC = () => {
   useEffect(() => {
     updateOrientationFromContent();
   }, [updateOrientationFromContent]);
+
+  // fade in when mounted
+  useEffect(() => {
+    setVisible(true);
+  }, []);
 
   // Add an effect to force content refresh when the window gains focus
   useEffect(() => {
@@ -206,9 +212,10 @@ const DisplayScreen: React.FC = () => {
   };
 
   return (
-    <Box sx={{ ...TRANSITION_STYLES.container }}>
-      {shouldRotate ? (
-        // Apply rotation transform for mismatched orientation
+    <Fade in={visible} timeout={800}>
+      <Box sx={{ ...TRANSITION_STYLES.container }}>
+        {shouldRotate ? (
+          // Apply rotation transform for mismatched orientation
         <Box
           sx={{
             ...TRANSITION_STYLES.rotated,
@@ -224,7 +231,8 @@ const DisplayScreen: React.FC = () => {
           {DisplayComponent}
         </Box>
       )}
-    </Box>
+      </Box>
+    </Fade>
   );
 };
 
