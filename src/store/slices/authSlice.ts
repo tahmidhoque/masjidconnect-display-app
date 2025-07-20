@@ -1,10 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import masjidDisplayClient from '../../api/masjidDisplayClient';
 import { ApiCredentials, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../../api/models';
-// Define Orientation type locally instead of importing from context
-export type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 import logger from '../../utils/logger';
 import dataSyncService from '../../services/dataSyncService';
+// Define Orientation type locally instead of importing from context
+export type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 
 // State interface
 export interface AuthState {

@@ -34,7 +34,6 @@ import networkStatusService from "./services/networkStatusService";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "./store";
 import { store } from "./store";
-import { initializeFromStorage } from "./store/slices/authSlice";
 
 // Verify database health early in the app lifecycle
 try {
@@ -69,15 +68,18 @@ const AppRoutes: React.FC = () => {
   useKioskMode();
   const { stage } = useInitializationFlow();
 
+  let content: React.ReactElement;
   if (stage === "checking" || stage === "welcome" || stage === "fetching") {
-    return <LoadingScreen />;
+    content = <LoadingScreen />;
+  } else if (stage === "pairing") {
+    content = <PairingScreen />;
+  } else {
+    content = <DisplayScreen />;
   }
 
-  if (stage === "pairing") {
-    return <PairingScreen />;
-  }
-
-  return <DisplayScreen />;
+  return (
+    <Suspense fallback={<LoadingScreen isSuspenseFallback />}>{content}</Suspense>
+  );
 };
 // Memoize the AppRoutes component to prevent unnecessary re-renders
 const MemoizedAppRoutes = memo(AppRoutes);
@@ -91,9 +93,8 @@ const MemoizedAppRoutes = memo(AppRoutes);
 const App: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  // Initialize auth from storage and network monitoring on app start
+  // Initialize network monitoring on app start
   useEffect(() => {
-    dispatch(initializeFromStorage());
 
     // Initialize network status service
     networkStatusService.initialize();

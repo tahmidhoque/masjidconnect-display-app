@@ -1,8 +1,8 @@
 import React, { ReactNode } from "react";
 import { Box, Fade, Divider, useTheme } from "@mui/material";
+import logoGold from "../../../assets/logos/logo-gold.svg";
 // Import Orientation type from UI slice or define locally
 type Orientation = "LANDSCAPE" | "PORTRAIT";
-import logoGold from "../../../assets/logos/logo-gold.svg";
 
 interface PairingScreenLayoutProps {
   orientation: Orientation;
