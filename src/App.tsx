@@ -68,17 +68,56 @@ const AppRoutes: React.FC = () => {
   useKioskMode();
   const { stage } = useInitializationFlow();
 
-  let content: React.ReactElement;
   if (stage === "checking" || stage === "welcome" || stage === "fetching") {
-    content = <LoadingScreen />;
-  } else if (stage === "pairing") {
-    content = <PairingScreen />;
-  } else {
-    content = <DisplayScreen />;
+    return <LoadingScreen />;
   }
 
   return (
-    <Suspense fallback={<LoadingScreen isSuspenseFallback />}>{content}</Suspense>
+    <>
+      <GracefulErrorOverlay position="center" autoHide={true} />
+      <Box
+        sx={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+        }}
+      >
+        <UpdateNotification
+          position={{ vertical: "bottom", horizontal: "right" }}
+        />
+        <AuthErrorDetector />
+        <EmergencyAlert />
+        <Suspense fallback={<LoadingScreen isSuspenseFallback={true} />}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                stage === "pairing" ? (
+                  <Navigate to="/pair" replace />
+                ) : (
+                  <AuthenticatedRoute>
+                    <DisplayScreen />
+                  </AuthenticatedRoute>
+                )
+              }
+            />
+            <Route
+              path="/pair"
+              element={
+                stage === "pairing" ? (
+                  <PairingScreen />
+                ) : (
+                  <Navigate replace to="/" />
+                )
+              }
+            />
+            <Route path="/loading" element={<LoadingScreen />} />
+            <Route path="/error" element={<ErrorScreen />} />
+            <Route path="*" element={<Navigate replace to="/" />} />
+          </Routes>
+        </Suspense>
+      </Box>
+    </>
   );
 };
 // Memoize the AppRoutes component to prevent unnecessary re-renders
