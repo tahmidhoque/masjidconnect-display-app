@@ -9,6 +9,7 @@ import {
   Chip,
   useTheme,
   alpha,
+  IconButton,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
@@ -17,6 +18,8 @@ import {
   Error as ErrorIcon,
   Warning as WarningIcon,
   Info as InfoIcon,
+  Close as CloseIcon,
+  CheckCircle as CheckCircleIcon,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../../store";
@@ -26,6 +29,7 @@ import {
   testNetworkConnectivity,
   selectCurrentError,
   selectIsRecovering,
+  dismissError,
   ErrorCode,
   ErrorSeverity,
   ErrorCategory,
@@ -33,6 +37,7 @@ import {
 import IslamicPatternBackground from "./IslamicPatternBackground";
 import { refreshAllContent } from "../../store/slices/contentSlice";
 import logger from "../../utils/logger";
+import logoGold from "../../assets/logos/logo-notext-gold.svg";
 
 interface GracefulErrorOverlayProps {
   position?: "center" | "top" | "bottom";
@@ -41,10 +46,10 @@ interface GracefulErrorOverlayProps {
 }
 
 /**
- * GracefulErrorOverlay - Shows user-friendly error messages with automatic recovery
+ * GracefulErrorOverlay - Shows MasjidConnect-branded error messages
  *
- * Displays errors in an on-brand overlay with Islamic pattern background.
- * Provides automatic recovery actions - no user interaction required.
+ * Critical/High: Full overlay with backdrop blur
+ * Medium/Low: Corner notification that doesn't interfere with display
  */
 const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
   position = "center",
@@ -68,72 +73,33 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
     null
   );
 
-  // Handle recovery actions
+  // Handle recovery process
   const handleRecovery = async () => {
-    if (!currentError) return;
-
-    dispatch(startRecovery());
-    setRecoveryProgress(10);
+    if (!currentError || isRecovering) return;
 
     try {
-      let success = false;
+      dispatch(startRecovery());
 
-      // Different recovery actions based on error code
+      // Recovery actions based on error type
       switch (currentError.code) {
         case ErrorCode.NET_OFFLINE:
-        case ErrorCode.NET_CONNECTION_FAILED:
-          // Test network connectivity
-          const result = await dispatch(testNetworkConnectivity());
-          success = testNetworkConnectivity.fulfilled.match(result);
+          await dispatch(testNetworkConnectivity()).unwrap();
           break;
-
-        case ErrorCode.DATA_PRAYER_TIMES_MISSING:
-        case ErrorCode.DATA_CONTENT_MISSING:
         case ErrorCode.DATA_SYNC_FAILED:
-          // Refresh content
-          await dispatch(refreshAllContent({ forceRefresh: true }));
-          success = true;
+          await dispatch(refreshAllContent({ forceRefresh: true })).unwrap();
           break;
-
-        case ErrorCode.SYS_MEMORY_EXCEEDED:
-          // Trigger garbage collection and optimization
-          if (window.gc) {
-            window.gc();
-          }
-          success = true;
-          break;
-
-        case ErrorCode.AUTH_TOKEN_EXPIRED:
-        case ErrorCode.AUTH_INVALID_TOKEN:
-          // Clear credentials and redirect to pairing
-          localStorage.removeItem("masjid_api_key");
-          localStorage.removeItem("masjid_screen_id");
-          window.location.href = "/pair";
-          success = true;
-          break;
-
         default:
-          // Generic retry
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          success = true;
+          // Generic recovery - wait and try again
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          break;
       }
 
-      setRecoveryProgress(100);
-
-      setTimeout(() => {
-        dispatch(
-          completeRecovery({
-            success,
-            message: success
-              ? "Recovery completed successfully"
-              : "Recovery failed",
-          })
-        );
-
-        if (success) {
-          setIsVisible(false);
-        }
-      }, 1000);
+      dispatch(
+        completeRecovery({
+          success: true,
+          message: "Issue resolved successfully",
+        })
+      );
     } catch (error) {
       logger.error("[GracefulErrorOverlay] Recovery failed", { error });
       dispatch(
@@ -146,13 +112,22 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
     }
   };
 
+  // Determine if this should be a full overlay or corner notification
+  const isFullOverlay =
+    currentError?.severity === ErrorSeverity.CRITICAL ||
+    currentError?.severity === ErrorSeverity.HIGH;
+
   // Show/hide logic
   useEffect(() => {
     if (currentError) {
       setIsVisible(true);
 
-      // Auto-hide for low severity errors
-      if (autoHide && currentError.severity === ErrorSeverity.LOW) {
+      // Auto-hide for medium/low severity errors
+      if (
+        autoHide &&
+        (currentError.severity === ErrorSeverity.MEDIUM ||
+          currentError.severity === ErrorSeverity.LOW)
+      ) {
         const timer = setTimeout(() => {
           setIsVisible(false);
         }, 8000);
@@ -163,7 +138,7 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
       if (currentError.isRecoverable && !isRecovering) {
         setTimeout(() => {
           handleRecovery();
-        }, 2000); // Wait 2 seconds before attempting recovery
+        }, 2000);
       }
     } else {
       setIsVisible(false);
@@ -214,69 +189,45 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
         return InfoIcon;
       case ErrorSeverity.LOW:
       default:
-        return InfoIcon;
+        return CheckCircleIcon;
     }
   };
 
-  // Get colors based on severity
+  // Get MasjidConnect-branded colors based on severity
   const getErrorColors = () => {
     switch (currentError.severity) {
       case ErrorSeverity.CRITICAL:
         return {
-          primary: theme.palette.error.main,
-          secondary: theme.palette.error.light,
-          background: alpha(theme.palette.error.main, 0.08),
-          border: alpha(theme.palette.error.main, 0.3),
+          primary: "#E76F51", // Error Red
+          secondary: "#FF8A65",
+          background: alpha("#E76F51", 0.1),
+          border: alpha("#E76F51", 0.3),
+          gradient: "linear-gradient(135deg, #E76F51 0%, #FF8A65 100%)",
         };
       case ErrorSeverity.HIGH:
         return {
-          primary: theme.palette.warning.main,
-          secondary: theme.palette.warning.light,
-          background: alpha(theme.palette.warning.main, 0.08),
-          border: alpha(theme.palette.warning.main, 0.3),
+          primary: "#E9C46A", // Golden Yellow
+          secondary: "#F1C40F",
+          background: alpha("#E9C46A", 0.1),
+          border: alpha("#E9C46A", 0.3),
+          gradient: "linear-gradient(135deg, #E9C46A 0%, #F1C40F 100%)",
         };
       case ErrorSeverity.MEDIUM:
         return {
-          primary: theme.palette.info.main,
-          secondary: theme.palette.info.light,
-          background: alpha(theme.palette.info.main, 0.08),
-          border: alpha(theme.palette.info.main, 0.3),
+          primary: "#66D1FF", // Sky Blue
+          secondary: "#87CEEB",
+          background: alpha("#66D1FF", 0.1),
+          border: alpha("#66D1FF", 0.3),
+          gradient: "linear-gradient(135deg, #66D1FF 0%, #87CEEB 100%)",
         };
       case ErrorSeverity.LOW:
       default:
         return {
-          primary: theme.palette.primary.main,
-          secondary: theme.palette.primary.light,
-          background: alpha(theme.palette.primary.main, 0.08),
-          border: alpha(theme.palette.primary.main, 0.3),
-        };
-    }
-  };
-
-  // Position styles
-  const getPositionStyles = () => {
-    const baseStyles = {
-      position: "fixed" as const,
-      zIndex: 1500,
-      left: "50%",
-      transform: "translateX(-50%)",
-      width: "90%",
-      maxWidth: `${maxWidth}px`,
-    };
-
-    switch (position) {
-      case "top":
-        return { ...baseStyles, top: theme.spacing(3) };
-      case "bottom":
-        return { ...baseStyles, bottom: theme.spacing(3) };
-      case "center":
-      default:
-        return {
-          ...baseStyles,
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-          maxHeight: "80vh",
-          overflowY: "auto" as const,
+          primary: "#2A9D8F", // Emerald Green
+          secondary: "#20B2AA",
+          background: alpha("#2A9D8F", 0.1),
+          border: alpha("#2A9D8F", 0.3),
+          gradient: "linear-gradient(135deg, #2A9D8F 0%, #20B2AA 100%)",
         };
     }
   };
@@ -284,63 +235,267 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
   const ErrorIcon = getErrorIcon();
   const colors = getErrorColors();
 
-  return (
-    <Fade in={isVisible} timeout={300}>
-      <Box
-        sx={getPositionStyles()}
-        data-testid="graceful-error-overlay"
-        data-error-id={currentError?.id}
-        data-error-severity={currentError?.severity}
-        data-error-code={currentError?.code}
-      >
-        {/* Background overlay for center position */}
-        {position === "center" && (
+  // Handle dismiss
+  const handleDismiss = () => {
+    if (currentError) {
+      dispatch(dismissError(currentError.id));
+    }
+  };
+
+  // Full overlay layout for critical/high severity
+  if (isFullOverlay) {
+    return (
+      <Fade in={isVisible} timeout={300}>
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            p: 3,
+          }}
+        >
+          {/* Backdrop with Islamic pattern */}
           <Box
             sx={{
-              position: "fixed",
+              position: "absolute",
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: alpha(theme.palette.common.black, 0.7),
-              backdropFilter: "blur(8px)",
-              zIndex: 1450,
+              background: "linear-gradient(135deg, #0A2647 0%, #144272 100%)",
+              backdropFilter: "blur(12px)",
+              zIndex: 1,
             }}
-          />
-        )}
+          >
+            <IslamicPatternBackground
+              opacity={0.05}
+              patternColor="#F1C40F"
+              variant="subtle"
+            />
+          </Box>
 
+          {/* Main error card */}
+          <Card
+            sx={{
+              position: "relative",
+              zIndex: 2,
+              maxWidth: 600,
+              width: "100%",
+              overflow: "hidden",
+              borderRadius: 4,
+              background: `linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.95) 0%, 
+                rgba(255, 255, 255, 0.9) 100%)`,
+              backdropFilter: "blur(20px)",
+              border: `2px solid ${colors.border}`,
+              boxShadow: `0 30px 60px rgba(0, 0, 0, 0.3), 
+                         0 0 0 1px rgba(255, 255, 255, 0.2),
+                         inset 0 1px 0 rgba(255, 255, 255, 0.3)`,
+            }}
+          >
+            {/* Recovery Progress */}
+            {isRecovering && (
+              <LinearProgress
+                variant="determinate"
+                value={recoveryProgress}
+                sx={{
+                  height: 6,
+                  background: colors.gradient,
+                  "& .MuiLinearProgress-bar": {
+                    background:
+                      "linear-gradient(90deg, #F1C40F 0%, #DAA520 100%)",
+                    borderRadius: 3,
+                  },
+                }}
+              />
+            )}
+
+            <CardContent sx={{ p: 4 }}>
+              {/* Header with MasjidConnect branding */}
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 3, mb: 4 }}
+              >
+                {/* MasjidConnect Logo */}
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 3,
+                    background: colors.gradient,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    p: 1.5,
+                    boxShadow: `0 8px 24px ${alpha(colors.primary, 0.3)}`,
+                  }}
+                >
+                  <img
+                    src={logoGold}
+                    alt="MasjidConnect"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      filter: "brightness(0) invert(1)",
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      background: colors.gradient,
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      mb: 0.5,
+                    }}
+                  >
+                    {currentError.code === ErrorCode.NET_OFFLINE
+                      ? "Connection Lost"
+                      : currentError.code === ErrorCode.AUTH_SCREEN_NOT_PAIRED
+                      ? "Pairing Required"
+                      : currentError.code === ErrorCode.API_SERVER_DOWN
+                      ? "Service Unavailable"
+                      : "System Alert"}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    MasjidConnect Display System
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Error Message */}
+              <Typography
+                variant="h6"
+                color="text.primary"
+                sx={{
+                  mb: 3,
+                  lineHeight: 1.6,
+                  fontWeight: 500,
+                }}
+              >
+                {currentError.userFriendlyMessage || currentError.message}
+              </Typography>
+
+              {/* Recovery Status */}
+              {isRecovering && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    p: 3,
+                    borderRadius: 3,
+                    background: `linear-gradient(135deg, 
+                      ${alpha(colors.primary, 0.1)} 0%, 
+                      ${alpha(colors.primary, 0.05)} 100%)`,
+                    border: `2px solid ${colors.border}`,
+                    mb: 3,
+                  }}
+                >
+                  <RefreshIcon
+                    sx={{
+                      fontSize: 24,
+                      color: colors.primary,
+                      animation: "spin 2s linear infinite",
+                    }}
+                  />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="body1"
+                      color={colors.primary}
+                      fontWeight={600}
+                    >
+                      Resolving Issue Automatically
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Progress: {recoveryProgress}% • Please wait...
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Footer */}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  pt: 2,
+                  borderTop: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+                }}
+              >
+                <Chip
+                  label={`Error: ${currentError.code}`}
+                  size="small"
+                  sx={{
+                    backgroundColor: alpha(colors.primary, 0.1),
+                    color: colors.primary,
+                    fontFamily: "monospace",
+                    fontWeight: 600,
+                  }}
+                />
+
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(currentError.timestamp).toLocaleTimeString()}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Fade>
+    );
+  }
+
+  // Corner notification for medium/low severity
+  return (
+    <Fade in={isVisible} timeout={300}>
+      <Box
+        sx={{
+          position: "fixed",
+          top: 24,
+          right: 24,
+          zIndex: 1300,
+          maxWidth: 400,
+          width: "auto",
+        }}
+      >
         <Card
           sx={{
-            position: "relative",
             overflow: "hidden",
             borderRadius: 3,
+            background: `linear-gradient(135deg, 
+              rgba(255, 255, 255, 0.98) 0%, 
+              rgba(255, 255, 255, 0.95) 100%)`,
+            backdropFilter: "blur(20px)",
             border: `2px solid ${colors.border}`,
-            backgroundColor: theme.palette.background.paper,
-            boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, 0.3)}`,
-            opacity: 1,
+            boxShadow: `0 12px 32px rgba(0, 0, 0, 0.15), 
+                       0 0 0 1px rgba(255, 255, 255, 0.2)`,
             "&::before": {
               content: '""',
               position: "absolute",
               top: 0,
               left: 0,
               right: 0,
-              bottom: 0,
-              background: `linear-gradient(135deg, ${alpha(
-                colors.primary,
-                0.05
-              )} 0%, ${alpha(colors.primary, 0.02)} 100%)`,
-              pointerEvents: "none",
-              zIndex: 0,
+              height: 4,
+              background: colors.gradient,
             },
           }}
         >
-          {/* Islamic Pattern Background */}
-          <IslamicPatternBackground
-            opacity={0.02}
-            patternColor={colors.primary}
-            variant="subtle"
-          />
-
           {/* Recovery Progress */}
           {isRecovering && (
             <LinearProgress
@@ -348,169 +503,114 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
               value={recoveryProgress}
               sx={{
                 height: 4,
-                backgroundColor: alpha(colors.primary, 0.15),
+                background: alpha(colors.primary, 0.2),
                 "& .MuiLinearProgress-bar": {
-                  backgroundColor: colors.primary,
+                  background: colors.gradient,
                   borderRadius: 2,
                 },
               }}
             />
           )}
 
-          <CardContent sx={{ p: 4, position: "relative", zIndex: 1 }}>
-            {/* Header */}
-            <Box
-              sx={{ display: "flex", alignItems: "flex-start", gap: 3, mb: 3 }}
-            >
-              {/* Error Icon */}
+          <CardContent sx={{ p: 3, pt: 4 }}>
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+              {/* Icon */}
               <Box
                 sx={{
-                  p: 2.5,
-                  borderRadius: 3,
-                  backgroundColor: colors.background,
-                  border: `1px solid ${alpha(colors.primary, 0.2)}`,
+                  p: 1.5,
+                  borderRadius: 2,
+                  background: colors.gradient,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  minWidth: 64,
-                  height: 64,
+                  minWidth: 40,
+                  height: 40,
                 }}
               >
-                <ErrorIcon sx={{ fontSize: 32, color: colors.primary }} />
+                <ErrorIcon
+                  sx={{
+                    fontSize: 20,
+                    color: "white",
+                  }}
+                />
               </Box>
 
-              {/* Error Content */}
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    mb: 1.5,
-                  }}
+                  sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}
                 >
                   <Typography
-                    variant="h5"
-                    fontWeight={600}
-                    color={colors.primary}
-                    sx={{ letterSpacing: "0.5px" }}
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.primary,
+                      fontSize: "0.9rem",
+                    }}
                   >
                     {currentError.code === ErrorCode.NET_OFFLINE
-                      ? "No Internet Connection"
-                      : currentError.code === ErrorCode.AUTH_SCREEN_NOT_PAIRED
-                      ? "Device Not Paired"
-                      : currentError.code === ErrorCode.API_SERVER_DOWN
-                      ? "Server Unavailable"
+                      ? "Connection Issue"
+                      : currentError.code === ErrorCode.DATA_SYNC_FAILED
+                      ? "Data Sync Issue"
                       : "System Notice"}
                   </Typography>
 
-                  <Chip
-                    label={currentError.code}
-                    size="small"
-                    sx={{
-                      backgroundColor: alpha(colors.primary, 0.1),
-                      color: colors.primary,
-                      border: `1px solid ${alpha(colors.primary, 0.2)}`,
-                      fontFamily: "monospace",
-                      fontSize: "0.7rem",
-                      fontWeight: 500,
-                      height: 24,
-                    }}
-                  />
+                  {!isRecovering && (
+                    <IconButton
+                      size="small"
+                      onClick={handleDismiss}
+                      sx={{
+                        ml: "auto",
+                        color: "text.secondary",
+                        "&:hover": { color: colors.primary },
+                      }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  )}
                 </Box>
 
                 <Typography
-                  variant="body1"
+                  variant="body2"
                   color="text.primary"
                   sx={{
-                    mb: 2,
-                    lineHeight: 1.6,
-                    fontSize: "1rem",
-                    opacity: 0.9,
+                    mb: isRecovering ? 2 : 1,
+                    lineHeight: 1.4,
+                    fontSize: "0.85rem",
                   }}
                 >
                   {currentError.userFriendlyMessage || currentError.message}
                 </Typography>
 
-                {/* Recovery Status */}
+                {/* Recovery status for corner notification */}
                 {isRecovering && (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      mb: 2,
-                      p: 1.5,
-                      borderRadius: 2,
-                      backgroundColor: alpha(colors.primary, 0.05),
-                      border: `1px solid ${alpha(colors.primary, 0.1)}`,
-                    }}
-                  >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <RefreshIcon
                       sx={{
-                        fontSize: 18,
+                        fontSize: 16,
                         color: colors.primary,
-                        animation: "spin 1s linear infinite",
+                        animation: "spin 1.5s linear infinite",
                       }}
                     />
                     <Typography
-                      variant="body2"
+                      variant="caption"
                       color={colors.primary}
-                      fontWeight={500}
+                      fontWeight={600}
                     >
-                      Attempting to resolve automatically... {recoveryProgress}%
+                      Auto-resolving... {recoveryProgress}%
                     </Typography>
                   </Box>
                 )}
 
-                {/* Auto-recovery message for non-recovering errors */}
-                {!isRecovering && currentError.isRecoverable && (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      mb: 2,
-                      p: 1.5,
-                      borderRadius: 2,
-                      backgroundColor: alpha(colors.primary, 0.05),
-                      border: `1px solid ${alpha(colors.primary, 0.1)}`,
-                    }}
-                  >
-                    <InfoIcon
-                      sx={{
-                        fontSize: 18,
-                        color: colors.primary,
-                      }}
-                    />
-                    <Typography
-                      variant="body2"
-                      color={colors.primary}
-                      fontWeight={500}
-                    >
-                      Will attempt automatic recovery shortly...
-                    </Typography>
-                  </Box>
-                )}
+                {/* Timestamp */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: "0.75rem", mt: 0.5, display: "block" }}
+                >
+                  {new Date(currentError.timestamp).toLocaleTimeString()}
+                </Typography>
               </Box>
             </Box>
-
-            {/* Additional Info */}
-            {currentError.metadata &&
-              Object.keys(currentError.metadata).length > 0 && (
-                <Box
-                  sx={{
-                    mt: 3,
-                    pt: 2,
-                    borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-                  }}
-                >
-                  <Typography variant="caption" color="text.secondary">
-                    Error ID: {currentError.id} • Time:{" "}
-                    {new Date(currentError.timestamp).toLocaleTimeString()}
-                  </Typography>
-                </Box>
-              )}
           </CardContent>
         </Card>
       </Box>

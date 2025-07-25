@@ -154,16 +154,37 @@ export const initializeFromStorage = createAsyncThunk(
     try {
       logger.debug('[Auth] Initializing from storage...');
       
-      // Check for credentials in multiple formats
+      // Check for credentials in multiple formats with enhanced logging
       const checkAllCredentialFormats = () => {
+        logger.debug('[Auth] === Checking All Credential Formats ===');
+        
         const formats = [
-          { apiKey: localStorage.getItem('masjid_api_key'), screenId: localStorage.getItem('masjid_screen_id') },
-          { apiKey: localStorage.getItem('apiKey'), screenId: localStorage.getItem('screenId') }
+          { 
+            name: 'Primary masjid_* format',
+            apiKey: localStorage.getItem('masjid_api_key'), 
+            screenId: localStorage.getItem('masjid_screen_id') 
+          },
+          { 
+            name: 'Simple format',
+            apiKey: localStorage.getItem('apiKey'), 
+            screenId: localStorage.getItem('screenId') 
+          }
         ];
+        
+        // Log what we found in each format
+        formats.forEach(format => {
+          logger.debug(`[Auth] ${format.name}:`, {
+            hasApiKey: !!format.apiKey,
+            hasScreenId: !!format.screenId,
+            apiKeyLength: format.apiKey?.length || 0,
+            screenIdLength: format.screenId?.length || 0
+          });
+        });
         
         // Check each format
         for (const format of formats) {
           if (format.apiKey && format.screenId) {
+            logger.info(`[Auth] ✅ Valid credentials found in ${format.name}`);
             return { apiKey: format.apiKey, screenId: format.screenId, found: true };
           }
         }
@@ -171,32 +192,45 @@ export const initializeFromStorage = createAsyncThunk(
         // Try JSON format
         try {
           const jsonCreds = localStorage.getItem('masjidconnect_credentials');
+          logger.debug('[Auth] JSON credentials check:', { 
+            exists: !!jsonCreds,
+            length: jsonCreds?.length || 0 
+          });
+          
           if (jsonCreds) {
             const parsed = JSON.parse(jsonCreds);
             if (parsed.apiKey && parsed.screenId) {
+              logger.info('[Auth] ✅ Valid credentials found in JSON format');
               return { apiKey: parsed.apiKey, screenId: parsed.screenId, found: true };
             }
           }
         } catch (error) {
-          logger.warn('Failed to parse JSON credentials', { error });
+          logger.warn('[Auth] Failed to parse JSON credentials', { error });
         }
         
+        logger.warn('[Auth] ❌ No valid credentials found in any format');
         return { apiKey: null, screenId: null, found: false };
       };
       
       const { apiKey, screenId, found } = checkAllCredentialFormats();
       
       if (found && apiKey && screenId) {
-        logger.debug('[Auth] Valid credentials found, initializing...');
+        logger.info('[Auth] Valid credentials found, initializing authentication...', {
+          apiKeyLength: apiKey.length,
+          screenIdLength: screenId.length
+        });
         
-        // Ensure consistent localStorage state
+        // Ensure consistent localStorage state - save in ALL formats for compatibility
+        const credentialData = { apiKey, screenId };
+        
         localStorage.setItem('masjid_api_key', apiKey);
         localStorage.setItem('masjid_screen_id', screenId);
         localStorage.setItem('apiKey', apiKey);
         localStorage.setItem('screenId', screenId);
-        localStorage.setItem('masjidconnect_credentials', JSON.stringify({
-          apiKey, screenId
-        }));
+        localStorage.setItem('masjidconnect_credentials', JSON.stringify(credentialData));
+        localStorage.setItem('isPaired', 'true');
+        
+        logger.debug('[Auth] Credentials saved in all formats for consistency');
         
         // Initialize API client
         masjidDisplayClient.setCredentials({ apiKey, screenId });
@@ -211,6 +245,8 @@ export const initializeFromStorage = createAsyncThunk(
           pairingData: null,
         };
       } else {
+        logger.info('[Auth] No valid credentials found, checking for pairing data...');
+        
         // Check for stored pairing code
         const storedPairingCode = localStorage.getItem('pairingCode');
         const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
@@ -219,8 +255,14 @@ export const initializeFromStorage = createAsyncThunk(
           const expiresAt = new Date(storedPairingCodeExpiresAt);
           const now = new Date();
           
+          logger.debug('[Auth] Found stored pairing code', {
+            code: storedPairingCode,
+            expiresAt: expiresAt.toISOString(),
+            isExpired: expiresAt <= now
+          });
+          
           if (expiresAt > now) {
-            logger.debug('[Auth] Restoring saved pairing code');
+            logger.debug('[Auth] Restoring valid pairing code');
             return {
               credentials: null,
               pairingData: {
@@ -230,11 +272,13 @@ export const initializeFromStorage = createAsyncThunk(
             };
           } else {
             // Clear expired pairing code
+            logger.debug('[Auth] Clearing expired pairing code');
             localStorage.removeItem('pairingCode');
             localStorage.removeItem('pairingCodeExpiresAt');
           }
         }
         
+        logger.info('[Auth] No valid credentials or pairing data found');
         return {
           credentials: null,
           pairingData: null,

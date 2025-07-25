@@ -22,7 +22,7 @@ interface DisplayMessage {
  *
  * Displays a loading screen with the MasjidConnect logo and a loading animation
  * while the app checks pairing status and fetches content.
- * Shows different messages based on authentication status.
+ * Shows different messages based on authentication status and initialization stage.
  */
 const LoadingScreen: React.FC<LoadingScreenProps> = ({
   onComplete,
@@ -41,9 +41,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
   const contentLoading = useSelector(
     (state: RootState) => state.content.isLoading
   );
-  const prayerTimes = useSelector(
-    (state: RootState) => state.content.prayerTimes
-  );
   const loadingMessage = useSelector(
     (state: RootState) => state.ui.loadingMessage
   );
@@ -57,15 +54,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
   // Animation and content states
   const [rotationAngle, setRotationAngle] = useState(0);
   const [showContent, setShowContent] = useState(false);
-  const [loadingStage, setLoadingStage] = useState<
-    "initializing" | "setting-up" | "ready" | "complete"
-  >("initializing");
-  const [showSpinner, setShowSpinner] = useState(true);
-  const [spinnerOpacity, setSpinnerOpacity] = useState(1);
-  const [loadingContentMessage, setLoadingContentMessage] =
-    useState("Initializing...");
-
-  // Reference to track if we've already triggered completion
   const hasCompletedRef = useRef(false);
 
   // Track orientation for proper rendering
@@ -86,166 +74,56 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
   // Fade in the content initially
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setShowContent(true);
     }, 300);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  // Update loading message based on content loading status
+  // Handle completion when initialization is done
   useEffect(() => {
-    // Set a timeout to move past loading state even if prayer times aren't loaded
-    const loadingTimeout = setTimeout(() => {
-      if (contentLoading === false && loadingStage === "initializing") {
-        logger.info("Loading timeout reached, proceeding anyway");
-        setLoadingStage("setting-up");
-      }
-    }, 5000); // 5 second timeout
-
-    if (contentLoading) {
-      setLoadingContentMessage("Loading content...");
-    } else if (!prayerTimes) {
-      setLoadingContentMessage("Loading prayer times...");
-      // Even if prayer times aren't loaded, progress the loading stage
-      // to prevent getting stuck on loading screen
-      setLoadingStage((prevStage) =>
-        prevStage === "initializing" ? "setting-up" : prevStage
-      );
-    } else {
-      // Force progression if all data is loaded
-      setLoadingStage((prevStage) =>
-        prevStage === "initializing" ? "setting-up" : prevStage
-      );
+    if (
+      !isInitializing &&
+      initializationStage === "ready" &&
+      !hasCompletedRef.current &&
+      onComplete
+    ) {
+      hasCompletedRef.current = true;
+      // Add a brief delay to ensure smooth transition
+      setTimeout(() => {
+        onComplete();
+      }, 500);
     }
+  }, [isInitializing, initializationStage, onComplete]);
 
-    return () => clearTimeout(loadingTimeout);
-  }, [contentLoading, prayerTimes, loadingStage]);
-
-  // Progress through loading stages with timeouts for premium feel
-  useEffect(() => {
-    // Set initial loading stage
-    setLoadingStage("initializing");
-
-    // Progress through stages with timeouts
-    const stageTimers: NodeJS.Timeout[] = [];
-
-    // Stage 1: Setting up
-    stageTimers.push(
-      setTimeout(() => {
-        setLoadingStage("setting-up");
-      }, 2500)
-    );
-
-    // Stage 2: Ready
-    stageTimers.push(
-      setTimeout(() => {
-        setLoadingStage("ready");
-      }, 5000)
-    );
-
-    // Stage 3: Complete - fade spinner gradually
-    stageTimers.push(
-      setTimeout(() => {
-        setLoadingStage("complete");
-
-        // Gradually fade out the spinner over 2 seconds
-        const fadeStart = Date.now();
-        const fadeDuration = 2000;
-        const fadeInterval = setInterval(() => {
-          const elapsed = Date.now() - fadeStart;
-          const progress = Math.min(elapsed / fadeDuration, 1);
-          setSpinnerOpacity(1 - progress);
-
-          if (progress >= 1) {
-            clearInterval(fadeInterval);
-            // Only hide spinner completely after fade completes
-            setShowSpinner(false);
-
-            // Notify parent that loading is complete - ensure we only do this once
-            if (!hasCompletedRef.current && onComplete) {
-              hasCompletedRef.current = true;
-              onComplete();
-            }
-          }
-        }, 50); // Update every 50ms for smooth animation
-      }, 7500)
-    );
-
-    if (isSuspenseFallback) {
-      // If used as a Suspense fallback, keep showing the spinner indefinitely
-      setShowSpinner(true);
-      setSpinnerOpacity(1);
-      setLoadingStage("initializing");
-
-      // Ensure cleanup doesn't hide spinner
-      return () => {};
-    }
-
-    // Clean up all timers on unmount
-    return () => {
-      stageTimers.forEach((timer) => clearTimeout(timer));
-    };
-  }, [isSuspenseFallback]);
-
-  // Get display message based on loading stage, auth status and data loading
+  // Get display message based on initialization state
   const getDisplayMessage = (): DisplayMessage => {
     // If used as Suspense fallback, show a simple message
     if (isSuspenseFallback) {
       return { text: "Loading...", isArabic: false };
     }
 
-    // For final stage, always show the Salam greeting with mosque name if available
-    if (loadingStage === "complete" || initializationStage === "complete") {
-      if (isAuthenticated && masjidName) {
+    // Use the loading message from Redux state if available
+    if (loadingMessage) {
+      // Check if this is a completion message
+      if (loadingMessage === "Ready" && isAuthenticated && masjidName) {
         return { text: `السلام عليكم - ${masjidName}`, isArabic: true };
+      } else if (loadingMessage === "Ready") {
+        return { text: "السلام عليكم", isArabic: true };
       }
-      return { text: "السلام عليكم", isArabic: true };
-    }
 
-    // For other stages, use app initialization message if available
-    if (loadingMessage && initializationStage !== "complete") {
       return { text: loadingMessage, isArabic: false };
     }
 
+    // Fallback messages based on state
     if (isAuthenticated) {
-      // Show more specific loading messages when authenticated
       if (contentLoading) {
         return { text: "Loading latest content...", isArabic: false };
-      } else if (!prayerTimes) {
-        return { text: "Loading prayer times...", isArabic: false };
       }
-
-      switch (loadingStage) {
-        case "initializing":
-          return { text: "Loading your dashboard...", isArabic: false };
-        case "setting-up":
-          return { text: "Fetching latest content...", isArabic: false };
-        case "ready":
-          return { text: "Preparing your display...", isArabic: false };
-        default:
-          return { text: "Loading...", isArabic: false };
-      }
+      return { text: "Loading your dashboard...", isArabic: false };
     } else {
-      // Not authenticated
-      const isPaired = localStorage.getItem("masjid_screen_id") !== null;
-
-      switch (loadingStage) {
-        case "initializing":
-          return { text: "Initializing...", isArabic: false };
-        case "setting-up":
-          return {
-            text: isPaired
-              ? "Reconnecting to your masjid..."
-              : "Setting up display...",
-            isArabic: false,
-          };
-        case "ready":
-          return {
-            text: isPaired ? "Ready to reconnect" : "Ready to pair",
-            isArabic: false,
-          };
-        default:
-          return { text: "Loading...", isArabic: false };
-      }
+      return { text: "Initializing...", isArabic: false };
     }
   };
 
@@ -254,6 +132,14 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
     const goldColor = theme.palette.warning.main; // Gold color
     const emeraldColor = "#2A9D8F"; // Emerald Green from brand guidelines
     const skyBlueColor = "#66D1FF"; // Sky Blue from brand guidelines
+
+    // Don't show spinner for completion messages
+    const message = getDisplayMessage();
+    const isCompletionMessage = message.isArabic || message.text === "Ready";
+
+    if (isCompletionMessage) {
+      return null;
+    }
 
     return (
       <Box
@@ -341,7 +227,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
           alignItems: "center",
           justifyContent: "center",
           flexGrow: 2,
-          position: "relative", // Keep position stable
+          position: "relative",
         }}
       >
         <Box
@@ -361,14 +247,15 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
               width: "100%",
               height: "100%",
               objectFit: "contain",
-              animation:
-                loadingStage === "complete" ? "logoGlow 2s infinite" : "none",
+              animation: getDisplayMessage().isArabic
+                ? "logoGlow 2s infinite"
+                : "none",
             }}
           />
         </Box>
       </Box>
 
-      {/* Bottom section with fixed height to prevent layout shifts */}
+      {/* Bottom section with spinner and message */}
       <Box
         sx={{
           display: "flex",
@@ -377,8 +264,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
           marginTop: "auto",
           flexGrow: 1,
           justifyContent: "flex-end",
-          minHeight: "240px", // Increased height for better spacing
-          position: "relative", // Create a containing context
+          minHeight: "240px",
+          position: "relative",
           "@keyframes logoGlow": {
             "0%": { filter: "brightness(1)" },
             "50%": { filter: "brightness(1.3)" },
@@ -386,7 +273,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
           },
         }}
       >
-        {/* Fixed position spinner container with smooth opacity transition */}
+        {/* Spinner container */}
         <Box
           sx={{
             height: "auto",
@@ -394,24 +281,21 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            position: "relative", // Changed to relative positioning
-            marginBottom: 4, // Add space between spinner and text
-            opacity: spinnerOpacity,
-            transition: "opacity 2s ease",
-            visibility: showSpinner ? "visible" : "hidden",
+            position: "relative",
+            marginBottom: 4,
           }}
         >
           <CustomLoader />
         </Box>
 
-        {/* Message container - central and more prominent */}
+        {/* Message container */}
         <Box
           sx={{
             width: "100%",
             position: "relative",
             textAlign: "center",
             padding: "0 24px",
-            marginBottom: 4, // Add space at bottom
+            marginBottom: 4,
           }}
         >
           <Typography
@@ -421,9 +305,9 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
               textAlign: "center",
               fontWeight: 400,
               letterSpacing: "0.05em",
-              fontSize: loadingStage === "complete" ? "1.8rem" : "1.4rem",
+              fontSize: getDisplayMessage().isArabic ? "1.8rem" : "1.4rem",
               transition: "font-size 0.5s ease",
-              textShadow: "0 2px 4px rgba(0,0,0,0.5)", // Add shadow for better visibility
+              textShadow: "0 2px 4px rgba(0,0,0,0.5)",
             }}
           >
             {getDisplayMessage().text}
@@ -443,16 +327,18 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
         top: 0,
         left: 0,
         backgroundColor: theme.palette.background.default,
-        // Use opacity transition for entire component to fade out
         opacity: 1,
         transition: "opacity 1.2s ease-in-out",
         "&.fade-out": {
           opacity: 0,
         },
-        zIndex: 100, // Ensure loading screen is above other content
+        zIndex: 100,
       }}
-      // Add className conditionally to avoid type errors
-      className={!isInitializing ? "fade-out" : undefined}
+      className={
+        !isInitializing && initializationStage === "ready"
+          ? "fade-out"
+          : undefined
+      }
     >
       <Fade in={showContent} timeout={800}>
         {shouldRotate ? (

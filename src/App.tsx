@@ -1,237 +1,180 @@
-import React, {
-  useEffect,
-  Suspense,
-  lazy,
-  memo,
-} from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
-import { ThemeProvider } from "@mui/material/styles";
-import { CssBaseline, Box } from "@mui/material";
-import { SnackbarProvider } from "notistack";
-import LoadingScreen from "./components/screens/LoadingScreen";
-import AuthErrorDetector from "./components/common/AuthErrorDetector";
-import UpdateNotification from "./components/common/UpdateNotification";
-import ApiErrorBoundary from "./components/common/ApiErrorBoundary";
-import EmergencyAlert from "./components/common/EmergencyAlert";
-import GracefulErrorOverlay from "./components/common/GracefulErrorOverlay";
+import React, { useEffect } from "react";
+import { Box, ThemeProvider, CssBaseline } from "@mui/material";
+
 import theme from "./theme/theme";
+import logger from "./utils/logger";
+import ApiErrorBoundary from "./components/common/ApiErrorBoundary";
+import GracefulErrorOverlay from "./components/common/GracefulErrorOverlay";
+import EmergencyAlertOverlay from "./components/common/EmergencyAlertOverlay";
 import useKioskMode from "./hooks/useKioskMode";
-import ErrorScreen from "./components/screens/ErrorScreen";
 import useInitializationFlow from "./hooks/useInitializationFlow";
-import {
-  fetchHijriDateElectronSafe,
-  calculateApproximateHijriDate,
-} from "./utils/dateUtils";
-import storageService from "./services/storageService";
-import networkStatusService from "./services/networkStatusService";
 
-// Redux imports
-import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch, RootState } from "./store";
-import { store } from "./store";
+// Components
+import LoadingScreen from "./components/screens/LoadingScreen";
+import PairingScreen from "./components/screens/PairingScreen";
+import DisplayScreen from "./components/screens/DisplayScreen";
+import ErrorScreen from "./components/screens/ErrorScreen";
 
-// Verify database health early in the app lifecycle
-try {
-  storageService.verifyDatabaseHealth().catch((err) => {
-    console.error("Failed to verify database health:", err);
-  });
-} catch (error) {
-  console.error("Error starting database health check:", error);
-}
+// Store
+import { useSelector } from "react-redux";
+import type { RootState } from "./store";
 
-// Lazy load screen components
-const DisplayScreen = lazy(() => import("./components/screens/DisplayScreen"));
-const PairingScreen = lazy(() => import("./components/screens/PairingScreen"));
+// Development localStorage monitor for debugging credential issues
+const useLocalStorageMonitor = () => {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
 
-// Create a simple AuthenticatedRoute component
-interface AuthenticatedRouteProps {
-  children: React.ReactNode;
-}
+    // On app startup, dump all localStorage contents
+    logger.info("[DevMonitor] 🚀 App startup - localStorage contents:");
+    const allKeys = Object.keys(localStorage);
+    const allContents: Record<string, string> = {};
 
-const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = ({
-  children,
-}) => {
-  const isAuthenticated = useSelector(
-    (state: RootState) => state.auth.isAuthenticated
-  );
-  return isAuthenticated ? <>{children}</> : <Navigate to="/pair" replace />;
+    allKeys.forEach((key) => {
+      allContents[key] = localStorage.getItem(key) || "";
+    });
+
+    logger.info("[DevMonitor] All localStorage keys:", allKeys);
+    logger.info("[DevMonitor] All localStorage contents:", allContents);
+
+    // Specifically check for credential-related keys
+    const credentialKeys = [
+      "masjid_api_key",
+      "masjid_screen_id",
+      "apiKey",
+      "screenId",
+      "masjidconnect_credentials",
+      "isPaired",
+      "persist:root",
+    ];
+
+    const credentialContents: Record<string, string | null> = {};
+    credentialKeys.forEach((key) => {
+      credentialContents[key] = localStorage.getItem(key);
+    });
+
+    logger.info(
+      "[DevMonitor] Credential-related localStorage on startup:",
+      credentialContents
+    );
+
+    const originalSetItem = localStorage.setItem;
+    const originalRemoveItem = localStorage.removeItem;
+    const originalClear = localStorage.clear;
+
+    // Monitor setItem calls
+    localStorage.setItem = function (key: string, value: string) {
+      if (credentialKeys.includes(key)) {
+        logger.info(`[DevMonitor] 📝 localStorage.setItem("${key}")`, {
+          valueLength: value.length,
+          valuePreview:
+            value.substring(0, 20) + (value.length > 20 ? "..." : ""),
+          stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
+        });
+      }
+      return originalSetItem.call(this, key, value);
+    };
+
+    // Monitor removeItem calls
+    localStorage.removeItem = function (key: string) {
+      if (credentialKeys.includes(key)) {
+        logger.warn(`[DevMonitor] 🗑️ localStorage.removeItem("${key}")`, {
+          hadValue: !!localStorage.getItem(key),
+          stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
+        });
+      }
+      return originalRemoveItem.call(this, key);
+    };
+
+    // Monitor clear calls
+    localStorage.clear = function () {
+      const credentialValues = credentialKeys.reduce((acc, key) => {
+        acc[key] = localStorage.getItem(key);
+        return acc;
+      }, {} as Record<string, string | null>);
+
+      const hasCredentials = Object.values(credentialValues).some(
+        (v) => v !== null
+      );
+
+      if (hasCredentials) {
+        logger.warn(
+          "[DevMonitor] 🧹 localStorage.clear() called with credentials present!",
+          {
+            credentials: credentialValues,
+            stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
+          }
+        );
+      }
+
+      return originalClear.call(this);
+    };
+
+    // Restore original methods on cleanup
+    return () => {
+      localStorage.setItem = originalSetItem;
+      localStorage.removeItem = originalRemoveItem;
+      localStorage.clear = originalClear;
+    };
+  }, []);
 };
-
-// Main App Routes component defined separately to access auth state
 
 const AppRoutes: React.FC = () => {
   useKioskMode();
   const { stage } = useInitializationFlow();
+  const isInitializing = useSelector(
+    (state: RootState) => state.ui.isInitializing
+  );
 
-  if (stage === "checking" || stage === "welcome" || stage === "fetching") {
+  // Show loading screen during initialization, but allow pairing screen to show
+  if (
+    stage === "checking" ||
+    stage === "welcome" ||
+    stage === "fetching" ||
+    (isInitializing && stage !== "pairing")
+  ) {
     return <LoadingScreen />;
   }
 
-  return (
-    <>
-      <GracefulErrorOverlay position="center" autoHide={true} />
-      <Box
-        sx={{
-          width: "100%",
-          height: "100%",
-          position: "relative",
-        }}
-      >
-        <UpdateNotification
-          position={{ vertical: "bottom", horizontal: "right" }}
-        />
-        <AuthErrorDetector />
-        <EmergencyAlert />
-        <Suspense fallback={<LoadingScreen isSuspenseFallback={true} />}>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                stage === "pairing" ? (
-                  <Navigate to="/pair" replace />
-                ) : (
-                  <AuthenticatedRoute>
-                    <DisplayScreen />
-                  </AuthenticatedRoute>
-                )
-              }
-            />
-            <Route
-              path="/pair"
-              element={
-                stage === "pairing" ? (
-                  <PairingScreen />
-                ) : (
-                  <Navigate replace to="/" />
-                )
-              }
-            />
-            <Route path="/loading" element={<LoadingScreen />} />
-            <Route path="/error" element={<ErrorScreen />} />
-            <Route path="*" element={<Navigate replace to="/" />} />
-          </Routes>
-        </Suspense>
-      </Box>
-    </>
-  );
+  switch (stage) {
+    case "pairing":
+      return <PairingScreen />;
+    case "ready":
+      return <DisplayScreen />;
+    default:
+      return <ErrorScreen message="Unknown initialization stage" />;
+  }
 };
-// Memoize the AppRoutes component to prevent unnecessary re-renders
-const MemoizedAppRoutes = memo(AppRoutes);
 
-/**
- * App Component
- *
- * Root component that sets up theme and routing.
- * Redux Provider is configured in index.tsx.
- */
 const App: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-
-  // Initialize network monitoring on app start
-  useEffect(() => {
-
-    // Initialize network status service
-    networkStatusService.initialize();
-
-    // Subscribe to network status updates
-    const unsubscribe = networkStatusService.subscribe((status) => {
-      // Update Redux state when network status changes
-      dispatch({
-        type: "errors/updateNetworkStatus",
-        payload: status,
-      });
-    });
-
-    return () => {
-      unsubscribe();
-      networkStatusService.destroy();
-    };
-  }, [dispatch]);
-
-  // Fetch Hijri date early in the app lifecycle, but limit the frequency
-  useEffect(() => {
-    console.log("Pre-fetching Hijri date from App component...");
-
-    // Check if we already have a recent Hijri date (less than 12 hours old)
-    const hijriDateTimestamp = localStorage.getItem("hijriDateTimestamp");
-    const now = Date.now();
-    const twelveHoursMs = 12 * 60 * 60 * 1000;
-
-    if (
-      hijriDateTimestamp &&
-      now - parseInt(hijriDateTimestamp, 10) < twelveHoursMs
-    ) {
-      console.log("Using cached Hijri date (less than 12 hours old)");
-      return;
-    }
-
-    // Clear any cached Hijri date to force fresh calculation
-    localStorage.removeItem("hijriDate");
-    localStorage.removeItem("hijriDateTimestamp");
-
-    // Use the current date with the correct year
-    const currentDate = new Date();
-    const day = currentDate.getDate().toString().padStart(2, "0");
-    const month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
-    const year = currentDate.getFullYear();
-    const today = `${day}-${month}-${year}`;
-
-    // Use a timeout to defer this non-critical operation
-    setTimeout(() => {
-      // Use our utility function to get the Hijri date
-      fetchHijriDateElectronSafe(today)
-        .then((hijriDate) => {
-          console.log("Successfully pre-fetched Hijri date:", hijriDate);
-          localStorage.setItem("hijriDate", hijriDate);
-          localStorage.setItem("hijriDateTimestamp", Date.now().toString());
-        })
-        .catch((error) => {
-          console.error("Error pre-fetching Hijri date:", error);
-          // Fall back to calculation method
-          try {
-            const approximateDate = calculateApproximateHijriDate();
-            console.log(
-              "Using approximate Hijri date calculation:",
-              approximateDate
-            );
-            localStorage.setItem("hijriDate", approximateDate);
-            localStorage.setItem("hijriDateTimestamp", Date.now().toString());
-          } catch (calcError) {
-            console.error("Failed to calculate approximate date:", calcError);
-          }
-        });
-    }, 2000); // Defer by 2 seconds to prioritize UI rendering
-  }, []);
+  // Enable localStorage monitoring in development
+  useLocalStorageMonitor();
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SnackbarProvider maxSnack={3}>
-        <Router>
-          <ApiErrorBoundary>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                position: "fixed",
-                width: "100vw",
-                height: "100vh",
-                top: 0,
-                left: 0,
-                overflow: "visible", // Changed from hidden to visible
-                bgcolor: "background.default",
-              }}
-            >
-              <MemoizedAppRoutes />
-            </Box>
-          </ApiErrorBoundary>
-        </Router>
-      </SnackbarProvider>
+      <ApiErrorBoundary>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            position: "fixed",
+            width: "100vw",
+            height: "100vh",
+            top: 0,
+            left: 0,
+            overflow: "hidden",
+            bgcolor: "background.default",
+            // Optimize for performance
+            willChange: "auto",
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
+          }}
+        >
+          <AppRoutes />
+          <GracefulErrorOverlay />
+          <EmergencyAlertOverlay />
+        </Box>
+      </ApiErrorBoundary>
     </ThemeProvider>
   );
 };

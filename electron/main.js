@@ -13,29 +13,25 @@ log.info('App starting...');
 // Performance optimization flags - optimized for Raspberry Pi
 log.info('Setting up performance optimizations for Raspberry Pi');
 
-// Fully disable GPU features to prevent GpuControl.CreateCommandBuffer errors
-// app.disableHardwareAcceleration();
-// app.commandLine.appendSwitch('disable-gpu');
-// app.commandLine.appendSwitch('disable-gpu-compositing');
-// app.commandLine.appendSwitch('disable-gpu-rasterization');
-// app.commandLine.appendSwitch('disable-gpu-sandbox');
-// app.commandLine.appendSwitch('disable-software-rasterizer');
+// Enable selective hardware acceleration for better performance
+// Only disable specific GPU features that cause issues on RPi
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
 
-// // Force software rendering
-// app.commandLine.appendSwitch('use-gl', 'swiftshader');
-// app.commandLine.appendSwitch('disable-direct-composition');
+// Enable basic hardware acceleration for UI rendering
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
 
-// // Disable other features that might depend on GPU
-// app.commandLine.appendSwitch('disable-smooth-scrolling');
-// app.commandLine.appendSwitch('disable-reading-from-canvas');
-// app.commandLine.appendSwitch('disable-accelerated-video-decode');
-// app.commandLine.appendSwitch('disable-accelerated-video-encode');
-// app.commandLine.appendSwitch('disable-accelerated-2d-canvas');
-// app.commandLine.appendSwitch('disable-webgl');
+// Memory and performance optimizations
+app.commandLine.appendSwitch('num-raster-threads', '2');
+app.commandLine.appendSwitch('renderer-process-limit', '1');
+app.commandLine.appendSwitch('max_old_space_size', '256');
 
-// Memory optimization
-// app.commandLine.appendSwitch('num-raster-threads', '1');
-// app.commandLine.appendSwitch('renderer-process-limit', '1');
+// Disable features that aren't needed for display app
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
@@ -123,50 +119,6 @@ function createWindow() {
   const appDirectory = app.getAppPath();
   log.info(`App directory: ${appDirectory}`);
   
-  // Log the contents of some key directories for debugging
-  const possibleBuildDirs = [
-    path.join(appDirectory, 'build'),
-    path.join(appDirectory, 'dist/build'),
-    path.join(path.dirname(app.getPath('exe')), 'build'),
-    path.join(path.dirname(app.getPath('exe')), 'resources', 'build'),
-    path.join(appDirectory, 'resources', 'build')
-  ];
-  
-  for (const dir of possibleBuildDirs) {
-    if (fs.existsSync(dir)) {
-      log.info(`Found build directory: ${dir}`);
-      try {
-        const files = fs.readdirSync(dir);
-        log.info(`Files in ${dir}: ${files.join(', ')}`);
-        
-        // Also log static directory contents if it exists
-        const staticDir = path.join(dir, 'static');
-        if (fs.existsSync(staticDir)) {
-          const staticFiles = fs.readdirSync(staticDir);
-          log.info(`Static directory found with: ${staticFiles.join(', ')}`);
-          
-          // Log JS and CSS directories
-          const jsDir = path.join(staticDir, 'js');
-          const cssDir = path.join(staticDir, 'css');
-          
-          if (fs.existsSync(jsDir)) {
-            const jsFiles = fs.readdirSync(jsDir);
-            log.info(`JS files: ${jsFiles.join(', ')}`);
-          }
-          
-          if (fs.existsSync(cssDir)) {
-            const cssFiles = fs.readdirSync(cssDir);
-            log.info(`CSS files: ${cssFiles.join(', ')}`);
-          }
-        } else {
-          log.warn(`No static directory found in ${dir}`);
-        }
-      } catch (err) {
-        log.error(`Error reading directory ${dir}: ${err.message}`);
-      }
-    }
-  }
-  
   // Use a direct file path approach without protocol
   let indexPath = null;
   let indexContent = null;
@@ -224,7 +176,7 @@ function createWindow() {
     log.info(`Using development server: ${indexPath}`);
   }
 
-  // Create the browser window
+  // Create the browser window with optimized settings
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
@@ -235,7 +187,16 @@ function createWindow() {
       // Enable DevTools only during development to reduce overhead in production
       devTools: isDev,
       // Allow mixed content (http/https)
-      webSecurity: !isDev
+      webSecurity: !isDev,
+      // Enable hardware acceleration
+      hardwareAcceleration: true,
+      // Optimize for performance
+      backgroundThrottling: false,
+      // Disable node in renderer for security
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
+      // Enable experimental features for better performance
+      experimentalFeatures: true
     },
     // By default, start fullscreen for display purposes
     fullscreen: !isDev,
@@ -247,9 +208,15 @@ function createWindow() {
     skipTaskbar: !isDev,
     // Custom app icon
     icon: path.join(__dirname, '../assets/icon.png'),
-    // Basic performance settings
-    backgroundColor: '#000000',
-    show: false // Don't show window until it's ready
+    // Optimize startup performance
+    backgroundColor: '#0A2647', // Match the loading screen background
+    show: false, // Don't show window until it's ready
+    // Improve rendering performance
+    paintWhenInitiallyHidden: false,
+    // Disable transparency for better performance
+    transparent: false,
+    // Enable double buffering
+    enableLargerThanScreen: false
   });
 
   // Register custom protocols for assets if needed
@@ -277,8 +244,50 @@ function createWindow() {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self' 'unsafe-inline' file: data: static:; script-src 'self' 'unsafe-inline' file: static:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com file: static:; font-src 'self' https://fonts.gstatic.com static:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.co.uk; img-src 'self' data: https://*.masjidconnect.co.uk file: static:;"]
+        'Content-Security-Policy': ["default-src 'self' 'unsafe-inline' file: data: static:; script-src 'self' 'unsafe-inline' file: static:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com file: static:; font-src 'self' https://fonts.gstatic.com static:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.co.uk https://1.1.1.1 https://httpbin.org; img-src 'self' data: https://*.masjidconnect.co.uk file: static:;"]
       }
+    });
+  });
+
+  // Optimize window showing for faster startup
+  mainWindow.once('ready-to-show', () => {
+    log.info('Window ready to show');
+    mainWindow.show();
+    
+    // Focus the window to ensure it's active
+    if (!isDev) {
+      mainWindow.focus();
+    }
+  });
+
+  // Handle loading events
+  mainWindow.webContents.on('did-start-loading', () => {
+    log.info('Window started loading');
+  });
+  
+  mainWindow.webContents.on('did-finish-load', () => {
+    log.info('Window finished loading');
+    
+    // Inject performance optimizations into the page
+    mainWindow.webContents.executeJavaScript(`
+      // Ensure the page is optimized for display app
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Disable context menu globally
+      document.addEventListener('contextmenu', (e) => e.preventDefault());
+      
+      // Disable text selection
+      document.body.style.userSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+      
+      // Add hardware acceleration hints
+      document.body.style.transform = 'translateZ(0)';
+      document.body.style.backfaceVisibility = 'hidden';
+      
+      console.log('Electron optimizations applied');
+    `).catch(err => {
+      log.error('Failed to inject optimizations:', err);
     });
   });
 
