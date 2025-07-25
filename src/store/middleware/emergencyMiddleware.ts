@@ -27,7 +27,7 @@ let reconnectTimer: NodeJS.Timeout | null = null;
 /**
  * Emergency middleware handles SSE connections and emergency alert integration
  */
-export const emergencyMiddleware: Middleware = (api: MiddlewareAPI<AppDispatch, any>) => {
+export const emergencyMiddleware: Middleware = (api: any) => {
   
   // Set up emergency service listeners
   const setupEmergencyListeners = () => {

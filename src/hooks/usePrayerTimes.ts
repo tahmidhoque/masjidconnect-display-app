@@ -47,6 +47,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const dispatch = useDispatch<AppDispatch>();
   const prayerTimes = useSelector((state: RootState) => state.content.prayerTimes);
   
+  // Use refs to prevent unnecessary re-processing
+  const lastProcessedTimes = useRef<PrayerTimes | null>(null);
+  const lastProcessedDate = useRef<string>('');
+  
   // Create refresh function wrapper
   const refreshPrayerTimesHandler = useCallback((forceRefresh: boolean = false) => {
     dispatch(refreshPrayerTimes({ forceRefresh }));
@@ -251,6 +255,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       return;
     }
 
+    // Check if we've already processed this exact data
+    const currentDate = new Date().toISOString().split('T')[0];
+    if (lastProcessedTimes.current === prayerTimes && lastProcessedDate.current === currentDate) {
+      return; // Skip if already processed this data for today
+    }
+
     const now = Date.now();
     
     // Prevent excessive processing
@@ -263,6 +273,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     try {
       logger.debug('Processing prayer times data');
+
+      // Update processed data refs
+      lastProcessedTimes.current = prayerTimes;
+      lastProcessedDate.current = currentDate;
 
       // Check for date change first
       checkForDayChange();

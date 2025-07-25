@@ -11,6 +11,7 @@ import errorSlice from './slices/errorSlice';
 
 // Import middleware
 import { emergencyMiddleware } from './middleware/emergencyMiddleware';
+import { performanceMiddleware } from './middleware/performanceMiddleware';
 
 // Root reducer
 const rootReducer = combineReducers({
@@ -52,7 +53,8 @@ export const store = configureStore({
       immutableCheck: process.env.NODE_ENV === 'development',
     })
     // Add custom middleware
-    .concat(emergencyMiddleware),
+    .concat(emergencyMiddleware)
+    .concat(performanceMiddleware.middleware),
   // Enable Redux DevTools in development
   devTools: process.env.NODE_ENV === 'development',
 });

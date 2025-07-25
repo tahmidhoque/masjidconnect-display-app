@@ -7,8 +7,8 @@ import React, {
   memo,
 } from "react";
 import { Box, Typography, Fade, CircularProgress, Paper } from "@mui/material";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../store";
+import { useAppSelector } from "../../store/hooks";
+import { selectCarouselData } from "../../store/hooks";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import IslamicPatternBackground from "./IslamicPatternBackground";
 import { NoMobilePhoneIcon, PrayerRowsIcon } from "../../assets/svgComponent";
@@ -17,6 +17,7 @@ import localforage from "localforage";
 import ModernContentCard from "./ModernContentCard";
 import { Event, Schedule } from "../../api/models";
 import storageService from "../../services/storageService";
+import { isLowPowerDevice, throttle } from "../../utils/performanceUtils";
 
 // Define content types enum to match API
 type ContentItemType =
@@ -53,7 +54,7 @@ const formatTextWithNewlines = (text: string) => {
   ));
 };
 
-// Simplified component to memoize text formatting
+// Optimized component to memoize text formatting
 const MemoizedFormattedText = memo(({ text }: { text: string }) => (
   <>{formatTextWithNewlines(text)}</>
 ));
@@ -143,27 +144,21 @@ interface AnnouncementConfig {
  */
 const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   // Redux selectors
-  const masjidName = useSelector(
-    (state: RootState) => state.content.masjidName
+  const masjidName = useAppSelector((state) => state.content.masjidName);
+  const schedule = useAppSelector((state) => state.content.schedule);
+  const events = useAppSelector((state) => state.content.events);
+  const isContentLoading = useAppSelector((state) => state.content.isLoading);
+  const carouselTime = useAppSelector((state) => state.content.carouselTime);
+  const showPrayerAnnouncement = useAppSelector(
+    (state) => state.content.showPrayerAnnouncement
   );
-  const schedule = useSelector((state: RootState) => state.content.schedule);
-  const events = useSelector((state: RootState) => state.content.events);
-  const isContentLoading = useSelector(
-    (state: RootState) => state.content.isLoading
+  const prayerAnnouncementName = useAppSelector(
+    (state) => state.content.prayerAnnouncementName
   );
-  const carouselTime = useSelector(
-    (state: RootState) => state.content.carouselTime
+  const isPrayerJamaat = useAppSelector(
+    (state) => state.content.isPrayerJamaat
   );
-  const showPrayerAnnouncement = useSelector(
-    (state: RootState) => state.content.showPrayerAnnouncement
-  );
-  const prayerAnnouncementName = useSelector(
-    (state: RootState) => state.content.prayerAnnouncementName
-  );
-  const isPrayerJamaat = useSelector(
-    (state: RootState) => state.content.isPrayerJamaat
-  );
-  const orientation = useSelector((state: RootState) => state.ui.orientation);
+  const orientation = useAppSelector((state) => state.ui.orientation);
 
   // For now, create a simple refreshSchedule function that logs (to be implemented with Redux actions later)
   const refreshSchedule = useCallback((forceRefresh: boolean) => {
@@ -193,6 +188,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   const lastAnnouncementState = useRef<boolean>(false);
   const lastOrientationRef = useRef<string>(orientation);
 
+  // Refs to prevent unnecessary re-processing
+  const lastProcessedSchedule = useRef<Schedule | null>(null);
+  const lastProcessedEvents = useRef<Event[] | null>(null);
+
   // Constants
   const defaultDuration = 30; // Default duration in seconds
   const userInteractionTimeout = 60000; // 1 minute before resuming auto-rotation after user interaction
@@ -215,9 +214,20 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     setHasCheckedLocalStorage(true);
   }, [schedule, events, masjidName]);
 
-  // Process the schedule and events into content items
+  // Process the schedule and events into content items - optimized to prevent unnecessary processing
   useEffect(() => {
     if (!isComponentMountedRef.current) return;
+
+    // Skip processing if data hasn't changed
+    if (
+      lastProcessedSchedule.current === schedule &&
+      lastProcessedEvents.current === events
+    ) {
+      return;
+    }
+
+    lastProcessedSchedule.current = schedule;
+    lastProcessedEvents.current = events;
 
     let processedItems: any[] = [];
 
@@ -480,20 +490,28 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     return contentItems;
   }, [contentItems]);
 
+  // Throttle carousel transitions on low-power devices
+  const throttledItemChange = useMemo(() => {
+    const changeDelay = isLowPowerDevice() ? 1000 : 500;
+    return throttle((nextIndex: number) => {
+      setCurrentItemIndex(nextIndex);
+    }, changeDelay);
+  }, []);
+
   // Memoize content type config lookup
   const getCurrentTypeConfig = useCallback((type: string | undefined) => {
     return getContentTypeConfig(type);
   }, []);
 
-  // Simplify animation styles for better performance
-  const cardAnimationStyles = useMemo(
-    () => ({
+  // Simplify animation styles for better performance on low-power devices
+  const cardAnimationStyles = useMemo(() => {
+    const duration = isLowPowerDevice() ? "150ms" : "300ms";
+    return {
       transform: showContent ? "translateY(0)" : "translateY(5px)",
       opacity: showContent ? 1 : 0,
-      transition: "transform 300ms ease, opacity 300ms ease",
-    }),
-    [showContent]
-  );
+      transition: `transform ${duration} ease, opacity ${duration} ease`,
+    };
+  }, [showContent]);
 
   // Render formatted content with proper Arabic and English styling
   const renderFormattedContent = useCallback(
@@ -1008,4 +1026,5 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 };
 
 // Export as memoized component to prevent unnecessary re-renders
-export default ContentCarousel;
+// Export as memoized component to prevent unnecessary re-renders
+export default memo(ContentCarousel);

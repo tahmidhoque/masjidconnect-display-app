@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import { Box, ThemeProvider, CssBaseline } from "@mui/material";
 
 import theme from "./theme/theme";
@@ -8,16 +8,36 @@ import GracefulErrorOverlay from "./components/common/GracefulErrorOverlay";
 import EmergencyAlertOverlay from "./components/common/EmergencyAlertOverlay";
 import useKioskMode from "./hooks/useKioskMode";
 import useInitializationFlow from "./hooks/useInitializationFlow";
-
-// Components
-import LoadingScreen from "./components/screens/LoadingScreen";
-import PairingScreen from "./components/screens/PairingScreen";
-import DisplayScreen from "./components/screens/DisplayScreen";
-import ErrorScreen from "./components/screens/ErrorScreen";
+import { ComponentPreloader } from "./utils/performanceUtils";
 
 // Store
-import { useSelector } from "react-redux";
-import type { RootState } from "./store";
+import { useAppSelector } from "./store/hooks";
+
+// Lazy load components for better performance
+const LoadingScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "LoadingScreen",
+    () => import("./components/screens/LoadingScreen")
+  )
+);
+const PairingScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "PairingScreen",
+    () => import("./components/screens/PairingScreen")
+  )
+);
+const DisplayScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "DisplayScreen",
+    () => import("./components/screens/DisplayScreen")
+  )
+);
+const ErrorScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "ErrorScreen",
+    () => import("./components/screens/ErrorScreen")
+  )
+);
 
 // Development localStorage monitor for debugging credential issues
 const useLocalStorageMonitor = () => {
@@ -121,9 +141,7 @@ const useLocalStorageMonitor = () => {
 const AppRoutes: React.FC = () => {
   useKioskMode();
   const { stage } = useInitializationFlow();
-  const isInitializing = useSelector(
-    (state: RootState) => state.ui.isInitializing
-  );
+  const isInitializing = useAppSelector((state) => state.ui.isInitializing);
 
   // Show loading screen during initialization, but allow pairing screen to show
   if (
@@ -132,16 +150,32 @@ const AppRoutes: React.FC = () => {
     stage === "fetching" ||
     (isInitializing && stage !== "pairing")
   ) {
-    return <LoadingScreen />;
+    return (
+      <Suspense fallback={<div>Loading...</div>}>
+        <LoadingScreen />
+      </Suspense>
+    );
   }
 
   switch (stage) {
     case "pairing":
-      return <PairingScreen />;
+      return (
+        <Suspense fallback={<div>Loading...</div>}>
+          <PairingScreen />
+        </Suspense>
+      );
     case "ready":
-      return <DisplayScreen />;
+      return (
+        <Suspense fallback={<div>Loading...</div>}>
+          <DisplayScreen />
+        </Suspense>
+      );
     default:
-      return <ErrorScreen message="Unknown initialization stage" />;
+      return (
+        <Suspense fallback={<div>Loading...</div>}>
+          <ErrorScreen message="Unknown initialization stage" />
+        </Suspense>
+      );
   }
 };
 

@@ -1,1 +1,145 @@
- 
+/* Hardware Acceleration CSS for Raspberry Pi Performance */
+
+/* Critical performance CSS variables for low-power devices */
+:root {
+  --low-power-transition: 0.1s ease-out;
+  --low-power-animation: 0.3s ease-out;
+  --gpu-layer-promotion: translateZ(0);
+}
+
+/* Base optimizations for all elements when low-power-device class is present */
+.low-power-device * {
+  /* Reduce animation complexity */
+  --transition-duration: var(--low-power-transition);
+  --animation-duration: var(--low-power-animation);
+  
+  /* Disable expensive effects */
+  text-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  
+  /* Optimize transforms */
+  backface-visibility: hidden;
+  perspective: none;
+}
+
+/* GPU acceleration for critical layout containers only */
+.low-power-device .MuiBox-root:not(.no-acceleration),
+.low-power-device .MuiPaper-root,
+.low-power-device .MuiCard-root {
+  transform: var(--gpu-layer-promotion);
+  will-change: auto;
+}
+
+/* Disable expensive background effects on low-power devices */
+.low-power-device .glassmorphic-background,
+.low-power-device [class*="gradient"],
+.low-power-device [class*="blur"] {
+  background: rgba(10, 38, 71, 0.8) !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Simplified animations for low-power devices */
+.low-power-device [class*="carousel"],
+.low-power-device [class*="transition"] {
+  transition: opacity var(--low-power-transition), transform var(--low-power-transition) !important;
+  animation-duration: var(--low-power-animation) !important;
+}
+
+/* Disable complex transforms and 3D effects */
+.low-power-device [class*="rotate"],
+.low-power-device [class*="scale"],
+.low-power-device [class*="3d"] {
+  transform: none !important;
+}
+
+/* Optimize text rendering */
+.low-power-device .MuiTypography-root {
+  text-rendering: optimizeSpeed;
+  font-smooth: never;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+}
+
+/* Reduce gradient complexity */
+.low-power-device [style*="linear-gradient"],
+.low-power-device [style*="radial-gradient"] {
+  background: var(--fallback-color, #0A2647) !important;
+}
+
+/* Optimize SVG performance */
+.low-power-device svg {
+  shape-rendering: optimizeSpeed;
+  color-rendering: optimizeSpeed;
+}
+
+/* Disable animations on reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High-performance mode overrides */
+.high-performance-mode {
+  /* Force GPU acceleration for main containers */
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Raspberry Pi specific optimizations */
+@media screen and (max-device-width: 1920px) and (max-device-height: 1080px) {
+  /* Likely running on RPi display */
+  .carousel-content {
+    /* Reduce content complexity */
+    font-size: 0.9em;
+    line-height: 1.4;
+  }
+  
+  .prayer-times-card {
+    /* Simplify prayer card styling */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+  }
+  
+  .background-pattern {
+    /* Disable complex background patterns */
+    display: none;
+  }
+}
+
+/* Memory optimization classes */
+.optimized-container {
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+.optimized-text {
+  contain: style;
+  font-display: swap;
+}
+
+.optimized-image {
+  contain: size layout;
+  object-fit: cover;
+  image-rendering: optimizeSpeed;
+}
+
+/* Disable expensive pseudo-elements on low-power devices */
+.low-power-device *::before,
+.low-power-device *::after {
+  display: none !important;
+}
+
+/* Force software rendering for certain elements that cause issues */
+.software-render {
+  transform: none !important;
+  will-change: auto !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+} 

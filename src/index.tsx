@@ -11,22 +11,25 @@ import { store, persistor } from "./store";
 import { optimizeAppPerformance } from "./utils/performanceUtils";
 import LoadingScreen from "./components/screens/LoadingScreen";
 
+// Import performance CSS
+import "./styles/minimal-hardware-acceleration.css";
+
+// Apply performance optimizations after DOM is ready
+document.addEventListener("DOMContentLoaded", () => {
+  // Small delay to ensure everything is loaded
+  setTimeout(() => {
+    optimizeAppPerformance();
+  }, 100);
+});
+
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
 );
 
-// Apply runtime performance tweaks (e.g., hardware acceleration hints)
-optimizeAppPerformance();
-
-// Create a proper loading component for PersistGate
-const PersistGateLoader: React.FC = () => {
-  return <LoadingScreen />;
-};
-
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <PersistGate loading={<PersistGateLoader />} persistor={persistor}>
+      <PersistGate loading={null} persistor={persistor}>
         <App />
       </PersistGate>
     </Provider>
