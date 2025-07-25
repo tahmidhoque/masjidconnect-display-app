@@ -58,9 +58,12 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   );
 
   // Redux action wrapper
-  const refreshPrayerTimesHandler = useCallback(() => {
-    dispatch(refreshPrayerTimes());
-  }, [dispatch]);
+  const refreshPrayerTimesHandler = useCallback(
+    (forceRefresh: boolean = false) => {
+      dispatch(refreshPrayerTimes({ forceRefresh }));
+    },
+    [dispatch]
+  );
 
   // Local state to handle initial loading and retry logic
   const [isRetrying, setIsRetrying] = useState(false);

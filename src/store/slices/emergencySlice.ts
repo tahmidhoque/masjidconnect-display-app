@@ -190,6 +190,94 @@ const emergencySlice = createSlice({
         logger.info('[Emergency] Alert cleared', { alertId: previousAlert.id });
       }
     },
+
+    // Test emergency alert action for development
+    createTestAlert: (state, action: PayloadAction<{ type?: string; duration?: number }>) => {
+      const { type = 'RED', duration = 15 } = action.payload || {};
+      
+      // Mock alert data
+      const testAlerts = {
+        RED: {
+          title: 'Emergency Alert Test',
+          message: 'This is a critical emergency alert test. All congregants should remain calm and follow emergency procedures.',
+          colorScheme: 'RED' as const,
+        },
+        ORANGE: {
+          title: 'Important Notice',
+          message: 'An important announcement requires your immediate attention. Please be aware of current safety protocols.',
+          colorScheme: 'ORANGE' as const,
+        },
+        AMBER: {
+          title: 'Weather Advisory',
+          message: 'Severe weather conditions detected in the area. Exercise caution when traveling to and from the masjid.',
+          colorScheme: 'AMBER' as const,
+        },
+        BLUE: {
+          title: 'Information Update',
+          message: 'Prayer schedule has been updated due to special circumstances. Please check with masjid administration for details.',
+          colorScheme: 'BLUE' as const,
+        },
+        GREEN: {
+          title: 'All Clear',
+          message: 'Previous emergency conditions have been resolved. Normal operations have resumed. Alhamdulillah.',
+          colorScheme: 'GREEN' as const,
+        },
+        PURPLE: {
+          title: 'Special Announcement',
+          message: 'Join us for a special community gathering this Friday after Jumu\'ah prayer. Light refreshments will be served.',
+          colorScheme: 'PURPLE' as const,
+        },
+        DARK: {
+          title: 'Security Alert',
+          message: 'Enhanced security measures are currently in effect. Please report any suspicious activity to masjid staff immediately.',
+          colorScheme: 'DARK' as const,
+        },
+      };
+
+      const alertTemplate = testAlerts[type as keyof typeof testAlerts] || testAlerts.RED;
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + duration * 1000);
+
+      const testAlert: EmergencyAlert = {
+        id: `test-alert-${Date.now()}`,
+        title: alertTemplate.title,
+        message: alertTemplate.message,
+        color: '#f44336', // Will be overridden by colorScheme
+        colorScheme: alertTemplate.colorScheme,
+        expiresAt: expiresAt.toISOString(),
+        createdAt: now.toISOString(),
+        masjidId: 'test-masjid',
+      };
+
+      // Set the alert
+      state.currentAlert = testAlert;
+      state.totalAlertsReceived += 1;
+      state.lastAlertTime = now.toISOString();
+      
+      // Add to history
+      state.alertHistory.push({
+        alert: testAlert,
+        timestamp: now.toISOString(),
+        action: 'received',
+      });
+      
+      // Keep only last 10 alerts in history
+      if (state.alertHistory.length > 10) {
+        state.alertHistory = state.alertHistory.slice(-10);
+      }
+      
+      logger.info('[Emergency] Test alert created', { 
+        alertId: testAlert.id,
+        title: testAlert.title,
+        type: alertTemplate.colorScheme,
+        duration 
+      });
+
+      // Auto-clear after duration
+      setTimeout(() => {
+        // This will be handled by the display component
+      }, duration * 1000);
+    },
     
     clearCurrentAlert: (state) => {
       if (state.currentAlert) {
@@ -395,6 +483,7 @@ export const {
   clearError,
   resetEmergencyState,
   resetStatistics,
+  createTestAlert,
 } = emergencySlice.actions;
 
 // Selectors

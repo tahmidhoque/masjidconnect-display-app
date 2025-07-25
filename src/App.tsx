@@ -163,7 +163,8 @@ const App: React.FC = () => {
             top: 0,
             left: 0,
             overflow: "hidden",
-            bgcolor: "background.default",
+            // Use the same gradient as ModernIslamicBackground to prevent flashing
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
             // Optimize for performance
             willChange: "auto",
             transform: "translateZ(0)",

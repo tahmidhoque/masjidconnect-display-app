@@ -8,54 +8,78 @@ import EmergencyAlertOverlay from "./EmergencyAlertOverlay";
 /**
  * EmergencyAlert component
  *
- * This component serves as a wrapper for the EmergencyAlertOverlay.
- * The alert is displayed as a full-screen overlay with an Islamic pattern background.
+ * Modern emergency alert system with gradient backgrounds and smooth animations.
+ * Coordinates with DisplayScreen for seamless dissolve transitions where the
+ * display content fades out, background animates to alert color, then alert fades in.
  *
- * The following predefined alert color schemes are available:
+ * Available gradient alert types:
  *
- * - RED (#f44336): High urgency, critical emergency alerts
- * - ORANGE (#ff9800): Important alerts requiring attention
- * - AMBER (#ffb74d): Moderate urgency alerts
- * - BLUE (#2196f3): Informational emergency alerts
- * - GREEN (#4caf50): Status updates and resolutions
- * - PURPLE (#9c27b0): Special announcements during emergency situations
- * - DARK (#263238): Serious alerts requiring immediate attention
+ * - RED: Critical emergency alerts with deep red gradient
+ * - ORANGE: Important alerts with vibrant orange gradient
+ * - AMBER: Caution alerts with warm amber to yellow gradient
+ * - BLUE: Informational alerts with calm blue gradient
+ * - GREEN: Success/status updates with reassuring green gradient
+ * - PURPLE: Special announcements with elegant purple gradient
+ * - DARK: Urgent alerts with professional dark gradient
  *
- * Custom colors can also be used and will automatically determine appropriate contrast text colors.
+ * The system automatically creates beautiful gradients and ensures proper
+ * text contrast for optimal readability on display screens.
+ *
+ * Test shortcuts (when focused on display):
+ * - Ctrl+Shift+1-7: Trigger different alert types
+ * - Ctrl+Shift+C: Clear current alert
+ * - Ctrl+Shift+R: Random alert type
  */
 const EmergencyAlert: React.FC = () => {
   const hasActiveAlert = useSelector(
     (state: RootState) => state.emergency.currentAlert !== null
   );
+  const currentAlert = useSelector(
+    (state: RootState) => state.emergency.currentAlert
+  );
   const [visible, setVisible] = useState(false);
+  const [delayedVisible, setDelayedVisible] = useState(false);
 
-  // Handle animation states
+  // Handle smooth animation coordination with DisplayScreen
   useEffect(() => {
-    // When alert becomes active, show it immediately
     if (hasActiveAlert) {
+      // Alert is becoming active - delay showing until display components dissolve
       setVisible(true);
-    }
-    // When alert becomes inactive, delay the removal to allow fade-out animation
-    else {
-      // If currently visible, start fade-out
-      if (visible) {
-        const timer = setTimeout(() => {
-          setVisible(false);
-        }, 500); // Match this to the Fade timeout
 
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [hasActiveAlert, visible]);
+      // Delay the actual overlay appearance to coordinate with staggered dissolve
+      // Wait for all components to finish dissolving (300ms max delay + 300ms duration)
+      const showTimer = setTimeout(() => {
+        setDelayedVisible(true);
+      }, 600); // Matches staggered dissolve completion
 
-  // Don't render anything if there's no alert and animation has completed
+      return () => clearTimeout(showTimer);
+    } else {
+      // Alert is clearing - hide immediately, let display animate back in
+      setDelayedVisible(false);
+
+      // Remove component after fade out completes
+      const hideTimer = setTimeout(() => {
+        setVisible(false);
+      }, 500);
+
+      return () => clearTimeout(hideTimer);
+    }
+  }, [hasActiveAlert]);
+
+  // Don't render if no alert and animation completed
   if (!hasActiveAlert && !visible) return null;
 
   return (
     <Fade
-      in={hasActiveAlert}
-      timeout={500}
-      onExited={() => console.log("Alert fade-out completed")}
+      in={delayedVisible}
+      timeout={{
+        enter: 400,
+        exit: 300,
+      }}
+      onExited={() => {
+        console.log("Emergency alert fade-out completed");
+        setVisible(false);
+      }}
     >
       <div>
         <EmergencyAlertOverlay />

@@ -429,6 +429,34 @@ class MasjidDisplayClient {
     return hasCredentials && !!this.credentials?.apiKey && !!this.credentials?.screenId;
   }
 
+  // Wait for authentication to be initialized
+  public async waitForAuthInitialization(timeoutMs: number = 10000): Promise<boolean> {
+    if (this.authInitialized) {
+      return this.isAuthenticated();
+    }
+
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      
+      const checkAuth = () => {
+        if (this.authInitialized) {
+          resolve(this.isAuthenticated());
+          return;
+        }
+        
+        if (Date.now() - startTime >= timeoutMs) {
+          logger.warn('Auth initialization timeout, proceeding without auth');
+          resolve(false);
+          return;
+        }
+        
+        setTimeout(checkAuth, 100); // Check every 100ms
+      };
+      
+      checkAuth();
+    });
+  }
+
   // Debug method to check credentials
   public logCredentialsStatus(): void {
     logger.info('Credentials status', {
@@ -706,9 +734,12 @@ class MasjidDisplayClient {
 
   // Send heartbeat to server
   public async sendHeartbeat(status: HeartbeatRequest): Promise<ApiResponse<HeartbeatResponse>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
     // Check if we're authenticated
-    if (!this.isAuthenticated()) {
-      logger.warn('sendHeartbeat called without authentication');
+    if (!isAuthReady) {
+      logger.warn('sendHeartbeat called without authentication - auth not ready');
       return createErrorResponse('Not authenticated');
     }
 
@@ -771,6 +802,31 @@ class MasjidDisplayClient {
 
   // Get screen content
   public async getScreenContent(forceRefresh: boolean = false): Promise<ApiResponse<ScreenContent>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    if (!isAuthReady) {
+      logger.warn('Screen content request: Authentication not ready, trying fallback from storage');
+      
+      // Try to get from storage as fallback
+      try {
+        const storedContent = await localforage.getItem<ScreenContent>('screenContent');
+        if (storedContent) {
+          logger.info('Using stored screen content due to auth not ready');
+          return normalizeApiResponse({
+            data: storedContent,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          });
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored screen content as fallback', { error });
+      }
+      
+      return createErrorResponse('Authentication not ready and no cached data available');
+    }
+    
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {
@@ -816,6 +872,47 @@ class MasjidDisplayClient {
 
   // Get prayer times
   public async getPrayerTimes(startDate?: string, endDate?: string, forceRefresh: boolean = false): Promise<ApiResponse<PrayerTimes[]>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    if (!isAuthReady) {
+      logger.warn('Prayer times request: Authentication not ready, trying fallback from storage');
+      
+      // Try to get from storage as fallback
+      try {
+        let storedTimes: PrayerTimes[] | null = null;
+        
+        // Try electron-store first if available
+        if (electronStore) {
+          storedTimes = electronStore.get('prayerTimes', null);
+        }
+        
+        // Fallback to localforage if not found in electron-store
+        if (!storedTimes) {
+          storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        }
+        
+        if (storedTimes) {
+          logger.info('Using stored prayer times due to auth not ready');
+          return {
+            data: storedTimes,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored prayer times as fallback', { error });
+      }
+      
+      return {
+        success: false,
+        error: 'Authentication not ready and no cached data available',
+        cached: false,
+        data: null
+      };
+    }
+    
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {
@@ -852,7 +949,7 @@ class MasjidDisplayClient {
     
     // Either online or no stored times found
     const result = await this.fetchWithCache<PrayerTimes[]>(
-      `/api/prayer-times?${params.toString()}`,
+      `/api/screen/prayer-times?${params.toString()}`,
       { method: 'GET' },
       CACHE_EXPIRATION.PRAYER_TIMES
     );
@@ -879,6 +976,30 @@ class MasjidDisplayClient {
 
   // Get events
   public async getEvents(count: number = 5, forceRefresh: boolean = false): Promise<ApiResponse<EventsResponse>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    if (!isAuthReady) {
+      logger.warn('Events request: Authentication not ready, trying fallback from storage');
+      
+      // Try to get from storage as fallback
+      try {
+        const storedEvents = await localforage.getItem<EventsResponse>('events');
+        if (storedEvents) {
+          logger.info('Using stored events due to auth not ready');
+          return {
+            data: storedEvents,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored events as fallback', { error });
+      }
+      
+      return createErrorResponse('Authentication not ready and no cached data available');
+    }
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {

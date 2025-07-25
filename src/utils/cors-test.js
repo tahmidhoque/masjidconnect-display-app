@@ -57,7 +57,7 @@ export const testAllEndpoints = async (apiKey = null, screenId = null) => {
   const endpoints = [
     '/api/screens/content',
     '/api/prayer-status',
-    '/api/prayer-times',
+    '/api/screen/prayer-times',
     '/api/events'
   ];
   

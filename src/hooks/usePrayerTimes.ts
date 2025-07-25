@@ -48,8 +48,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const prayerTimes = useSelector((state: RootState) => state.content.prayerTimes);
   
   // Create refresh function wrapper
-  const refreshPrayerTimesHandler = useCallback(() => {
-    dispatch(refreshPrayerTimes());
+  const refreshPrayerTimesHandler = useCallback((forceRefresh: boolean = false) => {
+    dispatch(refreshPrayerTimes({ forceRefresh }));
   }, [dispatch]);
   
   // State for UI display
@@ -86,7 +86,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   useEffect(() => {
     const handlePrayerTimesUpdate = () => {
       logger.info('Prayer times update detected, refreshing data');
-      refreshPrayerTimesHandler();
+      refreshPrayerTimesHandler(true); // Force refresh to bypass debouncing when data sync completes
     };
 
     window.addEventListener('prayerTimesUpdated', handlePrayerTimesUpdate);
@@ -106,14 +106,14 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       } else if (!prayerTimes && !calculationsRef.current.isProcessing) {
         // If no prayer times data, try to refresh
         logger.warn("No prayer times data available, requesting refresh");
-        refreshPrayerTimesHandler();
+        refreshPrayerTimesHandler(true); // Force refresh on critical data missing
       }
     }, 60000); // Every minute
 
     // Perform an immediate check for prayer times data
     if (!prayerTimes) {
       logger.info("Immediate check: No prayer times data available, requesting refresh");
-      refreshPrayerTimesHandler();
+      refreshPrayerTimesHandler(true); // Force refresh on initial load
     }
 
     return () => {
@@ -145,26 +145,72 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         }) : 'none'
     });
     
-    // Validate the prayerTimes data
-    const isDataValid = prayerTimes && 
-      typeof prayerTimes === 'object' && 
-      (prayerTimes.fajr || prayerTimes.zuhr || prayerTimes.asr || prayerTimes.maghrib || prayerTimes.isha);
+    // Validate the prayerTimes data - handle both array and object formats
+    let isDataValid = false;
+    let todayData: any = null;
+    
+    if (prayerTimes && typeof prayerTimes === 'object') {
+      // If it's an array, check the first element
+      if (Array.isArray(prayerTimes) && prayerTimes.length > 0) {
+        todayData = prayerTimes[0];
+        isDataValid = !!(todayData?.fajr || todayData?.zuhr || todayData?.asr || todayData?.maghrib || todayData?.isha);
+        logger.debug('Prayer times validation - array format', {
+          arrayLength: prayerTimes.length,
+          hasTodayData: !!todayData,
+          isValid: isDataValid
+        });
+      } 
+      // If it's a direct object with prayer times
+      else if ((prayerTimes as any).fajr || (prayerTimes as any).zuhr || (prayerTimes as any).asr || (prayerTimes as any).maghrib || (prayerTimes as any).isha) {
+        todayData = prayerTimes;
+        isDataValid = true;
+        logger.debug('Prayer times validation - object format', {
+          isValid: isDataValid,
+          hasFajr: !!(prayerTimes as any).fajr
+        });
+      }
+      // If it's a wrapper object with .data property
+      else if ((prayerTimes as any).data) {
+        const dataProperty = (prayerTimes as any).data;
+        if (Array.isArray(dataProperty) && dataProperty.length > 0) {
+          todayData = dataProperty[0];
+          isDataValid = !!(todayData?.fajr || todayData?.zuhr || todayData?.asr || todayData?.maghrib || todayData?.isha);
+          logger.debug('Prayer times validation - wrapper with array format', {
+            arrayLength: dataProperty.length,
+            hasTodayData: !!todayData,
+            isValid: isDataValid
+          });
+        } else if (dataProperty && typeof dataProperty === 'object') {
+          todayData = dataProperty;
+          isDataValid = !!(todayData?.fajr || todayData?.zuhr || todayData?.asr || todayData?.maghrib || todayData?.isha);
+          logger.debug('Prayer times validation - wrapper with object format', {
+            isValid: isDataValid,
+            hasFajr: !!todayData?.fajr
+          });
+        }
+      }
+    }
     
     // Process the prayer times data if valid
     if (isDataValid) {
       logger.info('Prayer times data is valid, processing', {
-        date: prayerTimes.date
+        date: todayData?.date,
+        hasFajr: !!todayData?.fajr,
+        hasZuhr: !!todayData?.zuhr,
+        hasAsr: !!todayData?.asr
       });
       setTimeout(() => processPrayerTimes(), 0);
     } else {
       // If we have invalid data, log details and request a refresh
       logger.warn('Invalid or incomplete prayer times data, requesting refresh', {
         prayerTimesKeys: prayerTimes ? Object.keys(prayerTimes).join(', ') : 'null',
-        hasFajr: prayerTimes?.fajr,
-        hasZuhr: prayerTimes?.zuhr,
-        hasAsr: prayerTimes?.asr
+        isArray: prayerTimes ? Array.isArray(prayerTimes) : false,
+        arrayLength: (prayerTimes && Array.isArray(prayerTimes)) ? prayerTimes.length : 'n/a',
+        hasFajr: todayData?.fajr,
+        hasZuhr: todayData?.zuhr,
+        hasAsr: todayData?.asr
       });
-      refreshPrayerTimesHandler();
+      refreshPrayerTimesHandler(); // Normal refresh for validation failures
     }
   }, [prayerTimes, refreshPrayerTimesHandler]);
 
@@ -195,7 +241,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         hasPrayerTimes: !!prayerTimes,
         type: typeof prayerTimes
       });
-      refreshPrayerTimesHandler();
+      refreshPrayerTimesHandler(true); // Force refresh to bypass debouncing
     }
   }, [prayerTimes, refreshPrayerTimesHandler]);
 

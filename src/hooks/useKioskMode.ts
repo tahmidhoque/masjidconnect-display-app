@@ -33,7 +33,7 @@ export const useKioskMode = () => {
       logger.info('[KioskMode] Refreshing data conservatively...');
       
       // Only refresh prayer times, let Redux handle content updates
-      dispatch(refreshPrayerTimes());
+      dispatch(refreshPrayerTimes({ forceRefresh: true }));
       
       lastRefreshTimeRef.current = currentTime;
       logger.info('[KioskMode] Prayer times refreshed successfully');

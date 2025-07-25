@@ -14,11 +14,9 @@ import IslamicPatternBackground from "./IslamicPatternBackground";
 import { NoMobilePhoneIcon, PrayerRowsIcon } from "../../assets/svgComponent";
 import logger from "../../utils/logger";
 import localforage from "localforage";
-import GlassmorphicContentCard from "./GlassmorphicContentCard";
-import GlassmorphicCard from "./GlassmorphicCard";
+import ModernContentCard from "./ModernContentCard";
 import { Event, Schedule } from "../../api/models";
 import storageService from "../../services/storageService";
-import GlassmorphicContentCardWrapper from "./GlassmorphicContentCardWrapper";
 
 // Define content types enum to match API
 type ContentItemType =
@@ -497,67 +495,112 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     [showContent]
   );
 
+  // Render formatted content with proper Arabic and English styling
+  const renderFormattedContent = useCallback(
+    (content: string, fontSize: string) => {
+      // Check if content has Arabic characters (basic detection)
+      const hasArabic = /[\u0600-\u06FF]/.test(content);
+
+      // Split content by double newlines to separate sections
+      const sections = content.split("\n\n");
+
+      return (
+        <Box sx={{ width: "100%", textAlign: "center" }}>
+          {sections.map((section, index) => {
+            const trimmedSection = section.trim();
+            if (!trimmedSection) return null;
+
+            // Detect if this section is Arabic
+            const isArabicSection = /[\u0600-\u06FF]/.test(trimmedSection);
+
+            return (
+              <Typography
+                key={index}
+                sx={{
+                  fontSize: isArabicSection
+                    ? `${parseFloat(fontSize) * 1.1}rem`
+                    : fontSize,
+                  color: "rgba(255,255,255,0.9)",
+                  fontFamily: isArabicSection
+                    ? "'Amiri', 'Traditional Arabic', 'Arial Unicode MS', sans-serif"
+                    : "'Poppins', sans-serif",
+                  lineHeight: isArabicSection ? 2.2 : 1.7,
+                  direction: isArabicSection ? "rtl" : "ltr",
+                  textAlign: "center",
+                  mb: index < sections.length - 1 ? 2 : 0,
+                  whiteSpace: "pre-wrap",
+                  wordWrap: "break-word",
+                  overflowWrap: "break-word",
+                  // Better text rendering
+                  WebkitFontSmoothing: "antialiased",
+                  MozOsxFontSmoothing: "grayscale",
+                  letterSpacing: isArabicSection ? "1px" : "0.3px",
+                  fontWeight: isArabicSection ? 500 : 400,
+                  // Special styling for references (sections starting with —)
+                  ...(trimmedSection.startsWith("—") && {
+                    fontStyle: "italic",
+                    opacity: 0.85,
+                    fontSize: `${parseFloat(fontSize) * 0.9}rem`,
+                    mt: 1,
+                  }),
+                }}
+              >
+                {trimmedSection}
+              </Typography>
+            );
+          })}
+        </Box>
+      );
+    },
+    []
+  );
+
   // Process and format verse/hadith content correctly
   const formatVerseHadithContent = useCallback((content: any): string => {
-    if (typeof content === "string") {
-      // If it's already a JSON string, return it as is
-      if (content.startsWith("{") && content.includes('"type"')) {
-        return content;
+    const formatStructuredContent = (data: any): string => {
+      const arabic = data.arabicText || data.arabic || "";
+      const translation = data.translation || data.english || data.text || "";
+      const reference = data.reference || data.source || data.citation || "";
+
+      let formatted = "";
+
+      if (arabic) {
+        formatted += arabic;
       }
 
-      // Otherwise, it's a regular string
+      if (translation) {
+        if (formatted) formatted += "\n\n";
+        formatted += translation;
+      }
+
+      if (reference) {
+        formatted += `\n\n— ${reference}`;
+      }
+
+      return formatted || "No content available";
+    };
+
+    if (typeof content === "string") {
+      // Try to parse JSON if it looks like structured content
+      if (content.startsWith("{") && content.includes('"')) {
+        try {
+          const parsed = JSON.parse(content);
+          return formatStructuredContent(parsed);
+        } catch (e) {
+          // If parsing fails, return the original string
+          return content;
+        }
+      }
       return content;
     }
 
-    try {
-      // If it's an object with verse/hadith structure
-      if (
-        content.type === "QURAN_VERSE" ||
-        content.type === "HADITH" ||
-        content.arabicText ||
-        content.translation
-      ) {
-        // Return the whole object as a JSON string
-        return JSON.stringify(content);
-      }
-
-      // Legacy format
-      if (content.verse || content.text) {
-        const verse = content.verse || content.text || "";
-        const reference = content.reference || content.source || "";
-
-        // Try to combine into a JSON format for better display
-        if (content.arabicText) {
-          return JSON.stringify({
-            type: "QURAN_VERSE",
-            arabicText: content.arabicText,
-            translation: verse,
-            reference: reference,
-          });
-        }
-
-        return reference ? `${verse}\n\n${reference}` : verse;
-      } else if (content.hadith) {
-        const hadith = content.hadith || "";
-        const source = content.source || content.reference || "";
-
-        return source ? `${hadith}\n\n${source}` : hadith;
-      } else if (typeof content === "object") {
-        // Try to extract meaningful content from object
-        if (content.content) {
-          return typeof content.content === "string"
-            ? content.content
-            : JSON.stringify(content.content);
-        }
-        // If we can't parse in a specific way, return the JSON
-        return JSON.stringify(content);
-      }
-    } catch (e) {
-      console.error("Error formatting verse/hadith content:", e);
+    // If it's already an object
+    if (content && typeof content === "object") {
+      return formatStructuredContent(content);
     }
 
     // Fallback
-    return typeof content === "string" ? content : "Error displaying content";
+    return typeof content === "string" ? content : "No content available";
   }, []);
 
   // Content rendering with performance optimization
@@ -580,14 +623,32 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
     if (!contentItems.length) {
       return (
-        <GlassmorphicContentCardWrapper
+        <ModernContentCard
           title={`Welcome to ${masjidName || "your masjid"}`}
-          titleGradient="#2A9D8F"
-          content="Please log in to the admin portal to add announcements or events."
-          fontSize={fontSizes.h4}
           variant={variant || "landscape"}
-          itemType="CUSTOM"
-        />
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              p: 3,
+              textAlign: "center",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: fontSizes.h4,
+                color: "rgba(255,255,255,0.9)",
+                fontFamily: "'Poppins', sans-serif",
+                lineHeight: 1.6,
+              }}
+            >
+              Please log in to the admin portal to add announcements or events.
+            </Typography>
+          </Box>
+        </ModernContentCard>
       );
     }
 
@@ -739,14 +800,20 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     const fontSize = getDynamicFontSize(String(contentToShow), contentType);
 
     return (
-      <GlassmorphicContentCardWrapper
-        title={titleToShow}
-        titleGradient={titleGradient}
-        content={contentToShow}
-        fontSize={fontSize}
-        variant={variant || "landscape"}
-        itemType={contentType}
-      />
+      <ModernContentCard title={titleToShow} variant={variant || "landscape"}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100%",
+            p: 3,
+            textAlign: "center",
+          }}
+        >
+          {renderFormattedContent(String(contentToShow), fontSize)}
+        </Box>
+      </ModernContentCard>
     );
   }, [
     contentItems,
@@ -756,6 +823,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     getDynamicFontSize,
     variant,
     formatVerseHadithContent,
+    renderFormattedContent,
   ]);
 
   // Render prayer announcement

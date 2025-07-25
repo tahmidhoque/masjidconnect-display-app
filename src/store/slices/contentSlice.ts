@@ -240,14 +240,15 @@ export const refreshContent = createAsyncThunk(
 
 export const refreshPrayerTimes = createAsyncThunk(
   'content/refreshPrayerTimes',
-  async (_, { rejectWithValue }) => {
+  async (options: { forceRefresh?: boolean } = {}, { rejectWithValue }) => {
     try {
+      const { forceRefresh = false } = options;
       const debounceKey = 'refreshPrayerTimes';
       const now = Date.now();
       const lastCall = debounceMap.get(debounceKey) || 0;
       
-      // Aggressive debouncing to prevent rapid firing
-      if (now - lastCall < MIN_REFRESH_INTERVAL) {
+      // Allow force refresh to bypass debouncing
+      if (!forceRefresh && now - lastCall < MIN_REFRESH_INTERVAL) {
         logger.debug('[Content] Debouncing prayer times refresh - too recent', { 
           lastCall: new Date(lastCall).toISOString(),
           timeSince: now - lastCall 
@@ -385,7 +386,7 @@ export const refreshAllContent = createAsyncThunk(
       // Refresh all content in parallel for better performance
       const results = await Promise.allSettled([
         dispatch(refreshContent({ forceRefresh })),
-        dispatch(refreshPrayerTimes()),
+        dispatch(refreshPrayerTimes({ forceRefresh: true })),
         dispatch(refreshSchedule({ forceRefresh })),
         dispatch(refreshEvents()),
       ]);
