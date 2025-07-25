@@ -258,14 +258,50 @@ export const refreshPrayerTimes = createAsyncThunk(
       debounceMap.set(debounceKey, now);
       logger.debug('[Content] Refreshing prayer times...');
       
-      await dataSyncService.syncPrayerTimes();
+      // First, try to sync prayer times separately (but don't fail if it doesn't work)
+      try {
+        await dataSyncService.syncPrayerTimes();
+        logger.debug('[Content] Prayer times sync completed successfully');
+      } catch (syncError) {
+        logger.warn('[Content] Prayer times sync failed, falling back to cached data', { error: syncError });
+      }
       
-      // Get the prayer times from storage after sync
-      const prayerTimes = await storageService.getPrayerTimes();
+      // Try to get prayer times from storage
+      let prayerTimes = await storageService.getPrayerTimes();
+      
+      // If no prayer times found separately, try to extract from screen content
+      if (!prayerTimes) {
+        logger.info('[Content] No separate prayer times found, extracting from screen content...');
+        const screenContent = await storageService.getScreenContent();
+        
+        if (screenContent) {
+          // Try different possible locations for prayer times in screen content
+          if (screenContent.prayerTimes) {
+            prayerTimes = screenContent.prayerTimes;
+            logger.info('[Content] Extracted prayer times from screenContent.prayerTimes');
+          } else if ((screenContent as any).data?.prayerTimes) {
+            prayerTimes = (screenContent as any).data.prayerTimes;
+            logger.info('[Content] Extracted prayer times from screenContent.data.prayerTimes');
+          }
+          
+          // If we found prayer times in screen content, save them separately for future use
+          if (prayerTimes) {
+            await storageService.savePrayerTimes(prayerTimes);
+            logger.info('[Content] Saved extracted prayer times separately for future use');
+          }
+        }
+      }
       
       if (!prayerTimes) {
-        throw new Error('No prayer times received from server');
+        logger.warn('[Content] No prayer times found in storage or screen content');
+        throw new Error('No prayer times found in storage or screen content');
       }
+      
+      logger.info('[Content] Successfully loaded prayer times', { 
+        hasData: !!prayerTimes, 
+        isArray: Array.isArray(prayerTimes),
+        dataKeys: prayerTimes && typeof prayerTimes === 'object' ? Object.keys(prayerTimes) : []
+      });
       
       return {
         prayerTimes,

@@ -65,7 +65,10 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   // Local state to handle initial loading and retry logic
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [localLoading, setLocalLoading] = useState(true);
+  // Start with loading false if we already have prayer times data
+  const [localLoading, setLocalLoading] = useState(
+    !prayerTimes && !nextPrayer && todaysPrayerTimes.length === 0
+  );
 
   // Use refs to track component state between renders
   const lastRefreshTimeRef = useRef<number>(Date.now());
@@ -162,13 +165,23 @@ const GlassmorphicCombinedPrayerCard: React.FC<
     prayerTimes,
   ]);
 
+  // Ensure localLoading is cleared when we have data
+  useEffect(() => {
+    if (nextPrayer && todaysPrayerTimes.length > 0 && localLoading) {
+      logger.info(
+        "[GlassmorphicCombinedPrayerCard] Data available, clearing local loading state"
+      );
+      setLocalLoading(false);
+    }
+  }, [nextPrayer, todaysPrayerTimes, localLoading]);
+
   // Force refresh when mounted to ensure we have fresh data
   useEffect(() => {
     logger.info(
       "[GlassmorphicCombinedPrayerCard] Component mounted, triggering initial data refresh"
     );
     lastRefreshTimeRef.current = Date.now();
-    refreshPrayerTimes();
+    refreshPrayerTimesHandler();
 
     // Set up visibility change listener - important for focus/blur cycles
     const handleVisibilityChange = () => {
@@ -177,7 +190,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
           "[GlassmorphicCombinedPrayerCard] Window became visible, refreshing data"
         );
         lastRefreshTimeRef.current = Date.now();
-        refreshPrayerTimes();
+        refreshPrayerTimesHandler();
       }
     };
 
@@ -193,7 +206,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [refreshPrayerTimes]);
+  }, [refreshPrayerTimesHandler]);
 
   // Listen for content updates
   useEffect(() => {
@@ -235,14 +248,14 @@ const GlassmorphicCombinedPrayerCard: React.FC<
           "[GlassmorphicCombinedPrayerCard] Performing periodic data refresh check"
         );
         lastRefreshTimeRef.current = now;
-        refreshPrayerTimes();
+        refreshPrayerTimesHandler();
       }
     }, 15 * 60 * 1000); // 15 minutes
 
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [refreshPrayerTimes]);
+  }, [refreshPrayerTimesHandler]);
 
   // Animation for the shimmer effect
   const cardAnimation = useMemo(
@@ -340,14 +353,14 @@ const GlassmorphicCombinedPrayerCard: React.FC<
       );
 
       // Ensure we immediately refresh prayer times to get the next prayer
-      refreshPrayerTimes();
+      refreshPrayerTimesHandler();
 
       // Pass the event up to parent component if provided
       if (onCountdownComplete) {
         onCountdownComplete(isJamaat);
       }
     },
-    [refreshPrayerTimes, onCountdownComplete]
+    [refreshPrayerTimesHandler, onCountdownComplete]
   );
 
   // Helper to get background color for prayer row
@@ -371,49 +384,47 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   };
 
   // Early return with loading state
-  if (isLoading || localLoading || isRetrying) {
-    // Important fix: if we have the data already, show it instead of the loading spinner
-    if (nextPrayer && todaysPrayerTimes.length > 0) {
-      setLocalLoading(false);
-      // Immediately exit the loading state condition
-    } else {
-      return (
-        <GlassmorphicCard
-          opacity={0.2}
-          blurIntensity={8}
-          borderRadius={4}
-          borderWidth={1}
-          borderOpacity={0.3}
-          borderColor={theme.palette.warning.main}
-          shadowIntensity={0.35}
+  // Only show loading if we don't have the data AND we're in a loading state
+  if (
+    (isLoading || localLoading || isRetrying) &&
+    (!nextPrayer || todaysPrayerTimes.length === 0)
+  ) {
+    return (
+      <GlassmorphicCard
+        opacity={0.2}
+        blurIntensity={8}
+        borderRadius={4}
+        borderWidth={1}
+        borderOpacity={0.3}
+        borderColor={theme.palette.warning.main}
+        shadowIntensity={0.35}
+        sx={{
+          width: "100%",
+          height: "100%",
+          color: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          background: `linear-gradient(135deg, ${alpha(
+            theme.palette.primary.dark,
+            0.7
+          )} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
+        }}
+      >
+        <CircularProgress color="warning" size={40} thickness={4} />
+        <Typography
           sx={{
-            width: "100%",
-            height: "100%",
-            color: "#fff",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            background: `linear-gradient(135deg, ${alpha(
-              theme.palette.primary.dark,
-              0.7
-            )} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
+            mt: 2,
+            fontSize: fontSizes.h6,
+            fontWeight: 600,
+            textAlign: "center",
           }}
         >
-          <CircularProgress color="warning" size={40} thickness={4} />
-          <Typography
-            sx={{
-              mt: 2,
-              fontSize: fontSizes.h6,
-              fontWeight: 600,
-              textAlign: "center",
-            }}
-          >
-            Loading Prayer Times...
-          </Typography>
-        </GlassmorphicCard>
-      );
-    }
+          Loading Prayer Times...
+        </Typography>
+      </GlassmorphicCard>
+    );
   }
 
   // Fallback for when retries are exhausted but still no data
@@ -469,7 +480,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
           onClick={() => {
             setLocalLoading(true);
             setRetryCount(0);
-            refreshPrayerTimes();
+            refreshPrayerTimesHandler();
           }}
           sx={{
             cursor: "pointer",
