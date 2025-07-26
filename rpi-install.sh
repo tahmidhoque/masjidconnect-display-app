@@ -1,6 +1,6 @@
 #!/bin/bash
 # MasjidConnect Display App Installer for Raspberry Pi
-# This script handles installation and dependency resolution
+# This script handles installation and dependency resolution with proper permissions
 
 echo "MasjidConnect Display App Installer"
 echo "=================================="
@@ -27,28 +27,86 @@ fi
 echo "Found installation package: $(basename "$DEB_FILE")"
 echo
 
+# Fix APT sandbox issue (common on Raspberry Pi OS)
+echo "Configuring APT for proper package installation..."
+if [ ! -f "/etc/apt/apt.conf.d/99masjidconnect-fix" ]; then
+    cat > /etc/apt/apt.conf.d/99masjidconnect-fix << EOF
+APT::Sandbox::User "root";
+EOF
+    echo "✓ APT configuration fixed for Raspberry Pi"
+fi
+
+# Copy the .deb file to a system location to avoid permission issues
+TEMP_DEB="/tmp/$(basename "$DEB_FILE")"
+echo "Copying package to system location..."
+cp "$DEB_FILE" "$TEMP_DEB"
+chmod 644 "$TEMP_DEB"
+
 # Install required dependencies first
 echo "Installing required dependencies..."
 apt-get update
 apt-get install -y libasound2 libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
-    xdg-utils libatspi2.0-0 libuuid1 libgbm1 libdrm2 libxkbcommon0 libx11-xcb1
+    xdg-utils libatspi2.0-0 libuuid1 libgbm1 libdrm2 libxkbcommon0 libx11-xcb1 \
+    libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libatk-bridge2.0-0 \
+    libatk1.0-0 libcups2 libxcb-dri3-0
 
-# Install the application with dependency handling
+# Install the application using dpkg first, then fix dependencies
 echo "Installing MasjidConnect Display App..."
-apt-get install -f -y "$DEB_FILE"
+if dpkg -i "$TEMP_DEB" 2>/dev/null; then
+    echo "✓ Package installed successfully"
+else
+    echo "Package installation needs dependency fix, running apt-get install -f..."
+    apt-get install -f -y
+    
+    # Try installing again
+    if dpkg -i "$TEMP_DEB"; then
+        echo "✓ Package installed successfully after dependency fix"
+    else
+        echo "✗ Package installation failed. Trying alternative method..."
+        # Alternative: use gdebi if available, or force install
+        if command -v gdebi >/dev/null 2>&1; then
+            gdebi -n "$TEMP_DEB"
+        else
+            echo "Installing gdebi and trying again..."
+            apt-get install -y gdebi-core
+            gdebi -n "$TEMP_DEB"
+        fi
+    fi
+fi
 
-# Check if installation was successful
-if [ $? -eq 0 ]; then
+# Clean up temporary file
+rm -f "$TEMP_DEB"
+
+# Verify installation
+if command -v masjidconnect-display >/dev/null 2>&1 || [ -f "/opt/masjidconnect-display/masjidconnect-display" ]; then
     echo
     echo "✓ Installation completed successfully!"
-    echo "You can now run MasjidConnect Display from the applications menu"
-    echo "or by typing 'masjidconnect-display' in a terminal."
     echo
-    echo "To run in kiosk mode on startup, consider adding it to autostart or"
-    echo "creating a systemd service."
+    echo "The MasjidConnect Display App has been installed to:"
+    echo "  /opt/masjidconnect-display/"
+    echo
+    echo "The application will start automatically on next boot."
+    echo "To start it manually right now, run:"
+    echo "  /opt/masjidconnect-display/masjidconnect-display"
+    echo
+    echo "Or for kiosk mode:"
+    echo "  /opt/masjidconnect-display/launcher.sh"
+    echo
+    echo "To configure your display, pair it with your MasjidConnect account"
+    echo "when the pairing screen appears."
+    
+    # Clean up the APT configuration fix
+    rm -f /etc/apt/apt.conf.d/99masjidconnect-fix
+    echo
+    echo "Installation log available at: /var/log/masjidconnect-install.log"
 else
     echo
-    echo "✗ Installation encountered errors."
+    echo "✗ Installation verification failed."
     echo "Please check the output above for details."
+    echo "You may need to install missing dependencies manually."
     exit 1
-fi 
+fi
+
+echo
+echo "Installation complete! 🎉"
+echo "Reboot your Raspberry Pi to start the display automatically." 

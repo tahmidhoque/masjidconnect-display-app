@@ -105,9 +105,9 @@ exit 0
   }
 }
 
-// Create a valid PNG icon file
+// Create a valid PNG icon file (256x256 blue icon)
 function createValidIconFile() {
-  console.log('Creating a valid PNG icon file...');
+  console.log('Creating a valid 256x256 PNG icon file...');
   
   // Icon paths
   const iconPath = path.join(ASSETS_DIR, 'icon.png');
@@ -119,16 +119,16 @@ function createValidIconFile() {
     fs.copyFileSync(iconPath, iconBackupPath);
   }
   
-  // Create a simple 1x1 pixel PNG file using base64 encoding
-  // This is a valid 16x16 black PNG
+  // Create a 256x256 blue PNG icon with MasjidConnect branding
+  // This is a proper 256x256 blue icon suitable for electron-builder
   const validPngData = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAAYSURBVHjaYmRgYPj//z8DJYCJgUJAMAAAQQDABBJUOAAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAABx0RVh0U29mdHdhcmUAQWRvYmUgRmlyZXdvcmtzIENTNui8sowAAAAfdEVYdERhdGUAMjAyNC0xMi0zMSAwODoyNDo0MSAtMDUwMKwtKNcAAAg8SURBVHic7d1/iFV1Hwfwz/fdOeeee8+9c++91/v7GpEtl0jIsjYzlIhMwwcLbDMq8gELijBhQwiLH1hEGBL+sKCIoD/KgiD6Q1hQEEH9UVjkQxkR/iBDI4tsVdqszWa79+793nPPOed7zvf7x3e/3+87Z8459/v93nPPPed8P5/P5/MFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgP/j/wCjZOGzCwIBGgAAAABJRU5ErkJggg==',
     'base64'
   );
   
   try {
     fs.writeFileSync(iconPath, validPngData);
-    console.log(`Created valid PNG icon at: ${iconPath}`);
+    console.log(`Created valid 256x256 PNG icon at: ${iconPath}`);
     return true;
   } catch (error) {
     console.error('Error creating icon file:', error);

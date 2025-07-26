@@ -1,6 +1,6 @@
 {
   "name": "masjidconnect-display-app",
-  "version": "0.1.0",
+  "version": "0.0.1-beta",
   "private": true,
   "main": "electron/main.js",
   "description": "MasjidConnect Display App - Digital signage solution for mosques",
@@ -56,10 +56,10 @@
     "electron:build:publish": "npm run build:fix-paths && electron-builder build --publish always",
     "electron:start": "electron .",
     "install:fonts": "./scripts/install-fonts.sh",
-    "electron:build:rpi": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb --armv7l --publish never",
-    "electron:build:rpi:arm64": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb tar.gz --arm64 --config.linux.icon=false --publish never",
-    "electron:build:rpi:publish": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb tar.gz --armv7l --arm64 --config.linux.icon=false --publish always",
-    "electron:build:rpi:noicon": "npm run build:fix-paths && npm run install:fonts && electron-builder build --linux deb tar.gz --armv7l --config.linux.icon=false --publish never"
+    "rpi:build": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish never",
+    "rpi:build:armv7l": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --publish never",
+    "rpi:build:arm64": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --arm64 --publish never",
+    "rpi:publish": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish always"
   },
   "eslintConfig": {
     "extends": [
@@ -135,7 +135,15 @@
         {
           "target": "deb",
           "arch": [
-            "armv7l"
+            "armv7l",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "armv7l",
+            "arm64"
           ]
         }
       ],
