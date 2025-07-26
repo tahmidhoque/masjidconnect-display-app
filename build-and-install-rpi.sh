@@ -154,9 +154,9 @@ if [ "$INSTALL_SYSTEM" = true ]; then
     # Create installation directory
     mkdir -p "$INSTALL_DIR"
     
-    # Copy application files
+    # Copy application files maintaining structure
     cp -r build/* "$INSTALL_DIR/"
-    cp -r electron/* "$INSTALL_DIR/"
+    cp -r electron "$INSTALL_DIR/"
     cp -r node_modules "$INSTALL_DIR/"
     cp package.json "$INSTALL_DIR/"
     
@@ -238,9 +238,9 @@ else
     # Create user installation directory
     mkdir -p "$USER_INSTALL_DIR"
     
-    # Copy application files
+    # Copy application files maintaining structure  
     cp -r build/* "$USER_INSTALL_DIR/"
-    cp -r electron/* "$USER_INSTALL_DIR/"
+    cp -r electron "$USER_INSTALL_DIR/"
     cp -r node_modules "$USER_INSTALL_DIR/"
     cp package.json "$USER_INSTALL_DIR/"
     

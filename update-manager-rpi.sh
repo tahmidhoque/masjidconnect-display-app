@@ -221,10 +221,10 @@ update_from_source() {
     # Remove old files except config
     find "$TARGET_DIR" -mindepth 1 -maxdepth 1 ! -name "config" -exec rm -rf {} +
     
-    # Copy new files
-    cp -r build/* "$TARGET_DIR/"
-    cp -r electron/* "$TARGET_DIR/"
-    cp package.json "$TARGET_DIR/"
+         # Copy new files maintaining proper structure
+     cp -r build/* "$TARGET_DIR/"
+     cp -r electron "$TARGET_DIR/"
+     cp package.json "$TARGET_DIR/"
     
     # Restore or update node_modules
     if [ -d "/tmp/masjidconnect-node_modules.bak" ]; then
