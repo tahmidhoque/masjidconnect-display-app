@@ -6,8 +6,19 @@ import logger from "./utils/logger";
 import ApiErrorBoundary from "./components/common/ApiErrorBoundary";
 import GracefulErrorOverlay from "./components/common/GracefulErrorOverlay";
 import EmergencyAlertOverlay from "./components/common/EmergencyAlertOverlay";
+import AnalyticsErrorIntegration from "./components/common/AnalyticsErrorIntegration";
+import FactoryResetModal from "./components/common/FactoryResetModal";
+// Clear cached Hijri data to ensure accurate calculation
+import "./utils/clearHijriCache";
+// Verify Hijri calculation accuracy (development only)
+import "./utils/verifyHijriCalculation";
+// Demo factory reset functionality (development only)
+import "./utils/factoryResetDemo";
+// Countdown testing utilities (development only)
+import "./utils/countdownTest";
 import useKioskMode from "./hooks/useKioskMode";
 import useInitializationFlow from "./hooks/useInitializationFlow";
+import useFactoryReset from "./hooks/useFactoryReset";
 import { ComponentPreloader } from "./utils/performanceUtils";
 
 // Store
@@ -183,6 +194,10 @@ const App: React.FC = () => {
   // Enable localStorage monitoring in development
   useLocalStorageMonitor();
 
+  // Initialize factory reset functionality
+  const { isModalOpen, closeModal, confirmReset, isResetting } =
+    useFactoryReset();
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -208,6 +223,15 @@ const App: React.FC = () => {
           <AppRoutes />
           <GracefulErrorOverlay />
           <EmergencyAlertOverlay />
+          <AnalyticsErrorIntegration />
+
+          {/* Factory Reset Modal */}
+          <FactoryResetModal
+            open={isModalOpen}
+            onConfirm={confirmReset}
+            onCancel={closeModal}
+            isResetting={isResetting}
+          />
         </Box>
       </ApiErrorBoundary>
     </ThemeProvider>

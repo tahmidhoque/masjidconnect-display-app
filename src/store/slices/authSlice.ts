@@ -3,6 +3,7 @@ import masjidDisplayClient from '../../api/masjidDisplayClient';
 import { ApiCredentials, RequestPairingCodeResponse, CheckPairingStatusResponse } from '../../api/models';
 import logger from '../../utils/logger';
 import dataSyncService from '../../services/dataSyncService';
+import { analyticsService } from '../../services/analyticsService';
 // Define Orientation type locally instead of importing from context
 export type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 
@@ -107,6 +108,14 @@ export const checkPairingStatus = createAsyncThunk(
         const screenId = localStorage.getItem('masjid_screen_id') || 
                        localStorage.getItem('screenId');
         
+        logger.info('[Auth] Redux checking for credentials in localStorage', {
+          hasApiKey: !!apiKey,
+          hasScreenId: !!screenId,
+          apiKeyLength: apiKey?.length || 0,
+          screenIdLength: screenId?.length || 0,
+          isPaired
+        });
+        
         if (apiKey && screenId) {
           // Store credentials in multiple formats for compatibility
           localStorage.setItem('masjid_api_key', apiKey);
@@ -124,6 +133,11 @@ export const checkPairingStatus = createAsyncThunk(
           
           // Initialize API client
           masjidDisplayClient.setCredentials({ apiKey, screenId });
+          
+          logger.info('[Auth] Redux returning successful pairing result', {
+            isPaired: true,
+            hasCredentials: true
+          });
           
           return {
             isPaired: true,
@@ -392,7 +406,20 @@ const authSlice = createSlice({
       .addCase(checkPairingStatus.fulfilled, (state, action) => {
         state.isCheckingPairingStatus = false;
         
+        logger.info('[Auth] Redux reducer received checkPairingStatus.fulfilled', {
+          isPaired: action.payload.isPaired,
+          hasCredentials: !!action.payload.credentials,
+          payload: action.payload
+        });
+        
         if (action.payload.isPaired && action.payload.credentials) {
+          logger.info('[Auth] Redux updating state to authenticated', {
+            oldAuthenticated: state.isAuthenticated,
+            newAuthenticated: true,
+            oldPairing: state.isPairing,
+            newPairing: false
+          });
+          
           state.isAuthenticated = true;
           state.isPaired = true;
           state.isPairing = false;
@@ -403,11 +430,13 @@ const authSlice = createSlice({
           state.isPairingCodeExpired = false;
           state.isPolling = false;
           
-          // Initialize dataSyncService when pairing is successful
+          // Initialize services when pairing is successful
           try {
             dataSyncService.initialize();
+            analyticsService.initialize(action.payload.credentials.apiKey);
+            logger.info('[Auth] Services initialized successfully after pairing');
           } catch (error) {
-            logger.error('[Auth] Error initializing dataSyncService after pairing', { error });
+            logger.error('[Auth] Error initializing services after pairing', { error });
           }
           state.pairingError = null;
           state.lastUpdated = new Date().toISOString();
@@ -435,11 +464,13 @@ const authSlice = createSlice({
           state.isPairingCodeExpired = false;
           state.isPolling = false;
           
-          // Initialize dataSyncService when authentication is successful
+          // Initialize services when authentication is successful
           try {
             dataSyncService.initialize();
+            analyticsService.initialize(action.payload.credentials.apiKey);
+            logger.info('[Auth] Services initialized successfully from storage');
           } catch (error) {
-            logger.error('[Auth] Error initializing dataSyncService', { error });
+            logger.error('[Auth] Error initializing services', { error });
           }
         } else if (action.payload.pairingData) {
           state.pairingCode = action.payload.pairingData.pairingCode;

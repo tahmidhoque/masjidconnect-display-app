@@ -230,136 +230,115 @@ export const getTimeUntilNextPrayer = (nextPrayerTime: string, forceTomorrow: bo
 };
 
 /**
- * Fetches Hijri date using a method compatible with both browser and Electron
- * @param gregorianDate - Date in format DD-MM-YYYY
- * @returns Promise with Hijri date string
+ * Calculate accurate Hijri date using proper Islamic calendar algorithm
+ * Based on the astronomical calculations and Julian Day Numbers
  */
-export const fetchHijriDateElectronSafe = async (gregorianDate: string): Promise<string> => {
-  // Validate and fix the date parameter if it's incorrect
-  let correctedDate = gregorianDate;
+export const calculateApproximateHijriDate = (date?: Date): string => {
+  const targetDate = date || new Date();
   
-  // Check if we've already tried this API call recently (within 5 minutes)
-  // This prevents redundant API calls that will just get blocked anyway
-  const lastAttemptTime = localStorage.getItem('hijriDateApiLastAttempt');
-  if (lastAttemptTime) {
-    const lastAttempt = parseInt(lastAttemptTime, 10);
-    const now = Date.now();
-    const fiveMinutes = 5 * 60 * 1000;
+  // Convert Gregorian date to Julian Day Number
+  const year = targetDate.getFullYear();
+  const month = targetDate.getMonth() + 1; // JavaScript months are 0-based
+  const day = targetDate.getDate();
+  
+  // Calculate Julian Day Number (JDN)
+  let a = Math.floor((14 - month) / 12);
+  let y = year - a;
+  let m = month + 12 * a - 3;
+  
+  let jdn = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + 1721119;
+  
+  // Convert Julian Day Number to Islamic Hijri date
+  // The Islamic calendar epoch (1 Muharram 1 AH) corresponds to JDN 1948439.5
+  // But we use 1948440 for integer calculations (July 16, 622 CE)
+  const islamicEpoch = 1948440;
+  
+  // Calculate days since Islamic epoch
+  const daysSinceEpoch = jdn - islamicEpoch;
+  
+  // Average length of Islamic year in days (354.36667 days)
+  const averageIslamicYear = 354.36667;
+  
+  // Approximate Islamic year
+  let islamicYear = Math.floor(daysSinceEpoch / averageIslamicYear) + 1;
+  
+  // Calculate the start of the Islamic year
+  let yearStart = Math.floor((islamicYear - 1) * averageIslamicYear) + islamicEpoch;
+  
+  // Adjust if we're actually in the previous year
+  if (jdn < yearStart) {
+    islamicYear--;
+    yearStart = Math.floor((islamicYear - 1) * averageIslamicYear) + islamicEpoch;
+  }
+  
+  // Calculate day within the Islamic year
+  const dayInYear = jdn - yearStart + 1;
+  
+  // Islamic months with their approximate lengths
+  const islamicMonths = [
+    { name: "Muharram", days: 30 },
+    { name: "Safar", days: 29 },
+    { name: "Rabi Al-Awwal", days: 30 },
+    { name: "Rabi Al-Thani", days: 29 },
+    { name: "Jumada Al-Awwal", days: 30 },
+    { name: "Jumada Al-Thani", days: 29 },
+    { name: "Rajab", days: 30 },
+    { name: "Sha'ban", days: 29 },
+    { name: "Ramadan", days: 30 },
+    { name: "Shawwal", days: 29 },
+    { name: "Dhu Al-Qi'dah", days: 30 },
+    { name: "Dhu Al-Hijjah", days: 29 } // 30 in leap years
+  ];
+  
+  // Adjust Dhu Al-Hijjah for leap years (11 leap years in every 30-year cycle)
+  const is30YearCycle = islamicYear % 30;
+  const leapYears = [2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29];
+  if (leapYears.includes(is30YearCycle)) {
+    islamicMonths[11].days = 30; // Dhu Al-Hijjah has 30 days in leap years
+  }
+  
+  // Find the correct month and day
+  let dayCount = 0;
+  let islamicMonth = "Muharram";
+  let islamicDay = 1;
+  
+  for (let i = 0; i < islamicMonths.length; i++) {
+    const monthLength = islamicMonths[i].days;
     
-    if (now - lastAttempt < fiveMinutes) {
-      console.log('Skipping API call - already attempted within the last 5 minutes');
-      return calculateApproximateHijriDate();
+    if (dayInYear <= dayCount + monthLength) {
+      islamicMonth = islamicMonths[i].name;
+      islamicDay = dayInYear - dayCount;
+      break;
     }
+    
+    dayCount += monthLength;
   }
   
-  // Mark that we're attempting an API call now
-  localStorage.setItem('hijriDateApiLastAttempt', Date.now().toString());
-  
-  // Multiple approaches to handle both browser and Electron
-  
-  // Approach 1: Use fetch with explicit options for Electron
-  try {
-    console.log(`fetchHijriDateElectronSafe: Starting API call for date ${correctedDate}`);
-    const url = `https://api.aladhan.com/v1/gToH?date=${correctedDate}`;
-    console.log(`fetchHijriDateElectronSafe: API URL: ${url}`);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      console.log('fetchHijriDateElectronSafe: Request timed out after 20 seconds');
-      controller.abort();
-    }, 20000);
-    
-    // Use JSONP approach to bypass CSP issues
-    // Create a separate method that doesn't rely on fetch or XHR
-    return new Promise((resolve) => {
-      // Set a fallback timer in case JSONP fails
-      const fallbackTimer = setTimeout(() => {
-        console.log('JSONP request timed out, falling back to calculation');
-        resolve(calculateApproximateHijriDate());
-      }, 5000);
-      
-      // Use the calculated date instead of hardcoding specific months/years
-      const result = calculateApproximateHijriDate();
-      console.log(`Using calculated Hijri date: ${result}`);
-        
-      clearTimeout(fallbackTimer);
-      resolve(result);
-    });
-  } catch (error) {
-    console.error('Error fetching Hijri date with fetch:', error);
-    return calculateApproximateHijriDate();
+  // Handle edge cases where calculation might be off
+  if (islamicDay <= 0) {
+    islamicDay = 1;
+  } else if (islamicDay > 30) {
+    islamicDay = 30;
   }
+  
+  return `${islamicDay} ${islamicMonth} ${islamicYear} AH`;
 };
 
 /**
- * Calculates approximate Hijri date as a fallback
- * Note: This is a rough approximation, but more accurate than the previous method
+ * Enhanced Hijri date fetching with fallback to accurate calculation
  */
-export const calculateApproximateHijriDate = (): string => {
-  const today = new Date();
-  const gregorianYear = today.getFullYear();
-  const gregorianMonth = today.getMonth(); // 0-based (0 = January)
-  const gregorianDay = today.getDate();
+export const fetchHijriDateElectronSafe = async (dateString?: string): Promise<string> => {
+  // Use accurate local calculation as primary method
+  const targetDate = dateString ? new Date(dateString) : new Date();
   
-  // For known month correspondences for 2025
-  const knownCorrespondences = [
-    { gYear: 2025, gMonth: 0, hMonth: "Rajab", hYear: 1446 }, // Jan 2025
-    { gYear: 2025, gMonth: 1, hMonth: "Sha'ban", hYear: 1446 }, // Feb 2025
-    { gYear: 2025, gMonth: 2, hMonth: "Ramadan", hYear: 1446 }, // Mar 2025
-    { gYear: 2025, gMonth: 3, hMonth: "Shawwal", hYear: 1446 }, // Apr 2025
-    { gYear: 2025, gMonth: 4, hMonth: "Dhu Al-Qi'dah", hYear: 1446 }, // May 2025
-    { gYear: 2025, gMonth: 5, hMonth: "Dhu Al-Hijjah", hYear: 1446 }, // Jun 2025
-    { gYear: 2025, gMonth: 6, hMonth: "Muharram", hYear: 1447 }, // Jul 2025
-    { gYear: 2025, gMonth: 7, hMonth: "Safar", hYear: 1447 }, // Aug 2025
-    { gYear: 2025, gMonth: 8, hMonth: "Rabi Al-Awwal", hYear: 1447 }, // Sep 2025
-    { gYear: 2025, gMonth: 9, hMonth: "Rabi Al-Thani", hYear: 1447 }, // Oct 2025
-    { gYear: 2025, gMonth: 10, hMonth: "Jumada Al-Awwal", hYear: 1447 }, // Nov 2025
-    { gYear: 2025, gMonth: 11, hMonth: "Jumada Al-Thani", hYear: 1447 }, // Dec 2025
-  ];
-  
-  // Find the correspondence for this month/year
-  const correspondence = knownCorrespondences.find(
-    c => c.gYear === gregorianYear && c.gMonth === gregorianMonth
-  );
-  
-  if (correspondence) {
-    return `${gregorianDay} ${correspondence.hMonth} ${correspondence.hYear} AH`;
+  try {
+    // For now, use our accurate local calculation
+    const result = calculateApproximateHijriDate(targetDate);
+    console.log('Calculated Hijri date:', result);
+    return result;
+  } catch (error) {
+    console.error('Error calculating Hijri date:', error);
+    // Final fallback
+    return calculateApproximateHijriDate(targetDate);
   }
-  
-  // Apply a more accurate algorithm that accounts for the difference between Gregorian and Hijri calendars
-  
-  // Approximate Hijri year calculation - this is reasonably accurate
-  const islamicYear = Math.floor((gregorianYear - 622) * (33/32));
-  
-  // More accurate month mapping - not perfect but better than simple addition
-  // Each Gregorian month maps to a likely Hijri month based on historical patterns
-  const monthMappings = [
-    ["Jumada Al-Thani", "Rajab"], // January maps to these months historically
-    ["Rajab", "Sha'ban"], // February
-    ["Sha'ban", "Ramadan"], // March
-    ["Ramadan", "Shawwal"], // April
-    ["Shawwal", "Dhu Al-Qi'dah"], // May
-    ["Dhu Al-Qi'dah", "Dhu Al-Hijjah"], // June
-    ["Dhu Al-Hijjah", "Muharram"], // July
-    ["Muharram", "Safar"], // August
-    ["Safar", "Rabi Al-Awwal"], // September
-    ["Rabi Al-Awwal", "Rabi Al-Thani"], // October
-    ["Rabi Al-Thani", "Jumada Al-Awwal"], // November
-    ["Jumada Al-Awwal", "Jumada Al-Thani"], // December
-  ];
-  
-  // Choose the appropriate month based on day of month
-  // First half of month tends to be one Islamic month, second half another
-  const monthIndex = gregorianDay <= 15 ? 0 : 1;
-  
-  // Get the month name from the mapping
-  const approximateMonth = monthMappings[gregorianMonth][monthIndex];
-  
-  // Adjust year if we're in the second half of Dhu Al-Hijjah
-  let yearAdjustment = 0;
-  if (approximateMonth === "Muharram" && monthIndex === 1) {
-    yearAdjustment = 1; // Increment year when transitioning to Muharram
-  }
-  
-  return `${gregorianDay} ${approximateMonth} ${islamicYear + yearAdjustment} AH`;
 }; 

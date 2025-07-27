@@ -6,14 +6,11 @@ import type { RootState, AppDispatch } from './index';
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
-// Memoized selectors for performance optimization
-export const selectAuth = createSelector(
-  (state: RootState) => state.auth,
-  (auth) => auth
-);
+// Optimized memoized selectors for performance
+// Note: Avoid selectors that return the entire state slice - they cause unnecessary re-renders
 
 export const selectAuthStatus = createSelector(
-  selectAuth,
+  (state: RootState) => state.auth,
   (auth) => ({
     isAuthenticated: auth.isAuthenticated,
     isPairing: auth.isPairing,
@@ -22,13 +19,8 @@ export const selectAuthStatus = createSelector(
   })
 );
 
-export const selectContent = createSelector(
-  (state: RootState) => state.content,
-  (content) => content
-);
-
 export const selectContentData = createSelector(
-  selectContent,
+  (state: RootState) => state.content,
   (content) => ({
     masjidName: content.masjidName,
     prayerTimes: content.prayerTimes,
@@ -40,42 +32,58 @@ export const selectContentData = createSelector(
 );
 
 export const selectPrayerTimes = createSelector(
-  selectContent,
-  (content) => content.prayerTimes
+  (state: RootState) => state.content.prayerTimes,
+  (prayerTimes) => prayerTimes
 );
 
 export const selectContentItems = createSelector(
-  selectContent,
-  (content) => content.screenContent?.schedule?.items || []
+  (state: RootState) => state.content.screenContent?.schedule?.items,
+  (items) => items || []
 );
 
-export const selectUI = createSelector(
-  (state: RootState) => state.ui,
-  (ui) => ui
+export const selectSchedule = createSelector(
+  (state: RootState) => state.content.schedule,
+  (schedule) => schedule
+);
+
+export const selectEvents = createSelector(
+  (state: RootState) => state.content.events,
+  (events) => events || []
+);
+
+export const selectMasjidName = createSelector(
+  (state: RootState) => state.content.masjidName,
+  (masjidName) => masjidName || ""
 );
 
 export const selectUIStatus = createSelector(
-  selectUI,
+  (state: RootState) => state.ui,
   (ui) => ({
     orientation: ui.orientation,
     isInitializing: ui.isInitializing,
     errorMessage: ui.errorMessage,
+    initializationStage: ui.initializationStage,
   })
 );
 
-export const selectEmergency = createSelector(
-  (state: RootState) => state.emergency,
-  (emergency) => emergency
-);
-
 export const selectCurrentAlert = createSelector(
-  selectEmergency,
-  (emergency) => emergency.currentAlert
+  (state: RootState) => state.emergency.currentAlert,
+  (currentAlert) => currentAlert
 );
 
-export const selectErrors = createSelector(
-  (state: RootState) => state.errors,
-  (errors) => errors
+export const selectActiveErrors = createSelector(
+  (state: RootState) => state.errors.activeErrors,
+  (activeErrors) => activeErrors || []
+);
+
+// Prayer announcement selectors
+export const selectPrayerAnnouncement = createSelector(
+  (state: RootState) => state.content,
+  (content) => ({
+    showPrayerAnnouncement: content.showPrayerAnnouncement,
+    prayerAnnouncementName: content.prayerAnnouncementName,
+    isPrayerJamaat: content.isPrayerJamaat,
+  })
 );
 
 // Combined selectors for commonly used data combinations
@@ -88,14 +96,42 @@ export const selectDisplayData = createSelector(
   })
 );
 
-// Selector for content carousel specific data
+// Optimized selector for content carousel - only returns what's needed
 export const selectCarouselData = createSelector(
-  [selectContentItems, selectContent, selectCurrentAlert],
-  (contentItems, content, currentAlert) => ({
-    contentItems,
-    masjidName: content.masjidName,
-    isLoading: content.isLoading,
+  [
+    selectSchedule,
+    selectEvents,
+    selectMasjidName,
+    (state: RootState) => state.content.isLoading,
+    selectCurrentAlert,
+    (state: RootState) => state.content.carouselTime,
+    selectPrayerAnnouncement,
+    (state: RootState) => state.ui.orientation,
+  ],
+  (schedule, events, masjidName, isLoading, currentAlert, carouselTime, prayerAnnouncement, orientation) => ({
+    schedule,
+    events,
+    masjidName,
+    isLoading,
     currentAlert,
-    carouselTime: content.carouselTime,
+    carouselTime,
+    ...prayerAnnouncement,
+    orientation,
+  })
+);
+
+// Performance-optimized selector for ModernLandscapeDisplay
+export const selectLandscapeDisplayData = createSelector(
+  [
+    selectMasjidName,
+    (state: RootState) => state.content.prayerTimes,
+    selectCurrentAlert,
+    (state: RootState) => state.ui.orientation,
+  ],
+  (masjidName, prayerTimes, currentAlert, orientation) => ({
+    masjidName,
+    prayerTimes,
+    currentAlert,
+    orientation,
   })
 );

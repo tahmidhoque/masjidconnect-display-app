@@ -7,8 +7,7 @@ import React, {
   memo,
 } from "react";
 import { Box, Typography, Fade, CircularProgress, Paper } from "@mui/material";
-import { useAppSelector } from "../../store/hooks";
-import { selectCarouselData } from "../../store/hooks";
+import { useAppSelector, selectCarouselData } from "../../store/hooks";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import IslamicPatternBackground from "./IslamicPatternBackground";
 import { NoMobilePhoneIcon, PrayerRowsIcon } from "../../assets/svgComponent";
@@ -143,22 +142,18 @@ interface AnnouncementConfig {
  * Also displays prayer announcements when prayer times are reached.
  */
 const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
-  // Redux selectors
-  const masjidName = useAppSelector((state) => state.content.masjidName);
-  const schedule = useAppSelector((state) => state.content.schedule);
-  const events = useAppSelector((state) => state.content.events);
-  const isContentLoading = useAppSelector((state) => state.content.isLoading);
-  const carouselTime = useAppSelector((state) => state.content.carouselTime);
-  const showPrayerAnnouncement = useAppSelector(
-    (state) => state.content.showPrayerAnnouncement
-  );
-  const prayerAnnouncementName = useAppSelector(
-    (state) => state.content.prayerAnnouncementName
-  );
-  const isPrayerJamaat = useAppSelector(
-    (state) => state.content.isPrayerJamaat
-  );
-  const orientation = useAppSelector((state) => state.ui.orientation);
+  // Use optimized selector to reduce re-renders
+  const {
+    schedule,
+    events,
+    masjidName,
+    isLoading: isContentLoading,
+    carouselTime,
+    showPrayerAnnouncement,
+    prayerAnnouncementName,
+    isPrayerJamaat,
+    orientation,
+  } = useAppSelector(selectCarouselData);
 
   // For now, create a simple refreshSchedule function that logs (to be implemented with Redux actions later)
   const refreshSchedule = useCallback((forceRefresh: boolean) => {

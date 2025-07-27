@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Box } from "@mui/material";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { setPrayerAnnouncement } from "../../store/slices/contentSlice";
 import { usePrayerTimes } from "../../hooks/usePrayerTimes";
+import useCurrentTime from "../../hooks/useCurrentTime";
 import logoGold from "../../assets/logos/logo-notext-gold.svg";
 import ContentCarousel from "../common/ContentCarousel";
 import IslamicPatternBackgroundDark from "../common/IslamicPatternBackgroundDark";
@@ -47,17 +48,9 @@ const LandscapeDisplay: React.FC = () => {
   const { currentDate, hijriDate, nextPrayer } = usePrayerTimes();
 
   const { fontSizes, screenSize, layout } = useResponsiveFontSize();
-  const [currentTime, setCurrentTime] = useState(new Date());
+  // Use centralized time management to prevent timer conflicts
+  const currentTime = useCurrentTime();
   const announcementActiveRef = useRef(false);
-
-  // Update current time every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   // Track prayer announcements for debugging
   useEffect(() => {

@@ -304,10 +304,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       logger.info('Cleared cached Hijri date to ensure fresh calculation');
       
       // Use our Electron-safe function to get the Hijri date
-      const formattedDate = dayjs().format('DD-MM-YYYY');
-      logger.info(`Using Electron-safe method to fetch Hijri date for ${formattedDate}`);
+      logger.info('Using accurate method to calculate Hijri date');
       
-      const hijriDateStr = await fetchHijriDateElectronSafe(formattedDate);
+      const hijriDateStr = await fetchHijriDateElectronSafe();
       
       // Cache the result in localStorage
       localStorage.setItem('hijriDate', hijriDateStr);

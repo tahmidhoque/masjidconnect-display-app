@@ -248,6 +248,12 @@ export default function useInitializationFlow() {
 
   // Watch for authentication state changes to transition from pairing to content loading
   useEffect(() => {
+    logger.info('[InitFlow] Auth/Stage effect triggered', {
+      stage,
+      isAuthenticated,
+      shouldTransition: stage === "pairing" && isAuthenticated
+    });
+    
     // If we're in pairing stage and authentication becomes successful, transition to content loading
     if (stage === "pairing" && isAuthenticated) {
       logger.info('[InitFlow] 🎉 Authentication successful during pairing, transitioning to content loading');
@@ -266,6 +272,13 @@ export default function useInitializationFlow() {
       if (!active) return;
       
       const res: any = await dispatch(checkPairingStatus(pairingCode));
+      
+      logger.info('[InitFlow] Polling result', {
+        fulfilled: checkPairingStatus.fulfilled.match(res),
+        isPaired: res.payload?.isPaired,
+        payload: res.payload
+      });
+      
       if (checkPairingStatus.fulfilled.match(res) && res.payload?.isPaired) {
         logger.info('[InitFlow] Pairing successful, loading content...');
         dispatch(setLoadingMessage("Pairing successful! Loading content..."));

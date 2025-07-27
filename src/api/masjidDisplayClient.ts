@@ -14,10 +14,13 @@ import {
   RequestPairingCodeRequest,
   CheckPairingStatusRequest,
   PairedCredentialsRequest,
-  PairedCredentialsResponse
+  PairedCredentialsResponse,
+  AnalyticsRequest,
+  AnalyticsResponse
 } from './models';
 import logger, { setLastError } from '../utils/logger';
 import { createErrorResponse, normalizeApiResponse, validateApiResponse } from '../utils/apiErrorHandler';
+import { withDeduplication } from '../utils/requestDeduplication';
 // Note: We'll dispatch errors via a callback to avoid circular dependencies
 // The store will be passed to the client after initialization
 
@@ -528,7 +531,7 @@ class MasjidDisplayClient {
       });
     }
     
-    // Otherwise, fetch from network
+    // Otherwise, fetch from network with deduplication
     try {
       // Mark this endpoint as loading
       this.isLoading.set(normalizedEndpoint, true);
@@ -540,7 +543,17 @@ class MasjidDisplayClient {
         currentTime: new Date().toISOString()
       });
       
-      const response = await this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime);
+      // Use request deduplication to prevent multiple simultaneous calls to the same endpoint
+      const deduplicationKey = `${normalizedEndpoint}:${JSON.stringify(options)}`;
+      const response = await withDeduplication(
+        deduplicationKey,
+        () => this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime),
+        {
+          ttl: 5000, // 5 second deduplication window
+          forceRefresh: forceRefresh,
+          skipCache: true, // Use our own caching mechanism
+        }
+      );
       
       // If success, update cache with current timestamp
       if (response.success && response.data) {
@@ -797,6 +810,69 @@ class MasjidDisplayClient {
       });
       
       return createErrorResponse('Failed to send heartbeat: ' + (isCorsError ? 'CORS policy error' : error.message));
+    }
+  }
+
+  // Send analytics data to server (comprehensive heartbeat system)
+  public async sendAnalyticsData(analyticsRequest: AnalyticsRequest): Promise<ApiResponse<AnalyticsResponse>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    // Check if we're authenticated
+    if (!isAuthReady) {
+      logger.warn('sendAnalyticsData called without authentication - auth not ready');
+      return createErrorResponse('Not authenticated');
+    }
+
+    try {
+      // Use the analytics endpoint as specified in the documentation
+      const endpoint = 'api/displays/heartbeat'.replace(/^\//, '');
+      
+      // Log detailed information about the request
+      logger.debug('Preparing analytics request', { 
+        endpoint,
+        type: analyticsRequest.type,
+        fullUrl: `${this.baseURL}/${endpoint}`,
+        corsProxyEnabled: USE_CORS_PROXY,
+        environment: process.env.NODE_ENV,
+        screenId: this.credentials?.screenId
+      });
+      
+      // Use consistent options with other API calls
+      const options = {
+        method: 'POST',
+        data: analyticsRequest,
+        timeout: 30000 // 30 second timeout
+      };
+      
+      // Use fetchWithCache with 0 cache time to ensure consistent CORS and auth handling
+      const result = await this.fetchWithCache<AnalyticsResponse>(endpoint, options, 0);
+      
+      if (!result.success) {
+        logger.warn('Analytics response not successful', { error: result.error, type: analyticsRequest.type });
+      } else {
+        logger.debug('Analytics response successful', { type: analyticsRequest.type });
+      }
+      
+      return validateApiResponse(result);
+    } catch (error: any) {
+      // Enhanced error logging with CORS-specific details
+      const isCorsError = error.message?.includes('CORS') || 
+                        error.message?.includes('NetworkError') ||
+                        error.message?.includes('Network Error');
+      
+      logger.error('Error sending analytics data', { 
+        error, 
+        type: analyticsRequest.type,
+        message: error.message,
+        isCorsError,
+        corsProxyEnabled: USE_CORS_PROXY,
+        baseUrl: this.baseURL,
+        status: error.response?.status,
+        headers: error.config?.headers
+      });
+      
+      return createErrorResponse('Failed to send analytics data: ' + (isCorsError ? 'CORS policy error' : error.message));
     }
   }
 
@@ -1115,6 +1191,14 @@ class MasjidDisplayClient {
           hasApiKey: !!apiKey 
         });
         
+        // Debug logging for condition check
+        logger.info('Checking pairing conditions', {
+          isPaired,
+          screenId,
+          conditionMet: isPaired && screenId,
+          apiKeyPresent: !!apiKey
+        });
+        
         if (isPaired && screenId) {
           // If the API response includes the apiKey directly, use it
           if (apiKey) {
@@ -1151,12 +1235,18 @@ class MasjidDisplayClient {
           } else {
             // Otherwise, get the full credentials using the paired-credentials endpoint
             logger.info('Pairing successful, fetching credentials from paired-credentials endpoint');
-            await this.fetchPairedCredentials(pairingCode);
-            
-            // Set isPaired flag in localStorage for other components to detect
-            localStorage.setItem('isPaired', 'true');
-            
-            return true;
+            try {
+              await this.fetchPairedCredentials(pairingCode);
+              
+              // Set isPaired flag in localStorage for other components to detect
+              localStorage.setItem('isPaired', 'true');
+              
+              logger.info('paired-credentials call completed successfully');
+              return true;
+            } catch (error) {
+              logger.error('Failed to fetch paired credentials', { error });
+              return false;
+            }
           }
         }
       }
@@ -1190,14 +1280,48 @@ class MasjidDisplayClient {
 
       const result = await this.fetchWithRetry<PairedCredentialsResponse>(endpoint, options);
       
+      logger.info('paired-credentials response received', { 
+        success: result.success, 
+        hasData: !!result.data,
+        data: result.data 
+      });
+      
       if (result.success && result.data) {
+        // Handle nested data structure: result.data.data contains the actual credentials
+        const credentialsData = (result.data as any).data || result.data;
+        
+        logger.info('Extracting credentials from paired-credentials response', {
+          hasNestedData: !!(result.data as any).data,
+          credentialsDataKeys: Object.keys(credentialsData || {}),
+          rawApiKey: credentialsData?.apiKey,
+          rawScreenId: credentialsData?.screenId
+        });
+        
         const credentials: ApiCredentials = {
-          apiKey: result.data.apiKey,
-          screenId: result.data.screenId
+          apiKey: credentialsData.apiKey,
+          screenId: credentialsData.screenId
         };
+        
+        logger.info('Setting credentials from paired-credentials', { 
+          hasApiKey: !!credentials.apiKey,
+          hasScreenId: !!credentials.screenId,
+          apiKeyLength: credentials.apiKey?.length || 0,
+          screenIdLength: credentials.screenId?.length || 0
+        });
         
         await this.setCredentials(credentials);
         logger.info('Successfully set credentials after pairing');
+        
+        // Dispatch authentication event
+        try {
+          const authEvent = new CustomEvent('masjidconnect:authenticated', {
+            detail: { apiKey: credentials.apiKey, screenId: credentials.screenId }
+          });
+          window.dispatchEvent(authEvent);
+          logger.info('Dispatched authentication event after paired-credentials');
+        } catch (error) {
+          logger.error('Error dispatching auth event after paired-credentials', { error });
+        }
       } else {
         logger.error('Failed to fetch credentials after pairing', { result });
       }

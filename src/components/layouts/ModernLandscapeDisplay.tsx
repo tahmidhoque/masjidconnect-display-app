@@ -1,16 +1,10 @@
-import React, {
-  useCallback,
-  useState,
-  useEffect,
-  memo,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useCallback, memo, useMemo, useRef } from "react";
 import { Box } from "@mui/material";
 import { useAppSelector } from "../../store/hooks";
-import { selectContentData } from "../../store/hooks";
+import { selectLandscapeDisplayData } from "../../store/hooks";
 import { usePrayerTimes } from "../../hooks/usePrayerTimes";
 import { useDisplayAnimation } from "../screens/DisplayScreen";
+import useCurrentTime from "../../hooks/useCurrentTime";
 import ModernIslamicBackground from "../common/ModernIslamicBackground";
 import ModernHeader from "../common/ModernHeader";
 import ModernPrayerCard from "../common/ModernPrayerCard";
@@ -21,8 +15,38 @@ import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import {
   isLowPowerDevice,
   PerformanceMonitor,
-  throttle,
 } from "../../utils/performanceUtils";
+
+// Memoized style objects to prevent recalculation
+const containerStyles = {
+  height: "100%",
+  width: "100%",
+  display: "flex",
+  flexDirection: "column" as const,
+  position: "relative" as const,
+  overflow: "hidden" as const,
+};
+
+const mainContentStyles = {
+  display: "flex",
+  flexGrow: 1,
+  overflow: "hidden",
+};
+
+const leftColumnStyles = {
+  width: "50%",
+  display: "flex",
+  flexDirection: "column" as const,
+  height: "100%",
+};
+
+const rightColumnStyles = {
+  width: "50%",
+  display: "flex",
+  flexDirection: "column" as const,
+  height: "100%",
+  overflow: "hidden",
+};
 
 /**
  * ModernLandscapeDisplay component
@@ -34,35 +58,22 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
   // Start performance monitoring
   const endRender = PerformanceMonitor.startRender("ModernLandscapeDisplay");
 
+  // Use optimized selectors to reduce re-renders
+  const { masjidName } = useAppSelector(selectLandscapeDisplayData);
+
   const { getSizeRem } = useResponsiveFontSize();
   const { getComponentAnimation } = useDisplayAnimation();
-
-  // Redux selectors - using memoized selectors
-  const { masjidName } = useAppSelector(selectContentData);
 
   // Prayer times hook for date and hijri date - memoized
   const { currentDate, hijriDate } = usePrayerTimes();
 
-  // Local state for current time - throttled updates for low-power devices
-  const [currentTime, setCurrentTime] = useState(new Date());
+  // Use centralized time management to prevent timer conflicts
+  const currentTime = useCurrentTime();
 
-  // Throttled time update function
-  const updateTime = useMemo(
-    () =>
-      throttle(
-        () => {
-          setCurrentTime(new Date());
-        },
-        isLowPowerDevice() ? 2000 : 1000
-      ),
-    []
-  );
-
-  // Update current time every second (throttled for low-power devices)
-  useEffect(() => {
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, [updateTime]);
+  // Use refs to prevent unnecessary recalculations
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const isLowPower = useRef(isLowPowerDevice());
 
   // Handle countdown completion - memoized
   const handleCountdownComplete = useCallback((isJamaat: boolean) => {
@@ -81,23 +92,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
     [getComponentAnimation]
   );
 
-  // Use refs to prevent layout recalculations
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  // Memoized style objects for better performance
-  const containerStyles = useMemo(
-    () => ({
-      height: "100%",
-      width: "100%",
-      display: "flex",
-      flexDirection: "column" as const,
-      position: "relative" as const,
-      overflow: "hidden" as const,
-    }),
-    []
-  );
-
+  // Memoized style objects for better performance - now using getSizeRem values
   const contentStyles = useMemo(
     () => ({
       display: "flex",
@@ -111,6 +106,56 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
       py: getSizeRem(1),
     }),
     [getSizeRem]
+  );
+
+  const mainContentWithGap = useMemo(
+    () => ({
+      ...mainContentStyles,
+      gap: getSizeRem(1.5),
+    }),
+    [getSizeRem]
+  );
+
+  const rightColumnWithGap = useMemo(
+    () => ({
+      ...rightColumnStyles,
+      gap: getSizeRem(1),
+    }),
+    [getSizeRem]
+  );
+
+  // Memoized components to prevent unnecessary re-renders
+  const MemoizedHeader = useMemo(
+    () => (
+      <ModernHeader
+        masjidName={masjidName || "MasjidConnect"}
+        currentDate={currentDate ? new Date(currentDate) : new Date()}
+        hijriDate={hijriDate || ""}
+        currentTime={currentTime}
+        orientation="landscape"
+      />
+    ),
+    [masjidName, currentDate, hijriDate, currentTime]
+  );
+
+  const MemoizedPrayerCard = useMemo(
+    () => (
+      <ModernPrayerCard
+        orientation="landscape"
+        onCountdownComplete={handleCountdownComplete}
+      />
+    ),
+    [handleCountdownComplete]
+  );
+
+  const MemoizedCarousel = useMemo(
+    () => <ContentCarousel variant="landscape" />,
+    []
+  );
+
+  const MemoizedFooter = useMemo(
+    () => <ModernFooter logoSrc={logoGold} orientation="landscape" />,
+    []
   );
 
   // End performance monitoring
@@ -132,53 +177,25 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
               transition: animations.header.transition,
             }}
           >
-            <ModernHeader
-              masjidName={masjidName || "MasjidConnect"}
-              currentDate={currentDate ? new Date(currentDate) : new Date()}
-              hijriDate={hijriDate || ""}
-              currentTime={currentTime}
-              orientation="landscape"
-            />
+            {MemoizedHeader}
           </Box>
 
           {/* Main Content */}
-          <Box
-            sx={{
-              display: "flex",
-              flexGrow: 1,
-              gap: getSizeRem(1.5),
-              overflow: "hidden",
-            }}
-          >
+          <Box sx={mainContentWithGap}>
             {/* Left Column - Prayer Times with staggered animation */}
             <Box
               sx={{
-                width: "50%",
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
+                ...leftColumnStyles,
                 opacity: animations.prayerCard.opacity,
                 transform: animations.prayerCard.transform,
                 transition: animations.prayerCard.transition,
               }}
             >
-              <ModernPrayerCard
-                orientation="landscape"
-                onCountdownComplete={handleCountdownComplete}
-              />
+              {MemoizedPrayerCard}
             </Box>
 
             {/* Right Column - Content Display with Footer */}
-            <Box
-              sx={{
-                width: "50%",
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
-                overflow: "hidden",
-                gap: getSizeRem(1),
-              }}
-            >
+            <Box sx={rightColumnWithGap}>
               {/* Carousel with staggered animation */}
               <Box
                 sx={{
@@ -189,7 +206,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
                   transition: animations.carousel.transition,
                 }}
               >
-                <ContentCarousel variant="landscape" />
+                {MemoizedCarousel}
               </Box>
 
               {/* Footer with staggered animation */}
@@ -200,7 +217,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
                   transition: animations.footer.transition,
                 }}
               >
-                <ModernFooter logoSrc={logoGold} orientation="landscape" />
+                {MemoizedFooter}
               </Box>
             </Box>
           </Box>
@@ -209,5 +226,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
     </Box>
   );
 });
+
+ModernLandscapeDisplay.displayName = "ModernLandscapeDisplay";
 
 export default ModernLandscapeDisplay;

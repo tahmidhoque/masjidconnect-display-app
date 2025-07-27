@@ -1,9 +1,10 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback } from "react";
 import { Box } from "@mui/material";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store";
 import { usePrayerTimes } from "../../hooks/usePrayerTimes";
 import { useDisplayAnimation } from "../screens/DisplayScreen";
+import useCurrentTime from "../../hooks/useCurrentTime";
 import ModernIslamicBackground from "../common/ModernIslamicBackground";
 import ModernHeader from "../common/ModernHeader";
 import ModernPrayerCard from "../common/ModernPrayerCard";
@@ -30,17 +31,8 @@ const ModernPortraitDisplay: React.FC = () => {
   // Prayer times hook for date and hijri date
   const { currentDate, hijriDate } = usePrayerTimes();
 
-  // Local state for current time
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  // Update current time every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
+  // Use centralized time management to prevent timer conflicts
+  const currentTime = useCurrentTime();
 
   // Handle countdown completion
   const handleCountdownComplete = useCallback((isJamaat: boolean) => {
