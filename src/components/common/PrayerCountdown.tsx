@@ -378,7 +378,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         sx={{
           display: "flex",
           justifyContent: "center",
-          alignItems: "center",
+          alignItems: "baseline",
           gap: isPortrait ? getSizeRem(0.1) : getSizeRem(0.1),
         }}
       >
