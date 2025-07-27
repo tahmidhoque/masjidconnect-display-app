@@ -1,18 +1,23 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import masjidDisplayClient from '../../api/masjidDisplayClient';
-import logger from '../../utils/logger';
-import { POLLING_INTERVALS } from '../../api/masjidDisplayClient';
+import React, { useEffect, useState, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "../../store";
+import { logout } from "../../store/slices/authSlice";
+import masjidDisplayClient from "../../api/masjidDisplayClient";
+import logger from "../../utils/logger";
+import { POLLING_INTERVALS } from "../../api/masjidDisplayClient";
 
 /**
  * AuthErrorDetector - A component that monitors for authentication errors
  * and handles them by triggering re-authentication when needed.
- * 
+ *
  * This version respects the polling intervals from the integration guide
  * to avoid making too frequent API calls.
  */
 const AuthErrorDetector: React.FC = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const dispatch = useDispatch<AppDispatch>();
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated
+  );
   const [lastCheckTime, setLastCheckTime] = useState<number>(Date.now());
   const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0);
   const checkIntervalRef = useRef<number | null>(null);
@@ -24,9 +29,9 @@ const AuthErrorDetector: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    logger.debug('AuthErrorDetector initialized with check interval', { 
+    logger.debug("AuthErrorDetector initialized with check interval", {
       checkIntervalMs: checkInterval,
-      checkIntervalMinutes: checkInterval / (60 * 1000)
+      checkIntervalMinutes: checkInterval / (60 * 1000),
     });
 
     // Only run the check if not already run within the interval time
@@ -36,8 +41,11 @@ const AuthErrorDetector: React.FC = () => {
     }
 
     // Set up periodic check based on the heartbeat interval from the integration guide
-    checkIntervalRef.current = window.setInterval(checkAuthStatus, checkInterval);
-    
+    checkIntervalRef.current = window.setInterval(
+      checkAuthStatus,
+      checkInterval
+    );
+
     return () => {
       if (checkIntervalRef.current !== null) {
         window.clearInterval(checkIntervalRef.current);
@@ -50,33 +58,38 @@ const AuthErrorDetector: React.FC = () => {
     try {
       // Make a heartbeat request to test auth (this doubles as our required heartbeat)
       const response = await masjidDisplayClient.sendHeartbeat({
-        status: 'ONLINE',
+        status: "ONLINE",
         metrics: {
           uptime: Math.floor((Date.now() - performance.now()) / 1000),
           memoryUsage: 0,
-          lastError: ''
-        }
+          lastError: "",
+        },
       });
 
       if (response.success) {
         // Reset consecutive errors on success
         if (consecutiveErrors > 0) {
-          logger.info('Authentication working again after previous errors');
+          logger.info("Authentication working again after previous errors");
           setConsecutiveErrors(0);
         }
-      } else if (response.status === 401) {
+      } else if (response?.status === 401) {
         // Authentication error
-        logger.warn('Authentication error detected', { status: response.status, error: response.error });
-        setConsecutiveErrors(prev => prev + 1);
-        
+        logger.warn("Authentication error detected", {
+          status: response?.status,
+          error: response.error,
+        });
+        setConsecutiveErrors((prev) => prev + 1);
+
         // If we've had 3 consecutive auth errors, force logout
         if (consecutiveErrors >= 2) {
-          logger.error('Multiple authentication errors, logging out', { consecutiveErrors });
-          logout();
+          logger.error("Multiple authentication errors, logging out", {
+            consecutiveErrors,
+          });
+          dispatch(logout());
         }
       }
     } catch (error) {
-      logger.error('Error in authentication check', { error });
+      logger.error("Error in authentication check", { error });
     } finally {
       setLastCheckTime(Date.now());
     }
@@ -86,4 +99,4 @@ const AuthErrorDetector: React.FC = () => {
   return null;
 };
 
-export default AuthErrorDetector; 
+export default AuthErrorDetector;

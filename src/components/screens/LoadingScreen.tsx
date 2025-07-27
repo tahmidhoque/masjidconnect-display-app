@@ -1,375 +1,306 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, useTheme, Fade } from '@mui/material';
-import { useAuth } from '../../contexts/AuthContext';
-import { useOrientation } from '../../contexts/OrientationContext';
-import { useContent } from '../../contexts/ContentContext';
-import useAppInitialization from '../../hooks/useAppInitialization';
-import useRotationHandling from '../../hooks/useRotationHandling';
-import logoGold from '../../assets/logos/logo-gold.svg';
+import React, { useState, useEffect, useRef } from "react";
+import { Box, Typography, useTheme, Fade } from "@mui/material";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../store";
+import useRotationHandling from "../../hooks/useRotationHandling";
+import ModernIslamicBackground from "../common/ModernIslamicBackground";
+import logoGold from "../../assets/logos/logo-gold.svg";
+import logger from "../../utils/logger";
 
 interface LoadingScreenProps {
   onComplete?: () => void;
+  isSuspenseFallback?: boolean;
 }
+
+// Interface for the display message object
+interface DisplayMessage {
+  text: string;
+  isArabic: boolean;
+}
+
+// Animation timing for smooth transitions
+const LOADING_ANIMATION_DELAYS = {
+  logo: 0,
+  spinner: 200,
+  text: 400,
+};
+
+const LOADING_ANIMATION_DURATION = 300;
 
 /**
  * LoadingScreen component
- * 
- * Displays a loading screen with the MasjidConnect logo and a loading animation
- * while the app checks pairing status and fetches content.
- * Shows different messages based on authentication status.
+ *
+ * Displays a loading screen with smooth staggered animations and consistent background.
+ * Uses the same design system as DisplayScreen for seamless transitions.
  */
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({
+  onComplete,
+  isSuspenseFallback = false,
+}) => {
   const theme = useTheme();
-  const { isAuthenticated } = useAuth();
-  const { orientation } = useOrientation();
-  const { masjidName } = useContent();
-  const { loadingMessage, initializationStage, isInitializing } = useAppInitialization();
-  
-  // Animation and content states
-  const [rotationAngle, setRotationAngle] = useState(0);
+
+  // Redux selectors
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated
+  );
+  const orientation = useSelector((state: RootState) => state.ui.orientation);
+  const masjidName = useSelector(
+    (state: RootState) => state.content.masjidName
+  );
+  const contentLoading = useSelector(
+    (state: RootState) => state.content.isLoading
+  );
+  const loadingMessage = useSelector(
+    (state: RootState) => state.ui.loadingMessage
+  );
+  const isInitializing = useSelector(
+    (state: RootState) => state.ui.isInitializing
+  );
+  const initializationStage = useSelector(
+    (state: RootState) => state.ui.initializationStage
+  );
+
+  // State for controlling visibility and animations
   const [showContent, setShowContent] = useState(false);
-  const [loadingStage, setLoadingStage] = useState<'initializing' | 'setting-up' | 'ready' | 'complete'>('initializing');
-  const [showSpinner, setShowSpinner] = useState(true);
-  const [spinnerOpacity, setSpinnerOpacity] = useState(1);
-  
-  // Reference to track if we've already triggered completion
-  const hasCompletedRef = useRef(false);
-  
-  // Track orientation for proper rendering
-  const { shouldRotate } = useRotationHandling(orientation);
-  
-  // Calculate viewport dimensions
-  const windowWidth = window.innerWidth;
-  const windowHeight = window.innerHeight;
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [windowDimensions, setWindowDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
 
-  // Simple spinner animation effect - runs independently
-  useEffect(() => {
-    const animationInterval = setInterval(() => {
-      setRotationAngle(prev => (prev + 2) % 360);
-    }, 30);
-    
-    return () => clearInterval(animationInterval);
-  }, []);
+  // Rotation handling
+  const rotationInfo = useRotationHandling(orientation);
+  const shouldRotate = rotationInfo.shouldRotate;
+  const { width: windowWidth, height: windowHeight } = windowDimensions;
 
-  // Fade in the content initially
+  // Set showContent to true on mount with a small delay for smooth entry
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setShowContent(true);
-    }, 300);
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Progress through loading stages with timeouts for premium feel
+  // Monitor window resize for responsive rotation handling
   useEffect(() => {
-    // Set initial loading stage
-    setLoadingStage('initializing');
-    
-    // Progress through stages with timeouts
-    const stageTimers: NodeJS.Timeout[] = [];
-    
-    // Stage 1: Setting up
-    stageTimers.push(setTimeout(() => {
-      setLoadingStage('setting-up');
-    }, 2500));
-    
-    // Stage 2: Ready
-    stageTimers.push(setTimeout(() => {
-      setLoadingStage('ready');
-    }, 5000));
-    
-    // Stage 3: Complete - fade spinner gradually
-    stageTimers.push(setTimeout(() => {
-      setLoadingStage('complete');
-      
-      // Gradually fade out the spinner over 2 seconds
-      const fadeStart = Date.now();
-      const fadeDuration = 2000;
-      const fadeInterval = setInterval(() => {
-        const elapsed = Date.now() - fadeStart;
-        const progress = Math.min(elapsed / fadeDuration, 1);
-        setSpinnerOpacity(1 - progress);
-        
-        if (progress >= 1) {
-          clearInterval(fadeInterval);
-          // Only hide spinner completely after fade completes
-          setShowSpinner(false);
-        }
-      }, 50); // Update every 50ms for smooth animation
-    }, 7500));
-    
-    // Clean up all timers on unmount
-    return () => {
-      stageTimers.forEach(timer => clearTimeout(timer));
+    const handleResize = () => {
+      setWindowDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
     };
-  }, []); // Empty dependency array ensures this only runs once
 
-  // Get display message based on loading stage and authentication status
-  const getDisplayMessage = () => {
-    // For final stage, always show the Salam greeting with mosque name if available
-    if (loadingStage === 'complete' || initializationStage === 'complete') {
-      if (isAuthenticated && masjidName) {
-        return `السلام عليكم - ${masjidName}`;
-      }
-      return 'السلام عليكم';
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Handle transition out when loading completes
+  useEffect(() => {
+    if (!isInitializing && initializationStage === "ready") {
+      setIsTransitioning(true);
+      // Simple transition timing
+      const timer = setTimeout(() => {
+        onComplete?.();
+      }, 300);
+      return () => clearTimeout(timer);
     }
-    
-    // For other stages, use app initialization message if available
-    if (loadingMessage && initializationStage !== 'complete') {
-      return loadingMessage;
+  }, [isInitializing, initializationStage, onComplete]);
+
+  // Get component animation styles
+  const getComponentAnimation = (
+    componentId: string,
+    visible: boolean = true
+  ) => {
+    if (!visible) {
+      return {
+        opacity: 0,
+        transform: "scale(0.95) translateY(10px)",
+        transition: `opacity ${LOADING_ANIMATION_DURATION}ms ease-out, transform ${LOADING_ANIMATION_DURATION}ms ease-out`,
+      };
     }
-    
-    if (isAuthenticated) {
-      switch (loadingStage) {
-        case 'initializing':
-          return 'Loading your dashboard...';
-        case 'setting-up':
-          return 'Fetching latest content...';
-        case 'ready':
-          return 'Preparing your display...';
-        default:
-          return 'Loading...';
-      }
-    } else {
-      // Not authenticated
-      const isPaired = localStorage.getItem('masjid_screen_id') !== null;
-      
-      switch (loadingStage) {
-        case 'initializing':
-          return 'Initializing...';
-        case 'setting-up':
-          return isPaired ? 'Reconnecting to your masjid...' : 'Setting up display...';
-        case 'ready':
-          return isPaired ? 'Ready to reconnect' : 'Ready to pair';
-        default:
-          return 'Loading...';
-      }
+
+    const delay =
+      LOADING_ANIMATION_DELAYS[
+        componentId as keyof typeof LOADING_ANIMATION_DELAYS
+      ] || 0;
+
+    return {
+      opacity: 1,
+      transform: "scale(1) translateY(0px)",
+      transition: `opacity ${LOADING_ANIMATION_DURATION}ms ease-out ${delay}ms, transform ${LOADING_ANIMATION_DURATION}ms ease-out ${delay}ms`,
+    };
+  };
+
+  // Determine the current loading message based on app state
+  const getDisplayMessage = (): DisplayMessage => {
+    if (loadingMessage) {
+      return { text: loadingMessage, isArabic: false };
+    }
+
+    if (isSuspenseFallback) {
+      return { text: "Loading application...", isArabic: false };
+    }
+
+    switch (initializationStage) {
+      case "checking":
+        return { text: "Checking connection...", isArabic: false };
+      case "welcome":
+        return isAuthenticated
+          ? { text: "Welcome back!", isArabic: false }
+          : { text: "Initializing...", isArabic: false };
+      case "fetching":
+        return {
+          text: `Loading ${masjidName || "content"}...`,
+          isArabic: false,
+        };
+      default:
+        return { text: "Loading...", isArabic: false };
     }
   };
 
-  // Custom Islamic geometric pattern loader
-  const CustomLoader = () => {
-    const goldColor = theme.palette.warning.main; // Gold color
-    const emeraldColor = '#2A9D8F'; // Emerald Green from brand guidelines
-    const skyBlueColor = '#66D1FF'; // Sky Blue from brand guidelines
-
-    return (
-      <Box sx={{ position: 'relative', width: 120, height: 120, marginBottom: 3 }}>
-        {/* Outer rotating ring */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            borderRadius: '50%',
-            border: `4px solid ${goldColor}`,
-            borderTopColor: 'transparent',
-            transform: `rotate(${rotationAngle}deg)`,
-          }}
-        />
-        
-        {/* Middle rotating ring */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '15%',
-            left: '15%',
-            width: '70%',
-            height: '70%',
-            borderRadius: '50%',
-            border: `4px solid ${emeraldColor}`,
-            borderRightColor: 'transparent',
-            transform: `rotate(${-rotationAngle * 1.5}deg)`,
-          }}
-        />
-        
-        {/* Inner geometric pattern */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '30%',
-            left: '30%',
-            width: '40%',
-            height: '40%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          {/* Eight-pointed star - central Islamic motif */}
-          <svg width="100%" height="100%" viewBox="0 0 40 40">
-            <polygon
-              points="20,0 25,15 40,20 25,25 20,40 15,25 0,20 15,15"
-              fill={skyBlueColor}
-              transform={`rotate(${rotationAngle * 0.5})`}
-              style={{ transformOrigin: 'center' }}
-            />
-          </svg>
-        </Box>
-      </Box>
-    );
+  // Get spinner animation styles
+  const getSpinnerAnimation = () => {
+    const baseSpinnerAnimation = getComponentAnimation("spinner", showContent);
+    return {
+      ...baseSpinnerAnimation,
+      "&::before": {
+        content: '""',
+        width: "40px",
+        height: "40px",
+        margin: "8px",
+        borderRadius: "50%",
+        border: "4px solid transparent",
+        borderTopColor: theme.palette.warning.main,
+        animation: "spin 1s ease-in-out infinite",
+      },
+    };
   };
 
-  // Main content to be displayed
+  // Loading screen content component
   const LoadingContent = () => (
-    <Box
-      sx={{
-        background: 'linear-gradient(135deg, #0A2647 0%, #144272 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-        height: '100%',
-        padding: '5vh 0',
-      }}
-    >
-      {/* Empty top space for balance */}
-      <Box sx={{ flexGrow: 1 }} />
-      
-      {/* Logo container - fixed height to prevent movement */}
+    <ModernIslamicBackground>
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexGrow: 2,
-          position: 'relative', // Keep position stable
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          position: "relative",
+          zIndex: 2,
+          px: 3,
         }}
       >
-        <Box sx={{ 
-          width: 280, 
-          height: 240, 
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          color: theme.palette.warning.main,
-        }}>
-          <img 
-            src={logoGold}
-            alt="MasjidConnect Logo"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'contain',
-              animation: loadingStage === 'complete' ? 'logoGlow 2s infinite' : 'none',
-            }} 
-          />
-        </Box>
-      </Box>
-
-      {/* Bottom section with fixed height to prevent layout shifts */}
-      <Box
-        sx={{ 
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          marginTop: 'auto',
-          flexGrow: 1,
-          justifyContent: 'flex-end',
-          minHeight: '240px', // Increased height for better spacing
-          position: 'relative', // Create a containing context
-          '@keyframes logoGlow': {
-            '0%': { filter: 'brightness(1)' },
-            '50%': { filter: 'brightness(1.3)' },
-            '100%': { filter: 'brightness(1)' },
-          },
-        }}
-      >
-        {/* Fixed position spinner container with smooth opacity transition */}
-        <Box 
-          sx={{ 
-            height: 'auto',
-            width: '100%', 
-            display: 'flex',
-            alignItems: 'center', 
-            justifyContent: 'center',
-            position: 'relative', // Changed to relative positioning
-            marginBottom: 4, // Add space between spinner and text
-            opacity: spinnerOpacity,
-            transition: 'opacity 2s ease',
-            visibility: showSpinner ? 'visible' : 'hidden',
-          }}
-        >
-          <CustomLoader />
-        </Box>
-
-        {/* Message container - central and more prominent */}
+        {/* Logo with staggered animation */}
         <Box
           sx={{
-            width: '100%',
-            position: 'relative',
-            textAlign: 'center',
-            padding: '0 24px',
-            marginBottom: 4, // Add space at bottom
+            mb: 4,
+            ...getComponentAnimation("logo", showContent),
+          }}
+        >
+          <img
+            src={logoGold}
+            alt="MasjidConnect"
+            style={{
+              width: "120px",
+              height: "auto",
+              filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))",
+            }}
+          />
+        </Box>
+
+        {/* Loading spinner with staggered animation */}
+        <Box
+          sx={{
+            mb: 6,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            ...getSpinnerAnimation(),
+          }}
+        />
+
+        {/* Loading text with staggered animation */}
+        <Box
+          sx={{
+            textAlign: "center",
+            maxWidth: "80%",
+            ...getComponentAnimation("text", showContent),
           }}
         >
           <Typography
-            variant="body1" 
+            variant={getDisplayMessage().isArabic ? "arabicText" : "body1"}
             sx={{
-              color: '#fff',
-              textAlign: 'center',
+              color: "#fff",
+              textAlign: "center",
               fontWeight: 400,
-              letterSpacing: '0.05em',
-              fontSize: loadingStage === 'complete' ? '1.8rem' : '1.4rem',
-              transition: 'font-size 0.5s ease',
-              textShadow: '0 2px 4px rgba(0,0,0,0.5)', // Add shadow for better visibility
+              letterSpacing: "0.05em",
+              fontSize: getDisplayMessage().isArabic ? "1.8rem" : "1.4rem",
+              textShadow: "0 2px 4px rgba(0,0,0,0.5)",
             }}
           >
-            {getDisplayMessage()}
+            {getDisplayMessage().text}
           </Typography>
         </Box>
       </Box>
-    </Box>
+    </ModernIslamicBackground>
   );
 
   return (
-    <Box
-      sx={{
-        width: '100vw',
-        height: '100vh',
-        overflow: 'hidden',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        backgroundColor: theme.palette.background.default,
-        // Use opacity transition for entire component to fade out
-        opacity: 1,
-        transition: 'opacity 1.2s ease-in-out',
-        '&.fade-out': {
-          opacity: 0,
-        },
-        zIndex: 9999, // Ensure loading screen is above other content
-      }}
-      // Add className conditionally to avoid type errors
-      className={!isInitializing ? 'fade-out' : undefined}
-    >
-      <Fade in={showContent} timeout={800}>
-        {shouldRotate ? (
-          // Portrait orientation with rotation transform
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              width: windowHeight,
-              height: windowWidth,
-              transform: 'translate(-50%, -50%) rotate(90deg)',
-              transformOrigin: 'center',
-            }}
-          >
-            <LoadingContent />
-          </Box>
-        ) : (
-          // Landscape orientation or no rotation needed
-          <Box sx={{ width: '100%', height: '100%' }}>
-            <LoadingContent />
-          </Box>
-        )}
-      </Fade>
-    </Box>
+    <>
+      {/* Add spinner keyframes */}
+      <style>
+        {`
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}
+      </style>
+
+      <Box
+        sx={{
+          width: "100vw",
+          height: "100vh",
+          overflow: "hidden",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          opacity: isTransitioning ? 0 : 1,
+          transform: isTransitioning ? "scale(0.98)" : "scale(1)",
+          transition:
+            "opacity 400ms cubic-bezier(0.4, 0, 0.2, 1), transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+          zIndex: 100,
+        }}
+      >
+        <Fade in={showContent} timeout={600}>
+          {shouldRotate ? (
+            // Portrait orientation with rotation transform
+            <Box
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: windowHeight,
+                height: windowWidth,
+                transform: "translate(-50%, -50%) rotate(90deg)",
+                transformOrigin: "center",
+              }}
+            >
+              <LoadingContent />
+            </Box>
+          ) : (
+            // Landscape orientation or no rotation needed
+            <Box sx={{ width: "100%", height: "100%" }}>
+              <LoadingContent />
+            </Box>
+          )}
+        </Fade>
+      </Box>
+    </>
   );
 };
 
-export default LoadingScreen; 
+export default LoadingScreen;

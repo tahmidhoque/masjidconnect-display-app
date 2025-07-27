@@ -14,10 +14,15 @@ import {
   RequestPairingCodeRequest,
   CheckPairingStatusRequest,
   PairedCredentialsRequest,
-  PairedCredentialsResponse
+  PairedCredentialsResponse,
+  AnalyticsRequest,
+  AnalyticsResponse
 } from './models';
 import logger, { setLastError } from '../utils/logger';
 import { createErrorResponse, normalizeApiResponse, validateApiResponse } from '../utils/apiErrorHandler';
+import { withDeduplication } from '../utils/requestDeduplication';
+// Note: We'll dispatch errors via a callback to avoid circular dependencies
+// The store will be passed to the client after initialization
 
 // CORS proxy configuration for development
 const USE_CORS_PROXY = process.env.REACT_APP_USE_CORS_PROXY === 'true';
@@ -59,10 +64,23 @@ const STORAGE_KEYS = {
   SCREEN_ID: 'masjid_screen_id',
 };
 
+// Check if we're running in Electron
+const isElectron = () => {
+  return typeof window !== 'undefined' && window.electron !== undefined;
+};
+
+// Access the Electron store through the contextBridge
+const electronStore = isElectron() && window.electron?.store ? window.electron.store : null;
+
+if (electronStore) {
+  console.log('Electron store initialized successfully in API client');
+}
+
 // Cache interface
 interface CacheItem<T> {
   data: T;
   expiry: number;
+  timestamp: number; // Change to required property with default
 }
 
 // Add debounce helper
@@ -237,10 +255,7 @@ class MasjidDisplayClient {
         headers: error.config?.headers
       });
       
-      // Store the CORS error for UI display
-      setLastError(`CORS policy error: The API server (${this.baseURL}) does not allow requests from this application. Backend CORS configuration needs to be updated.`);
-      
-      // Emit an event for the UI to handle with more details
+      // Legacy support - still emit event for existing CORS notification
       const corsErrorEvent = new CustomEvent('api:corserror', {
         detail: { 
           endpoint: endpoint, 
@@ -252,27 +267,39 @@ class MasjidDisplayClient {
       });
       window.dispatchEvent(corsErrorEvent);
       
-      // Try to fall back to cached data
       return;
     }
     
     // Handle other types of errors
     if (status === 401) {
       logger.warn(`Authentication error: ${message}`);
-      // Dispatch auth error event
+      
+      // Legacy support - still emit event for existing auth error detection
       const authErrorEvent = new CustomEvent('api:autherror', { 
         detail: { status, message } 
       });
       window.dispatchEvent(authErrorEvent);
+      
     } else if (status === 404) {
       logger.warn(`Resource not found: ${url}`);
+      
     } else if (status >= 500) {
       logger.error(`Server error (${status}): ${message}`);
+      
+    } else if (status === 429) {
+      logger.warn(`Rate limited: Too many requests to ${endpoint}`);
+      
+    } else if (!status && !navigator.onLine) {
+      logger.warn(`Device appears to be offline when accessing ${endpoint}`);
+      
+    } else if (!status) {
+      logger.error(`Failed to connect to API server: ${message}`);
+      
     } else {
       logger.error(`API error: ${message}`, { status, url });
     }
     
-    // Store the most recent error
+    // Store the most recent error (legacy support)
     setLastError(`${message} (${status || 'network error'})`);
   }
 
@@ -405,6 +432,34 @@ class MasjidDisplayClient {
     return hasCredentials && !!this.credentials?.apiKey && !!this.credentials?.screenId;
   }
 
+  // Wait for authentication to be initialized
+  public async waitForAuthInitialization(timeoutMs: number = 10000): Promise<boolean> {
+    if (this.authInitialized) {
+      return this.isAuthenticated();
+    }
+
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      
+      const checkAuth = () => {
+        if (this.authInitialized) {
+          resolve(this.isAuthenticated());
+          return;
+        }
+        
+        if (Date.now() - startTime >= timeoutMs) {
+          logger.warn('Auth initialization timeout, proceeding without auth');
+          resolve(false);
+          return;
+        }
+        
+        setTimeout(checkAuth, 100); // Check every 100ms
+      };
+      
+      checkAuth();
+    });
+  }
+
   // Debug method to check credentials
   public logCredentialsStatus(): void {
     logger.info('Credentials status', {
@@ -433,23 +488,36 @@ class MasjidDisplayClient {
     const cachedItem = this.cache.get(cacheKey);
     const isExpired = !cachedItem || (now > cachedItem.expiry);
     
+    // Log cache status for debugging
+    logger.debug(`Cache status for ${normalizedEndpoint}:`, {
+      hasCachedItem: !!cachedItem,
+      isExpired: isExpired,
+      timeSinceExpiry: cachedItem ? Math.round((now - cachedItem.expiry) / 1000) + 's' : 'N/A',
+      isOffline: !navigator.onLine
+    });
+
+    // Force refresh if explicitly requested by setting cache time to 0
+    const forceRefresh = cacheTime === 0;
+    
     // If offline, always use cache regardless of expiration
     if (!navigator.onLine && cachedItem) {
       logger.info(`Using cached data for ${normalizedEndpoint} because device is offline`, {
         cached: true,
         expired: isExpired,
-        offlineMode: true
+        offlineMode: true,
+        dataAge: Math.round((now - cachedItem.timestamp) / 1000 / 60) + ' minutes'
       });
       return normalizeApiResponse({
         data: cachedItem.data,
         success: true,
         cached: true,
-        offlineFallback: true
+        offlineFallback: true,
+        timestamp: cachedItem.timestamp
       });
     }
 
-    // If we have a non-expired cache entry, use it
-    if (cachedItem && !isExpired) {
+    // If we have a non-expired cache entry and not forcing a refresh, use it
+    if (cachedItem && !isExpired && !forceRefresh) {
       logger.debug(`Using cached data for ${normalizedEndpoint}`, { 
         cached: true, 
         expiry: new Date(cachedItem.expiry).toISOString(),
@@ -458,26 +526,48 @@ class MasjidDisplayClient {
       return normalizeApiResponse({
         data: cachedItem.data,
         success: true,
-        cached: true
+        cached: true,
+        timestamp: cachedItem.timestamp
       });
     }
     
-    // Otherwise, fetch from network
+    // Otherwise, fetch from network with deduplication
     try {
       // Mark this endpoint as loading
       this.isLoading.set(normalizedEndpoint, true);
       
-      const response = await this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime);
+      // Signal to debug console that we're making a fresh network request
+      logger.info(`Making fresh network request for ${normalizedEndpoint} (cache expired or force refresh)`, {
+        isExpired,
+        forceRefresh,
+        currentTime: new Date().toISOString()
+      });
       
-      // If success, update cache
+      // Use request deduplication to prevent multiple simultaneous calls to the same endpoint
+      const deduplicationKey = `${normalizedEndpoint}:${JSON.stringify(options)}`;
+      const response = await withDeduplication(
+        deduplicationKey,
+        () => this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime),
+        {
+          ttl: 5000, // 5 second deduplication window
+          forceRefresh: forceRefresh,
+          skipCache: true, // Use our own caching mechanism
+        }
+      );
+      
+      // If success, update cache with current timestamp
       if (response.success && response.data) {
         this.cache.set(cacheKey, {
           data: response.data,
-          expiry: now + cacheTime
+          expiry: now + cacheTime,
+          timestamp: now
         });
         
         // Reset backoff for this endpoint
         this.resetBackoff(normalizedEndpoint);
+        
+        // Add timestamp to the response
+        response.timestamp = now;
       }
       
       return validateApiResponse(response);
@@ -488,9 +578,11 @@ class MasjidDisplayClient {
       
       // If we have a cached item, return it even if expired as a fallback
       if (cachedItem) {
+        const cacheAge = Math.round((now - cachedItem.timestamp) / 1000 / 60);
         logger.info(`Falling back to cached data for ${normalizedEndpoint} due to fetch error`, {
           cached: true,
           expired: isExpired,
+          cacheAge: `${cacheAge} minutes old`,
           error: error.message || 'Unknown error'
         });
         
@@ -498,7 +590,9 @@ class MasjidDisplayClient {
           data: cachedItem.data,
           success: true,
           cached: true,
-          offlineFallback: true
+          offlineFallback: true,
+          cacheAge,
+          timestamp: cachedItem.timestamp
         });
       }
       
@@ -547,7 +641,7 @@ class MasjidDisplayClient {
       
       if (!shouldDebounceLog(`response-${normalizedEndpoint}`)) {
         logger.debug(`Response from ${normalizedEndpoint}:`, {
-          status: response.status,
+          status: response?.status,
           hasData: !!response.data
         });
       }
@@ -562,6 +656,7 @@ class MasjidDisplayClient {
         this.cache.set(cacheKey, {
           data: result,
           expiry: Date.now() + cacheTime,
+          timestamp: Date.now() // Add timestamp to the cache item
         });
       }
       
@@ -652,9 +747,12 @@ class MasjidDisplayClient {
 
   // Send heartbeat to server
   public async sendHeartbeat(status: HeartbeatRequest): Promise<ApiResponse<HeartbeatResponse>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
     // Check if we're authenticated
-    if (!this.isAuthenticated()) {
-      logger.warn('sendHeartbeat called without authentication');
+    if (!isAuthReady) {
+      logger.warn('sendHeartbeat called without authentication - auth not ready');
       return createErrorResponse('Not authenticated');
     }
 
@@ -715,8 +813,96 @@ class MasjidDisplayClient {
     }
   }
 
+  // Send analytics data to server (comprehensive heartbeat system)
+  public async sendAnalyticsData(analyticsRequest: AnalyticsRequest): Promise<ApiResponse<AnalyticsResponse>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    // Check if we're authenticated
+    if (!isAuthReady) {
+      logger.warn('sendAnalyticsData called without authentication - auth not ready');
+      return createErrorResponse('Not authenticated');
+    }
+
+    try {
+      // Use the analytics endpoint as specified in the documentation
+      const endpoint = 'api/displays/heartbeat'.replace(/^\//, '');
+      
+      // Log detailed information about the request
+      logger.debug('Preparing analytics request', { 
+        endpoint,
+        type: analyticsRequest.type,
+        fullUrl: `${this.baseURL}/${endpoint}`,
+        corsProxyEnabled: USE_CORS_PROXY,
+        environment: process.env.NODE_ENV,
+        screenId: this.credentials?.screenId
+      });
+      
+      // Use consistent options with other API calls
+      const options = {
+        method: 'POST',
+        data: analyticsRequest,
+        timeout: 30000 // 30 second timeout
+      };
+      
+      // Use fetchWithCache with 0 cache time to ensure consistent CORS and auth handling
+      const result = await this.fetchWithCache<AnalyticsResponse>(endpoint, options, 0);
+      
+      if (!result.success) {
+        logger.warn('Analytics response not successful', { error: result.error, type: analyticsRequest.type });
+      } else {
+        logger.debug('Analytics response successful', { type: analyticsRequest.type });
+      }
+      
+      return validateApiResponse(result);
+    } catch (error: any) {
+      // Enhanced error logging with CORS-specific details
+      const isCorsError = error.message?.includes('CORS') || 
+                        error.message?.includes('NetworkError') ||
+                        error.message?.includes('Network Error');
+      
+      logger.error('Error sending analytics data', { 
+        error, 
+        type: analyticsRequest.type,
+        message: error.message,
+        isCorsError,
+        corsProxyEnabled: USE_CORS_PROXY,
+        baseUrl: this.baseURL,
+        status: error.response?.status,
+        headers: error.config?.headers
+      });
+      
+      return createErrorResponse('Failed to send analytics data: ' + (isCorsError ? 'CORS policy error' : error.message));
+    }
+  }
+
   // Get screen content
   public async getScreenContent(forceRefresh: boolean = false): Promise<ApiResponse<ScreenContent>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    if (!isAuthReady) {
+      logger.warn('Screen content request: Authentication not ready, trying fallback from storage');
+      
+      // Try to get from storage as fallback
+      try {
+        const storedContent = await localforage.getItem<ScreenContent>('screenContent');
+        if (storedContent) {
+          logger.info('Using stored screen content due to auth not ready');
+          return normalizeApiResponse({
+            data: storedContent,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          });
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored screen content as fallback', { error });
+      }
+      
+      return createErrorResponse('Authentication not ready and no cached data available');
+    }
+    
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {
@@ -762,12 +948,64 @@ class MasjidDisplayClient {
 
   // Get prayer times
   public async getPrayerTimes(startDate?: string, endDate?: string, forceRefresh: boolean = false): Promise<ApiResponse<PrayerTimes[]>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    if (!isAuthReady) {
+      logger.warn('Prayer times request: Authentication not ready, trying fallback from storage');
+      
+      // Try to get from storage as fallback
+      try {
+        let storedTimes: PrayerTimes[] | null = null;
+        
+        // Try electron-store first if available
+        if (electronStore) {
+          storedTimes = electronStore.get('prayerTimes', null);
+        }
+        
+        // Fallback to localforage if not found in electron-store
+        if (!storedTimes) {
+          storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        }
+        
+        if (storedTimes) {
+          logger.info('Using stored prayer times due to auth not ready');
+          return {
+            data: storedTimes,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored prayer times as fallback', { error });
+      }
+      
+      return {
+        success: false,
+        error: 'Authentication not ready and no cached data available',
+        cached: false,
+        data: null
+      };
+    }
+    
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {
-        const storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        let storedTimes: PrayerTimes[] | null = null;
+        
+        // Try electron-store first if available
+        if (electronStore) {
+          storedTimes = electronStore.get('prayerTimes', null);
+        }
+        
+        // Fallback to localforage if not found in electron-store
+        if (!storedTimes) {
+          storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
+        }
+        
         if (storedTimes) {
-          logger.info('Using stored prayer times from localforage while offline');
+          logger.info('Using stored prayer times while offline');
           return {
             data: storedTimes,
             success: true,
@@ -787,18 +1025,25 @@ class MasjidDisplayClient {
     
     // Either online or no stored times found
     const result = await this.fetchWithCache<PrayerTimes[]>(
-      `/api/prayer-times?${params.toString()}`,
+      `/api/screen/prayer-times?${params.toString()}`,
       { method: 'GET' },
       CACHE_EXPIRATION.PRAYER_TIMES
     );
     
-    // If successful, store in localforage for offline use
+    // If successful, store for offline use (in both electron-store and localforage for compatibility)
     if (result.success && result.data) {
       try {
+        // Store in electron-store if available
+        if (electronStore) {
+          electronStore.set('prayerTimes', result.data);
+          logger.debug('Stored prayer times in electron-store for offline use');
+        }
+        
+        // Also store in localforage for browser fallback
         await localforage.setItem('prayerTimes', result.data);
         logger.debug('Stored prayer times in localforage for offline use');
       } catch (error) {
-        logger.error('Failed to store prayer times in localforage', { error });
+        logger.error('Failed to store prayer times', { error });
       }
     }
     
@@ -807,6 +1052,30 @@ class MasjidDisplayClient {
 
   // Get events
   public async getEvents(count: number = 5, forceRefresh: boolean = false): Promise<ApiResponse<EventsResponse>> {
+    // Wait for authentication to be initialized before making API calls
+    const isAuthReady = await this.waitForAuthInitialization();
+    
+    if (!isAuthReady) {
+      logger.warn('Events request: Authentication not ready, trying fallback from storage');
+      
+      // Try to get from storage as fallback
+      try {
+        const storedEvents = await localforage.getItem<EventsResponse>('events');
+        if (storedEvents) {
+          logger.info('Using stored events due to auth not ready');
+          return {
+            data: storedEvents,
+            success: true,
+            cached: true,
+            offlineFallback: true
+          };
+        }
+      } catch (error) {
+        logger.error('Error retrieving stored events as fallback', { error });
+      }
+      
+      return createErrorResponse('Authentication not ready and no cached data available');
+    }
     // If offline and no force refresh, first try to get from storage
     if (!navigator.onLine && !forceRefresh) {
       try {
@@ -922,6 +1191,14 @@ class MasjidDisplayClient {
           hasApiKey: !!apiKey 
         });
         
+        // Debug logging for condition check
+        logger.info('Checking pairing conditions', {
+          isPaired,
+          screenId,
+          conditionMet: isPaired && screenId,
+          apiKeyPresent: !!apiKey
+        });
+        
         if (isPaired && screenId) {
           // If the API response includes the apiKey directly, use it
           if (apiKey) {
@@ -958,12 +1235,18 @@ class MasjidDisplayClient {
           } else {
             // Otherwise, get the full credentials using the paired-credentials endpoint
             logger.info('Pairing successful, fetching credentials from paired-credentials endpoint');
-            await this.fetchPairedCredentials(pairingCode);
-            
-            // Set isPaired flag in localStorage for other components to detect
-            localStorage.setItem('isPaired', 'true');
-            
-            return true;
+            try {
+              await this.fetchPairedCredentials(pairingCode);
+              
+              // Set isPaired flag in localStorage for other components to detect
+              localStorage.setItem('isPaired', 'true');
+              
+              logger.info('paired-credentials call completed successfully');
+              return true;
+            } catch (error) {
+              logger.error('Failed to fetch paired credentials', { error });
+              return false;
+            }
           }
         }
       }
@@ -997,14 +1280,48 @@ class MasjidDisplayClient {
 
       const result = await this.fetchWithRetry<PairedCredentialsResponse>(endpoint, options);
       
+      logger.info('paired-credentials response received', { 
+        success: result.success, 
+        hasData: !!result.data,
+        data: result.data 
+      });
+      
       if (result.success && result.data) {
+        // Handle nested data structure: result.data.data contains the actual credentials
+        const credentialsData = (result.data as any).data || result.data;
+        
+        logger.info('Extracting credentials from paired-credentials response', {
+          hasNestedData: !!(result.data as any).data,
+          credentialsDataKeys: Object.keys(credentialsData || {}),
+          rawApiKey: credentialsData?.apiKey,
+          rawScreenId: credentialsData?.screenId
+        });
+        
         const credentials: ApiCredentials = {
-          apiKey: result.data.apiKey,
-          screenId: result.data.screenId
+          apiKey: credentialsData.apiKey,
+          screenId: credentialsData.screenId
         };
+        
+        logger.info('Setting credentials from paired-credentials', { 
+          hasApiKey: !!credentials.apiKey,
+          hasScreenId: !!credentials.screenId,
+          apiKeyLength: credentials.apiKey?.length || 0,
+          screenIdLength: credentials.screenId?.length || 0
+        });
         
         await this.setCredentials(credentials);
         logger.info('Successfully set credentials after pairing');
+        
+        // Dispatch authentication event
+        try {
+          const authEvent = new CustomEvent('masjidconnect:authenticated', {
+            detail: { apiKey: credentials.apiKey, screenId: credentials.screenId }
+          });
+          window.dispatchEvent(authEvent);
+          logger.info('Dispatched authentication event after paired-credentials');
+        } catch (error) {
+          logger.error('Error dispatching auth event after paired-credentials', { error });
+        }
       } else {
         logger.error('Failed to fetch credentials after pairing', { result });
       }

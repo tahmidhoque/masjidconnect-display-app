@@ -39,9 +39,11 @@ export function normalizeApiResponse<T>(
   
   // Copy optional fields if they exist
   if (response.error) normalized.error = response.error;
-  if (response.status) normalized.status = response.status;
+  if (response.status !== undefined) normalized.status = response.status;
   if (response.cached) normalized.cached = response.cached;
   if (response.offlineFallback) normalized.offlineFallback = response.offlineFallback;
+  if (response.timestamp) normalized.timestamp = response.timestamp;
+  if (response.cacheAge) normalized.cacheAge = response.cacheAge;
   
   return normalized;
 }

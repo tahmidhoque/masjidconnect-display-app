@@ -1,125 +1,296 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline, Box, Fade } from '@mui/material';
-import { SnackbarProvider } from 'notistack';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { OrientationProvider } from './contexts/OrientationContext';
-import { ContentProvider } from './contexts/ContentContext';
-import { OfflineProvider } from './contexts/OfflineContext';
-import { EmergencyAlertProvider } from './contexts/EmergencyAlertContext';
-import DisplayScreen from './components/screens/DisplayScreen';
-import PairingScreen from './components/screens/PairingScreen';
-import LoadingScreen from './components/screens/LoadingScreen';
-import AuthErrorDetector from './components/common/AuthErrorDetector';
-import OfflineNotification from './components/OfflineNotification';
-import ApiErrorBoundary from './components/common/ApiErrorBoundary';
-import EmergencyAlert from './components/common/EmergencyAlert';
-import theme from './theme/theme';
-import useAppInitialization from './hooks/useAppInitialization';
-import ErrorScreen from './components/screens/ErrorScreen';
+import React, { useEffect, Suspense, lazy, useCallback } from "react";
+import { Box, ThemeProvider, CssBaseline } from "@mui/material";
 
-// Create a simple AuthenticatedRoute component
-interface AuthenticatedRouteProps {
-  children: React.ReactNode;
-}
+import theme from "./theme/theme";
+import logger from "./utils/logger";
+import ApiErrorBoundary from "./components/common/ApiErrorBoundary";
+import GracefulErrorOverlay from "./components/common/GracefulErrorOverlay";
+import EmergencyAlertOverlay from "./components/common/EmergencyAlertOverlay";
+import AnalyticsErrorIntegration from "./components/common/AnalyticsErrorIntegration";
+import FactoryResetModal from "./components/common/FactoryResetModal";
+import EnhancedLoadingScreen from "./components/screens/EnhancedLoadingScreen";
+// Clear cached Hijri data to ensure accurate calculation
+import "./utils/clearHijriCache";
+// ✅ DISABLED: Demo imports that were causing console spam in development
+// import "./utils/verifyHijriCalculation";
+// import "./utils/factoryResetDemo";
+// import "./utils/countdownTest";
+import useKioskMode from "./hooks/useKioskMode";
+import useInitializationFlow from "./hooks/useInitializationFlow";
+import useFactoryReset from "./hooks/useFactoryReset";
+import useLoadingStateManager from "./hooks/useLoadingStateManager";
+import { ComponentPreloader } from "./utils/performanceUtils";
 
-const AuthenticatedRoute: React.FC<AuthenticatedRouteProps> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/pair" replace />;
+// Lazy load components for better performance
+const PairingScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "PairingScreen",
+    () => import("./components/screens/PairingScreen")
+  )
+);
+const DisplayScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "DisplayScreen",
+    () => import("./components/screens/DisplayScreen")
+  )
+);
+const ErrorScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "ErrorScreen",
+    () => import("./components/screens/ErrorScreen")
+  )
+);
+
+// Development localStorage monitor for debugging credential issues
+const useLocalStorageMonitor = () => {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+
+    // On app startup, dump all localStorage contents
+    logger.info("[DevMonitor] 🚀 App startup - localStorage contents:");
+    const allKeys = Object.keys(localStorage);
+    const allContents: Record<string, string> = {};
+
+    allKeys.forEach((key) => {
+      allContents[key] = localStorage.getItem(key) || "";
+    });
+
+    logger.info("[DevMonitor] All localStorage keys:", allKeys);
+    logger.info("[DevMonitor] All localStorage contents:", allContents);
+
+    // Specifically check for credential-related keys
+    const credentialKeys = [
+      "masjid_api_key",
+      "masjid_screen_id",
+      "apiKey",
+      "screenId",
+      "masjidconnect_credentials",
+      "isPaired",
+      "persist:root",
+    ];
+
+    const credentialContents: Record<string, string | null> = {};
+    credentialKeys.forEach((key) => {
+      credentialContents[key] = localStorage.getItem(key);
+    });
+
+    logger.info(
+      "[DevMonitor] Credential-related localStorage on startup:",
+      credentialContents
+    );
+
+    const originalSetItem = localStorage.setItem;
+    const originalRemoveItem = localStorage.removeItem;
+    const originalClear = localStorage.clear;
+
+    // Monitor setItem calls
+    localStorage.setItem = function (key: string, value: string) {
+      if (credentialKeys.includes(key)) {
+        logger.info(`[DevMonitor] 📝 localStorage.setItem("${key}")`, {
+          valueLength: value.length,
+          valuePreview:
+            value.substring(0, 20) + (value.length > 20 ? "..." : ""),
+          stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
+        });
+      }
+      return originalSetItem.call(this, key, value);
+    };
+
+    // Monitor removeItem calls
+    localStorage.removeItem = function (key: string) {
+      if (credentialKeys.includes(key)) {
+        logger.warn(`[DevMonitor] 🗑️ localStorage.removeItem("${key}")`, {
+          hadValue: !!localStorage.getItem(key),
+          stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
+        });
+      }
+      return originalRemoveItem.call(this, key);
+    };
+
+    // Monitor clear calls
+    localStorage.clear = function () {
+      const credentialValues = credentialKeys.reduce((acc, key) => {
+        acc[key] = localStorage.getItem(key);
+        return acc;
+      }, {} as Record<string, string | null>);
+
+      const hasCredentials = Object.values(credentialValues).some(
+        (v) => v !== null
+      );
+
+      if (hasCredentials) {
+        logger.warn(
+          "[DevMonitor] 🧹 localStorage.clear() called with credentials present!",
+          {
+            credentials: credentialValues,
+            stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
+          }
+        );
+      }
+
+      return originalClear.call(this);
+    };
+
+    // Restore original methods on cleanup
+    return () => {
+      localStorage.setItem = originalSetItem;
+      localStorage.removeItem = originalRemoveItem;
+      localStorage.clear = originalClear;
+    };
+  }, []);
 };
 
-// Main App Routes component defined separately to access auth context
 const AppRoutes: React.FC = () => {
-  const { isInitializing } = useAppInitialization();
-  const [showContent, setShowContent] = useState(false);
-  
-  // Add effect to fade in content after initialization completes
-  useEffect(() => {
-    if (!isInitializing) {
-      // Add slight delay to ensure loading screen has time to start fading out
-      // This creates an overlapping transition effect
-      const timer = setTimeout(() => {
-        setShowContent(true);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [isInitializing]);
-  
-  // Always render LoadingScreen, but it will fade out based on isInitializing state
+  useKioskMode();
+
+  // Initialize the app flow (but don't use its stage directly)
+  useInitializationFlow();
+
+  // Use the new unified loading state manager
+  const {
+    currentPhase,
+    shouldShowLoadingScreen,
+    shouldShowDisplay,
+    isTransitioning,
+    progress,
+    statusMessage,
+  } = useLoadingStateManager({
+    minimumLoadingDuration:
+      process.env.NODE_ENV === "development" ? 1500 : 2500, // Shorter in dev
+    contentReadyDelay: process.env.NODE_ENV === "development" ? 600 : 1000, // Faster in dev
+    transitionDuration: 600, // Smooth transition timing
+  });
+
+  // Handle loading screen transition completion
+  const handleLoadingComplete = useCallback(() => {
+    logger.info("[App] Loading screen transition completed");
+  }, []);
+
+  logger.info("[App] Current app state:", {
+    currentPhase,
+    shouldShowLoadingScreen,
+    shouldShowDisplay,
+    isTransitioning,
+    progress,
+  });
+
+  // Always show loading screen for these phases to prevent gaps
+  const shouldForceLoadingScreen =
+    currentPhase === "initializing" ||
+    currentPhase === "checking" ||
+    currentPhase === "loading-content" ||
+    currentPhase === "preparing" ||
+    currentPhase === "ready";
+
+  // Show enhanced loading screen when needed
+  if (shouldShowLoadingScreen || shouldForceLoadingScreen) {
+    return (
+      <EnhancedLoadingScreen
+        currentPhase={currentPhase}
+        progress={progress}
+        statusMessage={statusMessage}
+        isTransitioning={isTransitioning}
+        onTransitionComplete={handleLoadingComplete}
+      />
+    );
+  }
+
+  // Show appropriate screen based on phase - be more specific about when to show each
+  if (currentPhase === "pairing") {
+    return (
+      <Suspense
+        fallback={
+          <EnhancedLoadingScreen
+            currentPhase="checking"
+            progress={25}
+            statusMessage="Loading pairing..."
+            isTransitioning={false}
+          />
+        }
+      >
+        <PairingScreen />
+      </Suspense>
+    );
+  }
+
+  if (currentPhase === "displaying" && shouldShowDisplay) {
+    return (
+      <Suspense
+        fallback={
+          <EnhancedLoadingScreen
+            currentPhase="preparing"
+            progress={85}
+            statusMessage="Loading display..."
+            isTransitioning={false}
+          />
+        }
+      >
+        <DisplayScreen />
+      </Suspense>
+    );
+  }
+
+  // Fallback to loading screen instead of error screen to prevent white flash
+  logger.warn(
+    `[App] Unexpected state, showing loading screen as fallback: ${currentPhase}`
+  );
   return (
-    <>
-      <LoadingScreen />
-      
-      {/* Main content with improved fade-in effect */}
-      <Fade in={showContent} timeout={1200}>
-        <Box sx={{ 
-          opacity: showContent ? 1 : 0,
-          width: '100%', 
-          height: '100%',
-          position: 'relative',
-          // Add transform to create a slight movement effect during transition
-          transform: showContent ? 'translateY(0)' : 'translateY(20px)',
-          transition: 'transform 1s ease-out, opacity 1.2s ease-in-out',
-        }}>
-          <OfflineNotification position={{ vertical: 'bottom', horizontal: 'left' }} />
-          <AuthErrorDetector />
-          <EmergencyAlert />
-          <Routes>
-            <Route path="/" element={<AuthenticatedRoute><DisplayScreen /></AuthenticatedRoute>} />
-            <Route path="/pair" element={<PairingScreen />} />
-            <Route path="/loading" element={<LoadingScreen />} />
-            <Route path="/error" element={<ErrorScreen />} />
-            <Route path="*" element={<Navigate replace to="/" />} />
-          </Routes>
-        </Box>
-      </Fade>
-    </>
+    <EnhancedLoadingScreen
+      currentPhase={currentPhase}
+      progress={progress}
+      statusMessage={statusMessage || "Loading..."}
+      isTransitioning={isTransitioning}
+      onTransitionComplete={handleLoadingComplete}
+    />
   );
 };
 
-/**
- * App Component
- * 
- * Root component that sets up providers and theme.
- */
 const App: React.FC = () => {
+  // Enable localStorage monitoring in development
+  useLocalStorageMonitor();
+
+  // Initialize factory reset functionality
+  const { isModalOpen, closeModal, confirmReset, isResetting } =
+    useFactoryReset();
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SnackbarProvider maxSnack={3}>
-        <Router>
-          <AuthProvider>
-            <OrientationProvider>
-              <OfflineProvider>
-                <ContentProvider>
-                  <EmergencyAlertProvider>
-                    <ApiErrorBoundary>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          position: 'fixed',
-                          width: '100vw',
-                          height: '100vh',
-                          top: 0,
-                          left: 0,
-                          overflow: 'hidden',
-                          bgcolor: 'background.default',
-                        }}
-                      >
-                        <AppRoutes />
-                      </Box>
-                    </ApiErrorBoundary>
-                  </EmergencyAlertProvider>
-                </ContentProvider>
-              </OfflineProvider>
-            </OrientationProvider>
-          </AuthProvider>
-        </Router>
-      </SnackbarProvider>
+      <ApiErrorBoundary>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            position: "fixed",
+            width: "100vw",
+            height: "100vh",
+            top: 0,
+            left: 0,
+            overflow: "hidden",
+            // Use the same gradient as ModernIslamicBackground to prevent flashing
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
+            // Optimize for performance
+            willChange: "auto",
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
+          }}
+        >
+          <AppRoutes />
+          <GracefulErrorOverlay />
+          <EmergencyAlertOverlay />
+          <AnalyticsErrorIntegration />
+
+          {/* Factory Reset Modal */}
+          <FactoryResetModal
+            open={isModalOpen}
+            onConfirm={confirmReset}
+            onCancel={closeModal}
+            isResetting={isResetting}
+          />
+        </Box>
+      </ApiErrorBoundary>
     </ThemeProvider>
   );
 };
 
-export default App; 
+export default App;

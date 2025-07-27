@@ -1,239 +1,400 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Box } from '@mui/material';
-import { useContent } from '../../contexts/ContentContext';
-import { useOrientation } from '../../contexts/OrientationContext';
-import useRotationHandling from '../../hooks/useRotationHandling';
-import LandscapeDisplay from '../layouts/LandscapeDisplay';
-import PortraitDisplay from '../layouts/PortraitDisplay';
-import LoadingScreen from './LoadingScreen';
-import logger from '../../utils/logger';
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+  createContext,
+  useContext,
+} from "react";
+import { Box, Fade } from "@mui/material";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "../../store";
+import { refreshAllContent } from "../../store/slices/contentSlice";
+import { setOrientation } from "../../store/slices/uiSlice";
+import {
+  createTestAlert,
+  clearCurrentAlert,
+} from "../../store/slices/emergencySlice";
+import useRotationHandling from "../../hooks/useRotationHandling";
+import { ALERT_COLOR_SCHEMES } from "../common/EmergencyAlertOverlay";
+import ModernLandscapeDisplay from "../layouts/ModernLandscapeDisplay";
+import ModernPortraitDisplay from "../layouts/ModernPortraitDisplay";
+import logger from "../../utils/logger";
+import { isLowPowerDevice } from "../../utils/performanceUtils";
 
-// CSS classes for orientation transitions
-const TRANSITION_STYLES = {
-  container: {
-    width: '100vw', 
-    height: '100vh',
-    overflow: 'hidden',
-    transition: 'opacity 0.5s ease-in-out, transform 0.8s ease-in-out',
-    position: 'relative',
-    willChange: 'transform, opacity'
-  },
-  content: {
-    width: '100%',
-    height: '100%',
-    transition: 'opacity 0.5s ease-in-out, transform 0.8s ease-in-out',
-    willChange: 'transform, opacity'
-  },
-  rotated: {
-    width: '100vh',
-    height: '100vw',
-    position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    transformOrigin: 'center',
-    transition: 'transform 0.8s ease-in-out, opacity 0.5s ease-in-out',
-    willChange: 'transform, opacity'
+// Animation context for coordinating staggered animations
+interface AnimationContextType {
+  isAlertTransitioning: boolean;
+  isDisplayReady: boolean;
+  getComponentAnimation: (componentId: string) => {
+    opacity: number;
+    transform: string;
+    transition: string;
+  };
+}
+
+const AnimationContext = createContext<AnimationContextType | null>(null);
+
+export const useDisplayAnimation = () => {
+  const context = useContext(AnimationContext);
+  if (!context) {
+    return {
+      isAlertTransitioning: false,
+      isDisplayReady: true,
+      getComponentAnimation: () => ({
+        opacity: 1,
+        transform: "scale(1)",
+        transition: "none",
+      }),
+    };
   }
+  return context;
 };
+
+// Transition timing constants
+const DISPLAY_MOUNT_DURATION = 1200;
+const COMPONENT_STAGGER_DELAY = 150;
+const ALERT_ANIMATION_DURATION = 300;
+
+// Component animation timing
+const ANIMATION_DELAYS = {
+  header: 0,
+  prayerCard: COMPONENT_STAGGER_DELAY,
+  carousel: COMPONENT_STAGGER_DELAY * 2,
+  footer: COMPONENT_STAGGER_DELAY * 3,
+};
+
+// Memoized landscape and portrait components
+const MemoizedLandscapeDisplay = memo(ModernLandscapeDisplay);
+const MemoizedPortraitDisplay = memo(ModernPortraitDisplay);
 
 /**
  * DisplayScreen component
- * 
+ *
  * The main display screen shown after successful authentication.
- * Shows prayer times, current content, and other information.
- * Adapts to the screen orientation (portrait/landscape) based on admin settings.
+ * Features coordinated entrance animations and smooth alert transitions.
  */
 const DisplayScreen: React.FC = () => {
-  const { 
-    isLoading, 
-    masjidName,
-    screenContent
-  } = useContent();
-  
-  const { orientation, setAdminOrientation } = useOrientation();
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const dispatch = useDispatch<AppDispatch>();
+
+  // Redux selectors
+  const screenContent = useSelector(
+    (state: RootState) => state.content.screenContent
+  );
+  const prayerTimes = useSelector(
+    (state: RootState) => state.content.prayerTimes
+  );
+  const orientation = useSelector((state: RootState) => state.ui.orientation);
+  const currentAlert = useSelector(
+    (state: RootState) => state.emergency.currentAlert
+  );
+
+  // Component readiness and animation states
+  const [isDisplayReady, setIsDisplayReady] = useState(false);
+  const [isAlertTransitioning, setIsAlertTransitioning] = useState(false);
+  const [animationPhase, setAnimationPhase] = useState<
+    "idle" | "dissolving" | "showing" | "restoring"
+  >("idle");
+  const [isMounted, setIsMounted] = useState(false);
+
   const previousOrientationRef = useRef(orientation);
-  const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Safety timeout to ensure transitions don't get stuck
-  useEffect(() => {
-    // Force reset transition state on component mount to fix stuck animations after refresh
-    setIsTransitioning(false);
-    
-    // Safety cleanup to ensure animation never gets stuck for more than 2 seconds
-    const safetyTimer = setTimeout(() => {
-      if (isTransitioning) {
-        console.log(`⚠️ DisplayScreen: Animation appears stuck, forcing reset`);
-        setIsTransitioning(false);
+  const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Content refresh function
+  const forceRefresh = useCallback(() => {
+    dispatch(refreshAllContent({ forceRefresh: true }));
+  }, [dispatch]);
+
+  // Check if we have content ready to display
+  const hasContent = useMemo(() => {
+    return screenContent !== null || prayerTimes !== null;
+  }, [screenContent, prayerTimes]);
+
+  // Get current alert config for background morphing
+  const getAlertConfig = useCallback(() => {
+    if (!currentAlert) return null;
+
+    const alertConfig =
+      currentAlert.colorScheme && ALERT_COLOR_SCHEMES[currentAlert.colorScheme]
+        ? ALERT_COLOR_SCHEMES[currentAlert.colorScheme]
+        : ALERT_COLOR_SCHEMES.RED;
+
+    return alertConfig;
+  }, [currentAlert]);
+
+  // Calculate component animations
+  const getComponentAnimation = useCallback(
+    (componentId: string) => {
+      if (!isDisplayReady) {
+        // Initial mount animation
+        const delay =
+          ANIMATION_DELAYS[componentId as keyof typeof ANIMATION_DELAYS] || 0;
+        return {
+          opacity: isMounted ? 1 : 0,
+          transform: isMounted
+            ? "translateY(0px) scale(1)"
+            : "translateY(30px) scale(0.96)",
+          transition: `opacity ${DISPLAY_MOUNT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms, transform ${DISPLAY_MOUNT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms`,
+        };
       }
-    }, 2000);
-    
+
+      if (!isAlertTransitioning) {
+        return {
+          opacity: 1,
+          transform: "scale(1)",
+          transition: `opacity ${ALERT_ANIMATION_DURATION}ms ease-out, transform ${ALERT_ANIMATION_DURATION}ms ease-out`,
+        };
+      }
+
+      const delay =
+        ANIMATION_DELAYS[componentId as keyof typeof ANIMATION_DELAYS] || 0;
+      const isDissolving = animationPhase === "dissolving";
+      const isRestoring = animationPhase === "restoring";
+
+      if (isDissolving) {
+        return {
+          opacity: 0,
+          transform: "scale(0.95)",
+          transition: `opacity ${ALERT_ANIMATION_DURATION}ms ease-out ${delay}ms, transform ${ALERT_ANIMATION_DURATION}ms ease-out ${delay}ms`,
+        };
+      } else if (isRestoring) {
+        const maxDelay = Math.max(...Object.values(ANIMATION_DELAYS));
+        const reverseDelay = maxDelay - delay;
+        return {
+          opacity: 1,
+          transform: "scale(1)",
+          transition: `opacity ${ALERT_ANIMATION_DURATION}ms ease-out ${reverseDelay}ms, transform ${ALERT_ANIMATION_DURATION}ms ease-out ${reverseDelay}ms`,
+        };
+      }
+
+      return {
+        opacity: 0,
+        transform: "scale(0.95)",
+        transition: `opacity ${ALERT_ANIMATION_DURATION}ms ease-out, transform ${ALERT_ANIMATION_DURATION}ms ease-out`,
+      };
+    },
+    [isDisplayReady, isMounted, isAlertTransitioning, animationPhase]
+  );
+
+  // Mount and display readiness effect
+  useEffect(() => {
+    logger.info(
+      "[DisplayScreen] Component mounted, starting readiness sequence"
+    );
+
+    // Start mount animation immediately
+    setIsMounted(true);
+
+    // Mark display as ready after animation completes
+    mountTimerRef.current = setTimeout(() => {
+      logger.info("[DisplayScreen] Display ready - all animations complete");
+      setIsDisplayReady(true);
+    }, DISPLAY_MOUNT_DURATION + Math.max(...Object.values(ANIMATION_DELAYS)) + 200);
+
     return () => {
-      clearTimeout(safetyTimer);
-      if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
+      if (mountTimerRef.current) {
+        clearTimeout(mountTimerRef.current);
       }
     };
   }, []);
-  
-  // Add effect to track orientation changes
+
+  // Alert animation effect
   useEffect(() => {
-    // Only trigger animation if orientation actually changed
-    if (previousOrientationRef.current !== orientation) {
-      console.log(`🔄 DisplayScreen: Orientation changed from ${previousOrientationRef.current} to ${orientation}`);
-      
-      // Start transition
-      setIsTransitioning(true);
-      
-      // Clear any existing timeout
-      if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
-      }
-      
-      // After transition completes, clear the transitioning flag
-      transitionTimerRef.current = setTimeout(() => {
-        setIsTransitioning(false);
-        previousOrientationRef.current = orientation;
-        
-        // Force redraw to ensure layout is correct
-        window.dispatchEvent(new Event('resize'));
-        transitionTimerRef.current = null;
-      }, 800); // Match the transition duration
-      
-      return () => {
-        if (transitionTimerRef.current) {
-          clearTimeout(transitionTimerRef.current);
+    if (currentAlert) {
+      setIsAlertTransitioning(true);
+      setAnimationPhase("dissolving");
+
+      if (currentAlert.id.startsWith("test-alert-")) {
+        const expiresAt = new Date(currentAlert.expiresAt).getTime();
+        const now = Date.now();
+        const timeUntilExpiry = Math.max(0, expiresAt - now);
+
+        if (alertTimeoutRef.current) {
+          clearTimeout(alertTimeoutRef.current);
         }
-      };
+
+        alertTimeoutRef.current = setTimeout(() => {
+          dispatch(clearCurrentAlert());
+        }, timeUntilExpiry);
+      }
+    } else {
+      if (isAlertTransitioning) {
+        setAnimationPhase("restoring");
+
+        const maxDelay = Math.max(...Object.values(ANIMATION_DELAYS));
+        setTimeout(() => {
+          setIsAlertTransitioning(false);
+          setAnimationPhase("idle");
+        }, maxDelay + ALERT_ANIMATION_DURATION + 50);
+      }
+
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
+        alertTimeoutRef.current = null;
+      }
     }
-  }, [orientation]);
-  
-  // Add safety effect to reset transition state if it gets stuck longer than expected
-  useEffect(() => {
-    let safetyTimer: NodeJS.Timeout | null = null;
-    
-    if (isTransitioning) {
-      // If we're transitioning, set a safety timer
-      safetyTimer = setTimeout(() => {
-        console.log(`⚠️ DisplayScreen: Animation safety timeout triggered, forcing reset`);
-        setIsTransitioning(false);
-      }, 1500); // A bit longer than transition duration
-    }
-    
+
     return () => {
-      if (safetyTimer) {
-        clearTimeout(safetyTimer);
+      if (alertTimeoutRef.current) {
+        clearTimeout(alertTimeoutRef.current);
       }
     };
-  }, [isTransitioning]);
-  
-  // Update orientation from screen content when it changes
+  }, [currentAlert, dispatch, isAlertTransitioning]);
+
+  // Keyboard shortcuts for testing
   useEffect(() => {
-    if (!screenContent) return;
-    
-    // Check for orientation in both the new data structure and legacy location
-    let newOrientation;
-    
-    if (screenContent?.data?.screen?.orientation) {
-      newOrientation = screenContent.data.screen.orientation;
-    } else if (screenContent?.screen?.orientation) {
-      newOrientation = screenContent.screen.orientation;
-    }
-    
-    // Only update if we found a valid orientation and it's different from current
-    if (newOrientation && newOrientation !== orientation) {
-      // Check if this update is from initial load vs SSE event
-      const lastSseEvent = localStorage.getItem('last_orientation_sse_event');
-      if (lastSseEvent) {
-        const lastEventTime = parseInt(lastSseEvent, 10);
-        const now = Date.now();
-        
-        // If we've received an SSE event in the last 10 seconds, don't override it with content data
-        if (now - lastEventTime < 10000) {
-          console.log(`⚠️ DisplayScreen: Skipping content orientation update (${newOrientation}) because recent SSE event occurred ${(now - lastEventTime)/1000}s ago`);
-          return;
-        }
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || !event.shiftKey) return;
+
+      const alertTypes = [
+        "RED",
+        "ORANGE",
+        "AMBER",
+        "BLUE",
+        "GREEN",
+        "PURPLE",
+        "DARK",
+      ];
+
+      switch (event.key) {
+        case "1":
+        case "2":
+        case "3":
+        case "4":
+        case "5":
+        case "6":
+        case "7":
+          event.preventDefault();
+          const typeIndex = parseInt(event.key) - 1;
+          const alertType = alertTypes[typeIndex];
+          logger.info(`Triggering test alert: ${alertType}`);
+          dispatch(createTestAlert({ type: alertType, duration: 15 }));
+          break;
+
+        case "c":
+        case "C":
+          event.preventDefault();
+          logger.info("Clearing current alert via keyboard shortcut");
+          dispatch(clearCurrentAlert());
+          break;
+
+        case "r":
+        case "R":
+          event.preventDefault();
+          const randomType =
+            alertTypes[Math.floor(Math.random() * alertTypes.length)];
+          logger.info(`Triggering random test alert: ${randomType}`);
+          dispatch(createTestAlert({ type: randomType, duration: 10 }));
+          break;
+
+        default:
+          break;
       }
-      
-      console.log(`📄 DisplayScreen: Updating orientation from content API: ${newOrientation}`);
-      setAdminOrientation(newOrientation);
-    }
-  }, [screenContent, setAdminOrientation, orientation]);
-  
-  // Use rotation handling hook to determine if we need to rotate
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyPress);
+    };
+  }, [dispatch]);
+
+  // Periodic content refresh
+  useEffect(() => {
+    const baseInterval = parseInt(
+      process.env.REACT_APP_REFRESH_INTERVAL_MS || "300000",
+      10
+    );
+    const intervalMs = isLowPowerDevice() ? baseInterval * 2 : baseInterval;
+
+    const interval = setInterval(() => {
+      logger.info("Periodic content refresh");
+      forceRefresh();
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [forceRefresh]);
+
+  // Rotation handling
   const rotationInfo = useRotationHandling(orientation);
   const shouldRotate = rotationInfo.shouldRotate;
 
-  // Memoize the display component based on orientation
+  // Memoize the display component
   const DisplayComponent = useMemo(() => {
     logger.info(`DisplayScreen: Rendering ${orientation} layout`);
-    return orientation === 'LANDSCAPE' ? 
-      <LandscapeDisplay /> : 
-      <PortraitDisplay />;
+    return orientation === "LANDSCAPE" ? (
+      <MemoizedLandscapeDisplay />
+    ) : (
+      <MemoizedPortraitDisplay />
+    );
   }, [orientation]);
 
-  // Force a layout update when component mounts
-  useEffect(() => {
-    // Trigger a resize event to force layout recalculation
-    const resizeEvent = new Event('resize');
-    window.dispatchEvent(resizeEvent);
-    
-    // Force a reflow/repaint
-    const forceReflowTimeout = setTimeout(() => {
-      const element = document.documentElement;
-      // Reading offsetHeight causes a reflow
-      // eslint-disable-next-line no-unused-vars
-      const _ = element.offsetHeight; 
-      
-      // Force another resize event after a short delay
-      window.dispatchEvent(resizeEvent);
-    }, 100);
-    
-    return () => clearTimeout(forceReflowTimeout);
-  }, []);
+  // Animation context value
+  const animationContextValue: AnimationContextType = {
+    isAlertTransitioning,
+    isDisplayReady,
+    getComponentAnimation,
+  };
 
-  // If content is still loading, show loading screen
-  if (isLoading) {
-    return <LoadingScreen />;
+  // Wait for content to be available
+  if (!hasContent) {
+    logger.info("[DisplayScreen] Waiting for content to be available");
+    return (
+      <Box
+        sx={{
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: `linear-gradient(135deg, ${(theme: any) =>
+            theme.palette.primary.dark} 0%, ${(theme: any) =>
+            theme.palette.primary.main} 50%, ${(theme: any) =>
+            theme.palette.secondary.main} 100%)`,
+        }}
+      >
+        {/* Content loading indicator */}
+      </Box>
+    );
   }
 
   return (
-    <Box 
-      sx={{ 
-        ...TRANSITION_STYLES.container,
-        opacity: isTransitioning ? 0.6 : 1,
-        transform: isTransitioning ? 'scale(0.98)' : 'scale(1)',
-      }}
-    >
-      {shouldRotate ? (
-        // Apply rotation transform for mismatched orientation
+    <AnimationContext.Provider value={animationContextValue}>
+      <Fade in={isMounted} timeout={800}>
         <Box
           sx={{
-            ...TRANSITION_STYLES.rotated,
-            transform: `translate(-50%, -50%) rotate(90deg) ${isTransitioning ? 'scale(0.95)' : 'scale(1)'}`,
-            opacity: isTransitioning ? 0.6 : 1,
+            width: "100vw",
+            height: "100vh",
+            overflow: "hidden",
+            position: "fixed",
+            top: 0,
+            left: 0,
           }}
         >
-          <Box sx={{
-            ...TRANSITION_STYLES.content,
-            opacity: isTransitioning ? 0.8 : 1,
-            transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
-          }}>
-            {DisplayComponent}
-          </Box>
+          {shouldRotate ? (
+            <Box
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: "100vh",
+                height: "100vw",
+                transform: "translate(-50%, -50%) rotate(90deg)",
+                transformOrigin: "center",
+              }}
+            >
+              {DisplayComponent}
+            </Box>
+          ) : (
+            <Box sx={{ width: "100%", height: "100%" }}>{DisplayComponent}</Box>
+          )}
         </Box>
-      ) : (
-        // No rotation needed
-        <Box sx={{
-          ...TRANSITION_STYLES.content,
-          opacity: isTransitioning ? 0.8 : 1,
-          transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
-        }}>
-          {DisplayComponent}
-        </Box>
-      )}
-    </Box>
+      </Fade>
+    </AnimationContext.Provider>
   );
 };
 
-export default React.memo(DisplayScreen); 
+export default DisplayScreen;

@@ -39,9 +39,9 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: getSizeRem(0.4),
-          px: getSizeRem(0.7),
-          py: getSizeRem(0.2),
+          gap: getSizeRem(0.5),
+          px: getSizeRem(1.0),
+          py: getSizeRem(0.3),
           color: '#fff',
           backgroundColor: alpha(theme.palette.primary.dark, 0.15),
           borderTop: `1px solid ${alpha('#ffffff', 0.2)}`,
@@ -51,10 +51,11 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
       >
         <Typography
           sx={{
-            fontSize: fontSizes.small,
-            color: alpha('#fff', 0.6),
+            fontSize: isPortrait ? fontSizes.small : fontSizes.body2,
+            color: alpha('#fff', 0.75),
             fontFamily: "'Poppins', sans-serif",
-            fontWeight: 300,
+            fontWeight: 400,
+            letterSpacing: '0.3px',
           }}
         >
           Powered by
@@ -64,9 +65,9 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
           src={logoSrc} 
           alt="MasjidConnect Logo" 
           style={{ 
-            height: `${getSizeRem(0.7).replace('rem', '')}rem`,
+            height: `${getSizeRem(1.0).replace('rem', '')}rem`,
             width: 'auto',
-            filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12))'
+            filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15))'
           }}
         />
       </GlassmorphicCard>

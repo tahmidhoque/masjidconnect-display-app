@@ -1,6 +1,8 @@
-import { Orientation } from '../contexts/OrientationContext';
 import logger from '../utils/logger';
 import { DebugEventSource } from '../utils/debugEventSource';
+
+// Define Orientation type locally instead of importing from context
+type Orientation = 'LANDSCAPE' | 'PORTRAIT';
 
 // Event Types for SSE
 const EVENT_TYPES = {

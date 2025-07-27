@@ -1,12 +1,20 @@
 {
   "name": "masjidconnect-display-app",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
+  "main": "electron/main.js",
+  "description": "MasjidConnect Display App - Digital signage solution for mosques",
+  "author": {
+    "name": "MasjidConnect",
+    "email": "support@masjidconnect.com"
+  },
+  "homepage": "./",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.17.0",
     "@mui/material": "^5.17.0",
+    "@reduxjs/toolkit": "^2.8.2",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -17,15 +25,19 @@
     "axios": "^1.4.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
+    "electron-log": "^5.1.0",
+    "electron-store": "^10.1.0",
+    "electron-updater": "^6.1.7",
     "localforage": "^1.10.0",
-    "moment": "^2.30.1",
-    "momentjs": "^2.0.0",
     "notistack": "^3.0.2",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-error-boundary": "^6.0.0",
+    "react-redux": "^9.2.0",
     "react-router-dom": "^6.11.1",
     "react-scripts": "5.0.1",
+    "redux-persist": "^6.0.0",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4",
     "workbox-core": "^6.5.4",
@@ -34,10 +46,20 @@
     "workbox-strategies": "^6.5.4"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "PORT=3001 react-scripts start",
     "build": "react-scripts build",
+    "build:fix-paths": "react-scripts build && ./fix-paths.sh",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on --timeout 60000 http://localhost:3001 && cross-env ELECTRON_DEBUG=true electron .\"",
+    "electron:build": "npm run build:fix-paths && electron-builder build --publish never",
+    "electron:build:publish": "npm run build:fix-paths && electron-builder build --publish always",
+    "electron:start": "electron .",
+    "install:fonts": "./scripts/install-fonts.sh",
+    "rpi:build": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish never",
+    "rpi:build:armv7l": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --publish never",
+    "rpi:build:arm64": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --arm64 --publish never",
+    "rpi:publish": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish always"
   },
   "eslintConfig": {
     "extends": [
@@ -56,5 +78,118 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "concurrently": "^6.5.1",
+    "cross-env": "^7.0.3",
+    "customize-cra": "^1.0.0",
+    "electron": "^35.1.2",
+    "electron-builder": "^24.13.3",
+    "react-app-rewired": "^2.2.1",
+    "wait-on": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.masjidconnect.display",
+    "productName": "MasjidConnect Display",
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist",
+      "app": "."
+    },
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      },
+      {
+        "from": "build",
+        "to": "build"
+      },
+      {
+        "from": "node_modules/electron-store",
+        "to": "node_modules/electron-store"
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/electron-store/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "armv7l",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "armv7l",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "executableName": "masjidconnect-display",
+      "artifactName": "masjidconnect-display-${version}-${arch}.${ext}",
+      "synopsis": "Digital signage display for mosques",
+      "description": "MasjidConnect Display App for showing prayer times and announcements",
+      "desktop": {
+        "Name": "MasjidConnect Display",
+        "Comment": "Digital signage for mosques",
+        "Categories": "Utility;Education;",
+        "StartupWMClass": "masjidconnect-display"
+      }
+    },
+    "deb": {
+      "afterInstall": "after-install.sh",
+      "depends": [
+        "libasound2 (>= 1.1.3)",
+        "libatk-bridge2.0-0",
+        "libatk1.0-0",
+        "libatspi2.0-0",
+        "libcups2",
+        "libdrm2",
+        "libgbm1",
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libx11-xcb1",
+        "libxcb-dri3-0",
+        "libxcomposite1",
+        "libxdamage1",
+        "libxfixes3",
+        "libxkbcommon0",
+        "libxrandr2",
+        "libxss1",
+        "libxtst6",
+        "libuuid1",
+        "xdg-utils"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "masjidSolutions",
+      "repo": "masjidconnect-display-app",
+      "releaseType": "release"
+    }
   }
 }

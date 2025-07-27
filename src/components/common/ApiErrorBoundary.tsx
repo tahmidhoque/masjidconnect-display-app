@@ -1,12 +1,16 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Box, Typography, Button, Paper } from '@mui/material';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import { useOffline } from '../../contexts/OfflineContext';
+import React, { Component, ErrorInfo, ReactNode } from "react";
+import { Box, Typography, Button, Paper } from "@mui/material";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../store";
 
 interface Props {
   children: ReactNode;
-  fallbackComponent?: React.ComponentType<{ error: Error; resetError: () => void }>;
+  fallbackComponent?: React.ComponentType<{
+    error: Error;
+    resetError: () => void;
+  }>;
 }
 
 interface State {
@@ -19,12 +23,12 @@ const WithOfflineStatus: React.FC<{
   error: Error | null;
   resetError: () => void;
 }> = ({ error, resetError }) => {
-  const { isOnline } = useOffline();
-  
+  const isOnline = !useSelector((state: RootState) => state.ui.isOffline);
+
   return (
-    <DefaultFallback 
-      error={error || new Error('Unknown error')} 
-      resetError={resetError} 
+    <DefaultFallback
+      error={error || new Error("Unknown error")}
+      resetError={resetError}
       isOnline={isOnline}
     />
   );
@@ -36,24 +40,26 @@ const DefaultFallback: React.FC<{
   resetError: () => void;
   isOnline: boolean;
 }> = ({ error, resetError, isOnline }) => {
-  const isApiError = error.message.includes('API') || 
-                     error.message.includes('fetch') || 
-                     error.message.includes('network');
-                     
-  const isCorsError = error.message.includes('CORS') || 
-                      error.message.includes('cross-origin') ||
-                      error.name === 'TypeError' && error.message.includes('Network');
+  const isApiError =
+    error.message.includes("API") ||
+    error.message.includes("fetch") ||
+    error.message.includes("network");
+
+  const isCorsError =
+    error.message.includes("CORS") ||
+    error.message.includes("cross-origin") ||
+    (error.name === "TypeError" && error.message.includes("Network"));
 
   // If it's a CORS error, don't show this fallback as we have a dedicated CORS notification
   if (isCorsError) {
     return (
-      <Box 
-        sx={{ 
-          p: 3, 
-          m: 2, 
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center' 
+      <Box
+        sx={{
+          p: 3,
+          m: 2,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
         <Typography variant="body1" color="error">
@@ -77,24 +83,23 @@ const DefaultFallback: React.FC<{
         p: 3,
         m: 2,
         borderRadius: 2,
-        backgroundColor: 'error.light',
-        color: 'error.contrastText',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
+        backgroundColor: "error.light",
+        color: "error.contrastText",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
         gap: 2,
       }}
     >
       <ErrorOutlineIcon sx={{ fontSize: 60 }} />
       <Typography variant="h5" component="h2" align="center">
-        {isOnline ? 'Something went wrong' : 'You are offline'}
+        {isOnline ? "Something went wrong" : "You are offline"}
       </Typography>
-      
+
       <Typography variant="body1" align="center">
-        {isApiError && !isOnline 
-          ? 'The app is currently offline. Using cached data where available.'
-          : error.message
-        }
+        {isApiError && !isOnline
+          ? "The app is currently offline. Using cached data where available."
+          : error.message}
       </Typography>
 
       <Box sx={{ mt: 2 }}>
@@ -104,7 +109,7 @@ const DefaultFallback: React.FC<{
           startIcon={<RefreshIcon />}
           onClick={resetError}
         >
-          {isOnline ? 'Try Again' : 'Reload When Online'}
+          {isOnline ? "Try Again" : "Reload When Online"}
         </Button>
       </Box>
     </Paper>
@@ -122,7 +127,7 @@ class ApiErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('API Error caught by boundary:', error, errorInfo);
+    console.error("API Error caught by boundary:", error, errorInfo);
   }
 
   public resetError = () => {
@@ -130,7 +135,7 @@ class ApiErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
     });
-    
+
     // Refresh if the user explicitly requests it
     if (navigator.onLine) {
       window.location.reload();
@@ -143,9 +148,11 @@ class ApiErrorBoundary extends Component<Props, State> {
 
     if (hasError) {
       if (FallbackComponent) {
-        return <FallbackComponent error={error!} resetError={this.resetError} />;
+        return (
+          <FallbackComponent error={error!} resetError={this.resetError} />
+        );
       }
-      
+
       return <WithOfflineStatus error={error} resetError={this.resetError} />;
     }
 
@@ -153,4 +160,4 @@ class ApiErrorBoundary extends Component<Props, State> {
   }
 }
 
-export default ApiErrorBoundary; 
+export default ApiErrorBoundary;

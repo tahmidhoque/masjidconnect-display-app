@@ -84,6 +84,112 @@ export interface HeartbeatResponse {
   success: boolean;
 }
 
+// New Analytics Types for Enhanced Heartbeat System
+
+export type AnalyticsDataType = "heartbeat" | "content_view" | "error" | "schedule_event";
+
+export interface BaseAnalyticsRequest {
+  type: AnalyticsDataType;
+  timestamp: string; // ISO 8601 format
+  data: any; // Will be one of the specific data types below
+}
+
+// Heartbeat Analytics Data
+export interface HeartbeatAnalyticsData {
+  // System Performance (REQUIRED)
+  cpuUsage: number;              // CPU usage percentage (0-100)
+  memoryUsage: number;           // Memory usage percentage (0-100)
+  
+  // Storage & Network (REQUIRED)
+  storageUsed: number;           // Storage used percentage (0-100)
+  networkLatency: number;        // Network latency in milliseconds
+  bandwidthUsage: number;        // Current bandwidth usage in Mbps
+  
+  // Display Metrics (REQUIRED)
+  frameRate: number;             // Current frame rate (fps)
+  displayBrightness: number;     // Display brightness percentage (0-100)
+  resolution: string;            // Current resolution (e.g., "1920x1080")
+  
+  // Hardware Monitoring (OPTIONAL)
+  temperature?: number;          // Device temperature in Celsius
+  powerConsumption?: number;     // Power consumption in watts
+  ambientLight?: number;         // Ambient light sensor reading (0-100)
+  
+  // Content Information (REQUIRED)
+  currentContent: string;        // ID or name of currently displayed content
+  contentLoadTime: number;       // Time taken to load current content (ms)
+  contentErrors: number;         // Number of content errors since last heartbeat
+  
+  // Network Details (REQUIRED)
+  signalStrength: number;        // WiFi/Network signal strength percentage (0-100)
+  connectionType: string;        // Connection type: "wifi", "ethernet", "cellular"
+}
+
+export interface HeartbeatAnalyticsRequest extends BaseAnalyticsRequest {
+  type: "heartbeat";
+  data: HeartbeatAnalyticsData;
+}
+
+// Content View Analytics Data
+export interface ContentViewAnalyticsData {
+  contentId: string;             // Unique identifier for the content
+  contentType: string;           // Type: "announcement", "verse_hadith", "prayer_times", etc.
+  startTime: string;             // ISO 8601 timestamp when content started displaying
+  endTime?: string;              // ISO 8601 timestamp when content stopped (if applicable)
+  duration: number;              // Display duration in milliseconds
+  viewComplete: boolean;         // Whether the content was fully displayed
+}
+
+export interface ContentViewAnalyticsRequest extends BaseAnalyticsRequest {
+  type: "content_view";
+  data: ContentViewAnalyticsData;
+}
+
+// Error Reporting Analytics Data
+export type ErrorType = "NETWORK" | "CONTENT" | "DISPLAY" | "SYSTEM" | "API";
+
+export interface ErrorAnalyticsData {
+  errorType: ErrorType;
+  errorCode?: string;            // Application-specific error code
+  message: string;               // Human-readable error message
+  stack?: string;                // Stack trace (if available)
+  resolved: boolean;             // Whether the error has been resolved
+}
+
+export interface ErrorAnalyticsRequest extends BaseAnalyticsRequest {
+  type: "error";
+  data: ErrorAnalyticsData;
+}
+
+// Schedule Event Analytics Data
+export type ScheduleEventType = "content_change" | "schedule_update" | "override_start" | "override_end";
+
+export interface ScheduleEventAnalyticsData {
+  eventType: ScheduleEventType;
+  scheduleId?: string;           // ID of the schedule being executed
+  contentId?: string;            // ID of the content being displayed
+  expectedStartTime: string;     // When the event was scheduled to occur
+  actualStartTime: string;       // When the event actually occurred
+  delay?: number;                // Delay in milliseconds (if any)
+}
+
+export interface ScheduleEventAnalyticsRequest extends BaseAnalyticsRequest {
+  type: "schedule_event";
+  data: ScheduleEventAnalyticsData;
+}
+
+// Union type for all analytics requests
+export type AnalyticsRequest = 
+  | HeartbeatAnalyticsRequest 
+  | ContentViewAnalyticsRequest 
+  | ErrorAnalyticsRequest 
+  | ScheduleEventAnalyticsRequest;
+
+export interface AnalyticsResponse {
+  success: boolean;
+  message?: string;
+}
+
 // Content Types
 export type ContentItemType = 'VERSE_HADITH' | 'ANNOUNCEMENT' | 'EVENT' | 'CUSTOM' | 'ASMA_AL_HUSNA';
 
@@ -146,8 +252,12 @@ export interface ScreenContent {
     name: string;
     orientation: 'LANDSCAPE' | 'PORTRAIT';
     contentConfig: any;
+    masjid?: {
+      name: string;
+      timezone: string;
+    };
   };
-  masjid: {
+  masjid?: {
     name: string;
     timezone: string;
   };
@@ -170,6 +280,10 @@ export interface ScreenContent {
       name: string;
       orientation: 'LANDSCAPE' | 'PORTRAIT';
       contentConfig?: any;
+      masjid?: {
+        name: string;
+        timezone: string;
+      };
     };
     events?: Event[] | { data: Event[] };
   };
@@ -235,7 +349,9 @@ export interface ApiResponse<T> {
   error?: string;
   cached?: boolean;
   offlineFallback?: boolean;
-  status?: number; // Add status code property for error responses
+  timestamp?: number;
+  cacheAge?: number;
+  status?: number;
 }
 
 // Predefined alert color values matching ALERT_COLOR_SCHEMES
