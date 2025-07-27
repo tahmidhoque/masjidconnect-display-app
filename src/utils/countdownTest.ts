@@ -177,6 +177,9 @@ export const runCountdownTests = async (): Promise<void> => {
 };
 
 // Auto-run tests in development mode
+// ✅ DISABLED: Auto-run countdown test logs (was causing console spam)
+// Uncomment the lines below if you need to test countdown accuracy
+/*
 if (process.env.NODE_ENV === 'development') {
   // Add a delay to avoid interfering with app startup
   setTimeout(() => {
@@ -191,3 +194,4 @@ if (process.env.NODE_ENV === 'development') {
     (window as any).testClockAccuracy = () => testCountdownAccuracy(120); // 2 minute test
   }, 5000);
 } 
+*/

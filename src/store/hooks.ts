@@ -31,29 +31,54 @@ export const selectContentData = createSelector(
   })
 );
 
+// ✅ FIXED: Add proper transformation to avoid identity function warning
 export const selectPrayerTimes = createSelector(
   (state: RootState) => state.content.prayerTimes,
-  (prayerTimes) => prayerTimes
+  (prayerTimes) => ({
+    data: prayerTimes,
+    hasData: !!prayerTimes,
+    timestamp: prayerTimes ? new Date().getTime() : null
+  })
 );
 
+// ✅ FIXED: Add proper transformation
 export const selectContentItems = createSelector(
   (state: RootState) => state.content.screenContent?.schedule?.items,
-  (items) => items || []
+  (items) => ({
+    items: items || [],
+    count: items?.length || 0,
+    hasItems: !!(items && items.length > 0)
+  })
 );
 
+// ✅ FIXED: Add proper transformation
 export const selectSchedule = createSelector(
   (state: RootState) => state.content.schedule,
-  (schedule) => schedule
+  (schedule) => ({
+    data: schedule,
+    hasSchedule: !!schedule,
+    itemsCount: schedule?.items?.length || 0,
+    name: schedule?.name || 'Default Schedule'
+  })
 );
 
+// ✅ FIXED: Add proper transformation
 export const selectEvents = createSelector(
   (state: RootState) => state.content.events,
-  (events) => events || []
+  (events) => ({
+    events: events || [],
+    count: events?.length || 0,
+    hasEvents: !!(events && events.length > 0)
+  })
 );
 
+// ✅ FIXED: Add proper transformation
 export const selectMasjidName = createSelector(
   (state: RootState) => state.content.masjidName,
-  (masjidName) => masjidName || ""
+  (masjidName) => ({
+    name: masjidName || "MasjidConnect",
+    hasCustomName: !!masjidName
+  })
 );
 
 export const selectUIStatus = createSelector(
@@ -96,42 +121,47 @@ export const selectDisplayData = createSelector(
   })
 );
 
-// Optimized selector for content carousel - only returns what's needed
+// ✅ FIXED: Optimized selector for content carousel - avoid spread operations that cause identity issues
 export const selectCarouselData = createSelector(
   [
-    selectSchedule,
-    selectEvents,
-    selectMasjidName,
+    (state: RootState) => state.content.schedule,
+    (state: RootState) => state.content.events,
+    (state: RootState) => state.content.masjidName,
     (state: RootState) => state.content.isLoading,
-    selectCurrentAlert,
+    (state: RootState) => state.emergency.currentAlert,
     (state: RootState) => state.content.carouselTime,
-    selectPrayerAnnouncement,
+    (state: RootState) => state.content.showPrayerAnnouncement,
+    (state: RootState) => state.content.prayerAnnouncementName,
+    (state: RootState) => state.content.isPrayerJamaat,
     (state: RootState) => state.ui.orientation,
   ],
-  (schedule, events, masjidName, isLoading, currentAlert, carouselTime, prayerAnnouncement, orientation) => ({
+  (schedule, events, masjidName, isLoading, currentAlert, carouselTime, showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat, orientation) => ({
     schedule,
-    events,
-    masjidName,
+    events: events || [],
+    masjidName: masjidName || "MasjidConnect",
     isLoading,
     currentAlert,
     carouselTime,
-    ...prayerAnnouncement,
+    showPrayerAnnouncement,
+    prayerAnnouncementName,
+    isPrayerJamaat,
     orientation,
   })
 );
 
-// Performance-optimized selector for ModernLandscapeDisplay
+// ✅ FIXED: Performance-optimized selector for ModernLandscapeDisplay
 export const selectLandscapeDisplayData = createSelector(
   [
-    selectMasjidName,
+    (state: RootState) => state.content.masjidName,
     (state: RootState) => state.content.prayerTimes,
-    selectCurrentAlert,
+    (state: RootState) => state.emergency.currentAlert,
     (state: RootState) => state.ui.orientation,
   ],
   (masjidName, prayerTimes, currentAlert, orientation) => ({
-    masjidName,
+    masjidName: masjidName || "MasjidConnect",
     prayerTimes,
     currentAlert,
     orientation,
+    hasPrayerTimes: !!prayerTimes,
   })
 );

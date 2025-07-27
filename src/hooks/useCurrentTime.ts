@@ -167,7 +167,9 @@ export const useTimeManagerStats = () => {
 // Export for direct access if needed
 export { globalTimeManager };
 
-// Development utilities
+// ✅ DISABLED: Auto-run time manager logs (was causing console spam)
+// Uncomment the lines below if you need to debug time management
+/*
 if (process.env.NODE_ENV === 'development') {
   setTimeout(() => {
     console.log('⏰ Centralized Time Manager Active');
@@ -189,5 +191,6 @@ if (process.env.NODE_ENV === 'development') {
     };
   }, 3000);
 }
+*/
 
 export default useCurrentTime; 

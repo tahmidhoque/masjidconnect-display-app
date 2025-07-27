@@ -76,10 +76,13 @@ export const showFactoryResetStatus = (): void => {
   console.table(status);
 };
 
-// Auto-run demo in development
+// ✅ DISABLED: Auto-run demo in development (was causing console spam)
+// Uncomment the lines below if you need to test factory reset functionality
+/*
 if (process.env.NODE_ENV === 'development') {
   // Run demo after a short delay to avoid interfering with app startup
   setTimeout(() => {
     demoFactoryReset();
   }, 3000);
 } 
+*/ 

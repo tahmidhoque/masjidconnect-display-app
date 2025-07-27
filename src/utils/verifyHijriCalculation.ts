@@ -61,7 +61,10 @@ export const verifyHijriCalculation = (): void => {
   console.log('\n✅ Hijri calculation verification complete!');
 };
 
-// Auto-run verification in development
+// ✅ DISABLED: Auto-run verification in development (was causing console spam)
+// Uncomment the lines below if you need to test Hijri calculations
+/*
 if (process.env.NODE_ENV === 'development') {
   verifyHijriCalculation();
 } 
+*/ 

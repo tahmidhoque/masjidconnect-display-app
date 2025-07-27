@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
 import {
@@ -23,11 +23,12 @@ export type InitStage =
 
 /**
  * useInitializationFlow manages the application startup sequence.
- * It checks for saved credentials, handles pairing and polls for
- * success, then loads display content once authenticated.
+ * Optimized to work with the new loading state manager for smooth transitions.
  */
 export default function useInitializationFlow() {
   const dispatch = useDispatch<AppDispatch>();
+  
+  // Redux state
   const { isAuthenticated, pairingCode, isPairingCodeExpired } = useSelector(
     (state: RootState) => state.auth
   );
@@ -38,54 +39,76 @@ export default function useInitializationFlow() {
 
   const stage = initializationStage as InitStage;
 
+  // Refs for managing timers and preventing rapid state changes
+  const initializationStarted = useRef(false);
+  const pairingPollingActive = useRef(false);
+  const stageTransitionTimer = useRef<NodeJS.Timeout | null>(null);
+  const contentFetchTimer = useRef<NodeJS.Timeout | null>(null);
+  const pairingPollTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced stage transition to prevent rapid changes
+  const setStageDebounced = useCallback((newStage: InitStage, message: string, delay = 0) => {
+    if (stageTransitionTimer.current) {
+      clearTimeout(stageTransitionTimer.current);
+    }
+
+    const doTransition = () => {
+      logger.info(`[InitFlow] Stage transition: ${stage} -> ${newStage}`, { message });
+      dispatch(setInitializationStage(newStage));
+      dispatch(setLoadingMessage(message));
+    };
+
+    if (delay > 0) {
+      stageTransitionTimer.current = setTimeout(doTransition, delay);
+    } else {
+      doTransition();
+    }
+  }, [dispatch, stage]);
+
+  // Content fetching with improved error handling
   const fetchContent = useCallback(async () => {
-    dispatch(setInitializationStage("fetching"));
-    dispatch(setLoadingMessage("Loading your content..."));
+    logger.info('[InitFlow] Starting content fetch sequence');
+    
+    setStageDebounced("fetching", "Loading your content...");
     
     try {
-      logger.info('[InitFlow] Starting content fetch...');
-      await dispatch(refreshAllContent({ forceRefresh: true })).unwrap();
-      
-      // Wait a moment for state to update
+      // Add a small delay to ensure the loading state is visible
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      logger.info('[InitFlow] Content fetch completed');
-      dispatch(setLoadingMessage("Ready"));
-      dispatch(setInitializationStage("ready"));
+      logger.info('[InitFlow] Dispatching content refresh...');
+      const result = await dispatch(refreshAllContent({ forceRefresh: true })).unwrap();
+      
+      logger.info('[InitFlow] Content refresh completed', { result });
+      
+      // Wait a moment for state to update before marking as ready
+      contentFetchTimer.current = setTimeout(() => {
+        logger.info('[InitFlow] Content ready, transitioning to ready state');
+        setStageDebounced("ready", "Ready");
       dispatch(setInitializing(false));
+      }, 800);
+      
     } catch (error) {
       logger.error('[InitFlow] Error loading content:', { error });
-      // Still mark as ready to prevent getting stuck, but show warning message
-      dispatch(setLoadingMessage("Ready (some content may be cached)"));
-      dispatch(setInitializationStage("ready"));
+      
+      // Still mark as ready to prevent getting stuck, but note the issue
+      contentFetchTimer.current = setTimeout(() => {
+        setStageDebounced("ready", "Ready (using cached content)");
       dispatch(setInitializing(false));
+      }, 800);
     }
-  }, [dispatch]);
+  }, [dispatch, setStageDebounced]);
 
   // Check if we have minimum required data to show the display
   const hasMinimumData = useCallback(() => {
-    // For authenticated users, we should have at least screen content OR prayer times
     if (isAuthenticated) {
       return screenContent !== null || prayerTimes !== null;
     }
-    return true; // For non-authenticated users (pairing), we don't need content data
+    return true;
   }, [isAuthenticated, screenContent, prayerTimes]);
 
   // Enhanced credential checking with better persistence detection
   const checkCredentialsPersistence = useCallback(() => {
-    logger.info('[InitFlow] === Credential Storage Debug ===');
-    
-    // Log all localStorage entries related to credentials
-    const allLocalStorageEntries = {
-      'masjid_api_key': localStorage.getItem('masjid_api_key'),
-      'masjid_screen_id': localStorage.getItem('masjid_screen_id'),
-      'apiKey': localStorage.getItem('apiKey'),
-      'screenId': localStorage.getItem('screenId'),
-      'masjidconnect_credentials': localStorage.getItem('masjidconnect_credentials'),
-      'isPaired': localStorage.getItem('isPaired'),
-    };
-
-    logger.info('[InitFlow] All credential-related localStorage entries:', allLocalStorageEntries);
+    logger.info('[InitFlow] === Credential Storage Check ===');
 
     // Check all possible credential storage formats
     const credentialSources = [
@@ -116,217 +139,167 @@ export default function useInitializationFlow() {
       logger.warn('[InitFlow] Failed to parse JSON credentials:', { error });
     }
 
-    // Log all credential sources found
-    logger.info('[InitFlow] Credential sources found:', credentialSources);
-
     // Find the first valid credential set
     for (const source of credentialSources) {
       if (source.apiKey && source.screenId) {
-        logger.info(`[InitFlow] ✅ Found valid credentials from ${source.source} format`, {
-          apiKeyLength: source.apiKey.length,
-          screenIdLength: source.screenId.length,
-          apiKeyPreview: source.apiKey.substring(0, 8) + '...',
-          screenIdPreview: source.screenId.substring(0, 8) + '...',
-        });
+        logger.info(`[InitFlow] ✅ Found valid credentials from ${source.source} format`);
         return true;
       }
     }
 
-    logger.warn('[InitFlow] ❌ No valid credentials found in any format');
+    logger.warn('[InitFlow] ❌ No valid credentials found');
     return false;
   }, []);
 
-  // Check local credentials on first load with improved logic
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeApp = async () => {
-      if (!mounted) return;
-
-      dispatch(setInitializationStage("checking"));
-      dispatch(setLoadingMessage("Checking credentials..."));
+  // Start pairing process with better error handling
+  const startPairingProcess = useCallback(async () => {
+    logger.info('[InitFlow] Starting pairing process');
+    
+    setStageDebounced("pairing", "Preparing pairing...", 500);
+    
+    try {
+      // Wait for stage transition, then request pairing code
+      setTimeout(async () => {
+        logger.info('[InitFlow] Requesting pairing code');
+        dispatch(setLoadingMessage("Generating pairing code..."));
+        
+        await dispatch(requestPairingCode("LANDSCAPE"));
+        
+        setTimeout(() => {
+          dispatch(setLoadingMessage("Ready to pair"));
+          dispatch(setInitializing(false));
+        }, 500);
+      }, 1000);
       
-      // First check if credentials exist in localStorage directly
-      const hasStoredCredentials = checkCredentialsPersistence();
+    } catch (error) {
+      logger.error('[InitFlow] Error starting pairing:', { error });
+      setStageDebounced("pairing", "Pairing error - please refresh");
+    }
+  }, [dispatch, setStageDebounced]);
+
+  // Pairing status polling with better control
+  const startPairingPolling = useCallback(() => {
+    if (pairingPollingActive.current || !pairingCode) return;
+    
+    pairingPollingActive.current = true;
+    logger.info('[InitFlow] Starting pairing status polling');
+    
+    const poll = async () => {
+      if (!pairingPollingActive.current) return;
       
-      // Also check Redux-Persist state
-      logger.info('[InitFlow] Checking Redux persist state...');
-      const persistRoot = localStorage.getItem('persist:root') || localStorage.getItem('persist:masjidconnect-root');
-      if (persistRoot) {
-        try {
-          const parsed = JSON.parse(persistRoot);
-          logger.info('[InitFlow] Redux persist root found:', {
-            keys: Object.keys(parsed),
-            authKeys: parsed.auth ? Object.keys(JSON.parse(parsed.auth)) : 'no auth'
-          });
+      try {
+        const res: any = await dispatch(checkPairingStatus(pairingCode));
+        
+        if (checkPairingStatus.fulfilled.match(res) && res.payload?.isPaired) {
+          logger.info('[InitFlow] 🎉 Pairing successful!');
+          pairingPollingActive.current = false;
+          dispatch(setLoadingMessage("Pairing successful! Loading content..."));
           
-          if (parsed.auth) {
-            const authState = JSON.parse(parsed.auth);
-            logger.info('[InitFlow] Redux auth persist state:', {
-              isAuthenticated: authState.isAuthenticated,
-              isPaired: authState.isPaired,
-              hasScreenId: !!authState.screenId,
-              hasApiKey: !!authState.apiKey
-            });
-            
-            // If Redux-Persist shows authenticated but localStorage doesn't have credentials,
-            // copy them from Redux state to localStorage
-            if (authState.isAuthenticated && authState.apiKey && authState.screenId && !hasStoredCredentials) {
-              logger.info('[InitFlow] 🔄 Restoring credentials from Redux-Persist to localStorage');
-              localStorage.setItem('masjid_api_key', authState.apiKey);
-              localStorage.setItem('masjid_screen_id', authState.screenId);
-              localStorage.setItem('apiKey', authState.apiKey);
-              localStorage.setItem('screenId', authState.screenId);
-              localStorage.setItem('masjidconnect_credentials', JSON.stringify({
-                apiKey: authState.apiKey,
-                screenId: authState.screenId
-              }));
-            }
+          // Start content loading after a brief success message display
+          setTimeout(() => {
+            fetchContent();
+          }, 1000);
+        } else if (pairingPollingActive.current) {
+          // Continue polling
+          pairingPollTimer.current = setTimeout(poll, 4000);
           }
         } catch (error) {
-          logger.warn('[InitFlow] Failed to parse Redux persist state:', { error });
+        logger.error('[InitFlow] Pairing polling error:', { error });
+        if (pairingPollingActive.current) {
+          pairingPollTimer.current = setTimeout(poll, 5000);
         }
-      } else {
-        logger.warn('[InitFlow] No Redux persist root found');
       }
+    };
+    
+    // Start polling after initial delay
+    pairingPollTimer.current = setTimeout(poll, 3000);
+  }, [pairingCode, dispatch, fetchContent]);
+
+  // Main initialization effect
+  useEffect(() => {
+    if (initializationStarted.current) return;
+    
+    initializationStarted.current = true;
+    logger.info('[InitFlow] === Starting App Initialization ===');
+
+    const initializeApp = async () => {
+      // Stage 1: Check credentials
+      setStageDebounced("checking", "Checking credentials...");
       
-      if (hasStoredCredentials) {
-        logger.info('[InitFlow] Credentials detected, initializing from storage...');
-      } else {
-        logger.warn('[InitFlow] No credentials detected in localStorage');
-      }
-
+      const hasStoredCredentials = checkCredentialsPersistence();
+      
       try {
-        const action: any = await dispatch(initializeFromStorage());
+        // Wait minimum time to show checking stage
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        if (!mounted) return;
-
-        logger.info('[InitFlow] initializeFromStorage result:', {
-          hasCredentials: !!action.payload?.credentials,
-          hasPairingData: !!action.payload?.pairingData,
-          actionType: action.type
-        });
+        const action: any = await dispatch(initializeFromStorage());
 
         if (action.payload?.credentials) {
-          logger.info('[InitFlow] Authentication successful, loading content...');
-          dispatch(setLoadingMessage("Credentials found, loading content..."));
-          fetchContent();
-        } else {
-          logger.info('[InitFlow] No valid credentials, starting pairing process...');
-          // Smooth transition to pairing without intermediate "welcome" stage
-          dispatch(setInitializationStage("pairing"));
-          dispatch(setLoadingMessage("Preparing pairing..."));
+          logger.info('[InitFlow] Authentication successful from storage');
+          setStageDebounced("welcome", "Welcome back!", 500);
           
-          // Request pairing code after a brief delay to prevent flashing
+          // Start content loading after welcome message
           setTimeout(() => {
-            if (mounted) {
-              dispatch(setLoadingMessage("Generating pairing code..."));
-              dispatch(requestPairingCode("LANDSCAPE")).then(() => {
-                if (mounted) {
-                  dispatch(setLoadingMessage("Ready to pair"));
-                  dispatch(setInitializing(false)); // App is ready for pairing
-                }
-              });
-            }
-          }, 800); // Reduced delay to prevent long loading
+            fetchContent();
+          }, 1200);
+        } else {
+          logger.info('[InitFlow] No valid credentials, starting pairing');
+          startPairingProcess();
         }
       } catch (error) {
-        logger.error('[InitFlow] Error during initialization:', { error });
-        if (mounted) {
-          dispatch(setInitializationStage("pairing"));
-          dispatch(setLoadingMessage("Initialization error, starting pairing..."));
-        }
+        logger.error('[InitFlow] Initialization error:', { error });
+        startPairingProcess();
       }
     };
 
     initializeApp();
+  }, [dispatch, fetchContent, startPairingProcess, checkCredentialsPersistence, setStageDebounced]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [dispatch, fetchContent, checkCredentialsPersistence]);
-
-  // Watch for authentication state changes to transition from pairing to content loading
+  // Handle pairing code availability
   useEffect(() => {
-    logger.info('[InitFlow] Auth/Stage effect triggered', {
-      stage,
-      isAuthenticated,
-      shouldTransition: stage === "pairing" && isAuthenticated
-    });
-    
-    // If we're in pairing stage and authentication becomes successful, transition to content loading
-    if (stage === "pairing" && isAuthenticated) {
-      logger.info('[InitFlow] 🎉 Authentication successful during pairing, transitioning to content loading');
-      dispatch(setInitializationStage("fetching"));
-      dispatch(setLoadingMessage("Pairing successful! Loading content..."));
-      fetchContent();
+    if (stage === "pairing" && pairingCode && !pairingPollingActive.current) {
+      startPairingPolling();
     }
-  }, [stage, isAuthenticated, dispatch, fetchContent]);
+  }, [stage, pairingCode, startPairingPolling]);
 
-  // Poll pairing status when waiting for pairing
-  useEffect(() => {
-    if (stage !== "pairing" || !pairingCode) return;
-    
-    let active = true;
-    const poll = async () => {
-      if (!active) return;
-      
-      const res: any = await dispatch(checkPairingStatus(pairingCode));
-      
-      logger.info('[InitFlow] Polling result', {
-        fulfilled: checkPairingStatus.fulfilled.match(res),
-        isPaired: res.payload?.isPaired,
-        payload: res.payload
-      });
-      
-      if (checkPairingStatus.fulfilled.match(res) && res.payload?.isPaired) {
-        logger.info('[InitFlow] Pairing successful, loading content...');
-        dispatch(setLoadingMessage("Pairing successful! Loading content..."));
-        fetchContent();
-      } else if (active) {
-        setTimeout(poll, 5000);
-      }
-    };
-    
-    // Start polling after pairing code is established
-    const timer = setTimeout(poll, 3000); // Increased delay for stability
-    
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [stage, pairingCode, dispatch, fetchContent]);
-
-  // Regenerate pairing code if it expires
+  // Handle pairing code expiration
   useEffect(() => {
     if (stage === "pairing" && isPairingCodeExpired) {
+      logger.info('[InitFlow] Pairing code expired, requesting new one');
       dispatch(setLoadingMessage("Refreshing pairing code..."));
+      
       dispatch(requestPairingCode("LANDSCAPE")).then(() => {
         dispatch(setLoadingMessage("Ready to pair"));
       });
     }
   }, [stage, isPairingCodeExpired, dispatch]);
 
-  // Ensure we don't mark as ready too early if content is still loading
+  // Content readiness validation
   useEffect(() => {
     if (stage === "ready" && isAuthenticated && isLoading && !hasMinimumData()) {
       logger.info('[InitFlow] Content still loading, reverting to fetching state');
-      dispatch(setInitializationStage("fetching"));
-      dispatch(setLoadingMessage("Loading content..."));
+      setStageDebounced("fetching", "Loading content...");
     }
-  }, [stage, isAuthenticated, isLoading, hasMinimumData, dispatch]);
+  }, [stage, isAuthenticated, isLoading, hasMinimumData, setStageDebounced]);
 
-  // Prevent rapid stage transitions by debouncing stage changes
+  // Cleanup effect
   useEffect(() => {
-    let stageTransitionTimer: NodeJS.Timeout | undefined;
-    
-    // Clear any pending transitions when stage changes
     return () => {
-      if (stageTransitionTimer) {
-        clearTimeout(stageTransitionTimer);
+      // Cleanup all timers
+      if (stageTransitionTimer.current) {
+        clearTimeout(stageTransitionTimer.current);
       }
+      if (contentFetchTimer.current) {
+        clearTimeout(contentFetchTimer.current);
+      }
+      if (pairingPollTimer.current) {
+        clearTimeout(pairingPollTimer.current);
+      }
+      
+      // Stop polling
+      pairingPollingActive.current = false;
     };
-  }, [stage]);
+  }, []);
 
   return { stage };
 }

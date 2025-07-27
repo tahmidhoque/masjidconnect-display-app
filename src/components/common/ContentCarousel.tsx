@@ -620,47 +620,70 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   const renderContent = useCallback(() => {
     if (contentLoading) {
       return (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100%",
-            width: "100%",
-          }}
-        >
-          <CircularProgress />
-        </Box>
+        <ModernContentCard variant={variant || "landscape"}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              height: "100%",
+              width: "100%",
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        </ModernContentCard>
       );
     }
 
     if (!contentItems.length) {
       return (
-        <ModernContentCard
-          title={`Welcome to ${masjidName || "your masjid"}`}
-          variant={variant || "landscape"}
-        >
+        <ModernContentCard variant={variant || "landscape"}>
+          {/* Static Header */}
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              p: 3,
+              p: 2,
+              borderBottom: "1px solid rgba(255,255,255,0.1)",
               textAlign: "center",
             }}
           >
             <Typography
               sx={{
-                fontSize: fontSizes.h4,
-                color: "rgba(255,255,255,0.9)",
+                fontSize: fontSizes.h3,
+                fontWeight: 600,
+                color: "rgba(255, 193, 7, 1)",
                 fontFamily: "'Poppins', sans-serif",
-                lineHeight: 1.6,
               }}
             >
-              Please log in to the admin portal to add announcements or events.
+              Welcome to {masjidName || "your masjid"}
             </Typography>
           </Box>
+
+          {/* Animated Content */}
+          <Fade in={!isChangingItem} timeout={{ enter: 800, exit: 400 }}>
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 3,
+                textAlign: "center",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: fontSizes.h4,
+                  color: "rgba(255,255,255,0.9)",
+                  fontFamily: "'Poppins', sans-serif",
+                  lineHeight: 1.6,
+                }}
+              >
+                Please log in to the admin portal to add announcements or
+                events.
+              </Typography>
+            </Box>
+          </Fade>
         </ModernContentCard>
       );
     }
@@ -669,18 +692,44 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     const currentItem = contentItems[currentItemIndex];
     if (!currentItem || !currentItem.contentItem) {
       return (
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100%",
-            width: "100%",
-          }}
-        >
-          <Typography variant="h6">Invalid content item</Typography>
-        </Box>
+        <ModernContentCard variant={variant || "landscape"}>
+          {/* Static Header */}
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: "1px solid rgba(255,255,255,0.1)",
+              textAlign: "center",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: fontSizes.h3,
+                fontWeight: 600,
+                color: "rgba(255, 193, 7, 1)",
+                fontFamily: "'Poppins', sans-serif",
+              }}
+            >
+              Error
+            </Typography>
+          </Box>
+
+          {/* Animated Content */}
+          <Fade in={!isChangingItem} timeout={{ enter: 800, exit: 400 }}>
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                textAlign: "center",
+                p: 3,
+              }}
+            >
+              <Typography variant="h6">Invalid content item</Typography>
+            </Box>
+          </Fade>
+        </ModernContentCard>
       );
     }
 
@@ -813,30 +862,56 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     const fontSize = getDynamicFontSize(String(contentToShow), contentType);
 
     return (
-      <ModernContentCard title={titleToShow} variant={variant || "landscape"}>
+      <ModernContentCard variant={variant || "landscape"}>
+        {/* Static Header - Always Visible */}
         <Box
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "100%",
-            p: 3,
+            p: 2,
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
             textAlign: "center",
           }}
         >
-          {renderFormattedContent(String(contentToShow), fontSize)}
+          <Typography
+            sx={{
+              fontSize: fontSizes.h3,
+              fontWeight: 600,
+              color: "rgba(255, 193, 7, 1)",
+              fontFamily: "'Poppins', sans-serif",
+            }}
+          >
+            {titleToShow}
+          </Typography>
         </Box>
+
+        {/* Animated Content Area Only */}
+        <Fade in={!isChangingItem} timeout={{ enter: 800, exit: 400 }}>
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 3,
+              textAlign: "center",
+            }}
+          >
+            {renderFormattedContent(String(contentToShow), fontSize)}
+          </Box>
+        </Fade>
       </ModernContentCard>
     );
   }, [
+    contentLoading,
     contentItems,
     currentItemIndex,
-    contentLoading,
+    masjidName,
+    variant,
+    fontSizes,
+    formatVerseHadithContent,
     getCurrentTypeConfig,
     getDynamicFontSize,
-    variant,
-    formatVerseHadithContent,
     renderFormattedContent,
+    isChangingItem, // Add this dependency
   ]);
 
   // Render prayer announcement
@@ -978,28 +1053,21 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
     // Otherwise show normal content
     return (
-      <Fade in={!isChangingItem} timeout={{ enter: 800, exit: 400 }}>
-        <Box
-          sx={{
-            height: "100%",
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            position: "relative",
-            padding: 0, // Remove padding to maintain original dimensions
-          }}
-        >
-          {renderContent()}
-        </Box>
-      </Fade>
+      <Box
+        sx={{
+          height: "100%",
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          position: "relative",
+          padding: 0, // Remove padding to maintain original dimensions
+        }}
+      >
+        {renderContent()}
+      </Box>
     );
-  }, [
-    isChangingItem,
-    renderContent,
-    renderPrayerAnnouncement,
-    showPrayerAnnouncement,
-  ]);
+  }, [renderContent, renderPrayerAnnouncement, showPrayerAnnouncement]);
 
   return (
     <Box

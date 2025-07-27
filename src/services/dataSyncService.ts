@@ -186,6 +186,10 @@ class DataSyncService {
     this.stopHeartbeat();
   }
 
+  // ✅ FIXED: Prevent concurrent syncs and add proper queuing
+  private syncInProgress = false;
+  private pendingSyncRequest: { forceRefresh: boolean; resolve: () => void; reject: (error: any) => void } | null = null;
+
   // Sync all data immediately
   public async syncAllData(forceRefresh: boolean = false): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) {
@@ -193,6 +197,19 @@ class DataSyncService {
         online: navigator.onLine,
         authenticated: masjidDisplayClient.isAuthenticated()
       });
+      return;
+    }
+    
+    // ✅ FIXED: Prevent concurrent syncs
+    if (this.syncInProgress) {
+      logger.debug('Sync already in progress, queuing request', { forceRefresh });
+      
+      // Queue the request if it's a force refresh or no request is queued
+      if (forceRefresh || !this.pendingSyncRequest) {
+        return new Promise<void>((resolve, reject) => {
+          this.pendingSyncRequest = { forceRefresh, resolve, reject };
+        });
+      }
       return;
     }
     
@@ -207,64 +224,44 @@ class DataSyncService {
       return;
     }
     
+    this.syncInProgress = true;
     this.lastSyncAttempts[syncKey] = now;
     
-    logger.info('Syncing all data immediately', { forceRefresh });
-    
-    // Only include heartbeat if we haven't sent one recently
-    const includeHeartbeat = (now - this.lastHeartbeatTime) > this.MIN_HEARTBEAT_INTERVAL;
-    
-    const syncPromises = [
-      this.syncContent(forceRefresh),
-      this.syncPrayerTimes(forceRefresh),
-      this.syncEvents(forceRefresh),
-      this.syncSchedule(forceRefresh)
-    ];
-    
-    // Only add heartbeat if it's been long enough since the last one
-    if (includeHeartbeat) {
-      syncPromises.push(this.sendHeartbeat());
-    } else {
-      logger.debug('Skipping heartbeat in syncAllData - too soon since last heartbeat');
-    }
-    
-    // Use Promise.allSettled to ensure all sync attempts run even if some fail
     try {
-      const results = await Promise.allSettled(syncPromises);
+      logger.info('Syncing all data immediately', { forceRefresh });
       
-      // Log results of each sync operation
-      const syncResults: Record<string, string> = {
-        content: results[0].status,
-        prayerTimes: results[1].status,
-        events: results[2].status,
-        schedule: results[3].status
-      };
+      // Only include heartbeat if we haven't sent one recently
+      const includeHeartbeat = (now - this.lastHeartbeatTime) > this.MIN_HEARTBEAT_INTERVAL;
       
+      // ✅ FIXED: Execute sequentially to prevent race conditions
+      await this.syncContent(forceRefresh);
+      await this.syncPrayerTimes(forceRefresh);
+      await this.syncEvents(forceRefresh);
+      await this.syncSchedule(forceRefresh);
+      
+      // Only add heartbeat if it's been long enough since the last one
       if (includeHeartbeat) {
-        syncResults.heartbeat = results[4].status;
-      }
-      
-      // Check if any syncs failed
-      const failedSyncs = results.filter(result => result.status === 'rejected');
-      
-      if (failedSyncs.length > 0) {
-        logger.warn(`${failedSyncs.length} sync operations failed`, { syncResults });
-        
-        // Log detailed errors for each failed sync
-        failedSyncs.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            const syncTypes = ['content', 'prayerTimes', 'events', 'schedule'];
-            if (includeHeartbeat) syncTypes.push('heartbeat');
-            
-            const syncType = index < syncTypes.length ? syncTypes[index] : 'unknown';
-            logger.error(`Failed to sync ${syncType}`, { error: result.reason });
-          }
-        });
+        await this.sendHeartbeat();
       } else {
-        logger.info('All data synced successfully', { syncResults });
+        logger.debug('Skipping heartbeat in syncAllData - too soon since last heartbeat');
       }
+      
+      logger.info('All data synced successfully');
     } catch (error) {
       logger.error('Error in syncAllData', { error });
+    } finally {
+      this.syncInProgress = false;
+      
+      // Process any pending sync request
+      if (this.pendingSyncRequest) {
+        const { forceRefresh: pendingForceRefresh, resolve } = this.pendingSyncRequest;
+        this.pendingSyncRequest = null;
+        
+        // Execute the pending sync
+        this.syncAllData(pendingForceRefresh)
+          .then(resolve)
+          .catch(() => resolve()); // Always resolve to prevent hanging
+      }
     }
   }
 

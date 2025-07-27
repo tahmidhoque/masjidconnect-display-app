@@ -59,8 +59,11 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
   const endRender = PerformanceMonitor.startRender("ModernLandscapeDisplay");
 
   // Use optimized selectors to reduce re-renders
-  const { masjidName } = useAppSelector(selectLandscapeDisplayData);
+  const { masjidName, hasPrayerTimes } = useAppSelector(
+    selectLandscapeDisplayData
+  );
 
+  // ✅ PERFORMANCE: Use memoized hooks to prevent unnecessary recalculations
   const { getSizeRem } = useResponsiveFontSize();
   const { getComponentAnimation } = useDisplayAnimation();
 
@@ -74,6 +77,14 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isLowPower = useRef(isLowPowerDevice());
+
+  // ✅ PERFORMANCE: Cache previous values to prevent unnecessary re-renders
+  const prevValuesRef = useRef({
+    masjidName: "",
+    currentDate: "",
+    hijriDate: "",
+    currentTime: "",
+  });
 
   // Handle countdown completion - memoized
   const handleCountdownComplete = useCallback((isJamaat: boolean) => {
@@ -124,19 +135,40 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
     [getSizeRem]
   );
 
-  // Memoized components to prevent unnecessary re-renders
-  const MemoizedHeader = useMemo(
-    () => (
+  // ✅ PERFORMANCE: Optimized memoized components with value change detection
+  const MemoizedHeader = useMemo(() => {
+    const currentMasjidName = masjidName || "MasjidConnect";
+    const currentDateStr = currentDate ? currentDate.toString() : "";
+    const currentHijriDate = hijriDate || "";
+    const currentTimeStr = currentTime ? currentTime.toString() : "";
+
+    // Check if values actually changed
+    const prev = prevValuesRef.current;
+    const hasChanged =
+      prev.masjidName !== currentMasjidName ||
+      prev.currentDate !== currentDateStr ||
+      prev.hijriDate !== currentHijriDate ||
+      prev.currentTime !== currentTimeStr;
+
+    if (hasChanged) {
+      prevValuesRef.current = {
+        masjidName: currentMasjidName,
+        currentDate: currentDateStr,
+        hijriDate: currentHijriDate,
+        currentTime: currentTimeStr,
+      };
+    }
+
+    return (
       <ModernHeader
-        masjidName={masjidName || "MasjidConnect"}
+        masjidName={currentMasjidName}
         currentDate={currentDate ? new Date(currentDate) : new Date()}
-        hijriDate={hijriDate || ""}
+        hijriDate={currentHijriDate}
         currentTime={currentTime}
         orientation="landscape"
       />
-    ),
-    [masjidName, currentDate, hijriDate, currentTime]
-  );
+    );
+  }, [masjidName, currentDate, hijriDate, currentTime]);
 
   const MemoizedPrayerCard = useMemo(
     () => (
@@ -148,6 +180,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
     [handleCountdownComplete]
   );
 
+  // ✅ PERFORMANCE: Static components that never change
   const MemoizedCarousel = useMemo(
     () => <ContentCarousel variant="landscape" />,
     []
@@ -158,10 +191,23 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
     []
   );
 
-  // End performance monitoring
+  // ✅ PERFORMANCE: Throttled performance monitoring to prevent log spam
   React.useLayoutEffect(() => {
     endRender();
   });
+
+  // ✅ PERFORMANCE: Skip render if no essential data has changed
+  const shouldSkipRender = useMemo(() => {
+    if (!hasPrayerTimes) return false;
+
+    const prev = prevValuesRef.current;
+    return (
+      prev.masjidName === (masjidName || "MasjidConnect") &&
+      prev.currentDate === (currentDate ? currentDate.toString() : "") &&
+      prev.hijriDate === (hijriDate || "") &&
+      prev.currentTime === (currentTime ? currentTime.toString() : "")
+    );
+  }, [masjidName, currentDate, hijriDate, currentTime, hasPrayerTimes]);
 
   return (
     <Box ref={containerRef} sx={containerStyles}>

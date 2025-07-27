@@ -1,4 +1,4 @@
-import React, { useEffect, Suspense, lazy } from "react";
+import React, { useEffect, Suspense, lazy, useCallback } from "react";
 import { Box, ThemeProvider, CssBaseline } from "@mui/material";
 
 import theme from "./theme/theme";
@@ -8,29 +8,20 @@ import GracefulErrorOverlay from "./components/common/GracefulErrorOverlay";
 import EmergencyAlertOverlay from "./components/common/EmergencyAlertOverlay";
 import AnalyticsErrorIntegration from "./components/common/AnalyticsErrorIntegration";
 import FactoryResetModal from "./components/common/FactoryResetModal";
+import EnhancedLoadingScreen from "./components/screens/EnhancedLoadingScreen";
 // Clear cached Hijri data to ensure accurate calculation
 import "./utils/clearHijriCache";
-// Verify Hijri calculation accuracy (development only)
-import "./utils/verifyHijriCalculation";
-// Demo factory reset functionality (development only)
-import "./utils/factoryResetDemo";
-// Countdown testing utilities (development only)
-import "./utils/countdownTest";
+// ✅ DISABLED: Demo imports that were causing console spam in development
+// import "./utils/verifyHijriCalculation";
+// import "./utils/factoryResetDemo";
+// import "./utils/countdownTest";
 import useKioskMode from "./hooks/useKioskMode";
 import useInitializationFlow from "./hooks/useInitializationFlow";
 import useFactoryReset from "./hooks/useFactoryReset";
+import useLoadingStateManager from "./hooks/useLoadingStateManager";
 import { ComponentPreloader } from "./utils/performanceUtils";
 
-// Store
-import { useAppSelector } from "./store/hooks";
-
 // Lazy load components for better performance
-const LoadingScreen = lazy(() =>
-  ComponentPreloader.preload(
-    "LoadingScreen",
-    () => import("./components/screens/LoadingScreen")
-  )
-);
 const PairingScreen = lazy(() =>
   ComponentPreloader.preload(
     "PairingScreen",
@@ -151,43 +142,107 @@ const useLocalStorageMonitor = () => {
 
 const AppRoutes: React.FC = () => {
   useKioskMode();
-  const { stage } = useInitializationFlow();
-  const isInitializing = useAppSelector((state) => state.ui.isInitializing);
 
-  // Show loading screen during initialization, but allow pairing screen to show
-  if (
-    stage === "checking" ||
-    stage === "welcome" ||
-    stage === "fetching" ||
-    (isInitializing && stage !== "pairing")
-  ) {
+  // Initialize the app flow (but don't use its stage directly)
+  useInitializationFlow();
+
+  // Use the new unified loading state manager
+  const {
+    currentPhase,
+    shouldShowLoadingScreen,
+    shouldShowDisplay,
+    isTransitioning,
+    progress,
+    statusMessage,
+  } = useLoadingStateManager({
+    minimumLoadingDuration:
+      process.env.NODE_ENV === "development" ? 1500 : 2500, // Shorter in dev
+    contentReadyDelay: process.env.NODE_ENV === "development" ? 600 : 1000, // Faster in dev
+    transitionDuration: 600, // Smooth transition timing
+  });
+
+  // Handle loading screen transition completion
+  const handleLoadingComplete = useCallback(() => {
+    logger.info("[App] Loading screen transition completed");
+  }, []);
+
+  logger.info("[App] Current app state:", {
+    currentPhase,
+    shouldShowLoadingScreen,
+    shouldShowDisplay,
+    isTransitioning,
+    progress,
+  });
+
+  // Always show loading screen for these phases to prevent gaps
+  const shouldForceLoadingScreen =
+    currentPhase === "initializing" ||
+    currentPhase === "checking" ||
+    currentPhase === "loading-content" ||
+    currentPhase === "preparing" ||
+    currentPhase === "ready";
+
+  // Show enhanced loading screen when needed
+  if (shouldShowLoadingScreen || shouldForceLoadingScreen) {
     return (
-      <Suspense fallback={<div>Loading...</div>}>
-        <LoadingScreen />
+      <EnhancedLoadingScreen
+        currentPhase={currentPhase}
+        progress={progress}
+        statusMessage={statusMessage}
+        isTransitioning={isTransitioning}
+        onTransitionComplete={handleLoadingComplete}
+      />
+    );
+  }
+
+  // Show appropriate screen based on phase - be more specific about when to show each
+  if (currentPhase === "pairing") {
+    return (
+      <Suspense
+        fallback={
+          <EnhancedLoadingScreen
+            currentPhase="checking"
+            progress={25}
+            statusMessage="Loading pairing..."
+            isTransitioning={false}
+          />
+        }
+      >
+        <PairingScreen />
       </Suspense>
     );
   }
 
-  switch (stage) {
-    case "pairing":
-      return (
-        <Suspense fallback={<div>Loading...</div>}>
-          <PairingScreen />
-        </Suspense>
-      );
-    case "ready":
-      return (
-        <Suspense fallback={<div>Loading...</div>}>
-          <DisplayScreen />
-        </Suspense>
-      );
-    default:
-      return (
-        <Suspense fallback={<div>Loading...</div>}>
-          <ErrorScreen message="Unknown initialization stage" />
-        </Suspense>
-      );
+  if (currentPhase === "displaying" && shouldShowDisplay) {
+    return (
+      <Suspense
+        fallback={
+          <EnhancedLoadingScreen
+            currentPhase="preparing"
+            progress={85}
+            statusMessage="Loading display..."
+            isTransitioning={false}
+          />
+        }
+      >
+        <DisplayScreen />
+      </Suspense>
+    );
   }
+
+  // Fallback to loading screen instead of error screen to prevent white flash
+  logger.warn(
+    `[App] Unexpected state, showing loading screen as fallback: ${currentPhase}`
+  );
+  return (
+    <EnhancedLoadingScreen
+      currentPhase={currentPhase}
+      progress={progress}
+      statusMessage={statusMessage || "Loading..."}
+      isTransitioning={isTransitioning}
+      onTransitionComplete={handleLoadingComplete}
+    />
+  );
 };
 
 const App: React.FC = () => {
