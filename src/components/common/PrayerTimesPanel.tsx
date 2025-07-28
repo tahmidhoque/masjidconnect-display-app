@@ -50,7 +50,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         transform: scale(1.01);
       }
       50% {
-        transform: scale(1.03);
+        transform: scale(1.02); // Reduced from 1.03 for less jarring effect
       }
       100% {
         transform: scale(1.01);
@@ -62,7 +62,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3);
       }
       50% {
-        box-shadow: 0 4px 18px rgba(42, 157, 143, 0.6), 0 0 25px rgba(42, 157, 143, 0.5);
+        box-shadow: 0 4px 15px rgba(42, 157, 143, 0.5), 0 0 20px rgba(42, 157, 143, 0.4); // Reduced intensity
       }
       100% {
         box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3);
@@ -74,7 +74,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         box-shadow: 0 2px 8px rgba(20, 66, 114, 0.4);
       }
       50% {
-        box-shadow: 0 2px 15px rgba(20, 66, 114, 0.7);
+        box-shadow: 0 2px 12px rgba(20, 66, 114, 0.6); // Reduced intensity
       }
       100% {
         box-shadow: 0 2px 8px rgba(20, 66, 114, 0.4);
@@ -119,7 +119,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
       }
       50% {
-        text-shadow: 0 1px 12px rgba(241, 196, 15, 0.7), 0 0 20px rgba(241, 196, 15, 0.4);
+        text-shadow: 0 1px 8px rgba(241, 196, 15, 0.5), 0 0 15px rgba(241, 196, 15, 0.3); // Reduced intensity
       }
       100% {
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -133,7 +133,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
       }
       50% {
         border-image: linear-gradient(90deg, #F1C40F 0%, #FFD700 100%) 1;
-        box-shadow: 0 4px 20px rgba(241, 196, 15, 0.3), 0 8px 25px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 20px rgba(241, 196, 15, 0.2), 0 8px 25px rgba(0,0,0,0.2); // Reduced intensity
       }
       100% {
         border-image: linear-gradient(90deg, #DAA520 0%, #F1C40F 100%) 1;
@@ -378,6 +378,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   pl: getSizeRem(0.6),
                   pr: getSizeRem(0.6),
                   position: 'relative',
+                  // IMPROVED: More stable highlighting logic to prevent disappearing backgrounds
                   borderRadius: prayer.isNext || prayer.isCurrent ? '8px' : '0px',
                   borderBottom: index < todaysPrayerTimes.length - 1 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                   border: prayer.isNext 
@@ -385,28 +386,29 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     : prayer.isCurrent
                       ? '2px solid #0A2647'
                       : 'none',
-                  transition: 'all 0.3s ease',
+                  transition: 'all 0.2s ease', // Faster transition for RPi
                   transform: prayer.isNext 
-                    ? 'scale(1.02)'
+                    ? 'scale(1.01)' // Reduced scaling for less jarring effect
                     : prayer.isCurrent
-                      ? 'scale(1.01)'
+                      ? 'scale(1.005)' // Minimal scaling
                       : 'scale(1)',
                   boxShadow: prayer.isNext 
-                    ? '0 4px 12px rgba(42, 157, 143, 0.4), 0 0 15px rgba(42, 157, 143, 0.3)' 
+                    ? '0 4px 10px rgba(42, 157, 143, 0.3), 0 0 12px rgba(42, 157, 143, 0.25)' // Reduced intensity
                     : prayer.isCurrent
-                      ? '0 2px 8px rgba(20, 66, 114, 0.3)'
+                      ? '0 2px 6px rgba(20, 66, 114, 0.25)' // Reduced intensity
                       : 'none',
                   overflow: 'visible',
                   mx: prayer.isNext ? getSizeRem(0.4) : 0,
-                  my: prayer.isNext ? getSizeRem(0.8) : getSizeRem(0.2),
+                  my: prayer.isNext ? getSizeRem(0.6) : getSizeRem(0.2), // Reduced margin for less movement
                   backgroundColor: (!prayer.isNext && !prayer.isCurrent) ? 
                     (index % 2 === 0 ? 'rgba(246, 248, 250, 0.5)' : 'transparent') : 
                     'transparent',
                   zIndex: prayer.isNext ? 5 : (prayer.isCurrent ? 4 : 1),
+                  // REDUCED: Animation intensity for better RPi performance
                   animation: prayer.isNext 
-                    ? 'pulseGlow 3s infinite ease-in-out, pulseScale 3s infinite ease-in-out' 
+                    ? 'pulseGlow 4s infinite ease-in-out, pulseScale 4s infinite ease-in-out' // Slower animations
                     : prayer.isCurrent
-                      ? 'currentPrayerGlow 3s infinite ease-in-out'
+                      ? 'currentPrayerGlow 4s infinite ease-in-out' // Slower animation
                       : 'none',
                   '&::before': prayer.isNext ? {
                     content: '""',
@@ -415,8 +417,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     left: 0,
                     width: '200%',
                     height: '100%',
-                    background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
-                    animation: 'nextPrayerShine 3s infinite linear',
+                    background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
+                    animation: 'nextPrayerShine 5s infinite linear', // Slower shine animation
                     zIndex: 0
                   } : {},
                   '& .MuiTypography-root': {
@@ -426,6 +428,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   }
                 }}
               >
+                {/* IMPROVED: More stable background rendering to prevent disappearing */}
                 {(prayer.isCurrent || prayer.isNext) && (
                   <Box 
                     sx={{ 
@@ -436,11 +439,14 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       bottom: 0, 
                       zIndex: 0,
                       overflow: 'hidden',
+                      borderRadius: '8px', // Ensure border radius is applied
                       background: prayer.isCurrent 
                         ? 'linear-gradient(90deg, #0A2647 0%, #144272 100%)' 
                         : 'linear-gradient(90deg, #2A9D8F 0%, #1E796F 100%)',
                       backgroundSize: '200% 200%',
-                      animation: 'gradientFlow 10s ease infinite',
+                      animation: 'gradientFlow 15s ease infinite', // Slower animation for RPi
+                      // Ensure background persists with opacity
+                      opacity: prayer.isNext ? 0.9 : 0.85,
                     }}
                   >
                     <IslamicPatternBackground 
@@ -449,9 +455,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       height="100%"
                       patternColor={prayer.isCurrent ? '#0A2647' : '#2A9D8F'}
                       backgroundColor="transparent"
-                      opacity={prayer.isNext ? 0.4 : 0.3}
-                      patternSize={prayer.isNext ? 70 : 80}
-                      embossStrength={prayer.isNext ? "medium" : "light"}
+                      opacity={prayer.isNext ? 0.3 : 0.25} // Reduced opacity for better performance
+                      patternSize={prayer.isNext ? 80 : 90} // Slightly larger for less detail
+                      embossStrength={prayer.isNext ? "light" : "very-light"} // Reduced intensity
                     />
                   </Box>
                 )}

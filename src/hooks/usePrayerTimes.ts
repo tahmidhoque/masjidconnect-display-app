@@ -341,7 +341,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     return currentPrayer;
   }, []);
 
-  // Helper function to determine current and next prayer accurately - memoized
+  // Helper function to determine current and next prayer accurately - memoized and optimized for RPi
   const calculatePrayersAccurately = useCallback((prayers: FormattedPrayerTime[]) => {
     if (!prayers || prayers.length === 0) return { currentIndex: -1, nextIndex: -1 };
     
@@ -357,170 +357,150 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       currentTime: currentTimeStr
     });
     
-    // First, create a sorted copy of prayers by time
-    // We create new objects to avoid mutating the original array
+    // IMPROVED: More stable sorting logic to prevent inconsistencies
     const sortedPrayers = prayers
-      .map(p => ({ name: p.name, time: p.time, jamaat: p.jamaat }))
+      .map((p, originalIndex) => ({ 
+        name: p.name, 
+        time: p.time, 
+        jamaat: p.jamaat, 
+        originalIndex 
+      }))
       .sort((a, b) => {
-        // Handle special case for Fajr which may appear at end of day but actually be the first prayer
-        if (a.time < '03:00' && b.time > '20:00') return -1;
-        if (a.time > '20:00' && b.time < '03:00') return 1;
-        return a.time.localeCompare(b.time);
+        // Convert time strings to minutes for more accurate comparison
+        const getMinutes = (timeStr: string) => {
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          return hours * 60 + minutes;
+        };
+        
+        const aMinutes = getMinutes(a.time);
+        const bMinutes = getMinutes(b.time);
+        
+        // Handle Fajr prayer that might be early morning (< 6 AM)
+        const aIsFajr = aMinutes < 360; // Before 6 AM
+        const bIsFajr = bMinutes < 360; // Before 6 AM
+        
+        if (aIsFajr && !bIsFajr) return -1; // Fajr comes first
+        if (!aIsFajr && bIsFajr) return 1;  // Fajr comes first
+        
+        return aMinutes - bMinutes;
       });
     
-    // Log sorted prayers for debugging
-    logger.debug('[calculatePrayersAccurately] Sorted prayers:', 
-      sortedPrayers.map(p => `${p.name}: ${p.time}${p.jamaat ? ` (Jamaat: ${p.jamaat})` : ''}`));
+    // IMPROVED: More robust current and next prayer detection
+    const currentMinutes = now.hour() * 60 + now.minute();
     
-    // Special case: if near midnight, handle Isha prayer specially
-    if (now.hour() >= 22 || now.hour() < 3) {
-      // Check if Isha is one of our prayers
-      const ishaIndex = prayers.findIndex(p => p.name === 'Isha');
-      const fajrIndex = prayers.findIndex(p => p.name === 'Fajr');
+    // Find current prayer: last prayer whose time has passed
+    for (let i = sortedPrayers.length - 1; i >= 0; i--) {
+      const prayer = sortedPrayers[i];
+      const [hours, minutes] = prayer.time.split(':').map(Number);
+      const prayerMinutes = hours * 60 + minutes;
       
-      if (ishaIndex >= 0 && fajrIndex >= 0) {
-        const isha = prayers[ishaIndex];
-        const fajr = prayers[fajrIndex];
-        
-        // Convert to 24-hour clock mental model
-        const ishaTime = isha.time;
-        const fajrTime = fajr.time;
-        
-        // If it's past Isha time and before Fajr time
-        if (currentTimeStr >= ishaTime || currentTimeStr < fajrTime) {
-          // Isha is current, Fajr is next
-          currentIndex = ishaIndex;
-          nextIndex = fajrIndex;
-          
-          logger.info('Late night scenario: Isha is current, Fajr is next', {
-            ishaTime,
-            fajrTime,
-            currentTime: currentTimeStr
-          });
+      // Special handling for late night/early morning (Isha to Fajr period)
+      if (currentMinutes >= 0 && currentMinutes < 360) { // 00:00 to 06:00
+        // We're in early morning hours
+        if (prayerMinutes >= 1200) { // Prayer is in evening (after 8 PM)
+          // This is likely Isha from yesterday, so it's current
+          currentIndex = prayer.originalIndex;
+          logger.info(`Early morning: Found current prayer ${prayer.name} from yesterday evening`);
+          break;
+        } else if (prayerMinutes <= currentMinutes) {
+          // This is a morning prayer that has already passed
+          currentIndex = prayer.originalIndex;
+          logger.info(`Early morning: Found current prayer ${prayer.name} from this morning`);
+          break;
         }
-      }
-    } else {
-      // Regular time flow
-      
-      // Find the last prayer whose adhan time has passed (this is the current prayer period we're in)
-      for (let i = sortedPrayers.length - 1; i >= 0; i--) {
-        if (sortedPrayers[i].time <= currentTimeStr) {
-          const foundPrayerName = sortedPrayers[i].name;
-          const foundPrayerIndex = prayers.findIndex(p => p.name === foundPrayerName);
-          
-          // Set as current prayer
-          if (foundPrayerIndex >= 0) {
-            // Always mark as current prayer even if jamaat time has passed
-            // (removing the jamaat time check here)
-            currentIndex = foundPrayerIndex;
-            logger.info(`Current prayer period is ${prayers[currentIndex].name} (adhan time ${prayers[currentIndex].time} has passed)`);
-            break;
-          }
-        }
-      }
-      
-      // Find the first prayer whose adhan time is in the future (this is next up)
-      for (let i = 0; i < sortedPrayers.length; i++) {
-        if (sortedPrayers[i].time > currentTimeStr) {
-          const foundPrayerName = sortedPrayers[i].name;
-          const foundPrayerIndex = prayers.findIndex(p => p.name === foundPrayerName);
-          
-          if (foundPrayerIndex >= 0) {
-            nextIndex = foundPrayerIndex;
-            logger.info(`Next prayer will be ${prayers[nextIndex].name} (adhan time ${prayers[nextIndex].time} is upcoming)`);
-            break;
-          }
+      } else {
+        // Normal time flow
+        if (prayerMinutes <= currentMinutes) {
+          currentIndex = prayer.originalIndex;
+          logger.info(`Normal time: Found current prayer ${prayer.name}`);
+          break;
         }
       }
     }
     
-    // Handle special case: if currentIndex === nextIndex, it means we're in a state
-    // where one prayer's adhan time has passed, but we're treating the same prayer's jamaat as "next"
-    // This should generally be avoided - in this case, we'll let the prayer be EITHER current OR next, not both
-    if (currentIndex !== -1 && nextIndex !== -1 && currentIndex === nextIndex) {
-      logger.warn(`Same prayer (${prayers[currentIndex].name}) is marked as both current and next, resolving...`);
+    // Find next prayer: first prayer whose time is in the future
+    for (let i = 0; i < sortedPrayers.length; i++) {
+      const prayer = sortedPrayers[i];
+      const [hours, minutes] = prayer.time.split(':').map(Number);
+      const prayerMinutes = hours * 60 + minutes;
       
-      // Get the jamaat time
-      const currentPrayer = prayers[currentIndex];
-      const jamaatTime = currentPrayer.jamaat;
-      
-      // Depending on whether we're counting down to jamaat or not, this changes how we disambiguate
-      if (jamaatTime && jamaatTime > currentTimeStr) {
-        // If jamaat is still upcoming, let it be the next event (not current)
-        logger.info(`${currentPrayer.name} jamaat time (${jamaatTime}) is still upcoming, marking as next only`);
-        currentIndex = -1; // Not current, only next
-      }
-      // Do not clear current prayer if jamaat time has passed - this is the fix
-      // The commented out code below was causing the issue:
-      /*
-      else if (jamaatTime && jamaatTime <= currentTimeStr) {
-        logger.info(`${currentPrayer.name} jamaat time (${jamaatTime}) has passed, not marking as current prayer`);
-        currentIndex = -1; // Clear current prayer to avoid blue highlight
-        
-        // If we don't have a next prayer yet, look for the next prayer after this one
-        if (nextIndex === -1 || (nextIndex === currentIndex)) {
-          logger.info(`Looking for next prayer after ${currentPrayer.name}`);
-          
-          // Find the next prayer after the current one in the sorted list
-          let foundNext = false;
-          
-          // First create a map of prayer name to index
-          const prayerNameToIndex = new Map<string, number>();
-          prayers.forEach((p, idx) => prayerNameToIndex.set(p.name, idx));
-          
-          // Get the index of the current prayer in the sorted array
-          const currentPrayerSortedIndex = sortedPrayers.findIndex(p => p.name === currentPrayer.name);
-          
-          if (currentPrayerSortedIndex >= 0) {
-            // Check if there's a next prayer in the sequence
-            if (currentPrayerSortedIndex < sortedPrayers.length - 1) {
-              // Get the next prayer in the sequence
-              const nextPrayerName = sortedPrayers[currentPrayerSortedIndex + 1].name;
-              const nextPrayerIndex = prayerNameToIndex.get(nextPrayerName);
-              
-              if (nextPrayerIndex !== undefined) {
-                logger.info(`Setting ${prayers[nextPrayerIndex].name} as the next prayer (next in sequence)`);
-                nextIndex = nextPrayerIndex;
-                foundNext = true;
-              }
-            }
-            
-            // If we didn't find a next prayer after the current one, it means we're at the end of the day
-            if (!foundNext) {
-              // The next prayer will be the first prayer of tomorrow
-              const firstPrayerTomorrow = sortedPrayers[0];
-              const firstPrayerIndex = prayerNameToIndex.get(firstPrayerTomorrow.name);
-              
-              if (firstPrayerIndex !== undefined) {
-                nextIndex = firstPrayerIndex;
-                logger.info(`At end of day: Setting first prayer for tomorrow (${firstPrayerTomorrow.name}) as next`);
-              }
-            }
-          }
+      // Special handling for late night/early morning (Isha to Fajr period)
+      if (currentMinutes >= 1200) { // After 8 PM
+        // We're in evening hours
+        if (prayerMinutes < 360) { // Prayer is in early morning (before 6 AM)
+          // This is likely Fajr for tomorrow, so it's next
+          nextIndex = prayer.originalIndex;
+          logger.info(`Evening: Found next prayer ${prayer.name} for tomorrow morning`);
+          break;
+        } else if (prayerMinutes > currentMinutes) {
+          // This is an evening prayer that's upcoming today
+          nextIndex = prayer.originalIndex;
+          logger.info(`Evening: Found next prayer ${prayer.name} for today`);
+          break;
+        }
+      } else if (currentMinutes >= 0 && currentMinutes < 360) { // 00:00 to 06:00
+        // We're in early morning hours
+        if (prayerMinutes > currentMinutes && prayerMinutes < 360) {
+          // This is a morning prayer that's upcoming
+          nextIndex = prayer.originalIndex;
+          logger.info(`Early morning: Found next prayer ${prayer.name} for this morning`);
+          break;
+        }
+      } else {
+        // Normal time flow
+        if (prayerMinutes > currentMinutes) {
+          nextIndex = prayer.originalIndex;
+          logger.info(`Normal time: Found next prayer ${prayer.name}`);
+          break;
         }
       }
-      */
     }
     
-    // If no current prayer found (all are in future), there's no current prayer
-    if (currentIndex === -1 && sortedPrayers.length > 0) {
-      logger.info('No current prayer highlighted - all prayers are in the future or all jamaats have passed');
-    }
-    
-    // If no next prayer found (all are in the past), use the first prayer for tomorrow
+    // FAILSAFE: If no next prayer found, use the first prayer of the next day
     if (nextIndex === -1 && sortedPrayers.length > 0) {
-      const firstPrayer = sortedPrayers[0];
-      nextIndex = prayers.findIndex(p => p.name === firstPrayer.name);
-      logger.info(`All prayers for today have passed. Setting first prayer for tomorrow (${firstPrayer.name}) as next.`);
+      // Find Fajr or the earliest prayer for tomorrow
+      const fajrPrayer = sortedPrayers.find(p => p.name === 'Fajr');
+      if (fajrPrayer) {
+        nextIndex = fajrPrayer.originalIndex;
+        logger.info(`Failsafe: Using Fajr as next prayer for tomorrow`);
+      } else {
+        nextIndex = sortedPrayers[0].originalIndex;
+        logger.info(`Failsafe: Using first prayer as next prayer for tomorrow`);
+      }
     }
     
-    // Log the final result
-    logger.debug('[calculatePrayersAccurately] Final result:', {
-      currentIndex,
-      currentPrayer: currentIndex >= 0 ? prayers[currentIndex].name : 'none',
-      nextIndex,
-      nextPrayer: nextIndex >= 0 ? prayers[nextIndex].name : 'none'
-    });
+    // IMPROVED: Prevent same prayer being both current and next
+    if (currentIndex !== -1 && nextIndex !== -1 && currentIndex === nextIndex) {
+      logger.warn('Same prayer detected as both current and next, adjusting...');
+      
+      // Check if we're between adhan and jamaat time
+      const prayer = prayers[currentIndex];
+      if (prayer.jamaat && currentTimeStr >= prayer.time && currentTimeStr < prayer.jamaat) {
+        // We're between adhan and jamaat - keep as current, find next different prayer
+        for (let i = 0; i < sortedPrayers.length; i++) {
+          if (sortedPrayers[i].originalIndex !== currentIndex) {
+            const candidateMinutes = sortedPrayers[i].time.split(':').map(Number);
+            const candidateTimeMinutes = candidateMinutes[0] * 60 + candidateMinutes[1];
+            
+            if (candidateTimeMinutes > currentMinutes || 
+                (currentMinutes >= 1200 && candidateTimeMinutes < 360)) {
+              nextIndex = sortedPrayers[i].originalIndex;
+              logger.info(`Between adhan and jamaat: Adjusted next prayer to ${prayers[nextIndex].name}`);
+              break;
+            }
+          }
+        }
+      } else {
+        // Default: keep as next prayer, clear current
+        currentIndex = -1;
+        logger.info('Conflict resolution: Kept as next prayer, cleared current');
+      }
+    }
+    
+    // Log final result
+    const currentPrayerName = currentIndex >= 0 ? prayers[currentIndex].name : 'None';
+    const nextPrayerName = nextIndex >= 0 ? prayers[nextIndex].name : 'None';
+    logger.info(`Prayer calculation result: Current=${currentPrayerName}, Next=${nextPrayerName}`);
     
     return { currentIndex, nextIndex };
   }, []);
