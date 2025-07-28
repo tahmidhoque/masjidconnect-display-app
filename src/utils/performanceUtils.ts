@@ -33,16 +33,43 @@ export const isLowPowerDevice = (): boolean => {
 };
 
 /**
+ * Check if we're running on a 4K display
+ */
+export const is4KDisplay = (): boolean => {
+  const width = window.screen.width;
+  const height = window.screen.height;
+  const pixelRatio = window.devicePixelRatio || 1;
+  
+  // Check for 4K resolution (3840x2160 or similar)
+  const actualWidth = width * pixelRatio;
+  const actualHeight = height * pixelRatio;
+  
+  return actualWidth >= 3840 || actualHeight >= 2160 || width >= 3840 || height >= 2160;
+};
+
+/**
+ * Check if we're in a high-strain scenario (4K + Low Power)
+ */
+export const isHighStrainDevice = (): boolean => {
+  return isLowPowerDevice() && is4KDisplay();
+};
+
+/**
  * Enhanced device detection with more specific performance characteristics
  */
 export const getDevicePerformanceProfile = () => {
   const isLowPower = isLowPowerDevice();
+  const is4K = is4KDisplay();
+  const isHighStrain = isHighStrainDevice();
   const cores = navigator.hardwareConcurrency || 4;
   const memory = (window.performance as any)?.memory?.jsHeapSizeLimit || 0;
   
-  let profile: 'low' | 'medium' | 'high' = 'high';
+  let profile: 'ultra-low' | 'low' | 'medium' | 'high' = 'high';
   
-  if (isLowPower || cores <= 2 || memory < 536870912) { // Less than 512MB
+  if (isHighStrain) {
+    // 4K on RPi is ultra-low performance scenario
+    profile = 'ultra-low';
+  } else if (isLowPower || cores <= 2 || memory < 536870912) { // Less than 512MB
     profile = 'low';
   } else if (cores <= 4 || memory < 1073741824) { // Less than 1GB
     profile = 'medium';
@@ -53,12 +80,25 @@ export const getDevicePerformanceProfile = () => {
     cores,
     memory: memory / 1024 / 1024, // Convert to MB
     isLowPower,
+    is4K,
+    isHighStrain,
+    screenResolution: {
+      width: window.screen.width,
+      height: window.screen.height,
+      pixelRatio: window.devicePixelRatio || 1,
+    },
     recommendations: {
-      animationDuration: profile === 'low' ? 100 : profile === 'medium' ? 200 : 300,
-      debounceDelay: profile === 'low' ? 500 : profile === 'medium' ? 300 : 150,
-      throttleDelay: profile === 'low' ? 1000 : profile === 'medium' ? 500 : 250,
-      maxConcurrentOperations: profile === 'low' ? 1 : profile === 'medium' ? 2 : 4,
-    }
+      animationDuration: profile === 'ultra-low' ? 0 : profile === 'low' ? 100 : profile === 'medium' ? 200 : 300,
+      debounceDelay: profile === 'ultra-low' ? 1000 : profile === 'low' ? 500 : profile === 'medium' ? 300 : 150,
+      throttleDelay: profile === 'ultra-low' ? 2000 : profile === 'low' ? 1000 : profile === 'medium' ? 500 : 250,
+      maxConcurrentOperations: profile === 'ultra-low' ? 1 : profile === 'low' ? 1 : profile === 'medium' ? 2 : 4,
+      // 4K specific optimizations
+      enableHardwareAcceleration: !isHighStrain, // Disable for 4K RPi
+      enableTransitions: !isHighStrain, // Disable transitions for 4K RPi
+      enableAnimations: !isHighStrain, // Disable animations for 4K RPi
+      loadingStrategy: isHighStrain ? 'progressive' : 'standard',
+      renderBatching: isHighStrain ? 'aggressive' : 'normal',
+    },
   };
 };
 

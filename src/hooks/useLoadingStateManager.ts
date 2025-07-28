@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import logger from '../utils/logger';
+import { getDevicePerformanceProfile, isHighStrainDevice } from '../utils/performanceUtils';
 
 export type AppPhase = 
   | 'initializing'     // App is starting up
@@ -30,19 +31,53 @@ interface LoadingStateManager {
 }
 
 /**
+ * Get performance-aware loading durations
+ */
+const getLoadingDurations = () => {
+  const profile = getDevicePerformanceProfile();
+  const isHighStrain = isHighStrainDevice();
+  
+  if (isHighStrain) {
+    // Much faster loading for 4K RPi displays
+    return {
+      minimumLoadingDuration: 800,
+      contentReadyDelay: 300,
+      transitionDuration: 200,
+    };
+  } else if (profile.profile === 'low') {
+    // Slightly faster for low-power devices
+    return {
+      minimumLoadingDuration: 1500,
+      contentReadyDelay: 600,
+      transitionDuration: 400,
+    };
+  } else {
+    // Standard durations for more powerful devices
+    return {
+      minimumLoadingDuration: 2500,
+      contentReadyDelay: 1000,
+      transitionDuration: 600,
+    };
+  }
+};
+
+/**
  * useLoadingStateManager - Unified loading state management
  * 
  * Coordinates all loading states across the app to provide smooth,
  * predictable transitions without rapid state changes or flashing.
- * Enhanced with better stability and debouncing.
+ * Enhanced with 4K display optimizations and better stability.
  */
 export default function useLoadingStateManager(
   options: LoadingStateManagerOptions = {}
 ): LoadingStateManager {
+  const performanceDurations = getLoadingDurations();
+  const isHighStrain = isHighStrainDevice();
+  
   const {
-    minimumLoadingDuration = 2500, // Slightly longer for more stability
-    contentReadyDelay = 1000,
-    transitionDuration = 600
+    minimumLoadingDuration = performanceDurations.minimumLoadingDuration,
+    contentReadyDelay = performanceDurations.contentReadyDelay,
+    transitionDuration = performanceDurations.transitionDuration
   } = options;
 
   // Redux state
