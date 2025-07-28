@@ -25,7 +25,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [countingDownToJamaat, setCountingDownToJamaat] = useState(false);
-  const [textTransition, setTextTransition] = useState(false);
+  // REMOVED: textTransition state that was causing jarring flashing
 
   const { fontSizes, screenSize, getSizeRem } = useResponsiveFontSize();
 
@@ -34,6 +34,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const initialLoadTimestampRef = useRef(Date.now());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const calculateRemainingTimeRef = useRef<() => void>();
+  const lastCountdownStateRef = useRef<boolean>(false); // Track countdown state changes
 
   // Create stable callback for countdown completion
   const triggerCountdownComplete = useCallback(
@@ -83,8 +84,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       prayerDayjs = prayerDayjs.hour(prayerHours).minute(prayerMinutes);
 
       let targetDayjs = prayerDayjs.clone();
+      let shouldCountToJamaat = false;
 
-      // Determine which time we should be counting down to
+      // Improved logic: Determine which time we should be counting down to
       if (now.isAfter(prayerDayjs)) {
         // Prayer adhan time has passed
         if (jamaatTime && !jamaatTimePassedRef.current) {
@@ -105,20 +107,17 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
             // If jamaat time is still in the future, switch to counting down to jamaat
             if (now.isBefore(jamaatDayjs)) {
-              // Only trigger transition if we're not already counting down to jamaat
-              if (!countingDownToJamaat) {
-                // Trigger transition animation with a slight delay
-                setTextTransition(true);
-                setTimeout(() => {
-                  setCountingDownToJamaat(true);
-                  setTextTransition(false);
-                  logger.info(
-                    `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`
-                  );
-                }, 500); // Match fade out duration
-              }
-
               targetDayjs = jamaatDayjs.clone();
+              shouldCountToJamaat = true;
+              
+              // Only trigger state change if we're not already counting down to jamaat
+              if (!countingDownToJamaat) {
+                // FIXED: Smooth transition without flashing animation
+                setCountingDownToJamaat(true);
+                logger.info(
+                  `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`
+                );
+              }
             } else {
               // Both prayer and jamaat times have passed
               jamaatTimePassedRef.current = true;
@@ -141,6 +140,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
               // Set target to tomorrow's prayer
               targetDayjs = prayerDayjs.clone().add(1, "day");
+              // Reset jamaat countdown state for next prayer cycle
+              if (countingDownToJamaat) {
+                setCountingDownToJamaat(false);
+                jamaatTimePassedRef.current = false; // Reset for next day
+              }
             }
           }
         } else {
@@ -148,6 +152,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           // - There's no jamaat time, OR
           // - We've already processed the prayer-to-jamaat transition
           targetDayjs = prayerDayjs.clone().add(1, "day");
+          // Reset states for next day
+          if (countingDownToJamaat) {
+            setCountingDownToJamaat(false);
+            jamaatTimePassedRef.current = false;
+          }
+        }
+      } else {
+        // Prayer time hasn't passed yet, count down to prayer time
+        if (countingDownToJamaat) {
+          setCountingDownToJamaat(false);
         }
       }
 
@@ -179,7 +193,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         );
       }
 
-      // Check if countdown has reached zero
+      // IMPROVED: Check if countdown has reached zero with better logic
       if (totalSeconds === 0 && displayTimes) {
         // Only trigger events if not during initial page load
         const timeSinceLoad = Date.now() - initialLoadTimestampRef.current;
@@ -187,12 +201,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           if (countingDownToJamaat) {
             logger.info(`[CRITICAL] ${prayerName} jamaat time has arrived`);
             triggerCountdownComplete(true);
+            // Move to next prayer countdown
+            setTimeout(() => {
+              setCountingDownToJamaat(false);
+              jamaatTimePassedRef.current = true;
+            }, 1000);
           } else {
             logger.info(`[CRITICAL] ${prayerName} time has arrived`);
 
-            // If there's a jamaat time, we need to transition to jamaat countdown
+            // IMPROVED: Better transition logic for jamaat countdown
             if (jamaatTime) {
-              // Create moment object for jamaat time
               let jamaatDayjs = dayjs()
                 .hour(0)
                 .minute(0)
@@ -209,22 +227,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
                 // If jamaat time is still in the future
                 if (now.isBefore(jamaatDayjs)) {
-                  // Trigger the prayer time completion but don't hide the countdown
+                  // Trigger the prayer time completion
                   triggerCountdownComplete(false);
 
-                  // Transition to jamaat countdown after a short delay
+                  // FIXED: Smooth transition to jamaat countdown without flashing
                   setTimeout(() => {
-                    setTextTransition(true);
-
-                    // Change to jamaat countdown after the transition effect
-                    setTimeout(() => {
-                      setCountingDownToJamaat(true);
-                      setTextTransition(false);
-                      logger.info(
-                        `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`
-                      );
-                    }, 500); // Duration for the fade transition
-                  }, 2000); // Wait a bit before transitioning
+                    setCountingDownToJamaat(true);
+                    logger.info(
+                      `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`
+                    );
+                  }, 1000); // Brief pause before transition
 
                   return; // Don't set it to tomorrow yet
                 }
@@ -255,6 +267,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     prayerName,
     displayTimes,
     triggerCountdownComplete,
+    countingDownToJamaat // Added to dependencies to prevent stale state
   ]);
 
   // Update the ref whenever calculateRemainingTime changes
@@ -349,8 +362,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     <Box
       sx={{
         textAlign: "center",
-        transition: "opacity 0.5s ease-in-out",
-        opacity: textTransition ? 0.3 : 1,
+        // REMOVED: jarring textTransition animation - now always stable
+        opacity: 1,
       }}
     >
       <Typography

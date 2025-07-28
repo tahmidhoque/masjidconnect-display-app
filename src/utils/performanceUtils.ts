@@ -338,4 +338,211 @@ export class PerformanceMonitor {
       samples: this.renderTimes.length,
     };
   }
-} 
+}
+
+/**
+ * Memory management utilities for improved stability on low-power devices
+ * Helps prevent app crashes and restarts on Raspberry Pi
+ */
+export class MemoryManager {
+  private static cleanupCallbacks: Array<() => void> = [];
+  private static isMonitoring = false;
+  private static lastCleanup = Date.now();
+  private static readonly CLEANUP_INTERVAL = 300000; // 5 minutes
+  private static readonly MEMORY_THRESHOLD = 0.8; // 80% memory usage threshold
+
+  /**
+   * Register a cleanup callback to be called during memory pressure
+   */
+  static registerCleanupCallback(callback: () => void): () => void {
+    this.cleanupCallbacks.push(callback);
+    
+    // Return unregister function
+    return () => {
+      const index = this.cleanupCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.cleanupCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Start memory monitoring for low-power devices
+   */
+  static startMonitoring(): void {
+    if (this.isMonitoring || !isLowPowerDevice()) return;
+    
+    this.isMonitoring = true;
+    
+    // Check memory usage every 30 seconds
+    const monitorInterval = setInterval(() => {
+      try {
+        this.checkMemoryUsage();
+      } catch (error) {
+        console.warn('Memory monitoring error:', error);
+      }
+    }, 30000);
+
+    // Periodic cleanup every 5 minutes
+    const cleanupInterval = setInterval(() => {
+      this.performCleanup();
+    }, this.CLEANUP_INTERVAL);
+
+    // Global error handler to prevent app crashes
+    const originalErrorHandler = window.onerror;
+    window.onerror = (message, source, lineno, colno, error) => {
+      console.error('Global error caught:', { message, source, lineno, colno, error });
+      
+      // Perform emergency cleanup
+      this.performEmergencyCleanup();
+      
+      // Call original handler if it exists
+      if (originalErrorHandler) {
+        return originalErrorHandler(message, source, lineno, colno, error);
+      }
+      
+      // Prevent default browser error handling to avoid crashes
+      return true;
+    };
+
+    // Unhandled promise rejection handler
+    const originalRejectionHandler = window.onunhandledrejection;
+    window.onunhandledrejection = (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      
+      // Perform emergency cleanup
+      this.performEmergencyCleanup();
+      
+      // Call original handler if it exists
+      if (originalRejectionHandler) {
+        return originalRejectionHandler(event);
+      }
+      
+      // Prevent default to avoid crashes
+      event.preventDefault();
+    };
+
+    // Cleanup when page unloads
+    window.addEventListener('beforeunload', () => {
+      clearInterval(monitorInterval);
+      clearInterval(cleanupInterval);
+      this.performCleanup();
+    });
+
+    console.log('Memory monitoring started for low-power device');
+  }
+
+  /**
+   * Check current memory usage and trigger cleanup if needed
+   */
+  private static checkMemoryUsage(): void {
+    if (window.performance && (window.performance as any).memory) {
+      const memoryInfo = (window.performance as any).memory;
+      const usedMemory = memoryInfo.usedJSHeapSize;
+      const totalMemory = memoryInfo.jsHeapSizeLimit;
+      const usageRatio = usedMemory / totalMemory;
+
+      if (usageRatio > this.MEMORY_THRESHOLD) {
+        console.warn(`High memory usage detected: ${(usageRatio * 100).toFixed(1)}%`);
+        this.performCleanup();
+      }
+    }
+  }
+
+  /**
+   * Perform routine cleanup
+   */
+  private static performCleanup(): void {
+    const now = Date.now();
+    if (now - this.lastCleanup < 60000) return; // Don't cleanup more than once per minute
+    
+    this.lastCleanup = now;
+    
+    try {
+      // Run registered cleanup callbacks
+      this.cleanupCallbacks.forEach(callback => {
+        try {
+          callback();
+        } catch (error) {
+          console.warn('Cleanup callback error:', error);
+        }
+      });
+
+      // Force garbage collection if available
+      if (window.gc && typeof window.gc === 'function') {
+        window.gc();
+      }
+
+      console.log('Memory cleanup performed');
+    } catch (error) {
+      console.warn('Cleanup error:', error);
+    }
+  }
+
+  /**
+   * Perform emergency cleanup when errors occur
+   */
+  private static performEmergencyCleanup(): void {
+    try {
+      // Clear any large data structures that might be consuming memory
+      this.cleanupCallbacks.forEach(callback => {
+        try {
+          callback();
+        } catch (error) {
+          // Ignore errors during emergency cleanup
+        }
+      });
+
+      // Clear console to free memory
+      if (console.clear) {
+        console.clear();
+      }
+
+      // Force garbage collection
+      if (window.gc && typeof window.gc === 'function') {
+        window.gc();
+      }
+
+      console.log('Emergency cleanup performed');
+    } catch (error) {
+      // Even emergency cleanup failed - this is bad
+      console.error('Emergency cleanup failed:', error);
+    }
+  }
+
+  /**
+   * Get current memory statistics
+   */
+  static getMemoryStats() {
+    if (window.performance && (window.performance as any).memory) {
+      const memoryInfo = (window.performance as any).memory;
+      return {
+        used: Math.round(memoryInfo.usedJSHeapSize / 1024 / 1024), // MB
+        total: Math.round(memoryInfo.jsHeapSizeLimit / 1024 / 1024), // MB
+        usagePercent: Math.round((memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit) * 100),
+        cleanupCallbacks: this.cleanupCallbacks.length,
+      };
+    }
+    return null;
+  }
+}
+
+/**
+ * Initialize memory management for low-power devices
+ */
+export const initializeMemoryManagement = () => {
+  if (isLowPowerDevice()) {
+    MemoryManager.startMonitoring();
+    
+    // Register cleanup for common memory leaks
+    MemoryManager.registerCleanupCallback(() => {
+      // Clear any cached images that might be consuming memory
+      const images = document.querySelectorAll('img');
+      images.forEach(img => {
+        if (img.src && img.src.startsWith('blob:')) {
+          URL.revokeObjectURL(img.src);
+        }
+      });
+    });
+  }
+}; 

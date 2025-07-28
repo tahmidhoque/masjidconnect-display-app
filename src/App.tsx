@@ -19,7 +19,7 @@ import useKioskMode from "./hooks/useKioskMode";
 import useInitializationFlow from "./hooks/useInitializationFlow";
 import useFactoryReset from "./hooks/useFactoryReset";
 import useLoadingStateManager from "./hooks/useLoadingStateManager";
-import { ComponentPreloader } from "./utils/performanceUtils";
+import { ComponentPreloader, initializeMemoryManagement } from "./utils/performanceUtils";
 
 // Lazy load components for better performance
 const PairingScreen = lazy(() =>
@@ -252,6 +252,11 @@ const App: React.FC = () => {
   // Initialize factory reset functionality
   const { isModalOpen, closeModal, confirmReset, isResetting } =
     useFactoryReset();
+
+  // ADDED: Initialize memory management for stability on Raspberry Pi
+  useEffect(() => {
+    initializeMemoryManagement();
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>

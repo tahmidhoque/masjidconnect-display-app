@@ -5,94 +5,8 @@ import { useAppSelector } from "../../store/hooks";
 import logoGold from "../../assets/logos/logo-gold.svg";
 import type { AppPhase } from "../../hooks/useLoadingStateManager";
 
-// Static logo container that exists outside React
-let staticLogoContainer: HTMLDivElement | null = null;
-let staticLogoImg: HTMLImageElement | null = null;
-let logoInitialized = false;
-
-// Create completely static logo outside React
-const initializeStaticLogo = () => {
-  if (logoInitialized) return;
-
-  // Create container
-  staticLogoContainer = document.createElement("div");
-  staticLogoContainer.style.cssText = `
-    margin-bottom: 32px;
-    height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 1;
-    transform: none;
-    transition: none;
-    position: relative;
-    z-index: 10;
-  `;
-
-  // Create image
-  staticLogoImg = document.createElement("img");
-  staticLogoImg.src = logoGold;
-  staticLogoImg.alt = "MasjidConnect";
-  staticLogoImg.style.cssText = `
-    width: 130px;
-    height: auto;
-    max-height: 80px;
-    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
-    display: block;
-    opacity: 0;
-    transition: none;
-    transform: none;
-    pointer-events: none;
-  `;
-
-  // Show when loaded
-  const showLogo = () => {
-    if (staticLogoImg) {
-      staticLogoImg.style.opacity = "1";
-    }
-  };
-
-  if (staticLogoImg.complete && staticLogoImg.naturalHeight !== 0) {
-    showLogo();
-  } else {
-    staticLogoImg.onload = showLogo;
-    staticLogoImg.onerror = showLogo;
-  }
-
-  staticLogoContainer.appendChild(staticLogoImg);
-  logoInitialized = true;
-};
-
-// Placeholder component for logo positioning
-const StaticLogoPlaceholder: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    initializeStaticLogo();
-
-    if (containerRef.current && staticLogoContainer) {
-      // Insert static logo into placeholder
-      containerRef.current.appendChild(staticLogoContainer);
-    }
-
-    return () => {
-      // Don't remove - keep logo persistent
-    };
-  }, []);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        minHeight: "80px",
-        marginBottom: "32px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    />
-  );
-};
+// SIMPLIFIED: Removed complex static logo system that was causing flickering
+// Now using a simple, stable React component approach
 
 // Animation timing constants - refined for stability
 const FADE_IN_DURATION = 800;
@@ -108,7 +22,7 @@ const STATUS_FADE_DELAY = 600;
  * Enhanced Loading Screen Component
  *
  * Provides a smooth, stable loading experience with:
- * - Ultra-stable logo that never re-renders
+ * - Simple, stable logo rendering (no complex static DOM manipulation)
  * - Smooth progress animations
  * - Phase-based status updates
  */
@@ -299,17 +213,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
     }
   };
 
-  // Component styles for non-logo elements - no transitions to avoid conflicts
-  const getComponentStyle = (componentName: string, delay: number = 0) => {
-    const isVisible = isFullyVisible && !isExiting;
-
-    return {
-      opacity: isVisible ? 1 : 0,
-      transform: "none", // No transforms to prevent layout shifts
-      transition: "none", // No transitions to prevent conflicts
-    };
-  };
-
   // Loading content component
   const LoadingContent = () => (
     <Box
@@ -319,7 +222,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
         position: "relative",
         overflow: "hidden",
         background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
-        // No transitions to prevent any flashing
       }}
     >
       <Box
@@ -336,10 +238,33 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
           py: 6,
         }}
       >
-        {/* Static logo placeholder - completely independent */}
-        <StaticLogoPlaceholder />
+        {/* FIXED: Simple, stable logo - no complex DOM manipulation */}
+        <Box
+          sx={{
+            marginBottom: "32px",
+            height: "80px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: isFullyVisible ? 1 : 0,
+            transition: isFullyVisible ? "none" : "opacity 0.5s ease-in-out",
+          }}
+        >
+          <img
+            src={logoGold}
+            alt="MasjidConnect"
+            style={{
+              width: "130px",
+              height: "auto",
+              maxHeight: "80px",
+              filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.3))",
+              display: "block",
+              // REMOVED: All complex loading states and transitions that were causing flickering
+            }}
+          />
+        </Box>
 
-        {/* Spinner - no transitions */}
+        {/* Spinner - simplified animations */}
         <Box
           sx={{
             mb: 4,
@@ -347,29 +272,26 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            opacity: 1,
-            transform: "none",
-            transition: "none",
+            opacity: isFullyVisible ? 1 : 0,
+            transition: isFullyVisible ? "none" : "opacity 0.3s ease-in-out",
           }}
         >
           <Box
             sx={{
               ...getSpinnerStyle(currentPhase),
-              transition: "none", // Remove transition conflicts
             }}
           />
         </Box>
 
-        {/* Progress bar - no transitions */}
+        {/* Progress bar - simplified */}
         <Box
           sx={{
             width: "100%",
             maxWidth: "380px",
             mb: 3,
             height: "40px",
-            opacity: 1,
-            transform: "none",
-            transition: "none",
+            opacity: isFullyVisible ? 1 : 0,
+            transition: isFullyVisible ? "none" : "opacity 0.3s ease-in-out",
           }}
         >
           <Box
@@ -391,7 +313,7 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
                 width: `${Math.max(0, Math.min(100, displayProgress))}%`,
                 backgroundColor: getProgressColor(currentPhase),
                 borderRadius: 3,
-                transition: "none", // Remove progress transitions
+                transition: "width 0.3s ease-out", // Smooth progress animation
                 transformOrigin: "left",
               }}
             />
@@ -405,7 +327,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               color: "rgba(255, 255, 255, 0.75)",
               fontWeight: 500,
               fontSize: "0.8rem",
-              transition: "none", // Remove text transitions
               height: "20px",
               lineHeight: "20px",
             }}
@@ -414,7 +335,7 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
           </Typography>
         </Box>
 
-        {/* Status message - no transitions */}
+        {/* Status message - simplified */}
         <Box
           sx={{
             textAlign: "center",
@@ -423,9 +344,8 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            opacity: 1,
-            transform: "none",
-            transition: "none",
+            opacity: isFullyVisible ? 1 : 0,
+            transition: isFullyVisible ? "none" : "opacity 0.3s ease-in-out",
           }}
         >
           <Typography
@@ -438,7 +358,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               fontSize: "1.4rem",
               textShadow: "0 2px 8px rgba(0,0,0,0.5)",
               mb: 0.5,
-              transition: "none", // Remove text transitions
             }}
           >
             {enhancedStatusMessage}
@@ -452,7 +371,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               fontWeight: 400,
               fontSize: "0.85rem",
               textTransform: "capitalize",
-              transition: "none", // Remove text transitions
             }}
           >
             {currentPhase.replace("-", " ")}
