@@ -87,27 +87,31 @@ monitor_network() {
 
 # Function to monitor app processes
 monitor_app_process() {
-    local pids=($(pgrep -f "masjidconnect-display-app.*Electron" 2>/dev/null))
-    
-    if [ ${#pids[@]} -eq 0 ]; then
-        # Try alternative patterns
-        pids=($(pgrep -f "electron.*masjid" 2>/dev/null))
+    # Use same patterns as test-memory-fixes.sh for consistency
+    local pid=$(pgrep -f "masjidconnect-display-app.*Electron" | head -1)
+    if [ -z "$pid" ]; then
+        pid=$(pgrep -f "masjidconnect-display-app.*electron" | head -1)
+    fi
+    if [ -z "$pid" ]; then
+        pid=$(pgrep -f "electron.*masjidconnect" | head -1)
+    fi
+    if [ -z "$pid" ]; then
+        pid=$(pgrep -f "node.*electron.*\." | head -1)
     fi
     
-    if [ ${#pids[@]} -eq 0 ]; then
+    if [ -z "$pid" ]; then
         log_event "ERROR" "🚨 APP NOT RUNNING! Process disappeared."
         return 1
     fi
     
-    local main_pid=${pids[0]}
-    local memory=$(ps -p "$main_pid" -o rss= 2>/dev/null | tr -d ' ')
+    local memory=$(ps -p "$pid" -o rss= 2>/dev/null | tr -d ' ')
     
     if [ -n "$memory" ]; then
         local memory_mb=$((memory / 1024))
-        log_event "INFO" "App running: PID=$main_pid, Memory=${memory_mb}MB"
+        log_event "INFO" "App running: PID=$pid, Memory=${memory_mb}MB"
         return 0
     else
-        log_event "ERROR" "🚨 APP PROCESS UNRESPONSIVE! PID=$main_pid"
+        log_event "ERROR" "🚨 APP PROCESS UNRESPONSIVE! PID=$pid"
         return 1
     fi
 }
@@ -220,10 +224,24 @@ main() {
     cleanup
 }
 
+# Function to check if app is running (same logic as test-memory-fixes.sh)
+check_app_running() {
+    # Look for various patterns that indicate the Electron app is running
+    pgrep -f "masjidconnect-display-app.*Electron" >/dev/null 2>&1 || \
+    pgrep -f "masjidconnect-display-app.*electron" >/dev/null 2>&1 || \
+    pgrep -f "electron.*masjidconnect" >/dev/null 2>&1 || \
+    pgrep -f "node.*electron.*\." >/dev/null 2>&1
+}
+
 # Check if app is running before starting
-if ! pgrep -f "electron.*masjid\|masjidconnect.*electron" >/dev/null 2>&1; then
+if ! check_app_running; then
     echo "❌ MasjidConnect app is not running!"
+    echo ""
+    echo "🔍 Current Electron/Node processes:"
+    ps aux | grep -E "(electron|node)" | grep -v grep | head -5
+    echo ""
     echo "Start the app first with: ./start-production-clean.sh"
+    echo "💡 Make sure to wait a few seconds after starting before running this script"
     exit 1
 fi
 
