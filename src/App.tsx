@@ -24,6 +24,8 @@ import {
   initializeMemoryManagement,
   rpiMemoryManager,
 } from "./utils/performanceUtils";
+import { crashLogger } from "./utils/crashLogger";
+import "./utils/crashReportViewer";
 
 // Lazy load components for better performance
 const PairingScreen = lazy(() =>
@@ -260,6 +262,12 @@ const App: React.FC = () => {
   // ADDED: Initialize memory management for stability on Raspberry Pi
   useEffect(() => {
     initializeMemoryManagement();
+  }, []);
+
+  // Initialize crash logging for debugging restarts
+  useEffect(() => {
+    crashLogger.initialize();
+    logger.info("Application started with crash logging enabled");
   }, []);
 
   // Memory monitoring for RPi devices

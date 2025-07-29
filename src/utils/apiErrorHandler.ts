@@ -1,5 +1,6 @@
 import { ApiResponse } from '../api/models';
 import logger from './logger';
+import { crashLogger } from './crashLogger';
 
 /**
  * Creates a standardized error response object for API errors
@@ -13,6 +14,18 @@ export function createErrorResponse<T>(
   // Log the error with any details provided
   if (details) {
     logger.error(`API Error: ${error}`, { status, details });
+    
+    // Also log to crash logger for network errors that might cause restarts
+    if (status && (status >= 500 || status === 0)) {
+      crashLogger.logNetworkError(
+        { 
+          message: error, 
+          response: { status }, 
+          config: details 
+        }, 
+        details?.url || 'unknown'
+      );
+    }
   }
   
   // Return a properly formatted error response
