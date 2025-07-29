@@ -272,7 +272,20 @@ export default function useLoadingStateManager(
       targetPhase = 'pairing';
     } else if (isAuthenticated && (contentLoading || !hasMinimumContent())) {
       // Authenticated but content not ready
-      targetPhase = 'loading-content';
+      // CRITICAL FIX: Don't show loading screen for routine prayer time updates
+      if (currentPhase === 'displaying' && hasMinimumContent()) {
+        // If we're already displaying and have content, stay displaying
+        // This prevents loading screen during routine prayer time updates
+        targetPhase = 'displaying';
+        logger.debug(`[LoadingStateManager] Staying in display mode during routine update`, {
+          contentLoading,
+          hasContent: hasMinimumContent(),
+          currentPhase
+        });
+      } else {
+        // Only show loading if we truly don't have content to display
+        targetPhase = 'loading-content';
+      }
     } else if (isAuthenticated && hasMinimumContent()) {
       // Authenticated with content - ready to display
       if (currentPhase === 'displaying') {

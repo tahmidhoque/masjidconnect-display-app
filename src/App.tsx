@@ -26,6 +26,7 @@ import {
 } from "./utils/performanceUtils";
 import { crashLogger } from "./utils/crashLogger";
 import "./utils/crashReportViewer";
+import { rpiGPUOptimizer } from "./utils/rpiGpuOptimizer";
 
 // Lazy load components for better performance
 const PairingScreen = lazy(() =>
@@ -268,6 +269,14 @@ const App: React.FC = () => {
   useEffect(() => {
     crashLogger.initialize();
     logger.info("Application started with crash logging enabled");
+  }, []);
+
+  // Initialize RPi GPU optimizations
+  useEffect(() => {
+    rpiGPUOptimizer.initialize();
+    return () => {
+      rpiGPUOptimizer.cleanup();
+    };
   }, []);
 
   // Memory monitoring for RPi devices
