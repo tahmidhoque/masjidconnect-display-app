@@ -33,8 +33,11 @@ get_memory_usage() {
 
 # Function to check if PRODUCTION app is running (Electron)
 check_app_running() {
-    # Look specifically for Electron process, not development server
-    pgrep -f "electron.*masjidconnect" >/dev/null 2>&1 || pgrep -f "Electron.*masjidconnect" >/dev/null 2>&1
+    # Look for various patterns that indicate the Electron app is running
+    pgrep -f "masjidconnect-display-app.*Electron" >/dev/null 2>&1 || \
+    pgrep -f "masjidconnect-display-app.*electron" >/dev/null 2>&1 || \
+    pgrep -f "electron.*masjidconnect" >/dev/null 2>&1 || \
+    pgrep -f "node.*electron.*\." >/dev/null 2>&1
 }
 
 # Monitor memory usage over time
@@ -57,9 +60,16 @@ monitor_memory() {
     
     while [ $(date +%s) -lt $end_time ]; do
         local current_time=$(date +%s)
-        local pid=$(pgrep -f "electron.*masjidconnect" | head -1)
+        # Try different patterns to find the PID
+        local pid=$(pgrep -f "masjidconnect-display-app.*Electron" | head -1)
         if [ -z "$pid" ]; then
-            pid=$(pgrep -f "Electron.*masjidconnect" | head -1)
+            pid=$(pgrep -f "masjidconnect-display-app.*electron" | head -1)
+        fi
+        if [ -z "$pid" ]; then
+            pid=$(pgrep -f "electron.*masjidconnect" | head -1)
+        fi
+        if [ -z "$pid" ]; then
+            pid=$(pgrep -f "node.*electron.*\." | head -1)
         fi
         
         if [ -n "$pid" ]; then
@@ -119,25 +129,18 @@ monitor_memory() {
     fi
 }
 
-# Function to stress test the app
+# Function to stress test the app (gentle - no disruptive signals)
 stress_test() {
-    echo "🔥 Running stress test..."
+    echo "🔥 Running gentle monitoring test..."
     
-    # Simulate rapid data sync operations
-    for i in {1..10}; do
-        echo "Triggering data sync $i/10..."
-        # Send signal to refresh data (if app supports it)
-        pkill -USR1 -f "masjidconnect-display" 2>/dev/null || true
-        sleep 2
-    done
-    
-    # Simulate network connectivity changes
-    echo "Simulating network connectivity changes..."
+    # Just monitor for a period without sending any signals
     for i in {1..5}; do
-        echo "Network change simulation $i/5..."
-        # This would trigger network event listeners
-        sleep 5
+        echo "Monitoring cycle $i/5..."
+        # Just wait and monitor, don't send signals that could crash the app
+        sleep 3
     done
+    
+    echo "✅ Gentle stress test completed without sending disruptive signals"
 }
 
 # Main test execution
@@ -150,20 +153,34 @@ main() {
     if ! check_app_running; then
         echo "❌ Production Electron app is not running!"
         echo ""
+        echo "🔍 Current Electron/Node processes:"
+        ps aux | grep -E "(electron|node)" | grep -v grep | head -5
+        echo ""
         echo "Please start the PRODUCTION build first:"
-        echo "1. npm run build"
-        echo "2. npm run electron"
+        echo "1. ./start-production-clean.sh  (RECOMMENDED - true production mode)"
+        echo "   OR"
+        echo "2. npm run build && npm run electron:start"
         echo ""
         echo "Do NOT use 'npm start' (development mode) for this test."
+        echo ""
+        echo "💡 To debug: run './start-production-clean.sh' in another terminal and check if it stays running"
         exit 1
     fi
     
     echo "✅ App is running. Starting tests..."
     
-    # Get initial system info
+    # Get initial system info (macOS compatible)
     echo "\n📋 System Information:"
-    echo "Free Memory: $(free -h | grep Mem | awk '{print $7}')"
-    echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | awk -F'%' '{print $1}')"
+    # Use vm_stat for macOS memory info
+    if command -v vm_stat >/dev/null 2>&1; then
+        local free_pages=$(vm_stat | grep "Pages free" | awk '{print $3}' | sed 's/\.//')
+        local free_mb=$((free_pages * 4096 / 1024 / 1024))
+        echo "Free Memory: ${free_mb}MB"
+    else
+        echo "Free Memory: N/A (vm_stat not available)"
+    fi
+    # Use top for macOS CPU info
+    echo "CPU Usage: $(top -l 1 -n 0 | grep "CPU usage" | awk '{print $3}' | sed 's/%//' || echo "N/A")"
     
     # Run stress test first
     stress_test

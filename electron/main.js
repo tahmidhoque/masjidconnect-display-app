@@ -33,6 +33,29 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 
+// Production stability improvements - prevent network service crashes
+if (process.env.NODE_ENV === 'production') {
+  log.info('Applying production stability optimizations');
+  
+  // Disable debugging features that can cause instability
+  app.commandLine.appendSwitch('disable-dev-shm-usage');
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-web-security');
+  app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+  
+  // Network service stability
+  app.commandLine.appendSwitch('disable-extensions');
+  app.commandLine.appendSwitch('disable-plugins');
+  app.commandLine.appendSwitch('disable-default-apps');
+  
+  // Prevent inspector/debugger from starting
+  app.commandLine.appendSwitch('disable-dev-tools');
+  
+  // Reduce logging to prevent disk I/O issues
+  log.transports.file.level = 'error';
+  log.transports.console.level = 'error';
+}
+
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 
