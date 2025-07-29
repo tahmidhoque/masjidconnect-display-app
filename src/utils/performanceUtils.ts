@@ -613,9 +613,9 @@ class RPiMemoryManager {
 
   private constructor() {
     this.config = {
-      warningThreshold: 70,    // 70% memory usage warning
-      criticalThreshold: 85,   // 85% memory usage critical
-      cleanupInterval: 30000,  // Check every 30 seconds
+      warningThreshold: 85,    // 85% memory usage warning (increased from 70%)
+      criticalThreshold: 95,   // 95% memory usage critical (increased from 85%)
+      cleanupInterval: 60000,  // Check every 60 seconds (increased from 30s)
       maxLogEntries: 10        // Keep only last 10 memory readings
     };
   }
@@ -628,6 +628,12 @@ class RPiMemoryManager {
   }
 
   public startMonitoring(): void {
+    // Don't start monitoring in development mode to prevent interference
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[RPiMemoryManager] Skipping memory monitoring in development mode');
+      return;
+    }
+    
     if (this.isMonitoring || !isLowPowerDevice()) {
       return;
     }
@@ -728,16 +734,12 @@ class RPiMemoryManager {
   private performEmergencyCleanup(): void {
     // logger.warn('Performing emergency memory cleanup');
     
-    // More aggressive cleanup
+    // Only do gentle cleanup - no aggressive state clearing
     this.performGentleCleanup();
     
-    // Clear Redux state that can be safely reset
-    this.clearNonCriticalState();
-    
-    // Dispatch event for components to self-cleanup
-    document.dispatchEvent(new CustomEvent('memory-pressure', {
-      detail: { severity: 'critical' }
-    }));
+    // Don't clear Redux state or dispatch events that could break the app
+    // Just log the memory pressure for debugging
+    console.warn('[RPiMemoryManager] High memory usage detected - performed gentle cleanup only');
   }
 
   private clearExpiredCaches(): void {
@@ -764,11 +766,7 @@ class RPiMemoryManager {
     }
   }
 
-  private clearNonCriticalState(): void {
-    // This would interact with Redux store to clear non-critical data
-    // For now, just emit an event
-    document.dispatchEvent(new CustomEvent('clear-non-critical-data'));
-  }
+  // Removed clearNonCriticalState method as it was causing app instability
 
   public getMemoryStats(): { current: MemoryInfo | null; history: MemoryInfo[] } {
     return {
