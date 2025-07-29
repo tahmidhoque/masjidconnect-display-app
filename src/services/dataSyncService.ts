@@ -186,9 +186,11 @@ class DataSyncService {
     this.stopHeartbeat();
   }
 
-  // ✅ FIXED: Prevent concurrent syncs and add proper queuing
+  // ✅ FIXED: Prevent concurrent syncs and add proper queuing with bounds
   private syncInProgress = false;
   private pendingSyncRequest: { forceRefresh: boolean; resolve: () => void; reject: (error: any) => void } | null = null;
+  private syncQueueSize = 0;
+  private readonly MAX_QUEUE_SIZE = 5; // Prevent unbounded queue growth
 
   // Sync all data immediately
   public async syncAllData(forceRefresh: boolean = false): Promise<void> {
@@ -200,12 +202,22 @@ class DataSyncService {
       return;
     }
     
-    // ✅ FIXED: Prevent concurrent syncs
+    // ✅ FIXED: Prevent concurrent syncs with bounded queue
     if (this.syncInProgress) {
-      logger.debug('Sync already in progress, queuing request', { forceRefresh });
+      logger.debug('Sync already in progress, checking queue', { forceRefresh, queueSize: this.syncQueueSize });
+      
+      // Reject if queue is full to prevent memory accumulation
+      if (this.syncQueueSize >= this.MAX_QUEUE_SIZE) {
+        logger.warn('Sync queue full, rejecting request to prevent memory leak', { 
+          queueSize: this.syncQueueSize, 
+          maxSize: this.MAX_QUEUE_SIZE 
+        });
+        return Promise.reject(new Error('Sync queue full - too many pending requests'));
+      }
       
       // Queue the request if it's a force refresh or no request is queued
       if (forceRefresh || !this.pendingSyncRequest) {
+        this.syncQueueSize++;
         return new Promise<void>((resolve, reject) => {
           this.pendingSyncRequest = { forceRefresh, resolve, reject };
         });
@@ -256,6 +268,7 @@ class DataSyncService {
       if (this.pendingSyncRequest) {
         const { forceRefresh: pendingForceRefresh, resolve } = this.pendingSyncRequest;
         this.pendingSyncRequest = null;
+        this.syncQueueSize = Math.max(0, this.syncQueueSize - 1); // Decrement queue size safely
         
         // Execute the pending sync
         this.syncAllData(pendingForceRefresh)
@@ -862,11 +875,48 @@ class DataSyncService {
     }
   }
 
-  // Clean up resources
+  // Add a cleanup method to properly stop all intervals and reset state
+  // Public cleanup method to ensure all resources are freed
   public cleanup(): void {
+    logger.info('DataSyncService: Starting cleanup of all intervals and resources');
+    
+    // Stop all sync intervals
     this.stopAllSyncs();
-    window.removeEventListener('online', this.handleOnline);
-    window.removeEventListener('offline', this.handleOffline);
+    
+    // Clear any pending sync requests
+    if (this.pendingSyncRequest) {
+      this.pendingSyncRequest.reject(new Error('Service shutting down'));
+      this.pendingSyncRequest = null;
+    }
+    
+    // Reset sync progress flag
+    this.syncInProgress = false;
+    
+    // Clear backoff status
+    Object.keys(this.backoffStatus).forEach(key => {
+      this.backoffStatus[key] = { inBackoff: false, nextTry: 0 };
+    });
+    
+    // Clear last sync attempts
+    Object.keys(this.lastSyncAttempts).forEach(key => {
+      this.lastSyncAttempts[key] = 0;
+    });
+    
+    // Remove network listeners
+    this.removeNetworkListeners();
+    
+    // Reset initialization flag
+    this.isInitialized = false;
+    
+    logger.info('DataSyncService: Cleanup completed');
+  }
+
+  // Add method to remove network listeners
+  private removeNetworkListeners(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleOnline);
+      window.removeEventListener('offline', this.handleOffline);
+    }
   }
 }
 

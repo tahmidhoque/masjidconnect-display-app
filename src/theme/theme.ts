@@ -197,7 +197,7 @@ declare module '@mui/material/styles' {
   interface Theme {
     custom: {
       performance: {
-        profile: 'low' | 'medium' | 'high';
+        profile: 'ultra-low' | 'low' | 'medium' | 'high';
         animationDuration: number;
         shadows: {
           card: string;
@@ -209,7 +209,7 @@ declare module '@mui/material/styles' {
   interface ThemeOptions {
     custom?: {
       performance?: {
-        profile?: 'low' | 'medium' | 'high';
+        profile?: 'ultra-low' | 'low' | 'medium' | 'high';
         animationDuration?: number;
         shadows?: {
           card?: string;

@@ -22,7 +22,11 @@ import { ALERT_COLOR_SCHEMES } from "../common/EmergencyAlertOverlay";
 import ModernLandscapeDisplay from "../layouts/ModernLandscapeDisplay";
 import ModernPortraitDisplay from "../layouts/ModernPortraitDisplay";
 import logger from "../../utils/logger";
-import { isLowPowerDevice, getDevicePerformanceProfile, isHighStrainDevice } from "../../utils/performanceUtils";
+import {
+  isLowPowerDevice,
+  getDevicePerformanceProfile,
+  isHighStrainDevice,
+} from "../../utils/performanceUtils";
 
 // Animation context for coordinating staggered animations
 interface AnimationContextType {
@@ -57,7 +61,7 @@ export const useDisplayAnimation = () => {
 const getAnimationDelays = () => {
   const profile = getDevicePerformanceProfile();
   const isHighStrain = isHighStrainDevice();
-  
+
   if (isHighStrain) {
     // No delays for 4K RPi - immediate rendering
     return {
@@ -66,7 +70,7 @@ const getAnimationDelays = () => {
       content: 0,
       alerts: 0,
     };
-  } else if (profile.profile === 'low') {
+  } else if (profile.profile === "low") {
     // Reduced delays for low-power devices
     return {
       background: 50,
@@ -98,7 +102,8 @@ const DisplayScreen: React.FC = memo(() => {
   // Get performance profile
   const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
   const isHighStrain = isHighStrainDevice();
-  const shouldDisableAnimations = !performanceProfile.recommendations.enableAnimations;
+  const shouldDisableAnimations =
+    !performanceProfile.recommendations.enableAnimations;
 
   // Redux selectors
   const orientation = useSelector((state: RootState) => state.ui.orientation);
@@ -130,10 +135,10 @@ const DisplayScreen: React.FC = memo(() => {
 
   // Update orientation in Redux when it changes
   useEffect(() => {
-    if (rotationInfo.currentOrientation !== orientation) {
-      dispatch(setOrientation(rotationInfo.currentOrientation));
+    if (rotationInfo.physicalOrientation !== orientation) {
+      dispatch(setOrientation(rotationInfo.physicalOrientation));
     }
-  }, [rotationInfo.currentOrientation, orientation, dispatch]);
+  }, [rotationInfo.physicalOrientation, orientation, dispatch]);
 
   // Progressive loading effect for 4K displays
   useEffect(() => {
@@ -142,12 +147,27 @@ const DisplayScreen: React.FC = memo(() => {
     // Load components progressively with minimal delays for 4K displays
     const timeouts: NodeJS.Timeout[] = [];
 
-    timeouts.push(setTimeout(() => setComponentsLoaded(prev => ({ ...prev, background: true })), 50));
-    timeouts.push(setTimeout(() => setComponentsLoaded(prev => ({ ...prev, layout: true })), 100));
-    timeouts.push(setTimeout(() => setComponentsLoaded(prev => ({ ...prev, content: true })), 150));
+    timeouts.push(
+      setTimeout(
+        () => setComponentsLoaded((prev) => ({ ...prev, background: true })),
+        50
+      )
+    );
+    timeouts.push(
+      setTimeout(
+        () => setComponentsLoaded((prev) => ({ ...prev, layout: true })),
+        100
+      )
+    );
+    timeouts.push(
+      setTimeout(
+        () => setComponentsLoaded((prev) => ({ ...prev, content: true })),
+        150
+      )
+    );
 
     return () => {
-      timeouts.forEach(timeout => clearTimeout(timeout));
+      timeouts.forEach((timeout) => clearTimeout(timeout));
     };
   }, [isHighStrain]);
 
@@ -163,7 +183,8 @@ const DisplayScreen: React.FC = memo(() => {
         };
       }
 
-      const delay = ANIMATION_DELAYS[componentId as keyof typeof ANIMATION_DELAYS] || 0;
+      const delay =
+        ANIMATION_DELAYS[componentId as keyof typeof ANIMATION_DELAYS] || 0;
       const isVisible = isMounted && isDisplayReady && !isAlertTransitioning;
       const isRestoring = animationPhase === "restoring";
 
@@ -184,7 +205,14 @@ const DisplayScreen: React.FC = memo(() => {
         transition: `opacity ${FADE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms, transform ${FADE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms`,
       };
     },
-    [isMounted, isDisplayReady, isAlertTransitioning, animationPhase, shouldDisableAnimations, isHighStrain]
+    [
+      isMounted,
+      isDisplayReady,
+      isAlertTransitioning,
+      animationPhase,
+      shouldDisableAnimations,
+      isHighStrain,
+    ]
   );
 
   // Memoize animation context to prevent unnecessary re-renders
@@ -213,7 +241,10 @@ const DisplayScreen: React.FC = memo(() => {
       setIsMounted(true);
 
       // Mark display as ready after animation completes
-      const readinessDelay = DISPLAY_MOUNT_DURATION + Math.max(...Object.values(ANIMATION_DELAYS)) + 200;
+      const readinessDelay =
+        DISPLAY_MOUNT_DURATION +
+        Math.max(...Object.values(ANIMATION_DELAYS)) +
+        200;
       mountTimerRef.current = setTimeout(() => {
         logger.info("[DisplayScreen] Display ready - all animations complete");
         setIsDisplayReady(true);
@@ -250,9 +281,13 @@ const DisplayScreen: React.FC = memo(() => {
       if (isAlertTransitioning) {
         setAnimationPhase("restoring");
 
-        const maxDelay = isHighStrain ? 100 : Math.max(...Object.values(ANIMATION_DELAYS));
-        const restoreDelay = isHighStrain ? 150 : maxDelay + ALERT_ANIMATION_DURATION + 50;
-        
+        const maxDelay = isHighStrain
+          ? 100
+          : Math.max(...Object.values(ANIMATION_DELAYS));
+        const restoreDelay = isHighStrain
+          ? 150
+          : maxDelay + ALERT_ANIMATION_DURATION + 50;
+
         setTimeout(() => {
           setIsAlertTransitioning(false);
           setAnimationPhase("idle");
@@ -280,28 +315,22 @@ const DisplayScreen: React.FC = memo(() => {
       if (event.key === "1") {
         dispatch(
           createTestAlert({
-            title: "Emergency Test Alert",
-            message: "This is a test emergency alert message.",
-            colorScheme: "RED",
-            duration: 10000,
+            type: "RED",
+            duration: 10,
           })
         );
       } else if (event.key === "2") {
         dispatch(
           createTestAlert({
-            title: "Warning Test Alert",
-            message: "This is a test warning alert message.",
-            colorScheme: "AMBER",
-            duration: 8000,
+            type: "AMBER",
+            duration: 8,
           })
         );
       } else if (event.key === "3") {
         dispatch(
           createTestAlert({
-            title: "Info Test Alert",
-            message: "This is a test information alert message.",
-            colorScheme: "BLUE",
-            duration: 6000,
+            type: "BLUE",
+            duration: 6,
           })
         );
       } else if (event.key === "c") {
@@ -338,15 +367,16 @@ const DisplayScreen: React.FC = memo(() => {
     const unregister = MemoryManager.registerCleanupCallback(() => {
       // Clear any cached DOM references
       const images = document.querySelectorAll('img[src^="blob:"]');
-      images.forEach(img => {
-        if (img.src && img.src.startsWith('blob:')) {
-          URL.revokeObjectURL(img.src);
+      images.forEach((img) => {
+        const htmlImg = img as HTMLImageElement;
+        if (htmlImg.src && htmlImg.src.startsWith("blob:")) {
+          URL.revokeObjectURL(htmlImg.src);
         }
       });
-      
+
       // Force garbage collection of React fiber nodes
-      if (window.gc && typeof window.gc === 'function') {
-        setTimeout(() => window.gc(), 100);
+      if (window.gc && typeof window.gc === "function") {
+        setTimeout(() => window.gc!(), 100);
       }
     });
 

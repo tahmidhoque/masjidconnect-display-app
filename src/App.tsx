@@ -19,7 +19,11 @@ import useKioskMode from "./hooks/useKioskMode";
 import useInitializationFlow from "./hooks/useInitializationFlow";
 import useFactoryReset from "./hooks/useFactoryReset";
 import useLoadingStateManager from "./hooks/useLoadingStateManager";
-import { ComponentPreloader, initializeMemoryManagement } from "./utils/performanceUtils";
+import {
+  ComponentPreloader,
+  initializeMemoryManagement,
+  rpiMemoryManager,
+} from "./utils/performanceUtils";
 
 // Lazy load components for better performance
 const PairingScreen = lazy(() =>
@@ -256,6 +260,25 @@ const App: React.FC = () => {
   // ADDED: Initialize memory management for stability on Raspberry Pi
   useEffect(() => {
     initializeMemoryManagement();
+  }, []);
+
+  // Memory monitoring for RPi devices
+  useEffect(() => {
+    // Start memory monitoring for RPi devices
+    if (process.env.NODE_ENV === "production") {
+      rpiMemoryManager.startMonitoring();
+    }
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      // Stop memory monitoring
+      rpiMemoryManager.stopMonitoring();
+
+      // Clear any remaining timeouts/intervals
+      if (window.gc) {
+        window.gc(); // Force garbage collection if available
+      }
+    };
   }, []);
 
   return (

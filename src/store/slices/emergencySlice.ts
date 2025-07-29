@@ -187,6 +187,11 @@ const emergencySlice = createSlice({
           action: 'cleared',
         });
         
+        // Keep only last 10 alerts in history (prevent memory growth)
+        if (state.alertHistory.length > 10) {
+          state.alertHistory = state.alertHistory.slice(-10);
+        }
+        
         logger.info('[Emergency] Alert cleared', { alertId: previousAlert.id });
       }
     },
@@ -289,6 +294,11 @@ const emergencySlice = createSlice({
           timestamp: new Date().toISOString(),
           action: 'cleared',
         });
+        
+        // Keep only last 10 alerts in history (prevent memory growth)
+        if (state.alertHistory.length > 10) {
+          state.alertHistory = state.alertHistory.slice(-10);
+        }
         
         state.currentAlert = null;
         
@@ -461,6 +471,11 @@ const emergencySlice = createSlice({
             timestamp: action.payload.timestamp,
             action: 'expired',
           });
+          
+          // Keep only last 10 alerts in history (prevent memory growth)
+          if (state.alertHistory.length > 10) {
+            state.alertHistory = state.alertHistory.slice(-10);
+          }
           
           state.currentAlert = null;
         }

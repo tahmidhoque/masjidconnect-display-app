@@ -5,6 +5,8 @@
  * Enhanced for Raspberry Pi devices to reduce CPU and memory usage.
  */
 
+import logger from './logger';
+
 /**
  * Check if we're likely running on a Raspberry Pi device
  * This is a best-effort detection, not 100% accurate
@@ -455,7 +457,7 @@ export class MemoryManager {
       
       // Call original handler if it exists
       if (originalRejectionHandler) {
-        return originalRejectionHandler(event);
+        return originalRejectionHandler.call(window, event);
       }
       
       // Prevent default to avoid crashes
@@ -586,3 +588,198 @@ export const initializeMemoryManagement = () => {
     });
   }
 }; 
+
+// Add RPi memory monitoring and cleanup utilities
+interface MemoryInfo {
+  used: number;
+  total: number;
+  percentage: number;
+  timestamp: string;
+}
+
+interface MemoryConfig {
+  warningThreshold: number;  // Percentage
+  criticalThreshold: number; // Percentage
+  cleanupInterval: number;   // Milliseconds
+  maxLogEntries: number;
+}
+
+class RPiMemoryManager {
+  private static instance: RPiMemoryManager;
+  private config: MemoryConfig;
+  private memoryHistory: MemoryInfo[] = [];
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private isMonitoring = false;
+
+  private constructor() {
+    this.config = {
+      warningThreshold: 70,    // 70% memory usage warning
+      criticalThreshold: 85,   // 85% memory usage critical
+      cleanupInterval: 30000,  // Check every 30 seconds
+      maxLogEntries: 10        // Keep only last 10 memory readings
+    };
+  }
+
+  public static getInstance(): RPiMemoryManager {
+    if (!RPiMemoryManager.instance) {
+      RPiMemoryManager.instance = new RPiMemoryManager();
+    }
+    return RPiMemoryManager.instance;
+  }
+
+  public startMonitoring(): void {
+    if (this.isMonitoring || !isLowPowerDevice()) {
+      return;
+    }
+
+    this.isMonitoring = true;
+    logger.info('Starting RPi memory monitoring', { config: this.config });
+
+    this.cleanupInterval = setInterval(() => {
+      this.checkMemoryUsage();
+    }, this.config.cleanupInterval);
+  }
+
+  public stopMonitoring(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.isMonitoring = false;
+    // logger.info('Stopped RPi memory monitoring');
+  }
+
+  private checkMemoryUsage(): void {
+    try {
+      const memInfo = this.getMemoryInfo();
+      
+      // Add to history with bounds
+      this.memoryHistory.push(memInfo);
+      if (this.memoryHistory.length > this.config.maxLogEntries) {
+        this.memoryHistory = this.memoryHistory.slice(-this.config.maxLogEntries);
+      }
+
+      // Check thresholds and take action
+      if (memInfo.percentage > this.config.criticalThreshold) {
+        // logger.error('Critical memory usage detected on RPi', { 
+        //   memInfo,
+        //   trend: this.getMemoryTrend()
+        // });
+        this.performEmergencyCleanup();
+      } else if (memInfo.percentage > this.config.warningThreshold) {
+        // logger.warn('High memory usage detected on RPi', { 
+        //   memInfo,
+        //   trend: this.getMemoryTrend()
+        // });
+        this.performGentleCleanup();
+      }
+    } catch (error) {
+      // logger.error('Error checking memory usage', { error });
+    }
+  }
+
+  private getMemoryInfo(): MemoryInfo {
+    if (window.performance && (window.performance as any).memory) {
+      const memory = (window.performance as any).memory;
+      const used = memory.usedJSHeapSize / 1024 / 1024; // MB
+      const total = memory.totalJSHeapSize / 1024 / 1024; // MB
+      const percentage = (used / total) * 100;
+
+      return {
+        used: Number(used.toFixed(2)),
+        total: Number(total.toFixed(2)),
+        percentage: Number(percentage.toFixed(1)),
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    // Fallback estimation for devices without memory API
+    return {
+      used: 0,
+      total: 0,
+      percentage: 50, // Assume moderate usage
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private getMemoryTrend(): 'increasing' | 'stable' | 'decreasing' {
+    if (this.memoryHistory.length < 3) return 'stable';
+    
+    const recent = this.memoryHistory.slice(-3);
+    const avgChange = (recent[2].percentage - recent[0].percentage) / 2;
+    
+    if (avgChange > 2) return 'increasing';
+    if (avgChange < -2) return 'decreasing';
+    return 'stable';
+  }
+
+  private performGentleCleanup(): void {
+    // logger.debug('Performing gentle memory cleanup');
+    
+    // Trigger garbage collection if available
+    if (window.gc) {
+      window.gc();
+    }
+
+    // Clear any expired caches or temporary data
+    this.clearExpiredCaches();
+  }
+
+  private performEmergencyCleanup(): void {
+    // logger.warn('Performing emergency memory cleanup');
+    
+    // More aggressive cleanup
+    this.performGentleCleanup();
+    
+    // Clear Redux state that can be safely reset
+    this.clearNonCriticalState();
+    
+    // Dispatch event for components to self-cleanup
+    document.dispatchEvent(new CustomEvent('memory-pressure', {
+      detail: { severity: 'critical' }
+    }));
+  }
+
+  private clearExpiredCaches(): void {
+    try {
+      // Clear expired items from localStorage if any
+      const keysToCheck = ['hijri_cache', 'temporary_data', 'debug_logs'];
+      keysToCheck.forEach(key => {
+        const item = localStorage.getItem(key);
+        if (item) {
+          try {
+            const parsed = JSON.parse(item);
+            if (parsed.expiry && Date.now() > parsed.expiry) {
+              localStorage.removeItem(key);
+              // logger.debug('Cleared expired cache', { key });
+            }
+          } catch {
+            // Invalid JSON, remove it
+            localStorage.removeItem(key);
+          }
+        }
+      });
+    } catch (error) {
+      // logger.error('Error clearing expired caches', { error });
+    }
+  }
+
+  private clearNonCriticalState(): void {
+    // This would interact with Redux store to clear non-critical data
+    // For now, just emit an event
+    document.dispatchEvent(new CustomEvent('clear-non-critical-data'));
+  }
+
+  public getMemoryStats(): { current: MemoryInfo | null; history: MemoryInfo[] } {
+    return {
+      current: this.memoryHistory[this.memoryHistory.length - 1] || null,
+      history: [...this.memoryHistory]
+    };
+  }
+}
+
+// Export singleton instance
+export const rpiMemoryManager = RPiMemoryManager.getInstance();
+
+// Add this to the existing performanceUtils exports
+export { RPiMemoryManager }; 

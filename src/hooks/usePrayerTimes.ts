@@ -76,12 +76,16 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     nextPrayerName: string;
     currentPrayerName: string;
     isProcessing: boolean;
+    lastRefreshRequest: number;
   }>({
     lastProcessTime: 0,
     nextPrayerName: '',
     currentPrayerName: '',
-    isProcessing: false
+    isProcessing: false,
+    lastRefreshRequest: 0
   });
+  
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Min interval between calculations to prevent excessive processing
   const MIN_PROCESS_INTERVAL = 5000; // 5 seconds
@@ -102,26 +106,42 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
   // Set up periodic refresh to ensure components always have fresh prayer time data
   useEffect(() => {
+    // Guard against multiple intervals
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
     // Update prayer times every minute to ensure we catch transitions
-    const minuteInterval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       // Process the prayer times data only if we need to (time has changed)
       if (prayerTimes && !calculationsRef.current.isProcessing) {
         processPrayerTimes();
       } else if (!prayerTimes && !calculationsRef.current.isProcessing) {
-        // If no prayer times data, try to refresh
-        logger.warn("No prayer times data available, requesting refresh");
-        refreshPrayerTimesHandler(true); // Force refresh on critical data missing
+        // If no prayer times data, try to refresh (throttled)
+        const now = Date.now();
+        if (now - calculationsRef.current.lastRefreshRequest > 30000) { // 30 second throttle
+          logger.warn("No prayer times data available, requesting refresh");
+          calculationsRef.current.lastRefreshRequest = now;
+          refreshPrayerTimesHandler(true); // Force refresh on critical data missing
+        }
       }
     }, 60000); // Every minute
 
-    // Perform an immediate check for prayer times data
+    // Perform an immediate check for prayer times data (throttled)
     if (!prayerTimes) {
-      logger.info("Immediate check: No prayer times data available, requesting refresh");
-      refreshPrayerTimesHandler(true); // Force refresh on initial load
+      const now = Date.now();
+      if (now - calculationsRef.current.lastRefreshRequest > 10000) { // 10 second throttle
+        logger.info("Immediate check: No prayer times data available, requesting refresh");
+        calculationsRef.current.lastRefreshRequest = now;
+        refreshPrayerTimesHandler(true); // Force refresh on initial load
+      }
     }
 
     return () => {
-      clearInterval(minuteInterval);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [prayerTimes, refreshPrayerTimesHandler]);
 
