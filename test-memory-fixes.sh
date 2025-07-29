@@ -5,6 +5,16 @@
 
 echo "🧪 MasjidConnect Display App - Memory Leak Fix Validation"
 echo "========================================================="
+echo ""
+echo "⚠️  IMPORTANT: This script tests the PRODUCTION build only!"
+echo ""
+echo "📋 Before running this test:"
+echo "1. Stop any development servers (npm start)"
+echo "2. Build and start the production app:"
+echo "   npm run build"
+echo "   npm run electron"
+echo "3. Then run this script"
+echo ""
 
 # Function to get memory usage
 get_memory_usage() {
@@ -21,9 +31,10 @@ get_memory_usage() {
     fi
 }
 
-# Function to check if app is running
+# Function to check if PRODUCTION app is running (Electron)
 check_app_running() {
-    pgrep -f "masjidconnect-display" >/dev/null 2>&1
+    # Look specifically for Electron process, not development server
+    pgrep -f "electron.*masjidconnect" >/dev/null 2>&1 || pgrep -f "Electron.*masjidconnect" >/dev/null 2>&1
 }
 
 # Monitor memory usage over time
@@ -46,7 +57,10 @@ monitor_memory() {
     
     while [ $(date +%s) -lt $end_time ]; do
         local current_time=$(date +%s)
-        local pid=$(pgrep -f "masjidconnect-display" | head -1)
+        local pid=$(pgrep -f "electron.*masjidconnect" | head -1)
+        if [ -z "$pid" ]; then
+            pid=$(pgrep -f "Electron.*masjidconnect" | head -1)
+        fi
         
         if [ -n "$pid" ]; then
             local memory=$(get_memory_usage "$pid")
@@ -132,9 +146,15 @@ main() {
     echo "Date: $(date)"
     echo "System: $(uname -a)"
     
-    # Check if app is running
+    # Check if PRODUCTION app is running
     if ! check_app_running; then
-        echo "❌ App is not running. Please start the app first."
+        echo "❌ Production Electron app is not running!"
+        echo ""
+        echo "Please start the PRODUCTION build first:"
+        echo "1. npm run build"
+        echo "2. npm run electron"
+        echo ""
+        echo "Do NOT use 'npm start' (development mode) for this test."
         exit 1
     fi
     
