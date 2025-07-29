@@ -445,10 +445,12 @@ const DisplayScreen: React.FC = memo(() => {
                 position: "absolute",
                 top: "50%",
                 left: "50%",
-                width: "100vh",
+                width: "100vh", // Swap dimensions for rotation
                 height: "100vw",
+                transformOrigin: "center center",
                 transform: "translate(-50%, -50%) rotate(90deg)",
-                transformOrigin: "center",
+                // Ensure no overflow or positioning issues
+                overflow: "hidden",
               }}
             >
               {DisplayComponent}
