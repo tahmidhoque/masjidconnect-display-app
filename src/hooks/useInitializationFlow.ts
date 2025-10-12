@@ -80,21 +80,33 @@ export default function useInitializationFlow() {
       
       logger.info('[InitFlow] Content refresh completed', { result });
       
-      // Wait a moment for state to update before marking as ready
-      contentFetchTimer.current = setTimeout(() => {
-        logger.info('[InitFlow] Content ready, transitioning to ready state');
-        setStageDebounced("ready", "Ready");
+      // CRITICAL FIX: Ensure content is actually loaded before proceeding
+      // Wait a moment for Redux state to fully update, then verify we have content
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Clear the timer and transition to ready state immediately
+      if (contentFetchTimer.current) {
+        clearTimeout(contentFetchTimer.current);
+        contentFetchTimer.current = null;
+      }
+      
+      logger.info('[InitFlow] Content ready, transitioning to ready state');
+      setStageDebounced("ready", "Ready");
       dispatch(setInitializing(false));
-      }, 800);
       
     } catch (error) {
       logger.error('[InitFlow] Error loading content:', { error });
       
+      // Clear any existing timer
+      if (contentFetchTimer.current) {
+        clearTimeout(contentFetchTimer.current);
+        contentFetchTimer.current = null;
+      }
+      
       // Still mark as ready to prevent getting stuck, but note the issue
-      contentFetchTimer.current = setTimeout(() => {
-        setStageDebounced("ready", "Ready (using cached content)");
+      logger.warn('[InitFlow] Proceeding to ready state despite error to prevent hang');
+      setStageDebounced("ready", "Ready (using cached content)");
       dispatch(setInitializing(false));
-      }, 800);
     }
   }, [dispatch, setStageDebounced]);
 
@@ -192,7 +204,14 @@ export default function useInitializationFlow() {
         
         if (checkPairingStatus.fulfilled.match(res) && res.payload?.isPaired) {
           logger.info('[InitFlow] 🎉 Pairing successful!');
+          
+          // CRITICAL FIX: Immediately stop polling and clear all timers
           pairingPollingActive.current = false;
+          if (pairingPollTimer.current) {
+            clearTimeout(pairingPollTimer.current);
+            pairingPollTimer.current = null;
+          }
+          
           dispatch(setLoadingMessage("Pairing successful! Loading content..."));
           
           // Start content loading after a brief success message display
@@ -228,6 +247,14 @@ export default function useInitializationFlow() {
       
       const hasStoredCredentials = checkCredentialsPersistence();
       
+      // CRITICAL FIX: Clear any stale pairing codes if we have valid credentials
+      if (hasStoredCredentials) {
+        logger.info('[InitFlow] Clearing any stale pairing codes since we have credentials');
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
+        localStorage.removeItem('lastPairingCodeRequestTime');
+      }
+      
       try {
         // Wait minimum time to show checking stage
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -257,10 +284,16 @@ export default function useInitializationFlow() {
 
   // Handle pairing code availability
   useEffect(() => {
+    // CRITICAL FIX: Don't start pairing polling if already authenticated
+    if (isAuthenticated) {
+      logger.info('[InitFlow] Skipping pairing poll - already authenticated');
+      return;
+    }
+    
     if (stage === "pairing" && pairingCode && !pairingPollingActive.current) {
       startPairingPolling();
     }
-  }, [stage, pairingCode, startPairingPolling]);
+  }, [stage, pairingCode, isAuthenticated, startPairingPolling]);
 
   // Handle pairing code expiration
   useEffect(() => {

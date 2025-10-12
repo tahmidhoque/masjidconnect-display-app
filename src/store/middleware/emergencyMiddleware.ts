@@ -102,13 +102,36 @@ export const emergencyMiddleware: Middleware = (api: any) => {
         const isAuthenticated = selectIsAuthenticated(state);
         const isEmergencyEnabled = selectIsEnabled(state);
         
+        // CRITICAL FIX: Verify credentials are actually available before initializing SSE
         if (isAuthenticated && isEmergencyEnabled) {
-          const baseURL = process.env.NODE_ENV === 'development' 
-            ? 'http://localhost:3000' 
-            : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+          // Check if credentials are in localStorage
+          const hasCredentials = !!(
+            localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId')
+          );
           
-                                 logger.debug('[EmergencyMiddleware] Authentication successful, initializing emergency service');
+          if (hasCredentials) {
+            const baseURL = process.env.NODE_ENV === 'development' 
+              ? 'http://localhost:3000' 
+              : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+            
+            logger.debug('[EmergencyMiddleware] Authentication successful with credentials, initializing emergency service');
             api.dispatch(initializeEmergencyService(baseURL));
+          } else {
+            logger.warn('[EmergencyMiddleware] Authentication successful but no credentials found, delaying SSE initialization');
+            // Retry after a short delay to allow credentials to be stored
+            setTimeout(() => {
+              const hasCredentialsNow = !!(
+                localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId')
+              );
+              if (hasCredentialsNow) {
+                const baseURL = process.env.NODE_ENV === 'development' 
+                  ? 'http://localhost:3000' 
+                  : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+                logger.debug('[EmergencyMiddleware] Credentials now available, initializing emergency service');
+                (api.dispatch as AppDispatch)(initializeEmergencyService(baseURL));
+              }
+            }, 1000);
+          }
         }
         break;
       }
@@ -206,12 +229,22 @@ export const emergencyMiddleware: Middleware = (api: any) => {
           const isAuthenticated = selectIsAuthenticated(state);
           const isEnabled = selectIsEnabled(state);
           
-                     if (isAuthenticated && isEnabled) {
-             // Small delay to ensure network is stable
-             setTimeout(() => {
-               (api.dispatch as AppDispatch)(connectToEmergencyService());
-             }, 2000);
-           }
+          // CRITICAL FIX: Check for credentials before reconnecting
+          if (isAuthenticated && isEnabled) {
+            const hasCredentials = !!(
+              localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId')
+            );
+            
+            if (hasCredentials) {
+              // Small delay to ensure network is stable
+              setTimeout(() => {
+                logger.debug('[EmergencyMiddleware] Reconnecting SSE after coming online');
+                (api.dispatch as AppDispatch)(connectToEmergencyService());
+              }, 2000);
+            } else {
+              logger.warn('[EmergencyMiddleware] Cannot reconnect SSE - no credentials available');
+            }
+          }
         }
         break;
       }

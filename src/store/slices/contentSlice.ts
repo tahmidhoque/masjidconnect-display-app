@@ -492,8 +492,13 @@ const contentSlice = createSlice({
           state.lastUpdated = action.payload.timestamp || null;
         }
         
-        // Update general loading state
-        state.isLoading = state.isLoadingPrayerTimes || state.isLoadingSchedule || state.isLoadingEvents;
+        // Update general loading state - only stay loading if others are still loading
+        const stillLoading = state.isLoadingPrayerTimes || state.isLoadingSchedule || state.isLoadingEvents;
+        state.isLoading = stillLoading;
+        
+        if (!stillLoading) {
+          logger.info('[ContentSlice] Content refresh complete, all loading finished');
+        }
       })
       .addCase(refreshContent.rejected, (state, action) => {
         state.isLoadingContent = false;
@@ -509,19 +514,28 @@ const contentSlice = createSlice({
       })
       .addCase(refreshPrayerTimes.fulfilled, (state, action) => {
         state.isLoadingPrayerTimes = false;
-        // Handle both single PrayerTimes object and array format
-        const prayerTimes = action.payload.prayerTimes;
-        if (Array.isArray(prayerTimes)) {
-          // If it's an array, take the first element (today's prayer times)
-          state.prayerTimes = prayerTimes[0] || null;
-        } else {
-          state.prayerTimes = prayerTimes || null;
-        }
-        state.lastPrayerTimesUpdate = action.payload.timestamp || new Date().toISOString();
-        state.lastUpdated = action.payload.timestamp || new Date().toISOString();
         
-        // Update general loading state
-        state.isLoading = state.isLoadingContent || state.isLoadingSchedule || state.isLoadingEvents;
+        // Skip update if this was debounced
+        if (!action.payload.skipped) {
+          // Handle both single PrayerTimes object and array format
+          const prayerTimes = action.payload.prayerTimes;
+          if (Array.isArray(prayerTimes)) {
+            // If it's an array, take the first element (today's prayer times)
+            state.prayerTimes = prayerTimes[0] || null;
+          } else {
+            state.prayerTimes = prayerTimes || null;
+          }
+          state.lastPrayerTimesUpdate = action.payload.timestamp || new Date().toISOString();
+          state.lastUpdated = action.payload.timestamp || new Date().toISOString();
+        }
+        
+        // Update general loading state - only stay loading if others are still loading
+        const stillLoading = state.isLoadingContent || state.isLoadingSchedule || state.isLoadingEvents;
+        state.isLoading = stillLoading;
+        
+        if (!stillLoading) {
+          logger.info('[ContentSlice] Prayer times refresh complete, all loading finished');
+        }
       })
       .addCase(refreshPrayerTimes.rejected, (state, action) => {
         state.isLoadingPrayerTimes = false;
@@ -581,11 +595,15 @@ const contentSlice = createSlice({
       })
       .addCase(refreshAllContent.fulfilled, (state, action) => {
         state.lastUpdated = action.payload.timestamp;
-        // Loading state will be updated by individual refresh actions
+        // CRITICAL FIX: Explicitly set isLoading to false when all content refresh completes
+        // This ensures the loading screen doesn't hang after pairing
+        state.isLoading = false;
+        logger.info('[ContentSlice] All content refresh completed, setting isLoading=false');
       })
       .addCase(refreshAllContent.rejected, (state, action) => {
         // Individual errors will be set by individual refresh actions
         state.isLoading = false;
+        logger.warn('[ContentSlice] All content refresh failed, setting isLoading=false');
       });
   },
 });

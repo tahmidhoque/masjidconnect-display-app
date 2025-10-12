@@ -85,6 +85,7 @@
     "customize-cra": "^1.0.0",
     "electron": "^35.1.2",
     "electron-builder": "^24.13.3",
+    "jest-canvas-mock": "^2.5.2",
     "react-app-rewired": "^2.2.1",
     "wait-on": "^6.0.1"
   },

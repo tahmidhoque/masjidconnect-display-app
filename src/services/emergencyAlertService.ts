@@ -48,9 +48,38 @@ class EmergencyAlertService {
         this.eventSource = null;
       }
       
+      // CRITICAL FIX: Get credentials and include them in the connection URL
+      const credentials = this.getCredentials();
+      
       // Use the correct endpoint for SSE
       const endpoint = '/api/sse';
-      this.connectionUrl = `${baseURL}${endpoint}`;
+      
+      // Build URL with authentication parameters
+      // EventSource doesn't support custom headers, so we must use query params
+      let connectionUrl = `${baseURL}${endpoint}`;
+      
+      if (credentials && credentials.screenId) {
+        const params = new URLSearchParams();
+        params.append('screenId', credentials.screenId);
+        
+        // Also add API key if available (though screenId should be sufficient)
+        if (credentials.apiKey) {
+          params.append('apiKey', credentials.apiKey);
+        }
+        
+        connectionUrl = `${connectionUrl}?${params.toString()}`;
+        
+        logger.info(`EmergencyAlertService: Connecting to SSE with authentication`, {
+          hasScreenId: !!credentials.screenId,
+          hasApiKey: !!credentials.apiKey
+        });
+        console.log(`🚨 EmergencyAlertService: Connecting to SSE with screenId: ${credentials.screenId}`);
+      } else {
+        logger.warn('EmergencyAlertService: No credentials available for SSE connection');
+        console.warn('🚨 EmergencyAlertService: Connecting to SSE without credentials (may not work properly)');
+      }
+      
+      this.connectionUrl = connectionUrl;
       
       logger.info(`EmergencyAlertService: Connecting to SSE at ${this.connectionUrl}`);
       console.log(`🚨 EmergencyAlertService: Connecting to SSE at ${this.connectionUrl}`);
@@ -333,7 +362,8 @@ class EmergencyAlertService {
 
   /**
    * Set the current alert and schedule its expiration
-   * This follows the displayEmergencyAlert pattern from documentation
+   * Uses timing.remaining from backend (server-calculated) when available,
+   * falls back to expiresAt calculation for backward compatibility
    */
   private setCurrentAlert(alert: EmergencyAlert): void {
     // Clear any existing expiration timer
@@ -345,22 +375,34 @@ class EmergencyAlertService {
     // Set the new alert
     this.currentAlert = alert;
     
-    // Save to local storage for offline fallback - exactly as shown in documentation
+    // Save to local storage for offline fallback
     localStorage.setItem('emergencyAlert', JSON.stringify(alert));
     
-    // Schedule automatic expiration - exactly as shown in documentation
-    const expiresAt = new Date(alert.expiresAt).getTime();
-    const now = Date.now();
-    const timeUntilExpiry = Math.max(0, expiresAt - now);
+    // Calculate time until expiry
+    let timeUntilExpiry: number;
     
+    // PREFER: Use timing.remaining from backend (server-calculated, no clock sync issues)
+    if (alert.timing && typeof alert.timing.remaining === 'number' && alert.timing.remaining > 0) {
+      timeUntilExpiry = alert.timing.remaining;
+      console.log(`🚨 EmergencyAlertService: Using server-calculated remaining time: ${timeUntilExpiry}ms (${(timeUntilExpiry / 1000).toFixed(1)}s)`);
+    } 
+    // FALLBACK: Calculate from expiresAt (for backward compatibility)
+    else {
+      const expiresAt = new Date(alert.expiresAt).getTime();
+      const now = Date.now();
+      timeUntilExpiry = Math.max(0, expiresAt - now);
+      console.log(`🚨 EmergencyAlertService: Calculated expiry from expiresAt: ${timeUntilExpiry}ms (${(timeUntilExpiry / 1000).toFixed(1)}s)`);
+    }
+    
+    // Schedule automatic expiration
     if (timeUntilExpiry > 0) {
-      console.log(`EmergencyAlertService: Alert will expire in ${timeUntilExpiry / 1000}s`);
+      console.log(`🚨 EmergencyAlertService: Alert "${alert.title}" will auto-clear in ${(timeUntilExpiry / 1000).toFixed(1)}s`);
       this.expirationTimer = setTimeout(() => {
-        console.log('EmergencyAlertService: Alert expired automatically');
+        console.log(`🚨 EmergencyAlertService: Alert "${alert.title}" expired automatically after ${(timeUntilExpiry / 1000).toFixed(1)}s`);
         this.clearCurrentAlert();
       }, timeUntilExpiry);
     } else {
-      console.warn('EmergencyAlertService: Received already expired alert');
+      console.warn(`🚨 EmergencyAlertService: Received already expired alert "${alert.title}" - clearing immediately`);
       this.clearCurrentAlert();
       return;
     }

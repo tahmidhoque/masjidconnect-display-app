@@ -106,6 +106,7 @@ export default function useLoadingStateManager(
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const lastPhaseChangeTime = useRef<number>(Date.now());
   const pendingPhaseRef = useRef<AppPhase | null>(null);
+  const failsafeTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Check if we have minimum content to display
   const hasMinimumContent = useCallback(() => {
@@ -282,6 +283,11 @@ export default function useLoadingStateManager(
           hasContent: hasMinimumContent(),
           currentPhase
         });
+      } else if (!contentLoading && hasMinimumContent()) {
+        // CRITICAL FIX: If not loading and we have content, proceed to preparing
+        // This handles the case after pairing completes
+        targetPhase = 'preparing';
+        logger.info('[LoadingStateManager] Content available after auth, proceeding to preparing');
       } else {
         // Only show loading if we truly don't have content to display
         targetPhase = 'loading-content';
@@ -292,8 +298,12 @@ export default function useLoadingStateManager(
         targetPhase = 'displaying'; // Stay displaying
       } else if (currentPhase === 'ready') {
         targetPhase = 'ready'; // Let the timer handle transition to displaying
+      } else if (currentPhase === 'preparing') {
+        targetPhase = 'preparing'; // Let the timer handle transition to ready
       } else {
-        targetPhase = 'preparing'; // First go to preparing, then ready
+        // CRITICAL FIX: Fast-track to preparing when authenticated with content
+        targetPhase = 'preparing';
+        logger.info('[LoadingStateManager] Fast-tracking to preparing phase');
       }
     } else {
       // Fallback
@@ -327,6 +337,42 @@ export default function useLoadingStateManager(
     transitionToPhaseDebounced
   ]);
 
+  // CRITICAL FIX: Failsafe timeout to prevent infinite loading
+  useEffect(() => {
+    // Clear any existing failsafe
+    if (failsafeTimer.current) {
+      clearTimeout(failsafeTimer.current);
+    }
+    
+    // If we're in a loading phase and have content and authentication, set a failsafe
+    const loadingPhases: AppPhase[] = ['loading-content', 'preparing', 'ready'];
+    if (loadingPhases.includes(currentPhase) && isAuthenticated && hasMinimumContent()) {
+      const FAILSAFE_TIMEOUT = 10000; // 10 seconds max
+      
+      logger.info('[LoadingStateManager] Setting failsafe timeout', { 
+        currentPhase, 
+        timeout: FAILSAFE_TIMEOUT 
+      });
+      
+      failsafeTimer.current = setTimeout(() => {
+        logger.warn('[LoadingStateManager] ⚠️ FAILSAFE TRIGGERED - Forcing transition to display');
+        
+        // Force immediate transition to displaying
+        setCurrentPhase('displaying');
+        setShouldShowLoadingScreen(false);
+        setShouldShowDisplay(true);
+        setProgress(100);
+        setStatusMessage('Connected');
+      }, FAILSAFE_TIMEOUT);
+    }
+    
+    return () => {
+      if (failsafeTimer.current) {
+        clearTimeout(failsafeTimer.current);
+      }
+    };
+  }, [currentPhase, isAuthenticated, hasMinimumContent]);
+  
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
@@ -338,6 +384,9 @@ export default function useLoadingStateManager(
       }
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
+      }
+      if (failsafeTimer.current) {
+        clearTimeout(failsafeTimer.current);
       }
     };
   }, []);

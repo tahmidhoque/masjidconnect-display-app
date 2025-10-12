@@ -376,4 +376,10 @@ export interface EmergencyAlert {
   expiresAt: string; // ISO date string when alert expires
   createdAt: string; // ISO date string when alert was created
   masjidId: string;  // ID of the masjid that created the alert
+  timing?: {
+    duration: number;      // Total duration in milliseconds
+    remaining: number;     // Remaining time in milliseconds (calculated by server)
+    autoCloseAt: string;   // ISO date string when alert should auto-close
+  };
+  action?: 'show' | 'hide' | 'update'; // Action to perform with this alert
 } 
