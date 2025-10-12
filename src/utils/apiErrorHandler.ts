@@ -44,6 +44,15 @@ export function createErrorResponse<T>(
 export function normalizeApiResponse<T>(
   response: Partial<ApiResponse<T>>
 ): ApiResponse<T> {
+  // Check if data is an HTML string (common error case)
+  if (response.data && typeof response.data === 'string' && 
+      (response.data as string).trim().startsWith('<')) {
+    logger.error('Received HTML in API response data', {
+      preview: (response.data as string).substring(0, 200)
+    });
+    return createErrorResponse('API returned HTML instead of JSON');
+  }
+  
   // Ensure the response has all required fields
   const normalized: ApiResponse<T> = {
     success: response.success === true,
@@ -66,10 +75,14 @@ export function normalizeApiResponse<T>(
  * This can be used as a final check before returning from API methods
  */
 export function validateApiResponse<T>(response: any): ApiResponse<T> {
+  // First check if response is a valid object (not string, not null, not array)
+  if (!response || typeof response !== 'object' || Array.isArray(response)) {
+    logger.error('Invalid API response: not an object', { response: typeof response });
+    return createErrorResponse('Invalid API response format');
+  }
+  
   // Check if this is already a valid API response
   if (
-    response &&
-    typeof response === 'object' &&
     'success' in response &&
     ('data' in response || response.success === false)
   ) {

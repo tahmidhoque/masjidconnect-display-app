@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography, Paper, Container, Button } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { getCurrentVersion, formatVersionDisplay } from '../../utils/versionManager';
 
 interface ErrorScreenProps {
   message?: string;
@@ -11,15 +12,11 @@ interface ErrorScreenProps {
 
 /**
  * ErrorScreen component
- * 
+ *
  * Displays an error message with optional details and a retry button.
  * Used when the app encounters a fatal error.
  */
-const ErrorScreen: React.FC<ErrorScreenProps> = ({ 
-  message = 'An error occurred', 
-  details,
-  onRetry 
-}) => {
+const ErrorScreen: React.FC<ErrorScreenProps> = ({ message = 'An error occurred', details, onRetry }) => {
   const handleRetry = () => {
     if (onRetry) {
       onRetry();
@@ -52,17 +49,17 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
           }}
         >
           <ErrorOutlineIcon color="error" sx={{ fontSize: 64, mb: 2 }} />
-          
+
           <Typography variant="h3" color="error" gutterBottom>
             {message}
           </Typography>
-          
+
           {details && (
             <Typography variant="body1" sx={{ mt: 2, mb: 4 }}>
               {details}
             </Typography>
           )}
-          
+
           <Button
             variant="contained"
             color="primary"
@@ -75,14 +72,14 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
           </Button>
         </Paper>
       </Container>
-      
+
       <Box sx={{ position: 'fixed', bottom: 16, width: '100%', textAlign: 'center' }}>
         <Typography variant="body2" color="text.secondary">
-          MasjidConnect Display v1.0.0
+          MasjidConnect Display {formatVersionDisplay(getCurrentVersion())}
         </Typography>
       </Box>
     </Box>
   );
 };
 
-export default ErrorScreen; 
+export default ErrorScreen;

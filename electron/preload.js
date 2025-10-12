@@ -48,8 +48,8 @@ class MemoryStore {
       if (typeof window !== 'undefined' && window.localStorage) {
         // Only clear our keys, not all localStorage
         Object.keys(window.localStorage)
-          .filter(k => k.startsWith('electron-store-'))
-          .forEach(k => window.localStorage.removeItem(k));
+          .filter((k) => k.startsWith('electron-store-'))
+          .forEach((k) => window.localStorage.removeItem(k));
       }
     } catch (err) {
       console.error('Failed to clear localStorage:', err.message);
@@ -69,7 +69,7 @@ try {
     name: 'masjidconnect-storage',
     // Make sure to encode/decode JSON for complex objects
     serialize: (value) => JSON.stringify(value),
-    deserialize: (value) => JSON.parse(value)
+    deserialize: (value) => JSON.parse(value),
   });
   console.log('Successfully loaded electron-store');
 } catch (error) {
@@ -80,8 +80,8 @@ try {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       Object.keys(window.localStorage)
-        .filter(k => k.startsWith('electron-store-'))
-        .forEach(k => {
+        .filter((k) => k.startsWith('electron-store-'))
+        .forEach((k) => {
           const actualKey = k.replace('electron-store-', '');
           try {
             const storedValue = window.localStorage.getItem(k);
@@ -100,31 +100,67 @@ try {
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
-contextBridge.exposeInMainWorld(
-  'electron', {
-    updater: {
-      // Listen for update messages
-      onUpdateMessage: (callback) => {
-        ipcRenderer.on('update-message', (event, text) => callback(text));
-      },
-      // Check for updates
-      checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-      // Restart app to install update
-      restartApp: () => ipcRenderer.invoke('restart-app')
+contextBridge.exposeInMainWorld('electron', {
+  updater: {
+    // Check for updates
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+
+    // Download update
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+
+    // Install update and restart
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+
+    // Restart app without installing update
+    restartApp: () => ipcRenderer.invoke('restart-app'),
+
+    // Listen for update messages
+    onUpdateMessage: (callback) => {
+      const subscription = (event, text) => callback(text);
+      ipcRenderer.on('update-message', subscription);
+      return () => ipcRenderer.removeListener('update-message', subscription);
     },
-    store: {
-      // Get a value from store
-      get: (key, defaultValue) => store.get(key, defaultValue),
-      // Set a value in store
-      set: (key, value) => store.set(key, value),
-      // Delete a key from store
-      delete: (key) => store.delete(key),
-      // Check if store has a key
-      has: (key) => store.has(key),
-      // Clear the entire store
-      clear: () => store.clear(),
-      // Get all keys in store
-      keys: () => store.keys()
-    }
-  }
-); 
+
+    // Listen for update available
+    onUpdateAvailable: (callback) => {
+      const subscription = (event, info) => callback(info);
+      ipcRenderer.on('update-available', subscription);
+      return () => ipcRenderer.removeListener('update-available', subscription);
+    },
+
+    // Listen for download progress
+    onDownloadProgress: (callback) => {
+      const subscription = (event, progress) => callback(progress);
+      ipcRenderer.on('download-progress', subscription);
+      return () => ipcRenderer.removeListener('download-progress', subscription);
+    },
+
+    // Listen for update downloaded
+    onUpdateDownloaded: (callback) => {
+      const subscription = (event, info) => callback(info);
+      ipcRenderer.on('update-downloaded', subscription);
+      return () => ipcRenderer.removeListener('update-downloaded', subscription);
+    },
+
+    // Listen for update errors
+    onUpdateError: (callback) => {
+      const subscription = (event, error) => callback(error);
+      ipcRenderer.on('update-error', subscription);
+      return () => ipcRenderer.removeListener('update-error', subscription);
+    },
+  },
+  store: {
+    // Get a value from store
+    get: (key, defaultValue) => store.get(key, defaultValue),
+    // Set a value in store
+    set: (key, value) => store.set(key, value),
+    // Delete a key from store
+    delete: (key) => store.delete(key),
+    // Check if store has a key
+    has: (key) => store.has(key),
+    // Clear the entire store
+    clear: () => store.clear(),
+    // Get all keys in store
+    keys: () => store.keys(),
+  },
+});

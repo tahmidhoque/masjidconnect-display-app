@@ -28,6 +28,7 @@
     "electron-log": "^5.1.0",
     "electron-store": "^10.1.0",
     "electron-updater": "^6.1.7",
+    "html2canvas": "^1.4.1",
     "localforage": "^1.10.0",
     "notistack": "^3.0.2",
     "qrcode.react": "^4.2.0",
@@ -46,9 +47,9 @@
     "workbox-strategies": "^6.5.4"
   },
   "scripts": {
-    "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build",
-    "build:fix-paths": "react-scripts build && ./fix-paths.sh",
+    "start": "cross-env REACT_APP_VERSION=$npm_package_version PORT=3001 react-scripts start",
+    "build": "cross-env REACT_APP_VERSION=$npm_package_version react-scripts build",
+    "build:fix-paths": "cross-env REACT_APP_VERSION=$npm_package_version react-scripts build && ./fix-paths.sh",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on --timeout 60000 http://localhost:3001 && cross-env ELECTRON_DEBUG=true electron .\"",
@@ -59,7 +60,11 @@
     "rpi:build": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish never",
     "rpi:build:armv7l": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --publish never",
     "rpi:build:arm64": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --arm64 --publish never",
-    "rpi:publish": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish always"
+    "rpi:publish": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish always",
+    "version:bump:major": "npm version major --no-git-tag-version",
+    "version:bump:minor": "npm version minor --no-git-tag-version",
+    "version:bump:patch": "npm version patch --no-git-tag-version",
+    "release:prepare": "npm run test -- --watchAll=false && npm run build"
   },
   "eslintConfig": {
     "extends": [
@@ -91,7 +96,8 @@
   },
   "build": {
     "appId": "com.masjidconnect.display",
-    "productName": "MasjidConnect Display",
+    "productName": "masjidconnect-display",
+    "executableName": "masjidconnect-display",
     "files": [
       "build/**/*",
       "electron/**/*",
@@ -158,7 +164,10 @@
         "Comment": "Digital signage for mosques",
         "Categories": "Utility;Education;",
         "StartupWMClass": "masjidconnect-display"
-      }
+      },
+      "maintainer": "MasjidConnect <support@masjidconnect.com>",
+      "vendor": "MasjidConnect",
+      "packageCategory": "utils"
     },
     "deb": {
       "afterInstall": "after-install.sh",

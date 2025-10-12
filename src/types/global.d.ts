@@ -5,11 +5,25 @@ interface Window {
       exit: () => void;
     };
     updater: {
-      onUpdateMessage: (callback: (text: string) => void) => void;
-      checkForUpdates: () => Promise<string>;
-      restartApp: () => Promise<void>;
+      // Methods
+      checkForUpdates: () => Promise<{ success: boolean; message?: string; error?: string }>;
+      downloadUpdate: () => Promise<{ success: boolean; message?: string; error?: string }>;
+      installUpdate: () => Promise<{ success: boolean; message?: string; error?: string }>;
+      restartApp: () => Promise<{ success: boolean; message?: string; error?: string }>;
       relaunch: () => Promise<void>;
       exit: () => Promise<void>;
+      
+      // Event listeners (all return unsubscribe functions)
+      onUpdateMessage: (callback: (text: string) => void) => () => void;
+      onUpdateAvailable: (callback: (info: { version: string }) => void) => () => void;
+      onDownloadProgress: (callback: (progress: {
+        bytesPerSecond: number;
+        percent: number;
+        transferred: number;
+        total: number;
+      }) => void) => () => void;
+      onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
+      onUpdateError: (callback: (error: Error) => void) => () => void;
     };
     store?: {
       get: (key: string, defaultValue?: any) => any;

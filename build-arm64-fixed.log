@@ -1,0 +1,263 @@
+
+> masjidconnect-display-app@0.0.1 rpi:build:arm64
+> npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --arm64 --publish never
+
+
+> masjidconnect-display-app@0.0.1 build:fix-paths
+> cross-env REACT_APP_VERSION=$npm_package_version react-scripts build && ./fix-paths.sh
+
+Creating an optimized production build...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Compiled with warnings.
+
+[eslint] 
+src/App.tsx
+  Line 36:7:  'ErrorScreen' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/api/masjidDisplayClient.ts
+  Line 9:3:     'PrayerStatus' is defined but never used                                                      @typescript-eslint/no-unused-vars
+  Line 49:7:    'ERROR_RETRY' is assigned a value but never used                                              @typescript-eslint/no-unused-vars
+  Line 246:59:  Unexpected mix of '||' and '&&'. Use parentheses to clarify the intended order of operations  no-mixed-operators
+  Line 247:52:  Unexpected mix of '||' and '&&'. Use parentheses to clarify the intended order of operations  no-mixed-operators
+  Line 247:83:  Unexpected mix of '||' and '&&'. Use parentheses to clarify the intended order of operations  no-mixed-operators
+  Line 248:33:  Unexpected mix of '||' and '&&'. Use parentheses to clarify the intended order of operations  no-mixed-operators
+
+src/components/common/AnalyticsErrorIntegration.tsx
+  Line 3:15:  'RootState' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/components/common/ContentCarousel.tsx
+  Line 9:51:    'Paper' is defined but never used                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  Line 12:8:    'IslamicPatternBackground' is defined but never used                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  Line 13:10:   'NoMobilePhoneIcon' is defined but never used                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  Line 15:8:    'localforage' is defined but never used                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  Line 18:8:    'storageService' is defined but never used                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  Line 57:7:    'MemoizedFormattedText' is assigned a value but never used                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  Line 121:11:  'ScheduleItem' is defined but never used                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  Line 150:16:  'isContentLoading' is assigned a value but never used                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  Line 151:5:   'carouselTime' is assigned a value but never used                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  Line 164:22:  'screenSize' is assigned a value but never used                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  Line 168:23:  'setShowContent' is assigned a value but never used                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  Line 171:22:  'setAutoRotate' is assigned a value but never used                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  Line 172:10:  'currentItemDisplayTime' is assigned a value but never used                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  Line 174:10:  'hasCheckedLocalStorage' is assigned a value but never used                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  Line 181:9:   'lastInteractionTime' is assigned a value but never used                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  Line 183:9:   'lastAnnouncementState' is assigned a value but never used                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  Line 192:9:   'userInteractionTimeout' is assigned a value but never used                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  Line 196:10:  'nextItemIndex' is assigned a value but never used                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  Line 319:6:   React Hook useEffect has a missing dependency: 'contentItems.length'. Either include it or remove the dependency array                                                                                                                                react-hooks/exhaustive-deps
+  Line 438:9:   The 'getDynamicFontSize' function makes the dependencies of useCallback Hook (at line 903) change on every render. Move it inside the useCallback callback. Alternatively, wrap the definition of 'getDynamicFontSize' in its own useCallback() Hook  react-hooks/exhaustive-deps
+  Line 484:9:   'processedContentItems' is assigned a value but never used                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  Line 489:9:   'throttledItemChange' is assigned a value but never used                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  Line 502:9:   'cardAnimationStyles' is assigned a value but never used                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  Line 515:13:  'hasArabic' is assigned a value but never used                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  Line 741:9:   'titleGradient' is assigned a value but never used                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+
+src/components/common/EmergencyAlertOverlay.tsx
+  Line 2:34:  'Fade' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/components/common/FactoryResetModal.tsx
+  Line 40:9:  'theme' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/components/common/GracefulErrorOverlay.tsx
+  Line 18:12:  'ErrorIcon' is defined but never used                                                                                                    @typescript-eslint/no-unused-vars
+  Line 152:6:  React Hook useEffect has missing dependencies: 'autoHideTimer' and 'handleRecovery'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+src/components/common/IslamicPatternBackground.tsx
+  Line 2:25:  'alpha' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/components/common/ModernIslamicBackground.tsx
+  Line 48:15:  'gradientContent' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/components/common/ModernPrayerCard.tsx
+  Line 2:3:    'useMemo' is defined but never used                     @typescript-eslint/no-unused-vars
+  Line 44:22:  'layout' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  Line 44:30:  'screenSize' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  Line 48:5:   'isJumuahToday' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  Line 49:5:   'jumuahDisplayTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  Line 50:5:   'jumuahKhutbahTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  Line 63:9:   'isPortrait' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+src/components/common/PrayerCountdown.tsx
+  Line 37:9:    'lastCountdownStateRef' is assigned a value but never used                                                              @typescript-eslint/no-unused-vars
+  Line 111:15:  'shouldCountToJamaat' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
+  Line 348:6:   React Hook useEffect has a missing dependency: 'timeUntilNextPrayer'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/components/common/RemoteCommandNotification.tsx
+  Line 9:80:  'IconButton' is defined but never used                                                                                      @typescript-eslint/no-unused-vars
+  Line 10:8:  'CloseIcon' is defined but never used                                                                                       @typescript-eslint/no-unused-vars
+  Line 11:8:  'SystemUpdateIcon' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+  Line 59:6:  React Hook useEffect has a missing dependency: 'executeCountdownCommand'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/components/layouts/ModernLandscapeDisplay.tsx
+  Line 79:9:   'isLowPower' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  Line 200:9:  'shouldSkipRender' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/components/screens/DisplayScreen.tsx
+  Line 21:10:  'ALERT_COLOR_SCHEMES' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/components/screens/EnhancedLoadingScreen.tsx
+  Line 13:7:   'FADE_IN_DURATION' is assigned a value but never used              @typescript-eslint/no-unused-vars
+  Line 15:7:   'PROGRESS_TRANSITION_DURATION' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  Line 18:7:   'SPINNER_FADE_DELAY' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  Line 19:7:   'PROGRESS_FADE_DELAY' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  Line 20:7:   'STATUS_FADE_DELAY' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  Line 57:10:  'isFullyVisible' is assigned a value but never used                @typescript-eslint/no-unused-vars
+
+src/components/screens/PairingScreen.tsx
+  Line 3:3:    'Box' is defined but never used                                                                                                                               @typescript-eslint/no-unused-vars
+  Line 4:3:    'Container' is defined but never used                                                                                                                         @typescript-eslint/no-unused-vars
+  Line 5:3:    'Typography' is defined but never used                                                                                                                        @typescript-eslint/no-unused-vars
+  Line 6:3:    'Button' is defined but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  Line 7:3:    'Fade' is defined but never used                                                                                                                              @typescript-eslint/no-unused-vars
+  Line 8:3:    'Paper' is defined but never used                                                                                                                             @typescript-eslint/no-unused-vars
+  Line 9:3:    'IconButton' is defined but never used                                                                                                                        @typescript-eslint/no-unused-vars
+  Line 10:3:   'Tooltip' is defined but never used                                                                                                                           @typescript-eslint/no-unused-vars
+  Line 12:21:  'RefreshIcon' is defined but never used                                                                                                                       @typescript-eslint/no-unused-vars
+  Line 19:3:   'clearPairingError' is defined but never used                                                                                                                 @typescript-eslint/no-unused-vars
+  Line 32:8:   'logger' is defined but never used                                                                                                                            @typescript-eslint/no-unused-vars
+  Line 59:5:   'isCheckingPairingStatus' is assigned a value but never used                                                                                                  @typescript-eslint/no-unused-vars
+  Line 67:10:  'isPolling' is assigned a value but never used                                                                                                                @typescript-eslint/no-unused-vars
+  Line 249:6:  React Hook useEffect has missing dependencies: 'isPairingCodeExpired', 'pairingCode', and 'startPolling'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+src/components/screens/pairing/PairingInstructions.tsx
+  Line 55:28:  Using target="_blank" without rel="noreferrer" (which implies rel="noopener") is a security risk in older browsers: see https://mathiasbynens.github.io/rel-noopener/#recommendations  react/jsx-no-target-blank
+
+src/hooks/useKioskMode.ts
+  Line 4:30:  'refreshContent' is defined but never used        @typescript-eslint/no-unused-vars
+  Line 15:9:  'prayerTimes' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/hooks/useLoadingStateManager.ts
+  Line 75:9:  'isHighStrain' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/hooks/usePrayerTimes.ts
+  Line 146:6:   React Hook useEffect has a missing dependency: 'processPrayerTimes'. Either include it or remove the dependency array                                      react-hooks/exhaustive-deps
+  Line 239:6:   React Hook useEffect has a missing dependency: 'processPrayerTimes'. Either include it or remove the dependency array                                      react-hooks/exhaustive-deps
+  Line 312:6:   React Hook useCallback has missing dependencies: 'checkForDayChange' and 'updateFormattedPrayerTimes'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  Line 575:11:  'now' is assigned a value but never used                                                                                                                   @typescript-eslint/no-unused-vars
+
+src/hooks/useResponsiveFontSize.ts
+  Line 28:9:  'BASE_HEIGHT' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/index.tsx
+  Line 12:8:  'LoadingScreen' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/services/dataSyncService.ts
+  Line 422:29:  Function declared in a loop contains unsafe references to variable(s) 'retryCount'  no-loop-func
+
+src/services/emergencyAlertService.ts
+  Line 3:8:   'storageService' is defined but never used        @typescript-eslint/no-unused-vars
+  Line 15:7:  'STORAGE_KEY' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/services/remoteControlService.ts
+  Line 13:8:  'storageService' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/services/storageService.ts
+  Line 2:38:   'PrayerStatus' is defined but never used                          @typescript-eslint/no-unused-vars
+  Line 470:1:  Assign instance to a variable before exporting as module default  import/no-anonymous-default-export
+
+src/store/middleware/emergencyMiddleware.ts
+  Line 1:22:  'MiddlewareAPI' is defined but never used                     @typescript-eslint/no-unused-vars
+  Line 1:37:  'ThunkDispatch' is defined but never used                     @typescript-eslint/no-unused-vars
+  Line 1:52:  'UnknownAction' is defined but never used                     @typescript-eslint/no-unused-vars
+  Line 2:28:  'RootState' is defined but never used                         @typescript-eslint/no-unused-vars
+  Line 16:3:  'selectAutoReconnect' is defined but never used               @typescript-eslint/no-unused-vars
+  Line 55:9:  'initializeRemoteControl' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/store/middleware/performanceMiddleware.ts
+  Line 16:7:  'throttledRefreshContent' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/store/slices/authSlice.ts
+  Line 3:10:  'ApiCredentials' is defined but never used              @typescript-eslint/no-unused-vars
+  Line 3:26:  'RequestPairingCodeResponse' is defined but never used  @typescript-eslint/no-unused-vars
+  Line 3:54:  'CheckPairingStatusResponse' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/store/slices/contentSlice.ts
+  Line 3:8:   'masjidDisplayClient' is defined but never used    @typescript-eslint/no-unused-vars
+  Line 10:7:  'SKIP_PRAYERS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/store/slices/errorSlice.ts
+  Line 170:13:  'dnsCheck' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/theme/theme.ts
+  Line 2:10:  'TypographyProps' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/utils/debugEventSource.ts
+  Line 197:7:  Unnecessarily computed property [0] found  no-useless-computed-key
+  Line 198:7:  Unnecessarily computed property [1] found  no-useless-computed-key
+  Line 199:7:  Unnecessarily computed property [2] found  no-useless-computed-key
+
+src/utils/logger.ts
+  Line 107:1:  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+File sizes after gzip:
+
+  201.28 kB  build/static/js/main.a225bc05.js
+  46.39 kB   build/static/js/239.a25351ee.chunk.js
+  15.57 kB   build/static/js/214.4bb5bc23.chunk.js
+  14.19 kB   build/static/js/477.09666eb9.chunk.js
+  7.32 kB    build/static/js/789.ca6b2641.chunk.js
+  3.99 kB    build/static/js/202.ab5a3dee.chunk.js
+  2.69 kB    build/static/js/7.fda3c2c4.chunk.js
+  1.78 kB    build/static/js/453.c0e3f3ac.chunk.js
+  1.77 kB    build/static/css/main.01d3372a.css
+
+The project was built assuming it is hosted at ./.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
+Fixing static asset paths in build...
+✅ Path fixes applied successfully!
+Original file backed up to: ./build/index.html.backup
+Preparing Raspberry Pi build...
+Building version: 0.0.1
+Generating build metadata...
+Build metadata written to: /Users/tahmidhoque/dev/masjidconnect-display-app/build/version.json
+Made after-install.sh executable
+Creating a valid 256x256 PNG icon file...
+Backing up existing icon...
+Created valid 256x256 PNG icon at: /Users/tahmidhoque/dev/masjidconnect-display-app/assets/icon.png
+Build report created at: /Users/tahmidhoque/dev/masjidconnect-display-app/build/rpi-build-report.txt
+
+========================================
+Raspberry Pi Build Preparation Complete!
+========================================
+Version: 0.0.1
+Git Hash: 1be29f0
+Git Branch: cursor/debug-and-stabilize-prayer-time-application-on-rpi-a221
+Build Time: 2025-10-12T15:31:01.213Z
+========================================
+
+  • electron-builder  version=24.13.3 os=24.6.0
+  • loaded configuration  file=package.json ("build" field)
+  • public/electron.js not found. Please see https://medium.com/@kitze/%EF%B8%8F-from-react-to-an-electron-app-ready-for-production-a0468ecb1da3
+  • loaded parent configuration  preset=react-cra
+  • Specified application directory equals to project dir — superfluous or wrong configuration  appDirectory=.
+  • packaging       platform=linux arch=arm64 electron=35.1.2 appOutDir=dist/linux-arm64-unpacked
+  • building        target=deb arch=arm64 file=dist/masjidconnect-display-0.0.1-arm64.deb
+  • adding autoupdate files for: deb. (Beta feature)  resourceDir=/Users/tahmidhoque/dev/masjidconnect-display-app/dist/linux-arm64-unpacked/resources
+  ⨯ Please specify executable name as linux.executableName instead of linux.desktop.Exec  failedTask=build stackTrace=Error: Please specify executable name as linux.executableName instead of linux.desktop.Exec
+    at LinuxTargetHelper.computeDesktopEntry (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/targets/LinuxTargetHelper.ts:107:13)
+    at LinuxTargetHelper.writeDesktopEntry (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/targets/LinuxTargetHelper.ts:95:29)
+    at FpmTarget.build (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/targets/FpmTarget.ts:235:47)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/platformPackager.ts:158:11
+    at async Promise.all (index 0)
+    at AsyncTaskManager.awaitTasks (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/builder-util/src/asyncTaskManager.ts:65:25)
+    at Packager.doBuild (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/packager.ts:461:5)
+    at executeFinally (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/builder-util/src/promise.ts:12:14)
+    at Packager._build (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/packager.ts:379:31)
+    at Packager.build (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/app-builder-lib/src/packager.ts:340:12)
+    at executeFinally (/Users/tahmidhoque/dev/masjidconnect-display-app/node_modules/builder-util/src/promise.ts:12:14)

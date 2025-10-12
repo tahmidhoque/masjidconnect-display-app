@@ -8,10 +8,12 @@ import contentSlice from './slices/contentSlice';
 import uiSlice from './slices/uiSlice';
 import emergencySlice from './slices/emergencySlice';
 import errorSlice from './slices/errorSlice';
+import updateSlice from './slices/updateSlice';
 
 // Import middleware
 import { emergencyMiddleware } from './middleware/emergencyMiddleware';
 import { performanceMiddleware } from './middleware/performanceMiddleware';
+import { updateMiddleware } from './middleware/updateMiddleware';
 
 // Root reducer
 const rootReducer = combineReducers({
@@ -20,6 +22,7 @@ const rootReducer = combineReducers({
   ui: uiSlice,
   emergency: emergencySlice,
   errors: errorSlice,
+  update: updateSlice,
 });
 
 // Types are defined below to avoid circular dependencies
@@ -30,7 +33,8 @@ const persistConfig = {
   version: 1,
   storage,
   // Blacklist UI state and error state that should not be persisted
-  blacklist: ['ui', 'errors'],
+  // Also blacklist update state as it should be fresh on each app start
+  blacklist: ['ui', 'errors', 'update'],
   // Whitelist critical data that should be persisted
   whitelist: ['auth', 'content', 'emergency']
 };
@@ -54,7 +58,8 @@ export const store = configureStore({
     })
     // Add custom middleware
     .concat(emergencyMiddleware)
-    .concat(performanceMiddleware.middleware),
+    .concat(performanceMiddleware.middleware)
+    .concat(updateMiddleware),
   // Enable Redux DevTools in development
   devTools: process.env.NODE_ENV === 'development',
 });

@@ -2,21 +2,25 @@ import React from 'react';
 import { Box, Typography, useTheme, alpha } from '@mui/material';
 import GlassmorphicCard from './GlassmorphicCard';
 import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
+import { getCurrentVersion, formatVersionDisplay } from '../../utils/versionManager';
 
 interface GlassmorphicFooterProps {
   logoSrc: string;
   orientation?: 'portrait' | 'landscape';
+  showVersion?: boolean;
 }
 
 const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
   logoSrc,
-  orientation = 'landscape'
+  orientation = 'landscape',
+  showVersion = true,
 }) => {
   const theme = useTheme();
   const { fontSizes, getSizeRem } = useResponsiveFontSize();
-  
+
   const isPortrait = orientation === 'portrait';
-  
+  const currentVersion = getCurrentVersion();
+
   return (
     <Box
       sx={{
@@ -34,7 +38,7 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
         borderWidth={1}
         borderOpacity={0.12}
         borderColor={alpha('#ffffff', 0.12)}
-        shadowIntensity={0.10}
+        shadowIntensity={0.1}
         sx={{
           display: 'flex',
           alignItems: 'center',
@@ -60,16 +64,31 @@ const GlassmorphicFooter: React.FC<GlassmorphicFooterProps> = ({
         >
           Powered by
         </Typography>
-        
-        <img 
-          src={logoSrc} 
-          alt="MasjidConnect Logo" 
-          style={{ 
+
+        <img
+          src={logoSrc}
+          alt="MasjidConnect Logo"
+          style={{
             height: `${getSizeRem(1.0).replace('rem', '')}rem`,
             width: 'auto',
-            filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15))'
+            filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15))',
           }}
         />
+
+        {showVersion && (
+          <Typography
+            sx={{
+              fontSize: isPortrait ? fontSizes.caption : fontSizes.small,
+              color: alpha('#fff', 0.5),
+              fontFamily: "'Poppins', sans-serif",
+              fontWeight: 300,
+              letterSpacing: '0.2px',
+              ml: getSizeRem(0.5),
+            }}
+          >
+            {formatVersionDisplay(currentVersion)}
+          </Typography>
+        )}
       </GlassmorphicCard>
     </Box>
   );

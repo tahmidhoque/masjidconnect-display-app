@@ -4,6 +4,35 @@ export interface ApiCredentials {
   screenId: string;
 }
 
+// Version/Update Types
+export interface GitHubRelease {
+  tag_name: string;
+  name: string;
+  body: string;
+  published_at: string;
+  prerelease: boolean;
+  assets: GitHubAsset[];
+}
+
+export interface GitHubAsset {
+  name: string;
+  browser_download_url: string;
+  size: number;
+  content_type: string;
+}
+
+export interface VersionInfo {
+  version: string;
+  releaseNotes: string;
+  publishedAt: string;
+  isPrerelease: boolean;
+  downloadUrls: {
+    armv7l?: string;
+    arm64?: string;
+  };
+  assets: GitHubAsset[];
+}
+
 export interface PairingRequest {
   pairingCode: string;
   deviceInfo: {

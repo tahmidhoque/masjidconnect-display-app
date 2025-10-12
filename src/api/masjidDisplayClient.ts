@@ -16,7 +16,9 @@ import {
   PairedCredentialsRequest,
   PairedCredentialsResponse,
   AnalyticsRequest,
-  AnalyticsResponse
+  AnalyticsResponse,
+  GitHubRelease,
+  VersionInfo
 } from './models';
 import logger, { setLastError } from '../utils/logger';
 import { createErrorResponse, normalizeApiResponse, validateApiResponse } from '../utils/apiErrorHandler';
@@ -112,8 +114,8 @@ class MasjidDisplayClient {
   private authInitialized: boolean = false;
 
   constructor() {
-    // Set the baseURL from environment or use default
-    let baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    // Set the baseURL from environment or use default production URL
+    let baseURL = process.env.REACT_APP_API_URL || 'https://portal.masjidconnect.co.uk/api';
     
     // Remove any trailing slash for consistency
     baseURL = baseURL.replace(/\/$/, '');
@@ -644,6 +646,16 @@ class MasjidDisplayClient {
           status: response?.status,
           hasData: !!response.data
         });
+      }
+      
+      // Check if response.data is HTML (common error response)
+      if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
+        logger.error(`Received HTML response instead of JSON from ${normalizedEndpoint}`, {
+          status: response.status,
+          contentType: response.headers?.['content-type'],
+          preview: response.data.substring(0, 200)
+        });
+        throw new Error(`API returned HTML instead of JSON. This usually indicates a server error or incorrect URL.`);
       }
       
       const result: ApiResponse<T> = normalizeApiResponse({
@@ -1396,6 +1408,134 @@ class MasjidDisplayClient {
     } catch (error) {
       console.error("Error testing emergency alert:", error);
       return false;
+    }
+  }
+
+  /**
+   * Fetch latest version information from GitHub Releases
+   * @param includePrerelease Whether to include pre-release versions
+   * @returns Latest version information
+   */
+  public async getLatestVersion(includePrerelease: boolean = false): Promise<ApiResponse<VersionInfo>> {
+    try {
+      const owner = 'masjidSolutions';
+      const repo = 'masjidconnect-display-app';
+      
+      // Use GitHub API to fetch releases
+      const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/releases`;
+      
+      logger.info('Fetching latest version from GitHub', { includePrerelease });
+      
+      // Fetch all releases
+      const response = await axios.get<GitHubRelease[]>(githubApiUrl, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+        },
+        timeout: 10000,
+      });
+      
+      if (!response.data || response.data.length === 0) {
+        return createErrorResponse('No releases found');
+      }
+      
+      // Filter releases based on prerelease preference
+      const releases = includePrerelease 
+        ? response.data 
+        : response.data.filter(r => !r.prerelease);
+      
+      if (releases.length === 0) {
+        return createErrorResponse('No stable releases found');
+      }
+      
+      // Get the latest release (first in the list)
+      const latestRelease = releases[0];
+      
+      // Extract download URLs for ARM architectures
+      const downloadUrls: { armv7l?: string; arm64?: string } = {};
+      
+      latestRelease.assets.forEach(asset => {
+        if (asset.name.includes('armv7l') && asset.name.endsWith('.deb')) {
+          downloadUrls.armv7l = asset.browser_download_url;
+        } else if (asset.name.includes('arm64') && asset.name.endsWith('.deb')) {
+          downloadUrls.arm64 = asset.browser_download_url;
+        }
+      });
+      
+      // Parse version from tag_name (remove 'v' prefix if present)
+      const version = latestRelease.tag_name.replace(/^v/, '');
+      
+      const versionInfo: VersionInfo = {
+        version,
+        releaseNotes: latestRelease.body || '',
+        publishedAt: latestRelease.published_at,
+        isPrerelease: latestRelease.prerelease,
+        downloadUrls,
+        assets: latestRelease.assets,
+      };
+      
+      logger.info('Latest version fetched successfully', { version });
+      
+      return normalizeApiResponse({
+        success: true,
+        data: versionInfo,
+      });
+    } catch (error: any) {
+      logger.error('Error fetching latest version', { error: error.message });
+      
+      // Check if it's a rate limit error
+      if (error.response?.status === 403) {
+        return createErrorResponse('GitHub API rate limit exceeded. Please try again later.');
+      }
+      
+      return createErrorResponse('Failed to fetch latest version: ' + error.message);
+    }
+  }
+
+  /**
+   * Check if an update is available
+   * @param currentVersion The current version of the application
+   * @param includePrerelease Whether to check for pre-release versions
+   * @returns Update availability information
+   */
+  public async checkForUpdate(
+    currentVersion: string,
+    includePrerelease: boolean = false
+  ): Promise<ApiResponse<{ updateAvailable: boolean; latestVersion?: VersionInfo }>> {
+    try {
+      const result = await this.getLatestVersion(includePrerelease);
+      
+      if (!result.success || !result.data) {
+        return {
+          success: false,
+          error: result.error || 'Failed to check for updates',
+          data: null,
+          cached: false,
+        };
+      }
+      
+      const latestVersionInfo = result.data;
+      
+      // Import version comparison utility
+      const { isNewerVersion } = await import('../utils/versionManager');
+      
+      const updateAvailable = isNewerVersion(latestVersionInfo.version, currentVersion);
+      
+      logger.info('Update check completed', {
+        currentVersion,
+        latestVersion: latestVersionInfo.version,
+        updateAvailable,
+      });
+      
+      return normalizeApiResponse({
+        success: true,
+        data: {
+          updateAvailable,
+          latestVersion: updateAvailable ? latestVersionInfo : undefined,
+        },
+      });
+    } catch (error: any) {
+      logger.error('Error checking for update', { error: error.message });
+      return createErrorResponse('Failed to check for update: ' + error.message);
     }
   }
 }

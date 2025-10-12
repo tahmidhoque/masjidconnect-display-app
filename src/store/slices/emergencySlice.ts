@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { EmergencyAlert } from '../../api/models';
 import emergencyAlertService from '../../services/emergencyAlertService';
+import remoteControlService from '../../services/remoteControlService';
 import logger from '../../utils/logger';
 
 // State interface
@@ -65,10 +66,13 @@ export const initializeEmergencyService = createAsyncThunk(
   'emergency/initialize',
   async (baseURL: string, { rejectWithValue }) => {
     try {
-      logger.debug('[Emergency] Initializing emergency alert service with baseURL', { baseURL });
+      logger.debug('[Emergency] Initializing emergency alert and remote control services with baseURL', { baseURL });
       
-      // Initialize the service
+      // Initialize the emergency alert service
       emergencyAlertService.initialize(baseURL);
+      
+      // Initialize the remote control service
+      remoteControlService.initialize(baseURL);
       
       return {
         baseURL,

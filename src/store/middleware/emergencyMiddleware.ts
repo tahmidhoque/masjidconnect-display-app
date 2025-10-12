@@ -1,6 +1,7 @@
 import { Middleware, MiddlewareAPI, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import type { AppDispatch, RootState } from '../index';
 import emergencyAlertService from '../../services/emergencyAlertService';
+import remoteControlService from '../../services/remoteControlService';
 import { 
   setCurrentAlert, 
   setConnectionStatus,
@@ -48,6 +49,16 @@ export const emergencyMiddleware: Middleware = (api: any) => {
     
     // Monitor connection status (we'll implement this in the service if needed)
     // For now, we'll manage connection status through the middleware
+  };
+  
+  // Initialize remote control service
+  const initializeRemoteControl = (baseURL: string) => {
+    try {
+      logger.info('[EmergencyMiddleware] Initializing remote control service');
+      remoteControlService.initialize(baseURL);
+    } catch (error) {
+      logger.error('[EmergencyMiddleware] Error initializing remote control service', { error });
+    }
   };
   
   // Handle reconnection logic
