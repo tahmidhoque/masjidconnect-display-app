@@ -15,12 +15,24 @@ date | tee -a "$LOGFILE"
 
 # Create desktop file in proper location
 echo "Creating desktop entry..." | tee -a $LOGFILE
+
+# Find icon path (could be in various locations)
+ICON_PATH="/opt/masjidconnect-display/resources/app/assets/icon.png"
+if [ ! -f "$ICON_PATH" ]; then
+  # Try alternative locations
+  if [ -f "/opt/masjidconnect-display/resources/assets/icon.png" ]; then
+    ICON_PATH="/opt/masjidconnect-display/resources/assets/icon.png"
+  else
+    ICON_PATH=""  # No icon if not found
+  fi
+fi
+
 cat > /usr/share/applications/masjidconnect-display.desktop << EOL
 [Desktop Entry]
 Type=Application
 Name=MasjidConnect Display
 Exec=/opt/masjidconnect-display/masjidconnect-display --no-sandbox
-Icon=/opt/masjidconnect-display/resources/app/assets/icon.png
+${ICON_PATH:+Icon=$ICON_PATH}
 Comment=Digital signage for mosques
 Categories=Utility;Education;
 X-GNOME-Autostart-enabled=true
@@ -52,16 +64,28 @@ if mkdir -p "$FONTS_DIR" 2>/dev/null; then
   # Try to copy fonts from various possible locations
   FONT_COPIED=false
   
-  # Try build directory first
+  # Try build directory (if not asar, or if asarUnpack includes fonts)
   if [ -d "/opt/masjidconnect-display/resources/app/build/static/media" ]; then
     echo "Copying fonts from build/static/media..." | tee -a "$LOGFILE"
-    cp /opt/masjidconnect-display/resources/app/build/static/media/*.woff2 "$FONTS_DIR/" 2>/dev/null && FONT_COPIED=true
+    find /opt/masjidconnect-display/resources/app/build/static/media -name "*.woff2" -exec cp {} "$FONTS_DIR/" \; 2>/dev/null && FONT_COPIED=true
   fi
   
-  # Try assets directory
-  if [ -d "/opt/masjidconnect-display/resources/app/src/assets/fonts" ]; then
-    echo "Copying fonts from src/assets/fonts..." | tee -a "$LOGFILE"
-    cp /opt/masjidconnect-display/resources/app/src/assets/fonts/*.woff2 "$FONTS_DIR/" 2>/dev/null && FONT_COPIED=true
+  # Try static directory directly
+  if [ -d "/opt/masjidconnect-display/resources/app/build/static" ]; then
+    echo "Copying fonts from build/static..." | tee -a "$LOGFILE"
+    find /opt/masjidconnect-display/resources/app/build/static -name "*.woff2" -exec cp {} "$FONTS_DIR/" \; 2>/dev/null && FONT_COPIED=true
+  fi
+  
+  # Try assets directory (if unpacked)
+  if [ -d "/opt/masjidconnect-display/resources/app/assets" ]; then
+    echo "Copying fonts from assets..." | tee -a "$LOGFILE"
+    find /opt/masjidconnect-display/resources/app/assets -name "*.woff2" -exec cp {} "$FONTS_DIR/" \; 2>/dev/null && FONT_COPIED=true
+  fi
+  
+  # Try extraResources assets directory
+  if [ -d "/opt/masjidconnect-display/resources/assets" ]; then
+    echo "Copying fonts from resources/assets..." | tee -a "$LOGFILE"
+    find /opt/masjidconnect-display/resources/assets -name "*.woff2" -exec cp {} "$FONTS_DIR/" \; 2>/dev/null && FONT_COPIED=true
   fi
   
   # Set proper permissions only if files exist
@@ -79,7 +103,7 @@ if mkdir -p "$FONTS_DIR" 2>/dev/null; then
     
     echo "Arabic fonts installed successfully" | tee -a "$LOGFILE"
   else
-    echo "Warning: No font files found to install" | tee -a "$LOGFILE"
+    echo "Warning: No font files found to install (fonts may be in asar archive)" | tee -a "$LOGFILE"
   fi
 else
   echo "Warning: Could not create fonts directory, fonts may not render correctly" | tee -a "$LOGFILE"

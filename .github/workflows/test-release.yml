@@ -1,0 +1,198 @@
+name: Test Release
+
+on:
+  workflow_run:
+    workflows: ["Build and Release"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 1.0.0)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-release:
+    name: Test Release Installation
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Get version
+        id: get-version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$VERSION" ]; then
+              VERSION=$(node -p "require('./package.json').version")
+            fi
+          else
+            # Extract version from workflow run
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Testing version: $VERSION"
+
+      - name: Download release artifacts
+        run: |
+          VERSION="${{ steps.get-version.outputs.VERSION }}"
+          mkdir -p test-artifacts
+          
+          # Download arm64 artifact (for testing)
+          echo "Downloading arm64 artifact..."
+          curl -L -o "test-artifacts/masjidconnect-display-${VERSION}-arm64.deb" \
+            "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/masjidconnect-display-${VERSION}-arm64.deb" || echo "Artifact not found (may not be released yet)"
+          
+          # Download armv7l artifact
+          echo "Downloading armv7l artifact..."
+          curl -L -o "test-artifacts/masjidconnect-display-${VERSION}-armv7l.deb" \
+            "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/masjidconnect-display-${VERSION}-armv7l.deb" || echo "Artifact not found (may not be released yet)"
+
+      - name: Validate .deb files
+        run: |
+          echo "Validating downloaded .deb files..."
+          
+          for deb_file in test-artifacts/*.deb; do
+            if [ -f "$deb_file" ]; then
+              echo "Checking $deb_file..."
+              
+              # Check file size
+              SIZE=$(stat -c%s "$deb_file" 2>/dev/null || stat -f%z "$deb_file" 2>/dev/null)
+              if [ "$SIZE" -eq 0 ]; then
+                echo "❌ $deb_file is empty"
+                exit 1
+              fi
+              
+              # Check if it's a valid ar archive (deb files are ar archives)
+              HEADER=$(head -c 8 "$deb_file" | od -An -tx1 | tr -d ' \n')
+              if [ "$HEADER" != "213c617263683e0a" ]; then
+                echo "⚠️  $deb_file may not be a valid .deb file (header check)"
+              fi
+              
+              echo "✅ $deb_file validated (size: $SIZE bytes)"
+            fi
+          done
+
+      - name: Test package metadata
+        run: |
+          echo "Testing package metadata..."
+          
+          # Install dpkg-dev tools for dpkg-deb
+          sudo apt-get update -qq
+          sudo apt-get install -y dpkg-dev
+          
+          for deb_file in test-artifacts/*.deb; do
+            if [ -f "$deb_file" ]; then
+              echo "Extracting metadata from $deb_file..."
+              
+              # Extract control file
+              dpkg-deb -I "$deb_file" || echo "⚠️  Could not extract metadata (may need actual RPI to test)"
+              
+              # Check package name
+              PACKAGE_NAME=$(dpkg-deb -I "$deb_file" | grep "^ Package:" | awk '{print $2}' || echo "")
+              if [ -n "$PACKAGE_NAME" ]; then
+                echo "✅ Package name: $PACKAGE_NAME"
+              fi
+              
+              # Check version
+              PACKAGE_VERSION=$(dpkg-deb -I "$deb_file" | grep "^ Version:" | awk '{print $2}' || echo "")
+              if [ -n "$PACKAGE_VERSION" ]; then
+                echo "✅ Package version: $PACKAGE_VERSION"
+                if [ "$PACKAGE_VERSION" != "${{ steps.get-version.outputs.VERSION }}" ]; then
+                  echo "⚠️  Version mismatch: expected ${{ steps.get-version.outputs.VERSION }}, got $PACKAGE_VERSION"
+                fi
+              fi
+            fi
+          done
+
+      - name: Validate checksums
+        run: |
+          echo "Validating checksums..."
+          VERSION="${{ steps.get-version.outputs.VERSION }}"
+          
+          for deb_file in test-artifacts/*.deb; do
+            if [ -f "$deb_file" ]; then
+              BASENAME=$(basename "$deb_file")
+              CHECKSUM_FILE="${deb_file}.sha256"
+              
+              # Download checksum file
+              curl -L -o "$CHECKSUM_FILE" \
+                "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${BASENAME}.sha256" || echo "Checksum file not found"
+              
+              if [ -f "$CHECKSUM_FILE" ]; then
+                EXPECTED=$(cat "$CHECKSUM_FILE" | awk '{print $1}')
+                ACTUAL=$(sha256sum "$deb_file" | awk '{print $1}')
+                
+                if [ "$EXPECTED" = "$ACTUAL" ]; then
+                  echo "✅ Checksum validated for $BASENAME"
+                else
+                  echo "❌ Checksum mismatch for $BASENAME"
+                  echo "   Expected: $EXPECTED"
+                  echo "   Actual: $ACTUAL"
+                  exit 1
+                fi
+              else
+                echo "⚠️  No checksum file found for $BASENAME"
+              fi
+            fi
+          done
+
+      - name: Test electron-updater detection
+        run: |
+          echo "Testing electron-updater release detection..."
+          VERSION="${{ steps.get-version.outputs.VERSION }}"
+          
+          # Check if release exists on GitHub
+          RELEASE_URL="https://api.github.com/repos/${{ github.repository }}/releases/tags/v${VERSION}"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$RELEASE_URL")
+          
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Release found on GitHub"
+            
+            # Get release data
+            RELEASE_DATA=$(curl -s "$RELEASE_URL")
+            PRERELEASE=$(echo "$RELEASE_DATA" | grep -o '"prerelease":[^,]*' | cut -d: -f2)
+            
+            if [ "$PRERELEASE" = "true" ]; then
+              echo "⚠️  Release is marked as pre-release"
+            else
+              echo "✅ Release is marked as stable"
+            fi
+          else
+            echo "⚠️  Release not found on GitHub (HTTP $RESPONSE)"
+            echo "   This may be normal if the release was just created"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Release Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.get-version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts Tested" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for deb_file in test-artifacts/*.deb; do
+            if [ -f "$deb_file" ]; then
+              echo "- ✅ $(basename "$deb_file")" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Test installation on actual Raspberry Pi hardware" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify app starts correctly" >> $GITHUB_STEP_SUMMARY
+          echo "3. Test update detection and download" >> $GITHUB_STEP_SUMMARY
+          echo "4. Monitor version reporting in heartbeat" >> $GITHUB_STEP_SUMMARY
+

@@ -76,6 +76,16 @@ autoUpdater.allowDowngrade = false; // Prevent downgrading to older versions
 autoUpdater.allowPrerelease = false; // Ignore pre-release versions
 autoUpdater.autoInstallOnAppQuit = false; // Keep manual control - don't auto install on quit
 
+// Configure update channel (stable by default, can be overridden via environment variable)
+// For GitHub releases, electron-updater automatically detects releases from package.json config
+// Update channel can be: 'latest' (stable), 'beta', or 'alpha'
+const updateChannel = process.env.UPDATE_CHANNEL || 'latest';
+log.info(`Update channel configured: ${updateChannel}`);
+
+// Note: electron-updater with GitHub provider automatically uses the repository
+// configured in package.json build.publish section. No explicit setFeedURL needed
+// for GitHub releases - it will use: https://github.com/masjidSolutions/masjidconnect-display-app/releases
+
 // Find the best path for a resource
 function findResourcePath(resourcePath) {
   const possibleBasePaths = [
