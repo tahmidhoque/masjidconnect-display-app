@@ -65,8 +65,3 @@ publish:
   releaseType: release
   private: false
 
-updater:
-  provider: github
-  owner: masjidSolutions
-  repo: masjidconnect-display-app
-
