@@ -11,6 +11,8 @@ import UpdateNotification from './components/common/UpdateNotification';
 import RemoteCommandNotification from './components/common/RemoteCommandNotification';
 import FactoryResetModal from './components/common/FactoryResetModal';
 import EnhancedLoadingScreen from './components/screens/EnhancedLoadingScreen';
+import { OrientationProvider } from './contexts/OrientationContext';
+import OrientationTester from './components/debug/OrientationTester';
 // Clear cached Hijri data to ensure accurate calculation
 import './utils/clearHijriCache';
 // ✅ DISABLED: Demo imports that were causing console spam in development
@@ -298,48 +300,51 @@ const App: React.FC = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <ApiErrorBoundary>
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'fixed',
-            width: '100vw',
-            height: '100vh',
-            top: 0,
-            left: 0,
-            overflow: 'hidden',
-            // Use the same gradient as ModernIslamicBackground to prevent flashing
-            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
-            // Optimize for performance
-            willChange: 'auto',
-            transform: 'translateZ(0)',
-            backfaceVisibility: 'hidden',
-          }}
-        >
-              <Suspense fallback={
-                <EnhancedLoadingScreen 
-                  currentPhase="checking" 
-                  progress={0} 
-                  statusMessage="Loading..." 
-                  isTransitioning={false} 
-                />
-              }>
-                <AppRoutes />
-              </Suspense>
-              <GracefulErrorOverlay />
-              <EmergencyAlertOverlay />
-              <AnalyticsErrorIntegration />
-              <UpdateNotification />
-              <RemoteCommandNotification />
+        <OrientationProvider>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'fixed',
+              width: '100vw',
+              height: '100vh',
+              top: 0,
+              left: 0,
+              overflow: 'hidden',
+              // Use the same gradient as ModernIslamicBackground to prevent flashing
+              background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
+              // Optimize for performance
+              willChange: 'auto',
+              transform: 'translateZ(0)',
+              backfaceVisibility: 'hidden',
+            }}
+          >
+                <Suspense fallback={
+                  <EnhancedLoadingScreen 
+                    currentPhase="checking" 
+                    progress={0} 
+                    statusMessage="Loading..." 
+                    isTransitioning={false} 
+                  />
+                }>
+                  <AppRoutes />
+                </Suspense>
+                <GracefulErrorOverlay />
+                <EmergencyAlertOverlay />
+                <AnalyticsErrorIntegration />
+                <UpdateNotification />
+                <RemoteCommandNotification />
+                <OrientationTester />
 
-          {/* Factory Reset Modal */}
-          <FactoryResetModal
-            open={isModalOpen}
-            onConfirm={confirmReset}
-            onCancel={closeModal}
-            isResetting={isResetting}
-          />
-        </Box>
+            {/* Factory Reset Modal */}
+            <FactoryResetModal
+              open={isModalOpen}
+              onConfirm={confirmReset}
+              onCancel={closeModal}
+              isResetting={isResetting}
+            />
+          </Box>
+        </OrientationProvider>
       </ApiErrorBoundary>
     </ThemeProvider>
   );

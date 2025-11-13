@@ -21,6 +21,8 @@ import useRotationHandling from "../../hooks/useRotationHandling";
 import { ALERT_COLOR_SCHEMES } from "../common/EmergencyAlertOverlay";
 import ModernLandscapeDisplay from "../layouts/ModernLandscapeDisplay";
 import ModernPortraitDisplay from "../layouts/ModernPortraitDisplay";
+import { OrientationTransition } from "../common/OrientationTransition";
+import { useOrientation } from "../../contexts/OrientationContext";
 import logger from "../../utils/logger";
 import {
   isLowPowerDevice,
@@ -105,8 +107,10 @@ const DisplayScreen: React.FC = memo(() => {
   const shouldDisableAnimations =
     !performanceProfile.recommendations.enableAnimations;
 
+  // Get orientation from context (includes transition state)
+  const { orientation, isChanging: isOrientationChanging } = useOrientation();
+  
   // Redux selectors
-  const orientation = useSelector((state: RootState) => state.ui.orientation);
   const currentAlert = useSelector(
     (state: RootState) => state.emergency.currentAlert
   );
@@ -130,15 +134,8 @@ const DisplayScreen: React.FC = memo(() => {
   const mountTimerRef = useRef<NodeJS.Timeout | null>(null);
   const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Rotation handling
+  // Rotation handling - use orientation from context
   const rotationInfo = useRotationHandling(orientation);
-
-  // Update orientation in Redux when it changes
-  useEffect(() => {
-    if (rotationInfo.physicalOrientation !== orientation) {
-      dispatch(setOrientation(rotationInfo.physicalOrientation));
-    }
-  }, [rotationInfo.physicalOrientation, orientation, dispatch]);
 
   // Progressive loading effect for 4K displays
   useEffect(() => {
@@ -383,15 +380,24 @@ const DisplayScreen: React.FC = memo(() => {
     return unregister;
   }, [isHighStrain]);
 
-  // Memoize the display component
+  // Memoize the display component with transition wrapper
   const DisplayComponent = useMemo(() => {
-    logger.info(`DisplayScreen: Rendering ${orientation} layout`);
-    return orientation === "LANDSCAPE" ? (
+    logger.info(`DisplayScreen: Rendering ${orientation} layout`, {
+      isChanging: isOrientationChanging
+    });
+    
+    const layout = orientation === "LANDSCAPE" ? (
       <ModernLandscapeDisplay />
     ) : (
       <ModernPortraitDisplay />
     );
-  }, [orientation]);
+    
+    return (
+      <OrientationTransition>
+        {layout}
+      </OrientationTransition>
+    );
+  }, [orientation, isOrientationChanging]);
 
   // Wait for content to be available (progressive loading for 4K)
   if (!componentsLoaded.background) {
@@ -436,6 +442,10 @@ const DisplayScreen: React.FC = memo(() => {
             willChange: isHighStrain ? "auto" : "transform",
             transform: isHighStrain ? "none" : "translateZ(0)",
             backfaceVisibility: isHighStrain ? "visible" : "hidden",
+            // Smooth transition during orientation changes
+            transition: isOrientationChanging && !isHighStrain 
+              ? "all 0.3s ease-in-out" 
+              : "none",
           }}
         >
           {rotationInfo.shouldRotate && !isHighStrain ? (
@@ -451,12 +461,27 @@ const DisplayScreen: React.FC = memo(() => {
                 transform: "translate(-50%, -50%) rotate(90deg)",
                 // Ensure no overflow or positioning issues
                 overflow: "hidden",
+                // Smooth transition during orientation changes
+                transition: isOrientationChanging 
+                  ? "transform 0.3s ease-in-out" 
+                  : "none",
               }}
             >
               {DisplayComponent}
             </Box>
           ) : (
-            <Box sx={{ width: "100%", height: "100%" }}>{DisplayComponent}</Box>
+            <Box 
+              sx={{ 
+                width: "100%", 
+                height: "100%",
+                // Smooth transition during orientation changes
+                transition: isOrientationChanging && !isHighStrain
+                  ? "all 0.3s ease-in-out"
+                  : "none",
+              }}
+            >
+              {DisplayComponent}
+            </Box>
           )}
         </Box>
       </Fade>

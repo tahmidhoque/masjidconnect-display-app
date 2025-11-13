@@ -14,6 +14,7 @@ import updateSlice from './slices/updateSlice';
 import { emergencyMiddleware } from './middleware/emergencyMiddleware';
 import { performanceMiddleware } from './middleware/performanceMiddleware';
 import { updateMiddleware } from './middleware/updateMiddleware';
+import { orientationMiddleware } from './middleware/orientationMiddleware';
 
 // Root reducer
 const rootReducer = combineReducers({
@@ -59,7 +60,8 @@ export const store = configureStore({
     // Add custom middleware
     .concat(emergencyMiddleware)
     .concat(performanceMiddleware.middleware)
-    .concat(updateMiddleware),
+    .concat(updateMiddleware)
+    .concat(orientationMiddleware),
   // Enable Redux DevTools in development
   devTools: process.env.NODE_ENV === 'development',
 });

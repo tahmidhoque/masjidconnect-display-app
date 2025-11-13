@@ -25,6 +25,7 @@ class OrientationEventService {
   private listeners: Set<(orientation: Orientation, screenId: string) => void> = new Set();
   private connectionUrl: string | null = null;
   private currentScreenId: string | null = null;
+  private currentOrientation: Orientation | null = null;
   private lastOrientationUpdate: { orientation: Orientation, timestamp: number } | null = null;
   private orientationUpdateDebounceTime = 2000; // 2 seconds debounce
 
@@ -41,6 +42,21 @@ class OrientationEventService {
    */
   public initialize(baseURL: string): void {
     logger.info('OrientationEventService: Initializing', { baseURL });
+    console.log('🔄 OrientationEventService: Initializing with baseURL:', baseURL);
+    
+    // Load saved orientation from localStorage if available
+    try {
+      const savedOrientation = localStorage.getItem('screen_orientation');
+      if (savedOrientation === 'LANDSCAPE' || savedOrientation === 'PORTRAIT') {
+        this.currentOrientation = savedOrientation as Orientation;
+        logger.debug('OrientationEventService: Loaded saved orientation from localStorage', {
+          orientation: savedOrientation
+        });
+        console.log(`📦 OrientationEventService: Loaded saved orientation: ${savedOrientation}`);
+      }
+    } catch (error) {
+      logger.warn('OrientationEventService: Could not load saved orientation from localStorage', { error });
+    }
     
     // Try connecting with endpoint
     this.connectToEventSource(baseURL);
@@ -260,8 +276,20 @@ class OrientationEventService {
         return;
       }
       
-      // We've validated the data, now notify listeners
-      console.log(`✅ OrientationEventService: Updating orientation to ${orientationData.orientation} for screen ${orientationData.id}`);
+      // Get previous orientation for logging
+      const previousOrientation = this.currentOrientation;
+      
+      // We've validated the data, now update state and notify listeners
+      console.log(`✅ OrientationEventService: Changing orientation from ${previousOrientation || 'unknown'} to ${orientationData.orientation} for screen ${orientationData.id}`);
+      logger.info('OrientationEventService: Orientation change', {
+        previousOrientation,
+        newOrientation: orientationData.orientation,
+        screenId: orientationData.id,
+        timestamp: now
+      });
+      
+      // Update current orientation
+      this.currentOrientation = orientationData.orientation;
       
       // Update last orientation update tracker
       this.lastOrientationUpdate = {
@@ -269,11 +297,32 @@ class OrientationEventService {
         timestamp: now
       };
       
-      // Store the event time in localStorage to coordinate with content updates
+      // Store orientation in localStorage for persistence
       try {
+        localStorage.setItem('screen_orientation', orientationData.orientation);
         localStorage.setItem('last_orientation_sse_event', now.toString());
+        logger.debug('OrientationEventService: Stored orientation in localStorage', {
+          orientation: orientationData.orientation
+        });
       } catch (error) {
-        console.error('Error setting last SSE event time:', error);
+        logger.error('OrientationEventService: Error storing orientation in localStorage', { error });
+        console.error('❌ OrientationEventService: Error storing orientation:', error);
+      }
+      
+      // Dispatch custom event for React components
+      try {
+        window.dispatchEvent(new CustomEvent('orientation-changed', {
+          detail: {
+            orientation: orientationData.orientation,
+            screenId: orientationData.id,
+            timestamp: now
+          }
+        }));
+        logger.debug('OrientationEventService: Dispatched orientation-changed custom event');
+        console.log('📢 OrientationEventService: Dispatched orientation-changed event');
+      } catch (error) {
+        logger.error('OrientationEventService: Error dispatching custom event', { error });
+        console.error('❌ OrientationEventService: Error dispatching custom event:', error);
       }
       
       // Notify all listeners
@@ -334,12 +383,20 @@ class OrientationEventService {
   /**
    * Get current connection status for debugging
    */
-  public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null } {
+  public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null, currentOrientation: Orientation | null } {
     return {
       connected: this.eventSource !== null && this.eventSource.readyState === 1,
       url: this.connectionUrl,
-      readyState: this.eventSource ? this.eventSource.readyState : null
+      readyState: this.eventSource ? this.eventSource.readyState : null,
+      currentOrientation: this.currentOrientation
     };
+  }
+
+  /**
+   * Get current orientation
+   */
+  public getCurrentOrientation(): Orientation | null {
+    return this.currentOrientation;
   }
 }
 
