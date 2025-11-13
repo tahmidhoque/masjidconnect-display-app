@@ -1,6 +1,6 @@
 {
   "name": "masjidconnect-display-app",
-  "version": "0.0.1",
+  "version": "0.0.2-beta.1",
   "private": true,
   "main": "electron/main.js",
   "description": "MasjidConnect Display App - Digital signage solution for mosques",
@@ -118,7 +118,9 @@
       {
         "from": "assets",
         "to": "assets",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asar": true,
@@ -137,7 +139,10 @@
       "target": [
         {
           "target": "deb",
-          "arch": ["armv7l", "arm64"]
+          "arch": [
+            "armv7l",
+            "arm64"
+          ]
         }
       ],
       "category": "Utility",
