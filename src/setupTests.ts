@@ -54,6 +54,33 @@ const localStorageMock = {
 };
 global.localStorage = localStorageMock as any;
 
+// Mock axios globally to handle ESM import issues
+jest.mock('axios', () => {
+  const mockAxiosInstance = {
+    request: jest.fn(),
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+    patch: jest.fn(),
+    interceptors: {
+      request: { use: jest.fn(), eject: jest.fn() },
+      response: { use: jest.fn(), eject: jest.fn() },
+    },
+  };
+  
+  const axiosMock = jest.fn(() => mockAxiosInstance);
+  axiosMock.create = jest.fn(() => mockAxiosInstance);
+  axiosMock.isAxiosError = jest.fn();
+  
+  return {
+    __esModule: true,
+    default: axiosMock,
+    create: axiosMock.create,
+    isAxiosError: axiosMock.isAxiosError,
+  };
+});
+
 // Mock electron API
 (global as any).electron = {
   store: {

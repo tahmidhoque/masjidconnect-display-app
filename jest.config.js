@@ -2,13 +2,14 @@ module.exports = {
   // Use react-scripts Jest configuration as base
   ...require('react-scripts/scripts/utils/createJestConfig')(__dirname),
   
-  // Transform ESM modules from node_modules
+  // Transform ESM modules from node_modules (axios uses ESM)
   transformIgnorePatterns: [
-    'node_modules/(?!(axios)/)',
+    'node_modules/(?!(axios|@jridgewell)/)',
   ],
   
-  // Module name mapper for static assets and styles
+  // Mock axios module globally and handle CSS imports
   moduleNameMapper: {
+    '^axios$': require.resolve('./src/__mocks__/axios.js'),
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   

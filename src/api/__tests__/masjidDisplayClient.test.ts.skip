@@ -19,20 +19,6 @@ import {
   waitFor,
 } from '../../test-utils/mocks';
 
-// Mock axios - must be before import
-const mockAxiosInstance = {
-  request: jest.fn(),
-  interceptors: {
-    request: { use: jest.fn() },
-    response: { use: jest.fn() },
-  },
-};
-
-jest.mock('axios', () => ({
-  create: jest.fn(() => mockAxiosInstance),
-  isAxiosError: jest.fn(),
-}));
-
 // Mock localforage - must be defined before jest.mock due to hoisting
 jest.mock('localforage', () => {
   const mockGetItem = jest.fn();

@@ -3,6 +3,24 @@
  * Comprehensive test suite for data synchronization functionality
  */
 
+// Mock axios FIRST - before any imports that use it
+jest.mock('axios', () => {
+  const mockAxiosInstance = {
+    request: jest.fn(),
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+  };
+  
+  return {
+    __esModule: true,
+    default: jest.fn(),
+    create: jest.fn(() => mockAxiosInstance),
+    isAxiosError: jest.fn(),
+  };
+});
+
 import dataSyncService from '../dataSyncService';
 import masjidDisplayClient from '../../api/masjidDisplayClient';
 import storageService from '../storageService';
