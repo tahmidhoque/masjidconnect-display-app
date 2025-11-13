@@ -35,9 +35,10 @@ const PairingScreen = lazy(() =>
 const DisplayScreen = lazy(() =>
   ComponentPreloader.preload('DisplayScreen', () => import('./components/screens/DisplayScreen'))
 );
-const ErrorScreen = lazy(() =>
-  ComponentPreloader.preload('ErrorScreen', () => import('./components/screens/ErrorScreen'))
-);
+// ErrorScreen is loaded dynamically when needed
+// const ErrorScreen = lazy(() =>
+//   ComponentPreloader.preload('ErrorScreen', () => import('./components/screens/ErrorScreen'))
+// );
 
 // Development localStorage monitor for debugging credential issues
 const useLocalStorageMonitor = () => {

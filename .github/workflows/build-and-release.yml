@@ -65,6 +65,8 @@ jobs:
         run: npm run build:fix-paths
         env:
           REACT_APP_VERSION: ${{ steps.package-version.outputs.VERSION }}
+          CI: false
+          DISABLE_ESLINT_PLUGIN: false
 
       - name: Prepare RPI build
         run: node scripts/prepare-rpi-build.js

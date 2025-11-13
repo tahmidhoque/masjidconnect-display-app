@@ -6,7 +6,6 @@ import {
   HeartbeatResponse,
   ScreenContent,
   PrayerTimes,
-  PrayerStatus,
   EventsResponse,
   ApiResponse,
   RequestPairingCodeResponse,
@@ -45,13 +44,13 @@ export const POLLING_INTERVALS = {
   EVENTS: 30 * 60 * 1000, // 30 minutes
 };
 
-// Error retry settings
-const ERROR_RETRY = {
-  MAX_RETRIES: 3,
-  INITIAL_DELAY: 2000, // 2 seconds
-  MAX_DELAY: 30000, // 30 seconds
-  JITTER_FACTOR: 0.2 // ±20% jitter
-};
+// Error retry settings (currently unused, kept for future use)
+// const ERROR_RETRY = {
+//   MAX_RETRIES: 3,
+//   INITIAL_DELAY: 2000, // 2 seconds
+//   MAX_DELAY: 30000, // 30 seconds
+//   JITTER_FACTOR: 0.2 // ±20% jitter
+// };
 
 // Error backoff tracking
 interface EndpointBackoff {
@@ -244,8 +243,8 @@ class MasjidDisplayClient {
     const isCorsError = message.includes('CORS') || 
                         message.includes('NetworkError') ||
                         message.includes('Network Error') ||
-                        error.name === 'TypeError' && message.includes('Network') ||
-                        !status && !navigator.onLine;
+                        (error.name === 'TypeError' && message.includes('Network')) ||
+                        (!status && !navigator.onLine);
     
     if (isCorsError) {
       logger.error(`CORS error accessing ${url}`, {
