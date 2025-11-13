@@ -12,6 +12,7 @@ import masjidDisplayClient from '../api/masjidDisplayClient';
 import updateService from './updateService';
 import storageService from './storageService';
 import localforage from 'localforage';
+import { analyticsService } from './analyticsService';
 
 // Event Types for SSE Remote Control
 const REMOTE_COMMAND_TYPES = {
@@ -37,6 +38,15 @@ export interface RemoteCommandResponse {
   message?: string;
   error?: string;
   timestamp: string;
+  executionTime?: number; // milliseconds
+}
+
+export interface ConnectionStatus {
+  connected: boolean;
+  url: string | null;
+  readyState: number | null;
+  reconnectAttempts: number;
+  lastError?: string;
 }
 
 class RemoteControlService {
@@ -49,15 +59,34 @@ class RemoteControlService {
   private connectionUrl: string | null = null;
   private lastCommandTimestamp: Record<string, number> = {};
   private commandCooldownMs = 2000; // 2 seconds cooldown between commands
+  private commandQueue: RemoteCommand[] = [];
+  private commandsInProgress: Set<string> = new Set(); // Track commands currently executing
+  private connectionStatusListeners: Set<(status: ConnectionStatus) => void> = new Set();
+  private maxStoredResponses = 50;
+  private isInitializing = false; // Prevent duplicate initialization
 
   /**
    * Initialize the SSE connection for remote control
    */
   public initialize(baseURL: string): void {
+    // Prevent duplicate initialization
+    if (this.isInitializing) {
+      logger.warn('RemoteControlService: Already initializing, skipping duplicate call');
+      return;
+    }
+    
+    // If already connected, don't reinitialize
+    if (this.eventSource && this.eventSource.readyState === EventSource.OPEN) {
+      logger.debug('RemoteControlService: Already connected, skipping initialization');
+      return;
+    }
+    
+    this.isInitializing = true;
     logger.info('RemoteControlService: Initializing', { baseURL });
     console.log('🎮 RemoteControlService: Initializing with baseURL:', baseURL);
     
     this.connectToEventSource(baseURL);
+    this.isInitializing = false;
   }
 
   /**
@@ -140,14 +169,44 @@ class RemoteControlService {
    * Set up event listeners for remote command events
    */
   private setupEventListeners(eventSource: EventSource): void {
+    logger.info('RemoteControlService: Setting up event listeners', {
+      eventTypes: Object.values(REMOTE_COMMAND_TYPES),
+    });
+    console.log('🎮 RemoteControlService: Registering listeners for:', Object.values(REMOTE_COMMAND_TYPES));
+    
     // Listen for each type of remote command
     Object.values(REMOTE_COMMAND_TYPES).forEach(commandType => {
       eventSource.addEventListener(commandType, this.handleRemoteCommand);
+      logger.debug(`RemoteControlService: Registered listener for ${commandType}`);
     });
     
     // Also listen for generic 'remote_command' event
     eventSource.addEventListener('remote_command', this.handleRemoteCommand);
     eventSource.addEventListener('remoteCommand', this.handleRemoteCommand);
+    
+    // CRITICAL: Also listen to default 'message' event in case server sends events without event type
+    eventSource.addEventListener('message', (event: MessageEvent) => {
+      logger.debug('RemoteControlService: Received default message event', {
+        data: event.data,
+        type: event.type,
+        lastEventId: (event as any).lastEventId,
+      });
+      console.log('🎮 RemoteControlService: Default message event received:', event.data);
+      
+      // Try to parse and handle as remote command
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data && (data.type || data.commandType)) {
+          // It looks like a remote command, handle it
+          this.handleRemoteCommand(event);
+        }
+      } catch (error) {
+        // Not JSON or not a command, ignore
+        logger.debug('RemoteControlService: Message event is not a remote command');
+      }
+    });
+    
+    logger.info('RemoteControlService: All event listeners registered');
   }
 
   /**
@@ -174,22 +233,56 @@ class RemoteControlService {
    */
   private handleConnectionOpen = (): void => {
     this.reconnectAttempts = 0;
-    logger.info('RemoteControlService: SSE connection established');
-    console.log('🎮 RemoteControlService: SSE connection established!');
+    const readyState = this.eventSource?.readyState;
+    const readyStateText = readyState === EventSource.OPEN ? 'OPEN' : 
+                          readyState === EventSource.CONNECTING ? 'CONNECTING' : 
+                          readyState === EventSource.CLOSED ? 'CLOSED' : 'UNKNOWN';
+    
+    logger.info('RemoteControlService: SSE connection established', {
+      url: this.connectionUrl,
+      readyState,
+      readyStateText,
+    });
+    console.log(`🎮 RemoteControlService: SSE connection established! ReadyState: ${readyStateText} (${readyState})`);
+    console.log(`🎮 RemoteControlService: Connection URL: ${this.connectionUrl}`);
+    
+    // Log registered event listeners for debugging
+    if (this.eventSource) {
+      console.log('🎮 RemoteControlService: EventSource ready, listeners should be active');
+    }
+    
+    // Notify connection status listeners
+    this.notifyConnectionStatusChange();
   };
 
   /**
    * Handle connection errors
    */
   private handleConnectionError = (error: Event): void => {
-    logger.error('RemoteControlService: SSE connection error', { error });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+    const readyState = this.eventSource?.readyState;
+    
+    logger.error('RemoteControlService: SSE connection error', { 
+      error: errorMessage,
+      readyState,
+      url: this.connectionUrl,
+      reconnectAttempts: this.reconnectAttempts,
+    });
     console.error('🎮 RemoteControlService: SSE connection error:', error);
+    
+    // Check for authentication errors (401, 403)
+    if (readyState === EventSource.CLOSED) {
+      logger.warn('RemoteControlService: SSE connection closed - possible authentication error');
+    }
     
     // Clean up existing connection
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
     }
+    
+    // Notify connection status listeners
+    this.notifyConnectionStatusChange(errorMessage);
     
     this.scheduleReconnect();
   };
@@ -232,23 +325,49 @@ class RemoteControlService {
    * Handle a remote command event
    */
   private handleRemoteCommand = (event: MessageEvent): void => {
-    console.log('🎮 RemoteControlService: Remote command received:', event.data);
+    const eventType = (event as any).type || 'message';
+    logger.info('RemoteControlService: Remote command event received', {
+      eventType,
+      data: event.data,
+      lastEventId: (event as any).lastEventId,
+    });
+    console.log(`🎮 RemoteControlService: Remote command received (event type: ${eventType}):`, event.data);
     
     try {
       let commandData: RemoteCommand;
       
       // Try to parse the data
       if (typeof event.data === 'string') {
-        commandData = JSON.parse(event.data) as RemoteCommand;
+        try {
+          commandData = JSON.parse(event.data) as RemoteCommand;
+        } catch (parseError) {
+          logger.error('RemoteControlService: Failed to parse command data as JSON', {
+            error: parseError,
+            data: event.data,
+          });
+          console.error('🎮 RemoteControlService: Failed to parse JSON:', parseError);
+          return;
+        }
       } else {
         commandData = event.data as RemoteCommand;
       }
       
       // Validate command
       if (!commandData || !commandData.type || !commandData.commandId) {
+        logger.warn('RemoteControlService: Invalid command format', {
+          commandData,
+          hasType: !!commandData?.type,
+          hasCommandId: !!commandData?.commandId,
+        });
         console.error('🎮 RemoteControlService: Invalid command format:', commandData);
         return;
       }
+      
+      logger.info('RemoteControlService: Valid command received', {
+        type: commandData.type,
+        commandId: commandData.commandId,
+        timestamp: commandData.timestamp,
+      });
       
       // Check cooldown to prevent command spam
       const now = Date.now();
@@ -258,7 +377,26 @@ class RemoteControlService {
         logger.warn('RemoteControlService: Command throttled', {
           type: commandData.type,
           cooldown: this.commandCooldownMs,
+          commandId: commandData.commandId,
         });
+        
+        // Queue command instead of dropping it
+        this.commandQueue.push(commandData);
+        
+        // Dispatch throttled event for UI feedback
+        window.dispatchEvent(new CustomEvent('remote:command-throttled', {
+          detail: {
+            type: commandData.type,
+            commandId: commandData.commandId,
+            queued: true,
+          }
+        }));
+        
+        // Process queue after cooldown period
+        setTimeout(() => {
+          this.processCommandQueue();
+        }, this.commandCooldownMs - (now - lastTime));
+        
         return;
       }
       
@@ -269,6 +407,9 @@ class RemoteControlService {
       
       // Notify listeners
       this.notifyListeners(commandData);
+      
+      // Process any queued commands
+      this.processCommandQueue();
     } catch (error) {
       console.error('🎮 RemoteControlService: Error parsing command data:', error);
     }
@@ -278,10 +419,32 @@ class RemoteControlService {
    * Execute a remote command
    */
   private async executeCommand(command: RemoteCommand): Promise<void> {
+    const startTime = Date.now();
+    
+    // Check if command is already in progress
+    if (this.commandsInProgress.has(command.commandId)) {
+      logger.warn('RemoteControlService: Command already in progress', {
+        commandId: command.commandId,
+        type: command.type,
+      });
+      return;
+    }
+    
+    // Mark command as in progress
+    this.commandsInProgress.add(command.commandId);
+    
     logger.info('RemoteControlService: Executing command', {
       type: command.type,
       commandId: command.commandId,
     });
+    
+    // Dispatch event to notify UI that command was received
+    window.dispatchEvent(new CustomEvent('remote:command-received', {
+      detail: {
+        type: command.type,
+        commandId: command.commandId,
+      }
+    }));
     
     let response: RemoteCommandResponse;
     
@@ -321,11 +484,24 @@ class RemoteControlService {
             success: false,
             error: `Unknown command type: ${command.type}`,
             timestamp: new Date().toISOString(),
+            executionTime: Date.now() - startTime,
           };
       }
       
+      // Add execution time
+      response.executionTime = Date.now() - startTime;
+      
       // Send response back to portal via heartbeat or analytics
       this.sendCommandResponse(response);
+      
+      // Dispatch success event
+      window.dispatchEvent(new CustomEvent('remote:command-completed', {
+        detail: {
+          commandId: command.commandId,
+          success: response.success,
+          type: command.type,
+        }
+      }));
     } catch (error: any) {
       logger.error('RemoteControlService: Error executing command', { error, command });
       
@@ -334,9 +510,13 @@ class RemoteControlService {
         success: false,
         error: error.message || 'Command execution failed',
         timestamp: new Date().toISOString(),
+        executionTime: Date.now() - startTime,
       };
       
       this.sendCommandResponse(response);
+    } finally {
+      // Remove from in-progress set
+      this.commandsInProgress.delete(command.commandId);
     }
   }
 
@@ -352,15 +532,38 @@ class RemoteControlService {
     logger.info('RemoteControlService: Force update command received', { commandId: command.commandId });
     
     try {
+      // Validate command payload if needed
+      if (command.payload && typeof command.payload !== 'object') {
+        throw new Error('Invalid command payload format');
+      }
+      
+      // Check if running in Electron environment
+      const isElectron = typeof window !== 'undefined' && window.electron !== undefined;
+      if (!isElectron) {
+        logger.warn('RemoteControlService: Force update requested but not running in Electron');
+        return {
+          commandId: command.commandId,
+          success: false,
+          error: 'Update service not available (not running in Electron)',
+          timestamp: new Date().toISOString(),
+        };
+      }
+      
       // Check for updates
-      const currentVersion = updateService.getCurrentVersion();
-      const updateCheck = await masjidDisplayClient.checkForUpdate(currentVersion);
+      let updateCheck;
+      try {
+        const currentVersion = updateService.getCurrentVersion();
+        updateCheck = await masjidDisplayClient.checkForUpdate(currentVersion);
+      } catch (networkError: any) {
+        logger.error('RemoteControlService: Network error checking for updates', { error: networkError });
+        throw new Error(`Network error: ${networkError.message || 'Failed to connect to update server'}`);
+      }
       
       if (!updateCheck.success || !updateCheck.data) {
         return {
           commandId: command.commandId,
           success: false,
-          error: 'Failed to check for updates',
+          error: updateCheck.error || 'Failed to check for updates',
           timestamp: new Date().toISOString(),
         };
       }
@@ -375,12 +578,22 @@ class RemoteControlService {
       }
       
       // Trigger update check and download
-      await updateService.checkForUpdates();
+      try {
+        await updateService.checkForUpdates();
+      } catch (updateError: any) {
+        logger.error('RemoteControlService: Error triggering update check', { error: updateError });
+        throw new Error(`Update check failed: ${updateError.message || 'Unknown error'}`);
+      }
       
       // Dispatch custom event for UI to show update notification
-      window.dispatchEvent(new CustomEvent('remote:force-update', {
-        detail: { commandId: command.commandId }
-      }));
+      try {
+        window.dispatchEvent(new CustomEvent('remote:force-update', {
+          detail: { commandId: command.commandId }
+        }));
+      } catch (eventError) {
+        logger.warn('RemoteControlService: Error dispatching update event', { error: eventError });
+        // Continue execution even if event dispatch fails
+      }
       
       return {
         commandId: command.commandId,
@@ -389,7 +602,11 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error('RemoteControlService: Error in force update', { error });
+      logger.error('RemoteControlService: Error in force update', { 
+        error: error.message || error,
+        stack: error.stack,
+        commandId: command.commandId,
+      });
       return {
         commandId: command.commandId,
         success: false,
@@ -715,17 +932,55 @@ class RemoteControlService {
 
   /**
    * Send command response back to portal
+   * Stores responses in structured format with metadata, limits to last 50 entries
    */
   private sendCommandResponse(response: RemoteCommandResponse): void {
     logger.info('RemoteControlService: Sending command response', response);
     
-    // Store response in local storage for next heartbeat
     try {
-      const responses = JSON.parse(localStorage.getItem('pending_command_responses') || '[]');
+      // Retrieve existing responses
+      const storedResponses = localStorage.getItem('pending_command_responses');
+      const responses: RemoteCommandResponse[] = storedResponses 
+        ? JSON.parse(storedResponses) 
+        : [];
+      
+      // Add new response
       responses.push(response);
+      
+      // Keep only last 50 responses (FIFO)
+      if (responses.length > this.maxStoredResponses) {
+        responses.splice(0, responses.length - this.maxStoredResponses);
+      }
+      
+      // Store back to localStorage
       localStorage.setItem('pending_command_responses', JSON.stringify(responses));
-    } catch (error) {
-      logger.error('RemoteControlService: Error storing command response', { error });
+      
+      logger.debug('RemoteControlService: Command response stored', {
+        commandId: response.commandId,
+        totalResponses: responses.length,
+      });
+      
+      // Trigger immediate heartbeat attempt if analytics service is initialized
+      // This will be handled by analyticsService when it sends the heartbeat
+      try {
+        // Try to trigger heartbeat immediately
+        if (analyticsService && typeof (analyticsService as any).sendHeartbeat === 'function') {
+          // Use setTimeout to avoid blocking
+          setTimeout(() => {
+            (analyticsService as any).sendHeartbeat().catch((err: any) => {
+              logger.debug('RemoteControlService: Could not trigger immediate heartbeat', { err });
+            });
+          }, 100);
+        }
+      } catch (error) {
+        // Silently fail - heartbeat will be sent on next interval
+        logger.debug('RemoteControlService: Could not trigger immediate heartbeat', { error });
+      }
+    } catch (error: any) {
+      logger.error('RemoteControlService: Error storing command response', { 
+        error: error.message || error,
+        response 
+      });
     }
   }
 
@@ -755,12 +1010,81 @@ class RemoteControlService {
   /**
    * Get connection status
    */
-  public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null } {
+  public getConnectionStatus(): ConnectionStatus {
     return {
-      connected: this.eventSource !== null && this.eventSource.readyState === 1,
+      connected: this.eventSource !== null && this.eventSource.readyState === EventSource.OPEN,
       url: this.connectionUrl,
-      readyState: this.eventSource ? this.eventSource.readyState : null
+      readyState: this.eventSource ? this.eventSource.readyState : null,
+      reconnectAttempts: this.reconnectAttempts,
     };
+  }
+
+  /**
+   * Notify all connection status listeners of status changes
+   */
+  private notifyConnectionStatusChange(lastError?: string): void {
+    const status = this.getConnectionStatus();
+    if (lastError) {
+      (status as ConnectionStatus).lastError = lastError;
+    }
+    
+    this.connectionStatusListeners.forEach(listener => {
+      try {
+        listener(status);
+      } catch (error) {
+        logger.error('RemoteControlService: Error notifying connection status listener', { error });
+      }
+    });
+    
+    // Dispatch custom event for UI components
+    window.dispatchEvent(new CustomEvent('remote-control:connection-status', {
+      detail: status,
+    }));
+  }
+
+  /**
+   * Add a listener for connection status changes
+   */
+  public addConnectionStatusListener(callback: (status: ConnectionStatus) => void): () => void {
+    this.connectionStatusListeners.add(callback);
+    // Immediately call with current status
+    callback(this.getConnectionStatus());
+    return () => {
+      this.connectionStatusListeners.delete(callback);
+    };
+  }
+
+  /**
+   * Process queued commands after cooldown period
+   */
+  private processCommandQueue(): void {
+    if (this.commandQueue.length === 0) {
+      return;
+    }
+    
+    const now = Date.now();
+    const command = this.commandQueue.shift();
+    
+    if (!command) {
+      return;
+    }
+    
+    const lastTime = this.lastCommandTimestamp[command.type] || 0;
+    
+    // Check if cooldown has passed
+    if (now - lastTime >= this.commandCooldownMs) {
+      this.lastCommandTimestamp[command.type] = now;
+      this.executeCommand(command);
+      this.notifyListeners(command);
+      
+      // Process next queued command
+      setTimeout(() => {
+        this.processCommandQueue();
+      }, this.commandCooldownMs);
+    } else {
+      // Put command back at front of queue
+      this.commandQueue.unshift(command);
+    }
   }
 
   /**
@@ -780,6 +1104,9 @@ class RemoteControlService {
     }
     
     this.commandListeners.clear();
+    this.connectionStatusListeners.clear();
+    this.commandQueue = [];
+    this.commandsInProgress.clear();
   }
 }
 

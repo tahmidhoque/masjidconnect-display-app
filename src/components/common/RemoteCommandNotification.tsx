@@ -14,9 +14,13 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import CachedIcon from '@mui/icons-material/Cached';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
 import logger from '../../utils/logger';
 import updateService from '../../services/updateService';
 import useFactoryReset from '../../hooks/useFactoryReset';
+import { useAppDispatch } from '../../store/hooks';
+import { addNotification } from '../../store/slices/uiSlice';
 
 interface RemoteCommandNotificationProps {
   position?: {
@@ -34,11 +38,19 @@ interface CountdownCommand {
 const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
   position = { vertical: 'top', horizontal: 'center' },
 }) => {
+  const dispatch = useAppDispatch();
   const [countdownCommand, setCountdownCommand] = useState<CountdownCommand | null>(null);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [showReloadMessage, setShowReloadMessage] = useState(false);
   const [showSettingsMessage, setShowSettingsMessage] = useState(false);
   const [showScreenshotMessage, setShowScreenshotMessage] = useState(false);
+  const [showForceUpdateProgress, setShowForceUpdateProgress] = useState(false);
+  const [showCommandReceived, setShowCommandReceived] = useState(false);
+  const [showCommandThrottled, setShowCommandThrottled] = useState(false);
+  const [showCommandCompleted, setShowCommandCompleted] = useState(false);
+  const [commandReceivedType, setCommandReceivedType] = useState<string>('');
+  const [commandCompletedType, setCommandCompletedType] = useState<string>('');
+  const [commandCompletedSuccess, setCommandCompletedSuccess] = useState<boolean>(true);
 
   const { confirmReset } = useFactoryReset();
 
@@ -87,6 +99,56 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
 
   // Listen for remote command events
   useEffect(() => {
+    const handleCommandReceived = (event: CustomEvent) => {
+      logger.info('Remote command received event', { type: event.detail?.type });
+      const commandType = event.detail?.type || 'unknown';
+      setCommandReceivedType(commandType);
+      setShowCommandReceived(true);
+      
+      // Also add to Redux notifications
+      dispatch(addNotification({
+        type: 'info',
+        message: `Remote command received: ${commandType}`,
+        duration: 3000,
+      }));
+      
+      setTimeout(() => setShowCommandReceived(false), 3000);
+    };
+
+    const handleCommandThrottled = (event: CustomEvent) => {
+      logger.info('Remote command throttled event', { type: event.detail?.type });
+      setShowCommandThrottled(true);
+      
+      dispatch(addNotification({
+        type: 'warning',
+        message: `Command ${event.detail?.type || 'unknown'} is queued (throttled)`,
+        duration: 3000,
+      }));
+      
+      setTimeout(() => setShowCommandThrottled(false), 3000);
+    };
+
+    const handleCommandCompleted = (event: CustomEvent) => {
+      logger.info('Remote command completed event', { 
+        type: event.detail?.type,
+        success: event.detail?.success 
+      });
+      const commandType = event.detail?.type || 'unknown';
+      const success = event.detail?.success !== false;
+      
+      setCommandCompletedType(commandType);
+      setCommandCompletedSuccess(success);
+      setShowCommandCompleted(true);
+      
+      dispatch(addNotification({
+        type: success ? 'success' : 'error',
+        message: `Command ${commandType} ${success ? 'completed successfully' : 'failed'}`,
+        duration: 3000,
+      }));
+      
+      setTimeout(() => setShowCommandCompleted(false), 3000);
+    };
+
     const handleRestartApp = (event: CustomEvent) => {
       logger.info('Remote restart app event received');
       const countdown = event.detail?.countdown || 10;
@@ -127,20 +189,35 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
       setTimeout(() => setShowScreenshotMessage(false), 3000);
     };
 
+    const handleForceUpdate = () => {
+      logger.info('Remote force update event received');
+      setShowForceUpdateProgress(true);
+      // Hide after 5 seconds or when update completes
+      setTimeout(() => setShowForceUpdateProgress(false), 5000);
+    };
+
+    window.addEventListener('remote:command-received', handleCommandReceived as EventListener);
+    window.addEventListener('remote:command-throttled', handleCommandThrottled as EventListener);
+    window.addEventListener('remote:command-completed', handleCommandCompleted as EventListener);
     window.addEventListener('remote:restart-app', handleRestartApp as EventListener);
     window.addEventListener('remote:factory-reset', handleFactoryReset as EventListener);
     window.addEventListener('remote:reload-content', handleReloadContent);
     window.addEventListener('remote:update-settings', handleUpdateSettings);
     window.addEventListener('remote:screenshot-captured', handleScreenshot);
+    window.addEventListener('remote:force-update', handleForceUpdate);
 
     return () => {
+      window.removeEventListener('remote:command-received', handleCommandReceived as EventListener);
+      window.removeEventListener('remote:command-throttled', handleCommandThrottled as EventListener);
+      window.removeEventListener('remote:command-completed', handleCommandCompleted as EventListener);
       window.removeEventListener('remote:restart-app', handleRestartApp as EventListener);
       window.removeEventListener('remote:factory-reset', handleFactoryReset as EventListener);
       window.removeEventListener('remote:reload-content', handleReloadContent);
       window.removeEventListener('remote:update-settings', handleUpdateSettings);
       window.removeEventListener('remote:screenshot-captured', handleScreenshot);
+      window.removeEventListener('remote:force-update', handleForceUpdate);
     };
-  }, []);
+  }, [dispatch]);
 
   // Render countdown notification
   if (countdownCommand) {
@@ -267,6 +344,99 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
         >
           <AlertTitle sx={{ fontWeight: 600 }}>Screenshot Captured</AlertTitle>
           Screen capture sent to admin portal.
+        </Alert>
+      </Snackbar>
+    );
+  }
+
+  // Render command received notification
+  if (showCommandReceived) {
+    return (
+      <Snackbar
+        open={showCommandReceived}
+        autoHideDuration={3000}
+        onClose={() => setShowCommandReceived(false)}
+        anchorOrigin={position}
+      >
+        <Alert
+          icon={<SystemUpdateIcon />}
+          severity="info"
+          onClose={() => setShowCommandReceived(false)}
+          sx={{ borderRadius: '8px' }}
+        >
+          <AlertTitle sx={{ fontWeight: 600 }}>Remote Command Received</AlertTitle>
+          Processing command: {commandReceivedType}
+        </Alert>
+      </Snackbar>
+    );
+  }
+
+  // Render command throttled notification
+  if (showCommandThrottled) {
+    return (
+      <Snackbar
+        open={showCommandThrottled}
+        autoHideDuration={3000}
+        onClose={() => setShowCommandThrottled(false)}
+        anchorOrigin={position}
+      >
+        <Alert
+          icon={<WarningIcon />}
+          severity="warning"
+          onClose={() => setShowCommandThrottled(false)}
+          sx={{ borderRadius: '8px' }}
+        >
+          <AlertTitle sx={{ fontWeight: 600 }}>Command Queued</AlertTitle>
+          Command is queued due to rate limiting. It will execute shortly.
+        </Alert>
+      </Snackbar>
+    );
+  }
+
+  // Render command completed notification
+  if (showCommandCompleted) {
+    return (
+      <Snackbar
+        open={showCommandCompleted}
+        autoHideDuration={3000}
+        onClose={() => setShowCommandCompleted(false)}
+        anchorOrigin={position}
+      >
+        <Alert
+          icon={<CheckCircleIcon />}
+          severity={commandCompletedSuccess ? 'success' : 'error'}
+          onClose={() => setShowCommandCompleted(false)}
+          sx={{ borderRadius: '8px' }}
+        >
+          <AlertTitle sx={{ fontWeight: 600 }}>
+            {commandCompletedSuccess ? 'Command Completed' : 'Command Failed'}
+          </AlertTitle>
+          Command {commandCompletedType} {commandCompletedSuccess ? 'executed successfully' : 'failed to execute'}.
+        </Alert>
+      </Snackbar>
+    );
+  }
+
+  // Render force update progress
+  if (showForceUpdateProgress) {
+    return (
+      <Snackbar
+        open={showForceUpdateProgress}
+        anchorOrigin={position}
+        sx={{ maxWidth: '500px' }}
+      >
+        <Alert
+          icon={<SystemUpdateIcon />}
+          severity="info"
+          sx={{ borderRadius: '8px', width: '100%' }}
+        >
+          <AlertTitle sx={{ fontWeight: 600 }}>Checking for Updates</AlertTitle>
+          <Box sx={{ width: '100%', mt: 1 }}>
+            <LinearProgress sx={{ borderRadius: 4, height: 6 }} />
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Downloading update if available...
+            </Typography>
+          </Box>
         </Alert>
       </Snackbar>
     );

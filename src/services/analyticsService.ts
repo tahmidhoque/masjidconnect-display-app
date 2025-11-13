@@ -12,6 +12,7 @@ import { systemMetrics } from '../utils/systemMetrics';
 import logger from '../utils/logger';
 import localforage from 'localforage';
 import masjidDisplayClient from '../api/masjidDisplayClient';
+import { RemoteCommandResponse } from './remoteControlService';
 
 // Analytics configuration
 const ANALYTICS_CONFIG = {
@@ -97,7 +98,15 @@ export class AnalyticsService {
   private async sendHeartbeat(): Promise<void> {
     try {
       const heartbeatData = await this.collectHeartbeatData();
-      await this.sendAnalyticsData('heartbeat', heartbeatData);
+      const result = await this.sendAnalyticsData('heartbeat', heartbeatData);
+      
+      // If heartbeat was sent successfully and contained command responses, clear them
+      if (result && heartbeatData.commandResponses && heartbeatData.commandResponses.length > 0) {
+        this.clearSentCommandResponses();
+        logger.debug('Cleared sent command responses', { 
+          count: heartbeatData.commandResponses.length 
+        });
+      }
       
       // Reset content errors after successful heartbeat
       systemMetrics.resetContentErrors();
@@ -109,7 +118,7 @@ export class AnalyticsService {
   /**
    * Collect comprehensive heartbeat data
    */
-  private async collectHeartbeatData(): Promise<HeartbeatAnalyticsData> {
+  private async collectHeartbeatData(): Promise<HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] }> {
     const [
       cpuUsage,
       storageUsed,
@@ -128,7 +137,10 @@ export class AnalyticsService {
       systemMetrics.getAmbientLight(),
     ]);
 
-    const heartbeatData: HeartbeatAnalyticsData = {
+    // Get pending command responses
+    const commandResponses = this.getPendingCommandResponses();
+
+    const heartbeatData: HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] } = {
       // System Performance (REQUIRED)
       cpuUsage,
       memoryUsage: systemMetrics.getMemoryUsage(),
@@ -156,12 +168,16 @@ export class AnalyticsService {
       // Network Details (REQUIRED)
       signalStrength: systemMetrics.getSignalStrength(),
       connectionType: systemMetrics.getConnectionType(),
+      
+      // Command Responses (OPTIONAL - included if any pending)
+      ...(commandResponses.length > 0 && { commandResponses }),
     };
 
     logger.debug('Collected heartbeat data', { 
       cpuUsage, 
       memoryUsage: heartbeatData.memoryUsage,
-      currentContent: heartbeatData.currentContent 
+      currentContent: heartbeatData.currentContent,
+      commandResponseCount: commandResponses.length,
     });
 
     return heartbeatData;
@@ -194,11 +210,11 @@ export class AnalyticsService {
   private async sendAnalyticsData(
     type: AnalyticsRequest['type'], 
     data: any
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (!this.isInitialized || !this.apiKey) {
       logger.warn('Analytics service not initialized, queuing data', { type });
       await this.queueData(type, data);
-      return;
+      return false;
     }
 
     const analyticsRequest: AnalyticsRequest = {
@@ -210,9 +226,11 @@ export class AnalyticsService {
     try {
       await this.sendToAPI(analyticsRequest);
       logger.debug('Analytics data sent successfully', { type });
+      return true;
     } catch (error) {
       logger.error('Failed to send analytics data', { type, error });
       await this.queueData(type, data);
+      return false;
     }
   }
 
@@ -395,6 +413,43 @@ export class AnalyticsService {
   }
 
   /**
+   * Get pending command responses from localStorage
+   */
+  private getPendingCommandResponses(): RemoteCommandResponse[] {
+    try {
+      const storedResponses = localStorage.getItem('pending_command_responses');
+      if (!storedResponses) {
+        return [];
+      }
+      
+      const responses = JSON.parse(storedResponses) as RemoteCommandResponse[];
+      
+      // Validate that it's an array
+      if (!Array.isArray(responses)) {
+        logger.warn('AnalyticsService: Invalid command responses format in localStorage');
+        return [];
+      }
+      
+      return responses;
+    } catch (error) {
+      logger.error('AnalyticsService: Error retrieving pending command responses', { error });
+      return [];
+    }
+  }
+
+  /**
+   * Clear sent command responses from localStorage
+   */
+  private clearSentCommandResponses(): void {
+    try {
+      localStorage.removeItem('pending_command_responses');
+      logger.debug('AnalyticsService: Cleared sent command responses');
+    } catch (error) {
+      logger.error('AnalyticsService: Error clearing sent command responses', { error });
+    }
+  }
+
+  /**
    * Get analytics service status
    */
   getStatus(): {
@@ -402,12 +457,14 @@ export class AnalyticsService {
     hasApiKey: boolean;
     queueSize: number;
     heartbeatActive: boolean;
+    pendingCommandResponses: number;
   } {
     return {
       isInitialized: this.isInitialized,
       hasApiKey: !!this.apiKey,
       queueSize: this.queue.length,
       heartbeatActive: !!this.heartbeatInterval,
+      pendingCommandResponses: this.getPendingCommandResponses().length,
     };
   }
 }

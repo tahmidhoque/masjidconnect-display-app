@@ -28,6 +28,7 @@ class OrientationEventService {
   private currentOrientation: Orientation | null = null;
   private lastOrientationUpdate: { orientation: Orientation, timestamp: number } | null = null;
   private orientationUpdateDebounceTime = 2000; // 2 seconds debounce
+  private isInitializing = false; // Prevent duplicate initialization
 
   /**
    * Set the current screen ID
@@ -41,6 +42,19 @@ class OrientationEventService {
    * This reuses the same SSE connection as emergency alerts
    */
   public initialize(baseURL: string): void {
+    // Prevent duplicate initialization
+    if (this.isInitializing) {
+      logger.warn('OrientationEventService: Already initializing, skipping duplicate call');
+      return;
+    }
+    
+    // If already connected, don't reinitialize
+    if (this.eventSource && this.eventSource.readyState === EventSource.OPEN) {
+      logger.debug('OrientationEventService: Already connected, skipping initialization');
+      return;
+    }
+    
+    this.isInitializing = true;
     logger.info('OrientationEventService: Initializing', { baseURL });
     console.log('🔄 OrientationEventService: Initializing with baseURL:', baseURL);
     
@@ -60,6 +74,7 @@ class OrientationEventService {
     
     // Try connecting with endpoint
     this.connectToEventSource(baseURL);
+    this.isInitializing = false;
   }
 
   /**
@@ -137,12 +152,44 @@ class OrientationEventService {
    * Set up event listeners for the EventSource
    */
   private setupEventListeners(eventSource: EventSource): void {
+    logger.info('OrientationEventService: Setting up event listeners', {
+      primaryEventType: EVENT_TYPES.PRIMARY,
+    });
+    
     // Set up event listener for the primary orientation update event
     // This is the event documented by the backend team
     eventSource.addEventListener(EVENT_TYPES.PRIMARY, this.handleOrientationEvent);
     
-    // Log which event we're listening for
-    console.log(`🔍 OrientationEventService: Registered listener for primary event: ${EVENT_TYPES.PRIMARY}`);
+    // Also listen for alternative event names
+    eventSource.addEventListener('SCREEN_ORIENTATION', this.handleOrientationEvent);
+    eventSource.addEventListener('screen_orientation', this.handleOrientationEvent);
+    eventSource.addEventListener('orientation', this.handleOrientationEvent);
+    
+    // CRITICAL: Also listen to default 'message' event in case server sends events without event type
+    eventSource.addEventListener('message', (event: MessageEvent) => {
+      logger.debug('OrientationEventService: Received default message event', {
+        data: event.data,
+        type: event.type,
+        lastEventId: (event as any).lastEventId,
+      });
+      console.log('🔍 OrientationEventService: Default message event received:', event.data);
+      
+      // Try to parse and handle as orientation event
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data && (data.orientation || data.type === 'SCREEN_ORIENTATION')) {
+          // It looks like an orientation event, handle it
+          this.handleOrientationEvent(event);
+        }
+      } catch (error) {
+        // Not JSON or not an orientation event, ignore
+        logger.debug('OrientationEventService: Message event is not an orientation event');
+      }
+    });
+    
+    // Log which events we're listening for
+    console.log(`🔍 OrientationEventService: Registered listeners for: ${EVENT_TYPES.PRIMARY}, SCREEN_ORIENTATION, screen_orientation, orientation, message`);
+    logger.info('OrientationEventService: All event listeners registered');
   }
 
   /**
@@ -150,18 +197,22 @@ class OrientationEventService {
    */
   private handleConnectionOpen = (): void => {
     this.reconnectAttempts = 0;
-    logger.info('OrientationEventService: SSE connection established');
-    console.log('🔌 OrientationEventService: SSE connection established', {
+    const readyState = this.eventSource?.readyState;
+    const readyStateText = readyState === EventSource.OPEN ? 'OPEN' : 
+                          readyState === EventSource.CONNECTING ? 'CONNECTING' : 
+                          readyState === EventSource.CLOSED ? 'CLOSED' : 'UNKNOWN';
+    
+    logger.info('OrientationEventService: SSE connection established', {
       url: this.connectionUrl,
-      readyState: this.eventSource?.readyState,
-      registeredEventTypes: EVENT_TYPES
+      readyState,
+      readyStateText,
     });
+    console.log(`🔌 OrientationEventService: SSE connection established! ReadyState: ${readyStateText} (${readyState})`);
+    console.log(`🔌 OrientationEventService: Connection URL: ${this.connectionUrl}`);
     
     // Log available event types
     if (this.eventSource) {
-      console.log('🔍 OrientationEventService: Registered event listeners for:', [
-        EVENT_TYPES.PRIMARY
-      ]);
+      console.log('🔍 OrientationEventService: EventSource ready, listeners should be active');
     }
   };
 
@@ -280,12 +331,18 @@ class OrientationEventService {
       const previousOrientation = this.currentOrientation;
       
       // We've validated the data, now update state and notify listeners
+      const transitionType = previousOrientation 
+        ? `${previousOrientation} → ${orientationData.orientation}`
+        : `initial → ${orientationData.orientation}`;
+      
       console.log(`✅ OrientationEventService: Changing orientation from ${previousOrientation || 'unknown'} to ${orientationData.orientation} for screen ${orientationData.id}`);
       logger.info('OrientationEventService: Orientation change', {
         previousOrientation,
         newOrientation: orientationData.orientation,
+        transitionType,
         screenId: orientationData.id,
-        timestamp: now
+        timestamp: now,
+        transitionTime: previousOrientation ? (now - (this.lastOrientationUpdate?.timestamp || now)) : 0,
       });
       
       // Update current orientation

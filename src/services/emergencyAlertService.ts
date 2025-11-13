@@ -24,17 +24,32 @@ class EmergencyAlertService {
   private currentAlert: EmergencyAlert | null = null;
   private expirationTimer: NodeJS.Timeout | null = null;
   private connectionUrl: string | null = null;
+  private isInitializing = false; // Prevent duplicate initialization
 
   /**
    * Initialize the SSE connection to listen for emergency alerts
    */
   public initialize(baseURL: string): void {
+    // Prevent duplicate initialization
+    if (this.isInitializing) {
+      logger.warn('EmergencyAlertService: Already initializing, skipping duplicate call');
+      return;
+    }
+    
+    // If already connected, don't reinitialize
+    if (this.eventSource && this.eventSource.readyState === EventSource.OPEN) {
+      logger.debug('EmergencyAlertService: Already connected, skipping initialization');
+      return;
+    }
+    
+    this.isInitializing = true;
     logger.info('EmergencyAlertService: Initializing', { baseURL });
     console.log('🚨 EmergencyAlertService: Initializing with baseURL:', baseURL);
     this.loadSavedAlert();
     
     // Try connecting with both endpoints to ensure compatibility
     this.connectToEventSource(baseURL);
+    this.isInitializing = false;
   }
 
   /**

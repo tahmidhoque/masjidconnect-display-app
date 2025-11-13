@@ -40,82 +40,95 @@ export const orientationMiddleware: Middleware = (api: any) => {
     const result = next(action);
     const state = api.getState();
     
+    // Helper function to initialize orientation service when authenticated
+    const tryInitializeOrientation = () => {
+      const isAuthenticated = selectIsAuthenticated(state);
+      
+      if (isAuthenticated) {
+        // Check if credentials are in localStorage
+        const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
+        
+        if (screenId) {
+          // Set screen ID in the service
+          orientationEventService.setScreenId(screenId);
+          
+          const baseURL = process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+          
+          logger.info('[OrientationMiddleware] Authentication successful with credentials, initializing orientation service', {
+            screenId,
+            baseURL
+          });
+          console.log(`🔄 OrientationMiddleware: Initializing orientation service for screen ${screenId}`);
+          
+          // Initialize the orientation service
+          orientationEventService.initialize(baseURL);
+          
+          // Load saved orientation from localStorage and update Redux if available
+          try {
+            const savedOrientation = localStorage.getItem('screen_orientation');
+            if (savedOrientation === 'LANDSCAPE' || savedOrientation === 'PORTRAIT') {
+              logger.debug('[OrientationMiddleware] Loading saved orientation from localStorage', {
+                orientation: savedOrientation
+              });
+              api.dispatch(setOrientation(savedOrientation as 'LANDSCAPE' | 'PORTRAIT'));
+            }
+          } catch (error) {
+            logger.warn('[OrientationMiddleware] Could not load saved orientation', { error });
+          }
+          return true;
+        } else {
+          logger.warn('[OrientationMiddleware] Authentication successful but no screen ID found, delaying orientation service initialization');
+          // Retry after a short delay to allow credentials to be stored
+          setTimeout(() => {
+            const currentState = api.getState();
+            const stillAuthenticated = selectIsAuthenticated(currentState);
+            const screenIdNow = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
+            if (stillAuthenticated && screenIdNow) {
+              orientationEventService.setScreenId(screenIdNow);
+              
+              const baseURL = process.env.NODE_ENV === 'development' 
+                ? 'http://localhost:3000' 
+                : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+              
+              logger.info('[OrientationMiddleware] Screen ID now available, initializing orientation service');
+              console.log(`🔄 OrientationMiddleware: Initializing orientation service for screen ${screenIdNow}`);
+              orientationEventService.initialize(baseURL);
+              
+              // Load saved orientation
+              try {
+                const savedOrientation = localStorage.getItem('screen_orientation');
+                if (savedOrientation === 'LANDSCAPE' || savedOrientation === 'PORTRAIT') {
+                  api.dispatch(setOrientation(savedOrientation as 'LANDSCAPE' | 'PORTRAIT'));
+                }
+              } catch (error) {
+                logger.warn('[OrientationMiddleware] Could not load saved orientation', { error });
+              }
+            }
+          }, 1000);
+          return false;
+        }
+      }
+      return false;
+    };
+    
     // Handle specific actions
     switch (action.type) {
       case 'auth/initializeFromStorage/fulfilled':
-      case 'auth/checkPairingStatus/fulfilled': {
+      case 'auth/checkPairingStatus/fulfilled':
+      case 'auth/setIsPaired': {
         // When authentication is successful, initialize orientation service
-        const isAuthenticated = selectIsAuthenticated(state);
-        
-        if (isAuthenticated) {
-          // Check if credentials are in localStorage
-          const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
-          
-          if (screenId) {
-            // Set screen ID in the service
-            orientationEventService.setScreenId(screenId);
-            
-            const baseURL = process.env.NODE_ENV === 'development' 
-              ? 'http://localhost:3000' 
-              : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-            
-            logger.debug('[OrientationMiddleware] Authentication successful with credentials, initializing orientation service', {
-              screenId,
-              baseURL
-            });
-            console.log(`🔄 OrientationMiddleware: Initializing orientation service for screen ${screenId}`);
-            
-            // Initialize the orientation service
-            orientationEventService.initialize(baseURL);
-            
-            // Load saved orientation from localStorage and update Redux if available
-            try {
-              const savedOrientation = localStorage.getItem('screen_orientation');
-              if (savedOrientation === 'LANDSCAPE' || savedOrientation === 'PORTRAIT') {
-                logger.debug('[OrientationMiddleware] Loading saved orientation from localStorage', {
-                  orientation: savedOrientation
-                });
-                api.dispatch(setOrientation(savedOrientation as 'LANDSCAPE' | 'PORTRAIT'));
-              }
-            } catch (error) {
-              logger.warn('[OrientationMiddleware] Could not load saved orientation', { error });
-            }
-          } else {
-            logger.warn('[OrientationMiddleware] Authentication successful but no screen ID found, delaying orientation service initialization');
-            // Retry after a short delay to allow credentials to be stored
-            setTimeout(() => {
-              const screenIdNow = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
-              if (screenIdNow) {
-                orientationEventService.setScreenId(screenIdNow);
-                
-                const baseURL = process.env.NODE_ENV === 'development' 
-                  ? 'http://localhost:3000' 
-                  : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-                
-                logger.debug('[OrientationMiddleware] Screen ID now available, initializing orientation service');
-                console.log(`🔄 OrientationMiddleware: Initializing orientation service for screen ${screenIdNow}`);
-                orientationEventService.initialize(baseURL);
-                
-                // Load saved orientation
-                try {
-                  const savedOrientation = localStorage.getItem('screen_orientation');
-                  if (savedOrientation === 'LANDSCAPE' || savedOrientation === 'PORTRAIT') {
-                    api.dispatch(setOrientation(savedOrientation as 'LANDSCAPE' | 'PORTRAIT'));
-                  }
-                } catch (error) {
-                  logger.warn('[OrientationMiddleware] Could not load saved orientation', { error });
-                }
-              }
-            }, 1000);
-          }
-        }
+        logger.debug('[OrientationMiddleware] Auth action received', { actionType: action.type });
+        tryInitializeOrientation();
         break;
       }
       
       case 'auth/logout': {
         // When logging out, cleanup orientation service
-        logger.debug('[OrientationMiddleware] Logout detected, cleaning up orientation service');
+        logger.info('[OrientationMiddleware] Logout detected, cleaning up orientation service');
         orientationEventService.cleanup();
+        listenersSetup = false; // Reset so listeners can be set up again on next auth
         break;
       }
       
@@ -148,6 +161,32 @@ export const orientationMiddleware: Middleware = (api: any) => {
           }
         }
         break;
+      }
+    }
+    
+    // CRITICAL: Also check state after every action to catch any missed authentication cases
+    // This ensures orientation SSE is initialized even if we missed the specific action
+    // BUT: Only check on auth-related actions to prevent excessive checks
+    const isAuthAction = action.type.startsWith('auth/') || action.type.startsWith('emergency/');
+    if (isAuthAction) {
+      const isAuthenticated = selectIsAuthenticated(state);
+      const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
+      
+      // Check if we should have orientation SSE initialized but don't
+      if (isAuthenticated && screenId) {
+        const connectionStatus = orientationEventService.getConnectionStatus();
+        // Only initialize if we don't have an active connection
+        if (!connectionStatus.connected && connectionStatus.readyState !== EventSource.CONNECTING && connectionStatus.readyState !== EventSource.OPEN) {
+          logger.info('[OrientationMiddleware] Detected authenticated state but orientation SSE not initialized, initializing now', {
+            screenId,
+            connectionStatus
+          });
+          orientationEventService.setScreenId(screenId);
+          const baseURL = process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+          orientationEventService.initialize(baseURL);
+        }
       }
     }
     

@@ -264,12 +264,15 @@ function createWindow() {
 
   // Set up content security policy
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    // Allow localhost:3000 in development for fonts, images, and styles
+    const cspDirectives = isDev
+      ? "default-src 'self' 'unsafe-inline' file: data: static: http://localhost:3000; script-src 'self' 'unsafe-inline' file: static: http://localhost:3000; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com file: static: http://localhost:3000; font-src 'self' https://fonts.gstatic.com static: http://localhost:3000; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.co.uk https://1.1.1.1 https://httpbin.org; img-src 'self' data: blob: https://*.masjidconnect.co.uk file: static: http://localhost:3000;"
+      : "default-src 'self' 'unsafe-inline' file: data: static:; script-src 'self' 'unsafe-inline' file: static:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com file: static:; font-src 'self' https://fonts.gstatic.com static:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.co.uk https://1.1.1.1 https://httpbin.org; img-src 'self' data: blob: https://*.masjidconnect.co.uk file: static:;";
+    
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' file: data: static:; script-src 'self' 'unsafe-inline' file: static:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com file: static:; font-src 'self' https://fonts.gstatic.com static:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://*.masjidconnect.co.uk https://1.1.1.1 https://httpbin.org; img-src 'self' data: https://*.masjidconnect.co.uk file: static:;",
-        ],
+        'Content-Security-Policy': [cspDirectives],
       },
     });
   });
