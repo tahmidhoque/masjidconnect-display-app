@@ -538,7 +538,7 @@ class RemoteControlService {
       }
       
       // Check if running in Electron environment
-      const isElectron = typeof window !== 'undefined' && window.electron !== undefined;
+      const isElectron = typeof window !== 'undefined' && window.electron !== undefined && window.electron.ipcRenderer !== undefined;
       if (!isElectron) {
         logger.warn('RemoteControlService: Force update requested but not running in Electron');
         return {
@@ -549,58 +549,43 @@ class RemoteControlService {
         };
       }
       
-      // Check for updates
-      let updateCheck;
+      // Trigger update check via IPC to main process
       try {
-        const currentVersion = updateService.getCurrentVersion();
-        updateCheck = await masjidDisplayClient.checkForUpdate(currentVersion);
-      } catch (networkError: any) {
-        logger.error('RemoteControlService: Network error checking for updates', { error: networkError });
-        throw new Error(`Network error: ${networkError.message || 'Failed to connect to update server'}`);
-      }
-      
-      if (!updateCheck.success || !updateCheck.data) {
-        return {
-          commandId: command.commandId,
-          success: false,
-          error: updateCheck.error || 'Failed to check for updates',
-          timestamp: new Date().toISOString(),
-        };
-      }
-      
-      if (!updateCheck.data.updateAvailable) {
+        const result = await window.electron!.ipcRenderer!.invoke('check-for-updates');
+        
+        if (!result.success) {
+          return {
+            commandId: command.commandId,
+            success: false,
+            error: result.error || 'Failed to check for updates',
+            timestamp: new Date().toISOString(),
+          };
+        }
+        
+        // Update check started successfully
+        // Actual update progress will be reported via heartbeat
+        logger.info('RemoteControlService: Update check initiated successfully', { commandId: command.commandId });
+        
+        // Dispatch custom event for UI to show update notification
+        try {
+          window.dispatchEvent(new CustomEvent('remote:force-update', {
+            detail: { commandId: command.commandId }
+          }));
+        } catch (eventError) {
+          logger.warn('RemoteControlService: Error dispatching update event', { error: eventError });
+          // Continue execution even if event dispatch fails
+        }
+        
         return {
           commandId: command.commandId,
           success: true,
-          message: 'No update available, already on latest version',
+          message: 'Update check initiated. Progress will be reported via heartbeat.',
           timestamp: new Date().toISOString(),
         };
+      } catch (ipcError: any) {
+        logger.error('RemoteControlService: IPC error checking for updates', { error: ipcError });
+        throw new Error(`Update check failed: ${ipcError.message || 'Unknown error'}`);
       }
-      
-      // Trigger update check and download
-      try {
-        await updateService.checkForUpdates();
-      } catch (updateError: any) {
-        logger.error('RemoteControlService: Error triggering update check', { error: updateError });
-        throw new Error(`Update check failed: ${updateError.message || 'Unknown error'}`);
-      }
-      
-      // Dispatch custom event for UI to show update notification
-      try {
-        window.dispatchEvent(new CustomEvent('remote:force-update', {
-          detail: { commandId: command.commandId }
-        }));
-      } catch (eventError) {
-        logger.warn('RemoteControlService: Error dispatching update event', { error: eventError });
-        // Continue execution even if event dispatch fails
-      }
-      
-      return {
-        commandId: command.commandId,
-        success: true,
-        message: `Update available: ${updateCheck.data.latestVersion?.version}. Download initiated.`,
-        timestamp: new Date().toISOString(),
-      };
     } catch (error: any) {
       logger.error('RemoteControlService: Error in force update', { 
         error: error.message || error,

@@ -123,8 +123,22 @@ export interface BaseAnalyticsRequest {
   data: any; // Will be one of the specific data types below
 }
 
+// Update Progress Interface
+export interface UpdateProgress {
+  status: 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error' | 'not-available' | 'idle';
+  version?: string;
+  progress?: number;
+  error?: string;
+  timestamp: string;
+}
+
 // Heartbeat Analytics Data
 export interface HeartbeatAnalyticsData {
+  // Application Information (REQUIRED)
+  appVersion: string;           // Current app version (e.g., "1.2.3")
+  platform: string;             // Platform (e.g., "Linux armv7l")
+  electronVersion?: string;     // Electron version
+  
   // System Performance (REQUIRED)
   cpuUsage: number;              // CPU usage percentage (0-100)
   memoryUsage: number;           // Memory usage percentage (0-100)
@@ -152,6 +166,9 @@ export interface HeartbeatAnalyticsData {
   // Network Details (REQUIRED)
   signalStrength: number;        // WiFi/Network signal strength percentage (0-100)
   connectionType: string;        // Connection type: "wifi", "ethernet", "cellular"
+  
+  // Update Progress (OPTIONAL - included when available)
+  updateProgress?: UpdateProgress;
 }
 
 export interface HeartbeatAnalyticsRequest extends BaseAnalyticsRequest {

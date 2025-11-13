@@ -62,6 +62,14 @@ let mainWindow;
 // Update check interval (1 hour)
 const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000;
 
+// Track update state
+let updateState = {
+  status: 'idle', // idle, checking, available, downloading, downloaded, error, not-available
+  version: null,
+  progress: 0,
+  error: null
+};
+
 // Configure auto updater options
 autoUpdater.autoDownload = true; // Enable auto download
 autoUpdater.allowDowngrade = false; // Prevent downgrading to older versions
@@ -425,6 +433,13 @@ app.on('window-all-closed', function () {
   }
 });
 
+// Helper function to send update state to renderer
+function sendUpdateStateToRenderer() {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('update-state-changed', updateState);
+  }
+}
+
 // Auto updater events
 function sendStatusToWindow(text) {
   log.info(text);
@@ -434,42 +449,68 @@ function sendStatusToWindow(text) {
 }
 
 autoUpdater.on('checking-for-update', () => {
+  updateState = { status: 'checking', version: null, progress: 0, error: null };
   sendStatusToWindow('Checking for update...');
+  sendUpdateStateToRenderer();
 });
 
 autoUpdater.on('update-available', (info) => {
+  updateState = { status: 'available', version: info.version, progress: 0, error: null };
   const message = `Update available: v${info.version}`;
   log.info(message, info);
   sendStatusToWindow(message);
+  sendUpdateStateToRenderer();
 
   // Send structured event to renderer
   if (mainWindow && mainWindow.webContents) {
-    mainWindow.webContents.send('update-available', { version: info.version });
+    mainWindow.webContents.send('update-available', { 
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+      releaseDate: info.releaseDate
+    });
   }
+  
+  // Automatically start download
+  autoUpdater.downloadUpdate();
 });
 
 autoUpdater.on('update-not-available', (info) => {
+  updateState = { status: 'not-available', version: null, progress: 0, error: null };
   log.info('No update available', info);
   sendStatusToWindow('No update available.');
+  sendUpdateStateToRenderer();
 });
 
 autoUpdater.on('error', (err) => {
+  updateState = { status: 'error', version: null, progress: 0, error: err.message };
   const message = `Error in auto-updater: ${err.message}`;
   log.error(message, err);
   sendStatusToWindow(message);
+  sendUpdateStateToRenderer();
 
   // Send error event to renderer
   if (mainWindow && mainWindow.webContents) {
-    mainWindow.webContents.send('update-error', { message: err.message, stack: err.stack });
+    mainWindow.webContents.send('update-error', { 
+      message: err.message, 
+      stack: err.stack 
+    });
   }
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
+  updateState = { 
+    status: 'downloading', 
+    version: updateState.version,
+    progress: progressObj.percent,
+    error: null 
+  };
+  
   let log_message = `Download speed: ${progressObj.bytesPerSecond}`;
   log_message = `${log_message} - Downloaded ${progressObj.percent.toFixed(2)}%`;
   log_message = `${log_message} (${progressObj.transferred}/${progressObj.total})`;
   log.info(log_message);
   sendStatusToWindow(log_message);
+  sendUpdateStateToRenderer();
 
   // Send progress event to renderer
   if (mainWindow && mainWindow.webContents) {
@@ -483,13 +524,24 @@ autoUpdater.on('download-progress', (progressObj) => {
 });
 
 autoUpdater.on('update-downloaded', (info) => {
+  updateState = { 
+    status: 'downloaded', 
+    version: info.version,
+    progress: 100,
+    error: null 
+  };
+  
   const message = `Update v${info.version} downloaded. Will install on restart.`;
   log.info(message, info);
   sendStatusToWindow(message);
+  sendUpdateStateToRenderer();
 
   // Send downloaded event to renderer
   if (mainWindow && mainWindow.webContents) {
-    mainWindow.webContents.send('update-downloaded', { version: info.version });
+    mainWindow.webContents.send('update-downloaded', { 
+      version: info.version,
+      releaseNotes: info.releaseNotes
+    });
   }
 });
 
@@ -531,12 +583,29 @@ ipcMain.handle('install-update', async () => {
   }
 });
 
+// Get app version handler
+ipcMain.handle('get-app-version', async () => {
+  return app.getVersion();
+});
+
+// IPC handler to get current update state
+ipcMain.handle('get-update-state', async () => {
+  return updateState;
+});
+
 // Restart app handler (without installing update)
 ipcMain.handle('restart-app', async () => {
   log.info('App restart requested');
   try {
-    app.relaunch();
-    app.exit(0);
+    // Check if update is downloaded
+    if (updateState.status === 'downloaded') {
+      log.info('Installing update and restarting');
+      autoUpdater.quitAndInstall(false, true);
+    } else {
+      // Normal restart
+      app.relaunch();
+      app.exit(0);
+    }
     return { success: true, message: 'Restarting app...' };
   } catch (error) {
     log.error('Error restarting app:', error);

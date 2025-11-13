@@ -12,7 +12,6 @@ import RemoteCommandNotification from './components/common/RemoteCommandNotifica
 import FactoryResetModal from './components/common/FactoryResetModal';
 import EnhancedLoadingScreen from './components/screens/EnhancedLoadingScreen';
 import { OrientationProvider } from './contexts/OrientationContext';
-import OrientationTester from './components/debug/OrientationTester';
 // Clear cached Hijri data to ensure accurate calculation
 import './utils/clearHijriCache';
 // ✅ DISABLED: Demo imports that were causing console spam in development
@@ -334,7 +333,6 @@ const App: React.FC = () => {
                 <AnalyticsErrorIntegration />
                 <UpdateNotification />
                 <RemoteCommandNotification />
-                <OrientationTester />
 
             {/* Factory Reset Modal */}
             <FactoryResetModal

@@ -13,6 +13,7 @@ import logger from '../utils/logger';
 import localforage from 'localforage';
 import masjidDisplayClient from '../api/masjidDisplayClient';
 import { RemoteCommandResponse } from './remoteControlService';
+import updateProgressService from './updateProgressService';
 
 // Analytics configuration
 const ANALYTICS_CONFIG = {
@@ -55,6 +56,9 @@ export class AnalyticsService {
     this.isInitialized = true;
     
     logger.info('Analytics service initialized', { hasApiKey: !!apiKey });
+    
+    // Initialize update progress service
+    updateProgressService.initialize();
     
     // Start heartbeat collection
     this.startHeartbeat();
@@ -116,6 +120,25 @@ export class AnalyticsService {
   }
 
   /**
+   * Get application version
+   */
+  private async getAppVersion(): Promise<string> {
+    try {
+      // Try to get version from Electron app
+      if (typeof window !== 'undefined' && window.electron?.app?.getVersion) {
+        const version = await window.electron.app.getVersion();
+        return version || process.env.REACT_APP_VERSION || 'unknown';
+      }
+      
+      // Fallback to environment variable
+      return process.env.REACT_APP_VERSION || 'unknown';
+    } catch (error) {
+      logger.error('Failed to get app version', { error });
+      return process.env.REACT_APP_VERSION || 'unknown';
+    }
+  }
+
+  /**
    * Collect comprehensive heartbeat data
    */
   private async collectHeartbeatData(): Promise<HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] }> {
@@ -140,7 +163,26 @@ export class AnalyticsService {
     // Get pending command responses
     const commandResponses = this.getPendingCommandResponses();
 
+    // Get app version
+    const appVersion = await this.getAppVersion();
+
+    // Get platform information
+    const platform = typeof window !== 'undefined' ? window.navigator.platform : 'unknown';
+    
+    // Get electron version
+    const electronVersion = typeof window !== 'undefined' && window.electron?.versions?.electron
+      ? window.electron.versions.electron
+      : undefined;
+
+    // Get update progress if available
+    const updateProgress = updateProgressService.getProgress();
+
     const heartbeatData: HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] } = {
+      // Application Information (REQUIRED)
+      appVersion,
+      platform,
+      ...(electronVersion && { electronVersion }),
+      
       // System Performance (REQUIRED)
       cpuUsage,
       memoryUsage: systemMetrics.getMemoryUsage(),
@@ -169,15 +211,21 @@ export class AnalyticsService {
       signalStrength: systemMetrics.getSignalStrength(),
       connectionType: systemMetrics.getConnectionType(),
       
+      // Update Progress (OPTIONAL - included when available)
+      ...(updateProgress && { updateProgress }),
+      
       // Command Responses (OPTIONAL - included if any pending)
       ...(commandResponses.length > 0 && { commandResponses }),
     };
 
     logger.debug('Collected heartbeat data', { 
+      appVersion,
+      platform,
       cpuUsage, 
       memoryUsage: heartbeatData.memoryUsage,
       currentContent: heartbeatData.currentContent,
       commandResponseCount: commandResponses.length,
+      hasUpdateProgress: !!updateProgress,
     });
 
     return heartbeatData;

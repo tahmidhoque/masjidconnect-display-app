@@ -101,6 +101,23 @@ try {
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
+  app: {
+    getVersion: () => ipcRenderer.invoke('get-app-version'),
+  },
+  versions: {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+  },
+  ipcRenderer: {
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+    on: (channel, callback) => {
+      const subscription = (event, ...args) => callback(...args);
+      ipcRenderer.on(channel, subscription);
+      return () => ipcRenderer.removeListener(channel, subscription);
+    },
+    removeListener: (channel, callback) => ipcRenderer.removeListener(channel, callback),
+  },
   updater: {
     // Check for updates
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

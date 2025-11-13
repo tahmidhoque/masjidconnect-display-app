@@ -1,8 +1,19 @@
 interface Window {
   electron?: {
     app?: {
+      getVersion: () => Promise<string>;
       relaunch: () => void;
       exit: () => void;
+    };
+    versions?: {
+      electron: string;
+      chrome: string;
+      node: string;
+    };
+    ipcRenderer?: {
+      invoke: (channel: string, ...args: any[]) => Promise<any>;
+      on: (channel: string, callback: (...args: any[]) => void) => () => void;
+      removeListener: (channel: string, callback: (...args: any[]) => void) => void;
     };
     updater: {
       // Methods
