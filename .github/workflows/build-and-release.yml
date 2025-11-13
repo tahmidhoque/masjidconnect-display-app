@@ -30,12 +30,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetch all history for proper versioning
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
@@ -117,7 +117,7 @@ jobs:
           ls -lah dist/ || echo "No dist directory found"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: masjidconnect-display-${{ matrix.arch }}
           path: |
@@ -133,7 +133,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get version
         id: get-version
@@ -150,13 +150,13 @@ jobs:
           echo "Release version: $VERSION"
 
       - name: Download armv7l artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: masjidconnect-display-armv7l
           path: ./artifacts/armv7l
 
       - name: Download arm64 artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: masjidconnect-display-arm64
           path: ./artifacts/arm64
