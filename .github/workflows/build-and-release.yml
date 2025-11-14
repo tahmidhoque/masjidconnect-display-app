@@ -267,7 +267,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup artifacts
-        uses: geekyeggo/delete-artifact@v2
+        uses: geekyeggo/delete-artifact@v4
+        continue-on-error: true
         with:
           name: |
             masjidconnect-display-armv7l
