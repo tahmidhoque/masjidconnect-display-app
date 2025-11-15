@@ -42,10 +42,7 @@ The MasjidConnect Display App is designed to be run on screens throughout a mosq
    ```
    npm install
    ```
-3. Create a `.env` file with the following variables:
-   ```
-   REACT_APP_API_URL=https://portal.masjidconnect.co.uk
-   ```
+3. Set up environment variables (see [Environment Variables](#environment-variables) section below)
 4. Start the development server:
    ```
    npm start
@@ -58,6 +55,92 @@ npm run build
 ```
 
 This will create a production-ready build in the `build` folder.
+
+## Environment Variables
+
+Environment variables control the configuration of the application. They are baked into the build at compile time (not runtime), so they must be set before building.
+
+### Required for Production
+
+**`REACT_APP_API_URL`** - Main API endpoint URL
+- **Required**: Yes, for production builds
+- **Default**: `https://portal.masjidconnect.co.uk/api`
+- **Description**: The base URL for all API calls to the MasjidConnect backend
+- **Used in**: API client, analytics, emergency middleware, orientation middleware, system metrics
+
+### Automatically Set (No Action Needed)
+
+**`REACT_APP_VERSION`** - App version number
+- Automatically set from `package.json` during build via build scripts
+- Used for version tracking and analytics
+
+**`NODE_ENV`** - Environment mode
+- Automatically set by `react-scripts` (`production` or `development`)
+- Used throughout the codebase for conditional logic
+
+### Optional - Development/Debugging
+
+**`REACT_APP_USE_CORS_PROXY`** - Enable CORS proxy in development
+- **Default**: `false`
+- **Description**: Only used when set to `'true'` and `NODE_ENV=development`
+- **Usage**: Enable when developing locally and encountering CORS issues
+
+**`REACT_APP_CORS_PROXY_URL`** - CORS proxy URL
+- **Default**: `https://cors-anywhere.herokuapp.com/`
+- **Description**: Only used when `REACT_APP_USE_CORS_PROXY=true` and `NODE_ENV=development`
+
+### Optional - Electron-Specific
+
+**`ELECTRON_DEBUG`** - Enable Electron debug mode
+- **Default**: `false`
+- **Description**: Enables DevTools and development features in Electron
+
+**`UPDATE_CHANNEL`** - Electron updater channel
+- **Default**: `'latest'`
+- **Options**: `'latest'`, `'beta'`, `'alpha'`
+- **Description**: Controls which update channel the app checks for updates
+
+**`DISABLE_UPDATES`** - Disable automatic update checks
+- **Description**: Set to any value to disable automatic update checks
+
+### Setting Up Environment Variables
+
+#### Local Development
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set your values:
+   ```bash
+   REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
+   ```
+
+3. Restart your development server for changes to take effect.
+
+#### Production Builds
+
+For local production builds, set environment variables before running the build command:
+
+```bash
+export REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
+npm run build
+```
+
+Or use a `.env` file (same as development).
+
+#### GitHub Actions CI/CD
+
+Environment variables are configured via GitHub Secrets. See [GitHub Actions Environment Setup](docs/GITHUB_ACTIONS_ENV_SETUP.md) for detailed instructions.
+
+**Required GitHub Secrets:**
+- `REACT_APP_API_URL` - API endpoint URL (recommended, falls back to default if not set)
+
+**Automatically Available:**
+- `GITHUB_TOKEN` - Provided automatically by GitHub Actions for publishing releases
+
+For more detailed information, see [Environment Variables Documentation](docs/ENVIRONMENT_VARIABLES.md).
 
 ## Deployment
 

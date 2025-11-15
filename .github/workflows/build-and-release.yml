@@ -64,6 +64,10 @@ jobs:
       - name: Build React app
         run: npm run build:fix-paths
         env:
+          # Required: API URL for production builds
+          # Set as GitHub Secret: REACT_APP_API_URL
+          # Falls back to default if secret not set
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://portal.masjidconnect.co.uk' }}
           REACT_APP_VERSION: ${{ steps.package-version.outputs.VERSION }}
           CI: false
           DISABLE_ESLINT_PLUGIN: false
@@ -84,6 +88,10 @@ jobs:
             npx electron-builder --linux deb --arm64 --publish never
           fi
         env:
+          # Required: API URL for production builds
+          # Set as GitHub Secret: REACT_APP_API_URL
+          # Falls back to default if secret not set
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://portal.masjidconnect.co.uk' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REACT_APP_VERSION: ${{ steps.package-version.outputs.VERSION }}
 
