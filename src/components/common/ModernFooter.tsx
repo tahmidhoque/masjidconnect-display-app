@@ -1,6 +1,7 @@
 import React from "react";
-import { Box, Typography, useTheme } from "@mui/material";
+import { Box, Typography, useTheme, Fade } from "@mui/material";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 interface ModernFooterProps {
   logoSrc?: string;
@@ -19,8 +20,24 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
 }) => {
   const theme = useTheme();
   const { fontSizes, getSizeRem } = useResponsiveFontSize();
+  const { getCurrentNotification, removeNotification } = useNotifications();
 
   const isPortrait = orientation === "portrait";
+  const currentNotification = getCurrentNotification();
+
+  // Get notification color based on type
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'success':
+        return theme.palette.success.main;
+      case 'warning':
+        return theme.palette.warning.main;
+      case 'error':
+        return theme.palette.error.main;
+      default:
+        return theme.palette.info.main;
+    }
+  };
 
   return (
     <Box
@@ -50,7 +67,14 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
         },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: getSizeRem(1) }}>
+      {/* Powered by section - always centered */}
+      <Box 
+        sx={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: getSizeRem(1),
+        }}
+      >
         <Typography
           sx={{
             fontSize: fontSizes.caption,
@@ -89,6 +113,72 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
           </Typography>
         )}
       </Box>
+
+      {/* Notification pill - absolutely positioned in corner, doesn't affect layout */}
+      {currentNotification && (
+        <Fade in={true} timeout={300}>
+          <Box
+            sx={{
+              position: "absolute",
+              right: getSizeRem(0.75),
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: getSizeRem(0.5),
+              px: getSizeRem(0.75),
+              py: getSizeRem(0.3),
+              background: `linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)`,
+              borderRadius: "12px",
+              border: `1px solid rgba(255,255,255,0.08)`,
+              maxWidth: isPortrait ? "50%" : "240px",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: "2px",
+                background: getNotificationColor(currentNotification.type),
+                borderRadius: "12px 0 0 12px",
+                opacity: 0.7,
+              },
+            }}
+          >
+            {/* Icon */}
+            {currentNotification.icon && (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  color: getNotificationColor(currentNotification.type),
+                  "& svg": {
+                    fontSize: "0.875rem",
+                  },
+                }}
+              >
+                {currentNotification.icon}
+              </Box>
+            )}
+
+            {/* Text - just show message or title */}
+            <Typography
+              sx={{
+                fontSize: fontSizes.caption,
+                color: "rgba(255,255,255,0.85)",
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                lineHeight: 1.2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {currentNotification.message || currentNotification.title}
+            </Typography>
+          </Box>
+        </Fade>
+      )}
     </Box>
   );
 };

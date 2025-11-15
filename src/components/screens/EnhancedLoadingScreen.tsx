@@ -34,7 +34,7 @@ interface EnhancedLoadingScreenProps {
   statusMessage: string;
   isTransitioning: boolean;
   onTransitionComplete?: () => void;
-  orientation?: "LANDSCAPE" | "PORTRAIT";
+  orientation?: "LANDSCAPE" | "PORTRAIT"; // Optional prop for override, but defaults to Redux value
 }
 
 const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
@@ -43,10 +43,13 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
   statusMessage,
   isTransitioning,
   onTransitionComplete,
-  orientation = "LANDSCAPE",
+  orientation: orientationProp,
 }) => {
   const theme = useTheme();
   const masjidName = useAppSelector((state) => state.content.masjidName);
+  // Read orientation from Redux store, with prop override if provided
+  const reduxOrientation = useAppSelector((state) => state.ui.orientation);
+  const orientation = orientationProp || reduxOrientation || "LANDSCAPE";
 
   // Get performance profile for optimizations
   const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);

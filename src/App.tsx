@@ -13,6 +13,7 @@ import RemoteCommandNotification from './components/common/RemoteCommandNotifica
 import FactoryResetModal from './components/common/FactoryResetModal';
 import EnhancedLoadingScreen from './components/screens/EnhancedLoadingScreen';
 import { OrientationProvider } from './contexts/OrientationContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 // Clear cached Hijri data to ensure accurate calculation
 import './utils/clearHijriCache';
 // ✅ DISABLED: Demo imports that were causing console spam in development
@@ -335,7 +336,8 @@ const App: React.FC = () => {
       <CssBaseline />
       <ApiErrorBoundary>
         <OrientationProvider>
-          <Box
+          <NotificationProvider>
+            <Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
@@ -377,6 +379,7 @@ const App: React.FC = () => {
               isResetting={isResetting}
             />
           </Box>
+          </NotificationProvider>
         </OrientationProvider>
       </ApiErrorBoundary>
     </ThemeProvider>

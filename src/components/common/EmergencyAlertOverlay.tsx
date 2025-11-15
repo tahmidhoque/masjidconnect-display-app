@@ -4,6 +4,8 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../store";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import logoWhite from "../../assets/logos/logo-notext-white.svg";
+import { useOrientation } from "../../contexts/OrientationContext";
+import useRotationHandling from "../../hooks/useRotationHandling";
 
 // Define a type for color scheme keys
 export type AlertColorSchemeKey =
@@ -118,6 +120,11 @@ const EmergencyAlertOverlay: React.FC = () => {
   );
   const hasActiveAlert = currentAlert !== null;
   const { fontSizes } = useResponsiveFontSize();
+  
+  // Orientation handling
+  const { orientation } = useOrientation();
+  const rotationInfo = useRotationHandling(orientation);
+  const shouldRotate = rotationInfo.shouldRotate;
 
   useEffect(() => {
     console.log("🚨 EmergencyAlertOverlay: Alert state changed:", currentAlert);
@@ -187,7 +194,7 @@ const EmergencyAlertOverlay: React.FC = () => {
 
   const alertConfig = getAlertConfig();
 
-  return (
+  const AlertContent = () => (
     <Box
       sx={{
         position: "fixed",
@@ -361,6 +368,29 @@ const EmergencyAlertOverlay: React.FC = () => {
         </Box>
       </Paper>
     </Box>
+  );
+
+  return (
+    <>
+      {shouldRotate ? (
+        <Box
+          sx={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            width: "100vh",
+            height: "100vw",
+            transform: "translate(-50%, -50%) rotate(90deg)",
+            transformOrigin: "center",
+            zIndex: 110,
+          }}
+        >
+          <AlertContent />
+        </Box>
+      ) : (
+        <AlertContent />
+      )}
+    </>
   );
 };
 
