@@ -193,7 +193,8 @@ export class SystemMetricsCollector {
       const start = performance.now();
 
       // Use the same API base URL for consistency
-      const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:3000";
+      const { getApiBaseUrl } = require("./adminUrlUtils");
+      const baseUrl = getApiBaseUrl();
       const response = await fetch(`${baseUrl}/api/ping`, {
         method: "HEAD",
         cache: "no-cache",

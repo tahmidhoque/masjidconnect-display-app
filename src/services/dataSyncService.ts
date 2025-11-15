@@ -4,6 +4,7 @@ import masjidDisplayClient, {
 import storageService from "./storageService";
 import logger, { getLastError } from "../utils/logger";
 import { isLowPowerDevice } from "../utils/performanceUtils";
+import unifiedSSEService from "./unifiedSSEService";
 
 class DataSyncService {
   private syncIntervals: Record<string, number | null> = {
@@ -750,11 +751,60 @@ class DataSyncService {
       const response =
         await masjidDisplayClient.sendHeartbeat(heartbeatRequest);
 
+      // Log full response for debugging
+      logger.debug("Heartbeat response received", {
+        success: response.success,
+        hasData: !!response.data,
+        data: response.data,
+        hasPendingEvents: response.data?.hasPendingEvents,
+        error: response.error,
+      });
+      console.log("💓 Heartbeat response:", {
+        success: response.success,
+        data: response.data,
+        hasPendingEvents: response.data?.hasPendingEvents,
+      });
+
       if (response.success) {
         // Only update the successful time on success
         this.lastHeartbeatTime = now;
         this.lastSyncTime.heartbeat = now;
         logger.debug("Heartbeat sent successfully");
+
+        // Check if backend has pending SSE events queued
+        const hasPendingEvents = response.data?.hasPendingEvents === true;
+        logger.info("Checking for pending SSE events", {
+          hasPendingEvents,
+          responseData: response.data,
+        });
+        console.log(
+          `💓 Checking pending events flag: ${hasPendingEvents}`,
+          response.data,
+        );
+
+        if (hasPendingEvents) {
+          logger.info(
+            "Heartbeat response indicates pending SSE events - triggering reconnection",
+            {
+              hasPendingEvents,
+              responseData: response.data,
+            },
+          );
+          console.log(
+            "🔗 Heartbeat detected pending events - reconnecting SSE to process queued events",
+          );
+          // Trigger SSE reconnection to process queued events
+          try {
+            unifiedSSEService.reconnect();
+            logger.info("SSE reconnection triggered successfully");
+            console.log("✅ SSE reconnection triggered");
+          } catch (error) {
+            logger.error("Error triggering SSE reconnection", { error });
+            console.error("❌ Error triggering SSE reconnection:", error);
+          }
+        } else {
+          logger.debug("No pending events detected in heartbeat response");
+        }
       } else {
         // Implement backoff if heartbeat fails
         this.backoffStatus.heartbeat.inBackoff = true;

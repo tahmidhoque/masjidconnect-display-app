@@ -8,6 +8,7 @@ import type { AppDispatch, RootState } from "../index";
 import emergencyAlertService from "../../services/emergencyAlertService";
 import remoteControlService from "../../services/remoteControlService";
 import unifiedSSEService from "../../services/unifiedSSEService";
+import { getApiBaseUrl } from "../../utils/adminUrlUtils";
 import {
   setCurrentAlert,
   setConnectionStatus,
@@ -166,10 +167,7 @@ export const emergencyMiddleware: Middleware = (api: any) => {
             },
           );
 
-          const baseURL =
-            process.env.NODE_ENV === "development"
-              ? "http://localhost:3000"
-              : process.env.REACT_APP_API_URL || "https://api.masjid.app";
+          const baseURL = getApiBaseUrl();
 
           // Only cleanup if connections are actually stale (CLOSED or null)
           // Don't cleanup connections that are CONNECTING or OPEN
@@ -282,10 +280,7 @@ export const emergencyMiddleware: Middleware = (api: any) => {
         );
 
         if (hasCredentials) {
-          const baseURL =
-            process.env.NODE_ENV === "development"
-              ? "http://localhost:3000"
-              : process.env.REACT_APP_API_URL || "https://api.masjid.app";
+          const baseURL = getApiBaseUrl();
 
           logger.info(
             "[EmergencyMiddleware] Authentication successful with credentials, initializing emergency service",
@@ -431,10 +426,7 @@ export const emergencyMiddleware: Middleware = (api: any) => {
 
         if (isEnabled && isAuthenticated) {
           // Re-initialize if enabled
-          const baseURL =
-            process.env.NODE_ENV === "development"
-              ? "http://localhost:3000"
-              : process.env.REACT_APP_API_URL || "https://api.masjid.app";
+          const baseURL = getApiBaseUrl();
 
           (api.dispatch as AppDispatch)(initializeEmergencyService(baseURL));
         } else if (!isEnabled) {
@@ -590,10 +582,7 @@ export const emergencyMiddleware: Middleware = (api: any) => {
           logger.info(
             "[EmergencyMiddleware] Detected authenticated state but SSE not initialized, initializing now",
           );
-          const baseURL =
-            process.env.NODE_ENV === "development"
-              ? "http://localhost:3000"
-              : process.env.REACT_APP_API_URL || "https://api.masjid.app";
+          const baseURL = getApiBaseUrl();
           api.dispatch(initializeEmergencyService(baseURL));
         }
       }

@@ -3,11 +3,27 @@
  */
 
 /**
+ * Gets the API base URL from environment variables
+ * Always respects REACT_APP_API_URL if set, regardless of NODE_ENV
+ */
+export const getApiBaseUrl = (): string => {
+  // Always use REACT_APP_API_URL if set (works in both dev and prod)
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Fallback: localhost in development, production URL otherwise
+  return process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://portal.masjidconnect.co.uk/api";
+};
+
+/**
  * Gets the admin base URL from the current hostname and the API URL
  */
 export const getAdminBaseUrl = (): string => {
   // Get the API URL from environment variables
-  const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:3000";
+  const apiUrl = getApiBaseUrl();
 
   // Extract the hostname from the API URL
   const apiHostname = new URL(apiUrl).hostname;

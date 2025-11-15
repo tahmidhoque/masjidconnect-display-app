@@ -44,7 +44,9 @@ export class AnalyticsService {
   private isProcessingQueue = false;
 
   constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || "http://localhost:3000";
+    // Import here to avoid circular dependency
+    const { getApiBaseUrl } = require("../utils/adminUrlUtils");
+    this.baseUrl = getApiBaseUrl();
     this.loadQueueFromStorage();
   }
 

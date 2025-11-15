@@ -111,6 +111,7 @@ export interface HeartbeatRequest {
 
 export interface HeartbeatResponse {
   success: boolean;
+  hasPendingEvents?: boolean; // Indicates queued SSE events are available on backend
 }
 
 // New Analytics Types for Enhanced Heartbeat System

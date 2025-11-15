@@ -11,6 +11,7 @@
 
 import logger from "../utils/logger";
 import { DebugEventSource } from "../utils/debugEventSource";
+import { getApiBaseUrl } from "../utils/adminUrlUtils";
 
 type EventHandler = (event: MessageEvent) => void;
 type ConnectionStatusListener = (status: ConnectionStatus) => void;
@@ -30,6 +31,7 @@ class UnifiedSSEService {
   private maxReconnectAttempts = 10;
   private baseReconnectDelay = 5000; // 5 seconds
   private connectionUrl: string | null = null;
+  private baseURL: string | null = null;
   private isInitializing = false;
 
   // Event handlers registered by different services
@@ -105,6 +107,7 @@ class UnifiedSSEService {
     }
 
     this.isInitializing = true;
+    this.baseURL = baseURL;
     logger.info("UnifiedSSEService: Initializing", { baseURL });
     console.log("🔗 UnifiedSSEService: Initializing with baseURL:", baseURL);
 
@@ -112,13 +115,98 @@ class UnifiedSSEService {
   }
 
   /**
+   * Explicitly reconnect to the SSE endpoint
+   * Used when heartbeat indicates pending events are queued on the backend
+   */
+  public reconnect(): void {
+    logger.info("UnifiedSSEService: Explicit reconnection requested (pending events detected)");
+    console.log("🔗 UnifiedSSEService: Explicit reconnection requested (pending events detected)");
+    console.log("🔗 Current connection state:", {
+      hasEventSource: !!this.eventSource,
+      readyState: this.eventSource?.readyState,
+      isInitializing: this.isInitializing,
+      reconnectAttempts: this.reconnectAttempts,
+    });
+
+    // Determine baseURL if not already stored
+    let baseURL = this.baseURL;
+    if (!baseURL) {
+      baseURL = getApiBaseUrl();
+      this.baseURL = baseURL;
+      logger.info("UnifiedSSEService: Determined baseURL for reconnect", { baseURL });
+      console.log("🔗 UnifiedSSEService: Using baseURL:", baseURL);
+    }
+
+    // Close existing connection if present
+    if (this.eventSource) {
+      const oldReadyState = this.eventSource.readyState;
+      try {
+        this.eventSource.close();
+        logger.info("UnifiedSSEService: Closed existing connection for reconnect", {
+          oldReadyState,
+        });
+        console.log("🔗 UnifiedSSEService: Closed existing connection", {
+          oldReadyState,
+        });
+      } catch (error) {
+        logger.warn("UnifiedSSEService: Error closing existing connection during reconnect", {
+          error,
+        });
+        console.error("❌ UnifiedSSEService: Error closing connection:", error);
+      }
+      this.eventSource = null;
+    }
+
+    // Clear any pending reconnection timeouts
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+      logger.debug("UnifiedSSEService: Cleared pending reconnection timeout");
+    }
+
+    // CRITICAL: Clear attached listeners so handlers get re-attached to the new connection
+    // Otherwise, attachRegisteredHandlers will think handlers are already attached
+    // and skip attaching them to the new EventSource
+    const clearedListenerCount = this.attachedListeners.size;
+    this.attachedListeners.clear();
+    logger.info("UnifiedSSEService: Cleared attached listeners for reconnection", {
+      clearedListenerCount,
+    });
+    console.log(
+      `🔗 UnifiedSSEService: Cleared ${clearedListenerCount} attached listener type(s) - handlers will be re-attached to new connection`,
+    );
+
+    // Reset reconnection attempt counter for fresh start
+    this.reconnectAttempts = 0;
+
+    // Reset initialization flag
+    this.isInitializing = false;
+
+    // Establish new connection
+    logger.info("UnifiedSSEService: Establishing new SSE connection", { baseURL });
+    console.log("🔗 UnifiedSSEService: Establishing new SSE connection to:", baseURL);
+    this.connectToEventSource(baseURL);
+  }
+
+  /**
    * Connect to the SSE endpoint
    */
   private connectToEventSource(baseURL: string): void {
+    logger.info("UnifiedSSEService: connectToEventSource called", {
+      baseURL,
+      isOnline: navigator.onLine,
+      isInitializing: this.isInitializing,
+    });
+    console.log("🔗 UnifiedSSEService: connectToEventSource called", {
+      baseURL,
+      isOnline: navigator.onLine,
+    });
+
     try {
       // Don't connect if offline
       if (!navigator.onLine) {
         logger.warn("UnifiedSSEService: Cannot connect - device is offline");
+        console.warn("🔗 UnifiedSSEService: Cannot connect - device is offline");
         this.isInitializing = false;
         return;
       }
@@ -210,16 +298,29 @@ class UnifiedSSEService {
       this.attachRegisteredHandlers(eventSource);
 
       // Log that setup is complete
+      logger.info("UnifiedSSEService: EventSource created and listeners attached", {
+        connectionUrl: this.connectionUrl,
+        readyState: eventSource.readyState,
+        registeredEventTypes: Array.from(this.eventHandlers.keys()),
+      });
       console.log(
         "🔗 UnifiedSSEService: EventSource created and listeners attached",
-      );
-      console.log(
-        "🔗 UnifiedSSEService: EventSource readyState:",
-        eventSource.readyState,
+        {
+          connectionUrl: this.connectionUrl,
+          readyState: eventSource.readyState,
+          registeredEventTypes: Array.from(this.eventHandlers.keys()),
+        },
       );
     } catch (error) {
-      logger.error("UnifiedSSEService: Error connecting to SSE", { error });
-      console.error("🔗 UnifiedSSEService: Error connecting to SSE:", error);
+      logger.error("UnifiedSSEService: Error connecting to SSE", {
+        error,
+        baseURL,
+        connectionUrl: this.connectionUrl,
+      });
+      console.error("🔗 UnifiedSSEService: Error connecting to SSE:", error, {
+        baseURL,
+        connectionUrl: this.connectionUrl,
+      });
       this.isInitializing = false;
       this.scheduleReconnect();
     }
@@ -327,14 +428,32 @@ class UnifiedSSEService {
    * Only attaches handlers that haven't been attached yet
    */
   private attachRegisteredHandlers(eventSource: EventSource): void {
-    console.log(
-      `🔗 UnifiedSSEService: Attaching ${this.eventHandlers.size} registered event type(s)...`,
+    const eventTypeCount = this.eventHandlers.size;
+    const totalHandlerCount = Array.from(this.eventHandlers.values()).reduce(
+      (sum, handlers) => sum + handlers.size,
+      0,
     );
+    console.log(
+      `🔗 UnifiedSSEService: Attaching ${totalHandlerCount} handler(s) for ${eventTypeCount} event type(s)...`,
+      {
+        eventTypes: Array.from(this.eventHandlers.keys()),
+      },
+    );
+    logger.info("UnifiedSSEService: Attaching registered handlers", {
+      eventTypeCount,
+      totalHandlerCount,
+      eventTypes: Array.from(this.eventHandlers.keys()),
+    });
+
+    let attachedCount = 0;
+    let skippedCount = 0;
+
     this.eventHandlers.forEach((handlers, eventType) => {
       handlers.forEach((handler) => {
         // Check if this handler is already attached
         const attached = this.attachedListeners.get(eventType);
         if (attached && attached.has(handler)) {
+          skippedCount++;
           console.log(
             `🔗 UnifiedSSEService: Handler for ${eventType} already attached, skipping`,
           );
@@ -349,8 +468,13 @@ class UnifiedSSEService {
               {
                 type: event.type,
                 data: event.data,
+                timestamp: new Date().toISOString(),
               },
             );
+            logger.debug(`UnifiedSSEService: Processing ${eventType} event`, {
+              eventType,
+              data: event.data,
+            });
             handler(event);
           };
           eventSource.addEventListener(eventType, wrapper);
@@ -361,6 +485,7 @@ class UnifiedSSEService {
           }
           this.attachedListeners.get(eventType)!.add(handler);
 
+          attachedCount++;
           logger.debug(`UnifiedSSEService: Attached listener for ${eventType}`);
           console.log(
             `✅ UnifiedSSEService: Attached listener for ${eventType}`,
@@ -377,7 +502,15 @@ class UnifiedSSEService {
         }
       });
     });
-    console.log("🔗 UnifiedSSEService: All registered handlers attached");
+
+    console.log(
+      `🔗 UnifiedSSEService: Handler attachment complete - ${attachedCount} attached, ${skippedCount} skipped`,
+    );
+    logger.info("UnifiedSSEService: Handler attachment complete", {
+      attachedCount,
+      skippedCount,
+      totalHandlers: totalHandlerCount,
+    });
   }
 
   /**
@@ -598,10 +731,7 @@ class UnifiedSSEService {
       }
       this.reconnectAttempts++;
 
-      const baseURL =
-        process.env.NODE_ENV === "development"
-          ? "http://localhost:3000"
-          : process.env.REACT_APP_API_URL || "https://api.masjid.app";
+      const baseURL = getApiBaseUrl();
 
       this.connectToEventSource(baseURL);
     }, delay);

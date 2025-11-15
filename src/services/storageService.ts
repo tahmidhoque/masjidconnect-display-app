@@ -215,8 +215,12 @@ class StorageService {
       const testRequest = indexedDB.open("MasjidConnect");
 
       testRequest.onsuccess = (event) => {
-        // @ts-ignore
-        const db = event.target.result;
+        const target = event.target as IDBOpenDBRequest | null;
+        if (!target?.result) {
+          logger.error("Database verification failed: No result from IndexedDB");
+          return;
+        }
+        const db = target.result;
         const version = db.version;
         logger.info("Current database version is", { version });
 
@@ -233,9 +237,10 @@ class StorageService {
       };
 
       testRequest.onerror = (event) => {
-        // @ts-ignore
+        const target = event.target as IDBOpenDBRequest | null;
+        const error = target?.error || testRequest.error || "Unknown database error";
         logger.error("Error verifying database:", {
-          error: event.target.error,
+          error: error instanceof Error ? error.message : String(error),
         });
         logger.info("Consider clearing database if issues persist.");
       };
