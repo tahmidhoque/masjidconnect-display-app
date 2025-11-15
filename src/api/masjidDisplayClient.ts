@@ -22,6 +22,7 @@ import {
 import logger, { setLastError } from '../utils/logger';
 import { createErrorResponse, normalizeApiResponse, validateApiResponse } from '../utils/apiErrorHandler';
 import { withDeduplication } from '../utils/requestDeduplication';
+import offlineStorage from '../services/offlineStorageService';
 // Note: We'll dispatch errors via a callback to avoid circular dependencies
 // The store will be passed to the client after initialization
 
@@ -473,6 +474,62 @@ class MasjidDisplayClient {
     });
   }
 
+  /**
+   * Fetch with offline support - tries network first, falls back to offline storage cache
+   * 
+   * @param endpoint - API endpoint
+   * @param cacheKey - Key for offline storage cache
+   * @param cacheTTL - Time to live in seconds (default: 24 hours)
+   * @param contentType - Type of content for offline storage ('content', 'prayer-times', 'events', 'announcements', 'images')
+   * @returns API response with data from network or cache
+   */
+  async fetchWithOfflineSupport<T>(
+    endpoint: string,
+    cacheKey: string,
+    cacheTTL: number = 86400, // 24 hours default
+    contentType: 'content' | 'prayer-times' | 'events' | 'announcements' | 'images' = 'content'
+  ): Promise<ApiResponse<T>> {
+    try {
+      // Try network first
+      const response = await this.fetchWithCache<T>(
+        endpoint,
+        { method: 'GET' },
+        cacheTTL * 1000 // Convert to milliseconds
+      );
+
+      // Cache successful response in offline storage
+      if (response.success && response.data) {
+        await offlineStorage.storeContent(contentType, cacheKey, response.data, cacheTTL);
+        logger.debug(`[API] Cached ${contentType}/${cacheKey} for offline use`, {
+          ttl: cacheTTL,
+          endpoint,
+        });
+      }
+
+      return response;
+    } catch (error) {
+      logger.warn(`[API] Network request failed, trying cache for ${endpoint}`, { error });
+
+      // Fallback to offline storage cache
+      const cachedData = await offlineStorage.getContent(contentType, cacheKey);
+
+      if (cachedData) {
+        logger.info(`[API] Serving from cache: ${cacheKey}`);
+        return normalizeApiResponse({
+          data: cachedData,
+          success: true,
+          cached: true,
+          offlineFallback: true,
+        });
+      }
+
+      // No cached data available
+      const errorMessage = `No cached data available for ${endpoint}`;
+      logger.error(errorMessage);
+      return createErrorResponse(errorMessage);
+    }
+  }
+
   // Fetch with cache
   private async fetchWithCache<T>(
     endpoint: string, 
@@ -895,11 +952,23 @@ class MasjidDisplayClient {
     if (!isAuthReady) {
       logger.warn('Screen content request: Authentication not ready, trying fallback from storage');
       
-      // Try to get from storage as fallback
+      // Try to get from offline storage as fallback
+      const cachedContent = await offlineStorage.getContent('content', 'screen-content');
+      if (cachedContent) {
+        logger.info('Using cached screen content due to auth not ready');
+        return normalizeApiResponse({
+          data: cachedContent,
+          success: true,
+          cached: true,
+          offlineFallback: true
+        });
+      }
+      
+      // Fallback to legacy localforage storage
       try {
         const storedContent = await localforage.getItem<ScreenContent>('screenContent');
         if (storedContent) {
-          logger.info('Using stored screen content due to auth not ready');
+          logger.info('Using stored screen content from legacy storage');
           return normalizeApiResponse({
             data: storedContent,
             success: true,
@@ -914,47 +983,45 @@ class MasjidDisplayClient {
       return createErrorResponse('Authentication not ready and no cached data available');
     }
     
-    // If offline and no force refresh, first try to get from storage
-    if (!navigator.onLine && !forceRefresh) {
+    // Use offline support method (handles both online and offline cases)
+    if (forceRefresh) {
+      // Force refresh - bypass cache
       try {
-        const storedContent = await localforage.getItem<ScreenContent>('screenContent');
-        if (storedContent) {
-          logger.info('Using stored screen content from localforage while offline');
+        const result = await this.fetchWithCache<ScreenContent>(
+          '/api/screens/content',
+          { method: 'GET' },
+          CACHE_EXPIRATION.CONTENT
+        );
+        
+        // Cache successful response
+        if (result.success && result.data) {
+          await offlineStorage.storeContent('content', 'screen-content', result.data, 3600); // 1 hour TTL
+        }
+        
+        return validateApiResponse(result);
+      } catch (error) {
+        logger.error('Error fetching screen content', { error });
+        // Fallback to cache on error
+        const cachedContent = await offlineStorage.getContent('content', 'screen-content');
+        if (cachedContent) {
           return normalizeApiResponse({
-            data: storedContent,
+            data: cachedContent,
             success: true,
             cached: true,
             offlineFallback: true
           });
         }
-      } catch (error) {
-        logger.error('Error retrieving stored screen content', { error });
+        return createErrorResponse('Failed to fetch screen content');
       }
     }
     
-    // Either online or no stored content found
-    try {
-      const result = await this.fetchWithCache<ScreenContent>(
-        '/api/screens/content',
-        { method: 'GET' },
-        CACHE_EXPIRATION.CONTENT
-      );
-      
-      // If successful, store in localforage for offline use
-      if (result.success && result.data) {
-        try {
-          await localforage.setItem('screenContent', result.data);
-          logger.debug('Stored screen content in localforage for offline use');
-        } catch (error) {
-          logger.error('Failed to store screen content in localforage', { error });
-        }
-      }
-      
-      return validateApiResponse(result);
-    } catch (error) {
-      logger.error('Error fetching screen content', { error });
-      return createErrorResponse('Failed to fetch screen content');
-    }
+    // Use offline support with 1 hour TTL
+    return this.fetchWithOfflineSupport<ScreenContent>(
+      '/api/screens/content',
+      'screen-content',
+      3600, // 1 hour
+      'content'
+    );
   }
 
   // Get prayer times
@@ -962,25 +1029,37 @@ class MasjidDisplayClient {
     // Wait for authentication to be initialized before making API calls
     const isAuthReady = await this.waitForAuthInitialization();
     
+    // Build query parameters for cache key
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const cacheKey = `prayer-times${params.toString() ? `-${params.toString()}` : ''}`;
+    
     if (!isAuthReady) {
       logger.warn('Prayer times request: Authentication not ready, trying fallback from storage');
       
-      // Try to get from storage as fallback
+      // Try to get from offline storage as fallback
+      const cachedTimes = await offlineStorage.getContent('prayer-times', cacheKey);
+      if (cachedTimes) {
+        logger.info('Using cached prayer times due to auth not ready');
+        return {
+          data: cachedTimes,
+          success: true,
+          cached: true,
+          offlineFallback: true
+        };
+      }
+      
+      // Fallback to legacy storage
       try {
         let storedTimes: PrayerTimes[] | null = null;
-        
-        // Try electron-store first if available
         if (electronStore) {
           storedTimes = electronStore.get('prayerTimes', null);
         }
-        
-        // Fallback to localforage if not found in electron-store
         if (!storedTimes) {
           storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
         }
-        
         if (storedTimes) {
-          logger.info('Using stored prayer times due to auth not ready');
           return {
             data: storedTimes,
             success: true,
@@ -1000,65 +1079,45 @@ class MasjidDisplayClient {
       };
     }
     
-    // If offline and no force refresh, first try to get from storage
-    if (!navigator.onLine && !forceRefresh) {
+    // Use offline support method
+    if (forceRefresh) {
+      // Force refresh - bypass cache
       try {
-        let storedTimes: PrayerTimes[] | null = null;
+        const result = await this.fetchWithCache<PrayerTimes[]>(
+          `/api/screen/prayer-times?${params.toString()}`,
+          { method: 'GET' },
+          CACHE_EXPIRATION.PRAYER_TIMES
+        );
         
-        // Try electron-store first if available
-        if (electronStore) {
-          storedTimes = electronStore.get('prayerTimes', null);
+        // Cache successful response (7 days TTL for prayer times)
+        if (result.success && result.data) {
+          await offlineStorage.storeContent('prayer-times', cacheKey, result.data, 7 * 24 * 60 * 60); // 7 days
         }
         
-        // Fallback to localforage if not found in electron-store
-        if (!storedTimes) {
-          storedTimes = await localforage.getItem<PrayerTimes[]>('prayerTimes');
-        }
-        
-        if (storedTimes) {
-          logger.info('Using stored prayer times while offline');
+        return result;
+      } catch (error) {
+        logger.error('Error fetching prayer times', { error });
+        // Fallback to cache on error
+        const cachedTimes = await offlineStorage.getContent('prayer-times', cacheKey);
+        if (cachedTimes) {
           return {
-            data: storedTimes,
+            data: cachedTimes,
             success: true,
             cached: true,
             offlineFallback: true
           };
         }
-      } catch (error) {
-        logger.error('Error retrieving stored prayer times', { error });
+        return createErrorResponse('Failed to fetch prayer times');
       }
     }
     
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    
-    // Either online or no stored times found
-    const result = await this.fetchWithCache<PrayerTimes[]>(
+    // Use offline support with 7 days TTL for prayer times
+    return this.fetchWithOfflineSupport<PrayerTimes[]>(
       `/api/screen/prayer-times?${params.toString()}`,
-      { method: 'GET' },
-      CACHE_EXPIRATION.PRAYER_TIMES
+      cacheKey,
+      7 * 24 * 60 * 60, // 7 days
+      'prayer-times'
     );
-    
-    // If successful, store for offline use (in both electron-store and localforage for compatibility)
-    if (result.success && result.data) {
-      try {
-        // Store in electron-store if available
-        if (electronStore) {
-          electronStore.set('prayerTimes', result.data);
-          logger.debug('Stored prayer times in electron-store for offline use');
-        }
-        
-        // Also store in localforage for browser fallback
-        await localforage.setItem('prayerTimes', result.data);
-        logger.debug('Stored prayer times in localforage for offline use');
-      } catch (error) {
-        logger.error('Failed to store prayer times', { error });
-      }
-    }
-    
-    return result;
   }
 
   // Get events
@@ -1066,14 +1125,28 @@ class MasjidDisplayClient {
     // Wait for authentication to be initialized before making API calls
     const isAuthReady = await this.waitForAuthInitialization();
     
+    const cacheKey = `events-${count}`;
+    
     if (!isAuthReady) {
       logger.warn('Events request: Authentication not ready, trying fallback from storage');
       
-      // Try to get from storage as fallback
+      // Try to get from offline storage as fallback
+      const cachedEvents = await offlineStorage.getContent('events', cacheKey);
+      if (cachedEvents) {
+        logger.info('Using cached events due to auth not ready');
+        return {
+          data: cachedEvents,
+          success: true,
+          cached: true,
+          offlineFallback: true
+        };
+      }
+      
+      // Fallback to legacy storage
       try {
         const storedEvents = await localforage.getItem<EventsResponse>('events');
         if (storedEvents) {
-          logger.info('Using stored events due to auth not ready');
+          logger.info('Using stored events from legacy storage');
           return {
             data: storedEvents,
             success: true,
@@ -1087,42 +1160,46 @@ class MasjidDisplayClient {
       
       return createErrorResponse('Authentication not ready and no cached data available');
     }
-    // If offline and no force refresh, first try to get from storage
-    if (!navigator.onLine && !forceRefresh) {
+    
+    // Use offline support method
+    if (forceRefresh) {
+      // Force refresh - bypass cache
       try {
-        const storedEvents = await localforage.getItem<EventsResponse>('events');
-        if (storedEvents) {
-          logger.info('Using stored events from localforage while offline');
+        const result = await this.fetchWithCache<EventsResponse>(
+          `/api/events?count=${count}`,
+          { method: 'GET' },
+          CACHE_EXPIRATION.EVENTS
+        );
+        
+        // Cache successful response (24 hours TTL for events)
+        if (result.success && result.data) {
+          await offlineStorage.storeContent('events', cacheKey, result.data, 24 * 60 * 60); // 24 hours
+        }
+        
+        return result;
+      } catch (error) {
+        logger.error('Error fetching events', { error });
+        // Fallback to cache on error
+        const cachedEvents = await offlineStorage.getContent('events', cacheKey);
+        if (cachedEvents) {
           return {
-            data: storedEvents,
+            data: cachedEvents,
             success: true,
             cached: true,
             offlineFallback: true
           };
         }
-      } catch (error) {
-        logger.error('Error retrieving stored events', { error });
+        return createErrorResponse('Failed to fetch events');
       }
     }
     
-    // Either online or no stored events found
-    const result = await this.fetchWithCache<EventsResponse>(
+    // Use offline support with 24 hours TTL for events
+    return this.fetchWithOfflineSupport<EventsResponse>(
       `/api/events?count=${count}`,
-      { method: 'GET' },
-      CACHE_EXPIRATION.EVENTS
+      cacheKey,
+      24 * 60 * 60, // 24 hours
+      'events'
     );
-    
-    // If successful, store in localforage for offline use
-    if (result.success && result.data) {
-      try {
-        await localforage.setItem('events', result.data);
-        logger.debug('Stored events in localforage for offline use');
-      } catch (error) {
-        logger.error('Failed to store events in localforage', { error });
-      }
-    }
-    
-    return result;
   }
 
   // Request a pairing code

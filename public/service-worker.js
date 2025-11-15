@@ -47,7 +47,7 @@ workbox.routing.registerRoute(
   })
 );
 
-// Cache images with a cache-first strategy
+// Cache images with a cache-first strategy (30 days TTL)
 workbox.routing.registerRoute(
   ({request}) => request.destination === 'image',
   new workbox.strategies.CacheFirst({
@@ -57,17 +57,76 @@ workbox.routing.registerRoute(
         statuses: [0, 200],
       }),
       new workbox.expiration.ExpirationPlugin({
-        maxEntries: 60,
-        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+        maxEntries: 100,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
         purgeOnQuotaError: true,
       }),
     ],
   })
 );
 
-// Cache API responses with network-first strategy but fallback to cache if offline
+// Cache screen content API with network-first strategy (24h TTL)
 workbox.routing.registerRoute(
-  ({url}) => url.pathname.includes('/api/'),
+  ({url}) => url.pathname.startsWith('/api/screen/content'),
+  new workbox.strategies.NetworkFirst({
+    cacheName: 'api-content',
+    networkTimeoutSeconds: 10, // Fallback to cache if network request takes more than 10 seconds
+    plugins: [
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new workbox.expiration.ExpirationPlugin({
+        maxEntries: 50,
+        maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        purgeOnQuotaError: true,
+      }),
+    ],
+  })
+);
+
+// Cache prayer times API with stale-while-revalidate strategy (7 days TTL)
+workbox.routing.registerRoute(
+  ({url}) => url.pathname.startsWith('/api/screen/prayer-times'),
+  new workbox.strategies.StaleWhileRevalidate({
+    cacheName: 'prayer-times',
+    plugins: [
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new workbox.expiration.ExpirationPlugin({
+        maxEntries: 10,
+        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+        purgeOnQuotaError: true,
+      }),
+    ],
+  })
+);
+
+// Cache events API with network-first strategy (24h TTL)
+workbox.routing.registerRoute(
+  ({url}) => url.pathname.startsWith('/api/screen/events'),
+  new workbox.strategies.NetworkFirst({
+    cacheName: 'events',
+    networkTimeoutSeconds: 10,
+    plugins: [
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new workbox.expiration.ExpirationPlugin({
+        maxEntries: 20,
+        maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        purgeOnQuotaError: true,
+      }),
+    ],
+  })
+);
+
+// Cache other API responses with network-first strategy but fallback to cache if offline
+workbox.routing.registerRoute(
+  ({url}) => url.pathname.includes('/api/') && 
+             !url.pathname.startsWith('/api/screen/content') &&
+             !url.pathname.startsWith('/api/screen/prayer-times') &&
+             !url.pathname.startsWith('/api/screen/events'),
   new workbox.strategies.NetworkFirst({
     cacheName: 'api-responses',
     networkTimeoutSeconds: 10, // Fallback to cache if network request takes more than 10 seconds
@@ -120,6 +179,9 @@ self.addEventListener('activate', (event) => {
     'google-fonts-webfonts',
     'static-resources',
     'images',
+    'api-content',
+    'prayer-times',
+    'events',
     'api-responses',
     'critical-assets',
     'workbox-precache'

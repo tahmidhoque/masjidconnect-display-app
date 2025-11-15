@@ -2,6 +2,7 @@ import { Middleware, MiddlewareAPI, ThunkDispatch, UnknownAction } from '@reduxj
 import type { AppDispatch, RootState } from '../index';
 import emergencyAlertService from '../../services/emergencyAlertService';
 import remoteControlService from '../../services/remoteControlService';
+import unifiedSSEService from '../../services/unifiedSSEService';
 import { 
   setCurrentAlert, 
   setConnectionStatus,
@@ -24,6 +25,7 @@ import logger from '../../utils/logger';
 // Track if we've set up listeners to avoid duplicates
 let listenersSetup = false;
 let reconnectTimer: NodeJS.Timeout | null = null;
+let reloadDetectionChecked = false; // Track if we've checked for reload scenario
 
 /**
  * Emergency middleware handles SSE connections and emergency alert integration
@@ -51,13 +53,127 @@ export const emergencyMiddleware: Middleware = (api: any) => {
     // For now, we'll manage connection status through the middleware
   };
   
-  // Initialize remote control service
+  // Initialize unified SSE service (this handles all SSE connections)
+  const initializeUnifiedSSE = (baseURL: string) => {
+    try {
+      logger.info('[EmergencyMiddleware] Initializing unified SSE service');
+      unifiedSSEService.initialize(baseURL);
+    } catch (error) {
+      logger.error('[EmergencyMiddleware] Error initializing unified SSE service', { error });
+    }
+  };
+  
+  // Initialize remote control service (registers handlers with unified SSE)
   const initializeRemoteControl = (baseURL: string) => {
     try {
       logger.info('[EmergencyMiddleware] Initializing remote control service');
       remoteControlService.initialize(baseURL);
     } catch (error) {
       logger.error('[EmergencyMiddleware] Error initializing remote control service', { error });
+    }
+  };
+  
+  // Initialize emergency alert service (registers handlers with unified SSE)
+  const initializeEmergency = (baseURL: string) => {
+    try {
+      logger.info('[EmergencyMiddleware] Initializing emergency alert service');
+      emergencyAlertService.initialize(baseURL);
+    } catch (error) {
+      logger.error('[EmergencyMiddleware] Error initializing emergency alert service', { error });
+    }
+  };
+  
+  // Initialize orientation service (registers handlers with unified SSE)
+  const initializeOrientation = (baseURL: string) => {
+    try {
+      import('../../services/orientationEventService').then(({ default: orientationEventService }) => {
+        logger.info('[EmergencyMiddleware] Initializing orientation service');
+        orientationEventService.initialize(baseURL);
+      }).catch(error => {
+        logger.error('[EmergencyMiddleware] Could not initialize orientation service', { error });
+      });
+    } catch (error) {
+      logger.error('[EmergencyMiddleware] Error initializing orientation service', { error });
+    }
+  };
+  
+  // Check for stale connections after reload and force reinitialization if needed
+  const checkForStaleConnections = () => {
+    if (reloadDetectionChecked) return;
+    reloadDetectionChecked = true;
+    
+    const state = api.getState();
+    const isAuthenticated = selectIsAuthenticated(state);
+    const isEnabled = selectIsEnabled(state);
+    const hasCredentials = !!(
+      localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId')
+    );
+    
+    if (isAuthenticated && isEnabled && hasCredentials) {
+      // Wait a bit longer to allow connections to establish before checking
+      // This prevents closing connections that are still in CONNECTING state
+      setTimeout(() => {
+        // Check unified SSE service status (this is the single connection)
+        const unifiedStatus = unifiedSSEService.getConnectionStatus();
+        const unifiedIsStale = !unifiedStatus.readyState || unifiedStatus.readyState === EventSource.CLOSED;
+        
+        // Also check individual service statuses for reference
+        const emergencyStatus = emergencyAlertService.getConnectionStatus();
+        const remoteStatus = remoteControlService.getConnectionStatus();
+        
+        // CRITICAL: Only consider connections stale if unified SSE is CLOSED or null
+        // Don't close connections that are CONNECTING or OPEN
+        const needsReinitialization = unifiedIsStale;
+          
+        if (needsReinitialization) {
+          logger.info('[EmergencyMiddleware] Detected stale or missing SSE connections after reload, reinitializing...', {
+            emergencyConnected: emergencyStatus.connected,
+            remoteConnected: remoteStatus.connected,
+            emergencyReadyState: emergencyStatus.readyState,
+            remoteReadyState: remoteStatus.readyState,
+            unifiedIsStale,
+          });
+          
+          const baseURL = process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+          
+          // Only cleanup if connections are actually stale (CLOSED or null)
+          // Don't cleanup connections that are CONNECTING or OPEN
+          try {
+            if (unifiedIsStale) {
+              unifiedSSEService.cleanup();
+            }
+            // Always cleanup individual services to ensure handlers are re-registered
+            emergencyAlertService.cleanup();
+            remoteControlService.cleanup();
+            import('../../services/orientationEventService').then(({ default: orientationEventService }) => {
+              orientationEventService.cleanup();
+            }).catch(() => {});
+          } catch (error) {
+            logger.warn('[EmergencyMiddleware] Error during cleanup before reinitialization', { error });
+          }
+          
+          // Small delay to ensure cleanup completes
+          setTimeout(() => {
+            // Always initialize unified SSE service first (creates the single connection)
+            if (unifiedIsStale || needsReinitialization) {
+              initializeUnifiedSSE(baseURL);
+            }
+            
+            // Then initialize all services (they register handlers with unified SSE)
+            api.dispatch(initializeEmergencyService(baseURL));
+            initializeRemoteControl(baseURL);
+            initializeOrientation(baseURL);
+          }, 100);
+        } else {
+          logger.debug('[EmergencyMiddleware] SSE connections appear healthy after reload check', {
+            emergencyReadyState: emergencyStatus.readyState,
+            remoteReadyState: remoteStatus.readyState,
+            unifiedReadyState: unifiedStatus.readyState,
+          });
+        }
+      }, 2000); // Wait 2 seconds to allow connections to establish
     }
   };
   
@@ -179,6 +295,15 @@ export const emergencyMiddleware: Middleware = (api: any) => {
         api.dispatch(resetReconnectAttempts());
         api.dispatch(clearError());
         
+        // Also ensure unified SSE and all services are initialized
+        const baseURL = process.env.NODE_ENV === 'development' 
+          ? 'http://localhost:3000' 
+          : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+        initializeUnifiedSSE(baseURL);
+        initializeRemoteControl(baseURL);
+        initializeEmergency(baseURL);
+        initializeOrientation(baseURL);
+        
         // Clear any reconnection timer
         if (reconnectTimer) {
           clearTimeout(reconnectTimer);
@@ -245,8 +370,39 @@ export const emergencyMiddleware: Middleware = (api: any) => {
         const isOffline = action.payload;
         
         if (isOffline) {
-          // Going offline - the service will handle reconnection when back online
-          logger.debug('[EmergencyMiddleware] Device went offline');
+          // Going offline - disconnect SSE connections
+          logger.info('[EmergencyMiddleware] Device going offline, disconnecting SSE');
+          (api.dispatch as AppDispatch)(disconnectFromEmergencyService());
+          
+          // Also cleanup unified SSE and other services
+          try {
+            unifiedSSEService.cleanup();
+            logger.debug('[EmergencyMiddleware] Cleaned up unified SSE service');
+          } catch (error) {
+            logger.debug('[EmergencyMiddleware] Error cleaning up unified SSE service', { error });
+          }
+          
+          import('../../services/remoteControlService').then(({ default: remoteControlService }) => {
+            try {
+              remoteControlService.cleanup();
+              logger.debug('[EmergencyMiddleware] Cleaned up remote control service');
+            } catch (error) {
+              logger.debug('[EmergencyMiddleware] Error cleaning up remote control service', { error });
+            }
+          }).catch(error => {
+            logger.debug('[EmergencyMiddleware] Could not cleanup remote control service', { error });
+          });
+          
+          import('../../services/orientationEventService').then(({ default: orientationEventService }) => {
+            try {
+              orientationEventService.cleanup();
+              logger.debug('[EmergencyMiddleware] Cleaned up orientation service');
+            } catch (error) {
+              logger.debug('[EmergencyMiddleware] Error cleaning up orientation service', { error });
+            }
+          }).catch(error => {
+            logger.debug('[EmergencyMiddleware] Could not cleanup orientation service', { error });
+          });
         } else {
           // Coming back online - attempt reconnection if needed
           logger.debug('[EmergencyMiddleware] Device came back online');
@@ -265,6 +421,19 @@ export const emergencyMiddleware: Middleware = (api: any) => {
               setTimeout(() => {
                 logger.debug('[EmergencyMiddleware] Reconnecting SSE after coming online');
                 (api.dispatch as AppDispatch)(connectToEmergencyService());
+                
+                // Also reconnect unified SSE and all services
+                const baseURL = process.env.NODE_ENV === 'development' 
+                  ? 'http://localhost:3000' 
+                  : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
+                
+                // Initialize unified SSE first (creates the single connection)
+                initializeUnifiedSSE(baseURL);
+                
+                // Then initialize all services (they register handlers with unified SSE)
+                initializeRemoteControl(baseURL);
+                initializeEmergency(baseURL);
+                initializeOrientation(baseURL);
               }, 2000);
             } else {
               logger.warn('[EmergencyMiddleware] Cannot reconnect SSE - no credentials available');
@@ -275,10 +444,19 @@ export const emergencyMiddleware: Middleware = (api: any) => {
       }
     }
     
+    // CRITICAL: Check for stale connections after reload on first auth/emergency action
+    // This detects if the app reloaded and SSE connections need to be reestablished
+    const isAuthAction = action.type.startsWith('auth/') || action.type.startsWith('emergency/');
+    if (isAuthAction && !reloadDetectionChecked) {
+      // Small delay to allow state to settle after reload
+      setTimeout(() => {
+        checkForStaleConnections();
+      }, 500);
+    }
+    
     // CRITICAL: Also check state after every action to catch any missed authentication cases
     // This ensures SSE is initialized even if we missed the specific action
     // BUT: Only check on auth-related actions to prevent excessive checks
-    const isAuthAction = action.type.startsWith('auth/') || action.type.startsWith('emergency/');
     if (isAuthAction) {
       const isAuthenticated = selectIsAuthenticated(state);
       const isEnabled = selectIsEnabled(state);
@@ -313,6 +491,7 @@ export const cleanupEmergencyMiddleware = () => {
   
   // Reset listeners flag so they can be set up again if needed
   listenersSetup = false;
+  reloadDetectionChecked = false; // Reset reload detection flag
   
   logger.debug('[EmergencyMiddleware] Cleaned up');
 };

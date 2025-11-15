@@ -174,8 +174,9 @@ export class AnalyticsService {
       ? window.electron.versions.electron
       : undefined;
 
-    // Get update progress if available
-    const updateProgress = updateProgressService.getProgress();
+    // Get update progress if available - extract just the progress number
+    const updateProgressObj = updateProgressService.getProgress();
+    const updateProgress = updateProgressObj?.progress !== undefined ? updateProgressObj.progress : undefined;
 
     const heartbeatData: HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] } = {
       // Application Information (REQUIRED)
@@ -211,8 +212,8 @@ export class AnalyticsService {
       signalStrength: systemMetrics.getSignalStrength(),
       connectionType: systemMetrics.getConnectionType(),
       
-      // Update Progress (OPTIONAL - included when available)
-      ...(updateProgress && { updateProgress }),
+      // Update Progress (OPTIONAL - included when available, as number 0-100)
+      ...(updateProgress !== undefined && { updateProgress }),
       
       // Command Responses (OPTIONAL - included if any pending)
       ...(commandResponses.length > 0 && { commandResponses }),
@@ -225,7 +226,8 @@ export class AnalyticsService {
       memoryUsage: heartbeatData.memoryUsage,
       currentContent: heartbeatData.currentContent,
       commandResponseCount: commandResponses.length,
-      hasUpdateProgress: !!updateProgress,
+      hasUpdateProgress: updateProgress !== undefined,
+      updateProgressValue: updateProgress,
     });
 
     return heartbeatData;

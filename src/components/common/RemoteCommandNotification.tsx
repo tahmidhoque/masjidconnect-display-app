@@ -5,7 +5,7 @@
  * from the admin portal. Allows users to cancel destructive operations.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Snackbar, Alert, AlertTitle, Button, Box, Typography, LinearProgress, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SystemUpdateIcon from '@mui/icons-material/SystemUpdate';
@@ -53,6 +53,9 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
   const [commandCompletedSuccess, setCommandCompletedSuccess] = useState<boolean>(true);
 
   const { confirmReset } = useFactoryReset();
+  
+  // Use ref to track current commandId to avoid stale closures in event handlers
+  const currentCommandIdRef = useRef<string | null>(null);
 
   // Handle countdown timer
   useEffect(() => {
@@ -78,6 +81,9 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
 
     try {
       if (countdownCommand.type === 'restart') {
+        // Just restart - Electron will handle cleanup automatically
+        // Don't manually cleanup as it might interfere with the restart process
+        logger.info('Restarting app via Electron');
         await updateService.restartApp();
       } else if (countdownCommand.type === 'factory-reset') {
         await confirmReset();
@@ -86,6 +92,7 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
       logger.error('Error executing countdown command', { error });
     }
 
+    currentCommandIdRef.current = null;
     setCountdownCommand(null);
     setSecondsRemaining(0);
   }, [countdownCommand, confirmReset]);
@@ -93,6 +100,7 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
   // Cancel countdown
   const cancelCountdown = useCallback(() => {
     logger.info('Countdown cancelled by user', { type: countdownCommand?.type });
+    currentCommandIdRef.current = null;
     setCountdownCommand(null);
     setSecondsRemaining(0);
   }, [countdownCommand]);
@@ -150,23 +158,59 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
     };
 
     const handleRestartApp = (event: CustomEvent) => {
-      logger.info('Remote restart app event received');
+      logger.info('Remote restart app event received', {
+        commandId: event.detail?.commandId,
+        countdown: event.detail?.countdown,
+      });
+      
+      const incomingCommandId = event.detail?.commandId || 'unknown';
       const countdown = event.detail?.countdown || 10;
+      
+      // CRITICAL: Prevent resetting countdown if it's already active for the same command
+      // This prevents the countdown from restarting when duplicate events are received
+      // Use ref to check current commandId to avoid stale closure issues
+      if (currentCommandIdRef.current === incomingCommandId) {
+        logger.info('Remote restart app: Countdown already active for same command, skipping reset', {
+          commandId: incomingCommandId,
+        });
+        return;
+      }
+      
+      // Only set new countdown if it's a different command or no countdown is active
+      currentCommandIdRef.current = incomingCommandId;
       setCountdownCommand({
         type: 'restart',
         countdown,
-        commandId: event.detail?.commandId || 'unknown',
+        commandId: incomingCommandId,
       });
       setSecondsRemaining(countdown);
     };
 
     const handleFactoryReset = (event: CustomEvent) => {
-      logger.info('Remote factory reset event received');
+      logger.info('Remote factory reset event received', {
+        commandId: event.detail?.commandId,
+        countdown: event.detail?.countdown,
+      });
+      
+      const incomingCommandId = event.detail?.commandId || 'unknown';
       const countdown = event.detail?.countdown || 30;
+      
+      // CRITICAL: Prevent resetting countdown if it's already active for the same command
+      // This prevents the countdown from restarting when duplicate events are received
+      // Use ref to check current commandId to avoid stale closure issues
+      if (currentCommandIdRef.current === incomingCommandId) {
+        logger.info('Remote factory reset: Countdown already active for same command, skipping reset', {
+          commandId: incomingCommandId,
+        });
+        return;
+      }
+      
+      // Only set new countdown if it's a different command or no countdown is active
+      currentCommandIdRef.current = incomingCommandId;
       setCountdownCommand({
         type: 'factory-reset',
         countdown,
-        commandId: event.detail?.commandId || 'unknown',
+        commandId: incomingCommandId,
       });
       setSecondsRemaining(countdown);
     };

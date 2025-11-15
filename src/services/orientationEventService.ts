@@ -1,5 +1,5 @@
 import logger from '../utils/logger';
-import { DebugEventSource } from '../utils/debugEventSource';
+import unifiedSSEService from './unifiedSSEService';
 
 // Define Orientation type locally instead of importing from context
 type Orientation = 'LANDSCAPE' | 'PORTRAIT';
@@ -17,18 +17,13 @@ interface OrientationEventPayload {
 }
 
 class OrientationEventService {
-  private eventSource: EventSource | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private baseReconnectDelay = 5000; // 5 seconds
   private listeners: Set<(orientation: Orientation, screenId: string) => void> = new Set();
-  private connectionUrl: string | null = null;
   private currentScreenId: string | null = null;
   private currentOrientation: Orientation | null = null;
   private lastOrientationUpdate: { orientation: Orientation, timestamp: number } | null = null;
   private orientationUpdateDebounceTime = 2000; // 2 seconds debounce
   private isInitializing = false; // Prevent duplicate initialization
+  private unregisterHandlers: (() => void)[] = []; // Track registered handlers for cleanup
 
   /**
    * Set the current screen ID
@@ -38,8 +33,7 @@ class OrientationEventService {
   }
 
   /**
-   * Initialize the SSE connection to listen for orientation updates
-   * This reuses the same SSE connection as emergency alerts
+   * Initialize the orientation service using the unified SSE connection
    */
   public initialize(baseURL: string): void {
     // Prevent duplicate initialization
@@ -48,15 +42,9 @@ class OrientationEventService {
       return;
     }
     
-    // If already connected, don't reinitialize
-    if (this.eventSource && this.eventSource.readyState === EventSource.OPEN) {
-      logger.debug('OrientationEventService: Already connected, skipping initialization');
-      return;
-    }
-    
     this.isInitializing = true;
-    logger.info('OrientationEventService: Initializing', { baseURL });
-    console.log('🔄 OrientationEventService: Initializing with baseURL:', baseURL);
+    logger.info('OrientationEventService: Initializing with unified SSE service', { baseURL });
+    console.log('🔄 OrientationEventService: Initializing with unified SSE service');
     
     // Load saved orientation from localStorage if available
     try {
@@ -72,201 +60,68 @@ class OrientationEventService {
       logger.warn('OrientationEventService: Could not load saved orientation from localStorage', { error });
     }
     
-    // Try connecting with endpoint
-    this.connectToEventSource(baseURL);
+    // Ensure unified SSE service is initialized
+    unifiedSSEService.initialize(baseURL);
+    
+    // Register handlers for orientation events
+    this.registerEventHandlers();
+    
     this.isInitializing = false;
   }
-
+  
   /**
-   * Connect to the SSE endpoint
+   * Register event handlers with the unified SSE service
    */
-  private connectToEventSource(baseURL: string): void {
-    try {
-      // Close existing connection if any
-      if (this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = null;
-      }
-      
-      // Use the correct endpoint for SSE with required query parameters
-      const endpoint = '/api/sse';
-      
-      // Get masjidId from localStorage (needed according to the documentation)
-      const masjidId = localStorage.getItem('masjidId');
-      
-      // Build the URL with required query parameters
-      let url = `${baseURL}${endpoint}`;
-      const params = new URLSearchParams();
-      
-      if (this.currentScreenId) {
-        params.append('screenId', this.currentScreenId);
-      }
-      
-      if (masjidId) {
-        params.append('masjidId', masjidId);
-      }
-      
-      // Add the query parameters if we have any
-      if (params.toString()) {
-        url += `?${params.toString()}`;
-      }
-      
-      this.connectionUrl = url;
-      
-      logger.info(`OrientationEventService: Connecting to SSE at ${this.connectionUrl}`);
-      console.log(`🔌 OrientationEventService: Connecting to SSE at ${this.connectionUrl}`);
-      
-      // Create a new EventSource
-      let eventSource: EventSource;
-      if (process.env.NODE_ENV === 'development') {
-        // Cast DebugEventSource to EventSource for compatibility
-        eventSource = new DebugEventSource(this.connectionUrl, {
-          withCredentials: true,
-        }) as unknown as EventSource;
-      } else {
-        eventSource = new EventSource(this.connectionUrl, {
-          withCredentials: true,
-        });
-      }
-      
-      this.eventSource = eventSource;
-      
-      // Setup event listeners
-      this.setupEventListeners(eventSource);
-      
-      // Handle open event
-      eventSource.onopen = this.handleConnectionOpen;
-      
-      // Handle error events
-      eventSource.onerror = (error) => {
-        console.error('OrientationEventService: SSE connection error:', error);
-        this.handleConnectionError(error);
-      };
-    } catch (error) {
-      logger.error('OrientationEventService: Error connecting to SSE', { error });
-      this.scheduleReconnect();
-    }
-  }
-
-  /**
-   * Set up event listeners for the EventSource
-   */
-  private setupEventListeners(eventSource: EventSource): void {
-    logger.info('OrientationEventService: Setting up event listeners', {
-      primaryEventType: EVENT_TYPES.PRIMARY,
-    });
+  private registerEventHandlers(): void {
+    // Clean up any existing handlers first
+    this.unregisterHandlers.forEach(unregister => unregister());
+    this.unregisterHandlers = [];
     
-    // Set up event listener for the primary orientation update event
-    // This is the event documented by the backend team
-    eventSource.addEventListener(EVENT_TYPES.PRIMARY, this.handleOrientationEvent);
+    // Register handler for primary orientation event type
+    const unregisterPrimary = unifiedSSEService.addEventListener(EVENT_TYPES.PRIMARY, (event: MessageEvent) => {
+      console.log(`🔄 OrientationEventService: ${EVENT_TYPES.PRIMARY} event received via unified SSE!`, event.data);
+      this.handleOrientationEvent(event);
+    });
+    this.unregisterHandlers.push(unregisterPrimary);
     
     // Also listen for alternative event names
-    eventSource.addEventListener('SCREEN_ORIENTATION', this.handleOrientationEvent);
-    eventSource.addEventListener('screen_orientation', this.handleOrientationEvent);
-    eventSource.addEventListener('orientation', this.handleOrientationEvent);
-    
-    // CRITICAL: Also listen to default 'message' event in case server sends events without event type
-    eventSource.addEventListener('message', (event: MessageEvent) => {
-      logger.debug('OrientationEventService: Received default message event', {
-        data: event.data,
-        type: event.type,
-        lastEventId: (event as any).lastEventId,
+    const altNames = ['SCREEN_ORIENTATION', 'screen_orientation', 'orientation'];
+    altNames.forEach(eventName => {
+      const unregister = unifiedSSEService.addEventListener(eventName, (event: MessageEvent) => {
+        console.log(`🔄 OrientationEventService: ${eventName} event received via unified SSE!`, event.data);
+        this.handleOrientationEvent(event);
       });
-      console.log('🔍 OrientationEventService: Default message event received:', event.data);
+      this.unregisterHandlers.push(unregister);
+    });
+    
+    // Listen to default 'message' event for orientation events without specific type
+    const unregisterMessage = unifiedSSEService.addEventListener('message', (event: MessageEvent) => {
+      const messageEvent = event as MessageEvent;
+      
+      logger.debug('OrientationEventService: Received default message event via unified SSE', {
+        data: messageEvent.data,
+        type: messageEvent.type,
+      });
+      console.log('🔄 OrientationEventService: Default message event received:', messageEvent.data);
       
       // Try to parse and handle as orientation event
       try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        const data = typeof messageEvent.data === 'string' ? JSON.parse(messageEvent.data) : messageEvent.data;
         if (data && (data.orientation || data.type === 'SCREEN_ORIENTATION')) {
           // It looks like an orientation event, handle it
-          this.handleOrientationEvent(event);
+          this.handleOrientationEvent(messageEvent);
         }
       } catch (error) {
         // Not JSON or not an orientation event, ignore
         logger.debug('OrientationEventService: Message event is not an orientation event');
       }
     });
+    this.unregisterHandlers.push(unregisterMessage);
     
-    // Log which events we're listening for
-    console.log(`🔍 OrientationEventService: Registered listeners for: ${EVENT_TYPES.PRIMARY}, SCREEN_ORIENTATION, screen_orientation, orientation, message`);
-    logger.info('OrientationEventService: All event listeners registered');
+    logger.info('OrientationEventService: All event handlers registered with unified SSE service');
+    console.log('🔄 OrientationEventService: All event handlers registered successfully');
   }
 
-  /**
-   * Handle successful connection
-   */
-  private handleConnectionOpen = (): void => {
-    this.reconnectAttempts = 0;
-    const readyState = this.eventSource?.readyState;
-    const readyStateText = readyState === EventSource.OPEN ? 'OPEN' : 
-                          readyState === EventSource.CONNECTING ? 'CONNECTING' : 
-                          readyState === EventSource.CLOSED ? 'CLOSED' : 'UNKNOWN';
-    
-    logger.info('OrientationEventService: SSE connection established', {
-      url: this.connectionUrl,
-      readyState,
-      readyStateText,
-    });
-    console.log(`🔌 OrientationEventService: SSE connection established! ReadyState: ${readyStateText} (${readyState})`);
-    console.log(`🔌 OrientationEventService: Connection URL: ${this.connectionUrl}`);
-    
-    // Log available event types
-    if (this.eventSource) {
-      console.log('🔍 OrientationEventService: EventSource ready, listeners should be active');
-    }
-  };
-
-  /**
-   * Handle connection errors
-   */
-  private handleConnectionError = (error: Event): void => {
-    logger.error('OrientationEventService: SSE connection error', { error });
-    
-    // Clean up existing connection
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
-    
-    this.scheduleReconnect();
-  };
-
-  /**
-   * Schedule a reconnection attempt with exponential backoff
-   */
-  private scheduleReconnect(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-    }
-
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger.warn('OrientationEventService: Maximum reconnect attempts reached');
-      return;
-    }
-
-    // Calculate backoff time with exponential increase and jitter
-    const delay = Math.min(
-      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-      60000 // Max 1 minute
-    ) * (0.8 + Math.random() * 0.4); // Add 20% jitter
-
-    logger.info(`OrientationEventService: Scheduling reconnect in ${delay / 1000}s (attempt ${this.reconnectAttempts + 1})`);
-    
-    // Follow exact reconnection logic from documentation
-    this.reconnectTimeout = setTimeout(() => {
-      if (this.eventSource) {
-        this.eventSource.close();
-      }
-      this.reconnectAttempts++;
-      
-      // Use the development URL in development mode for consistency
-      const baseURL = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000' 
-        : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-        
-      this.connectToEventSource(baseURL);
-    }, delay);
-  }
 
   /**
    * Handle an orientation update event
@@ -277,6 +132,17 @@ class OrientationEventService {
       type: event.type,
       data: typeof event.data === 'string' ? event.data.substring(0, 100) : event.data,
     });
+    
+    // CRITICAL: Verify unified SSE connection is ready before processing events
+    const connectionStatus = unifiedSSEService.getConnectionStatus();
+    if (!connectionStatus.connected) {
+      logger.warn('OrientationEventService: Ignoring orientation event - unified SSE connection not ready', {
+        readyState: connectionStatus.readyState,
+        connected: connectionStatus.connected,
+      });
+      console.warn('🔍 OrientationEventService: Orientation event blocked - unified SSE connection not ready');
+      return;
+    }
     
     try {
       // Parse the data according to the expected payload format
@@ -424,27 +290,28 @@ class OrientationEventService {
    * Cleanup resources when the service is no longer needed
    */
   public cleanup(): void {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    logger.info('OrientationEventService: Cleaning up');
     
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
+    // Unregister all event handlers
+    this.unregisterHandlers.forEach(unregister => unregister());
+    this.unregisterHandlers = [];
+    
+    // Note: We don't close the unified SSE connection here as other services may be using it
+    // The unified service manages its own lifecycle
     
     this.listeners.clear();
+    this.isInitializing = false;
   }
 
   /**
-   * Get current connection status for debugging
+   * Get current connection status (delegates to unified SSE service)
    */
   public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null, currentOrientation: Orientation | null } {
+    const status = unifiedSSEService.getConnectionStatus();
     return {
-      connected: this.eventSource !== null && this.eventSource.readyState === 1,
-      url: this.connectionUrl,
-      readyState: this.eventSource ? this.eventSource.readyState : null,
+      connected: status.connected,
+      url: status.url,
+      readyState: status.readyState,
       currentOrientation: this.currentOrientation
     };
   }

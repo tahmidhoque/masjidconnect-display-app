@@ -167,8 +167,8 @@ export interface HeartbeatAnalyticsData {
   signalStrength: number;        // WiFi/Network signal strength percentage (0-100)
   connectionType: string;        // Connection type: "wifi", "ethernet", "cellular"
   
-  // Update Progress (OPTIONAL - included when available)
-  updateProgress?: UpdateProgress;
+  // Update Progress (OPTIONAL - included when available, as percentage 0-100)
+  updateProgress?: number;
 }
 
 export interface HeartbeatAnalyticsRequest extends BaseAnalyticsRequest {

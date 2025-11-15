@@ -434,6 +434,13 @@ const authSlice = createSlice({
           try {
             dataSyncService.initialize();
             analyticsService.initialize(action.payload.credentials.apiKey);
+            // Initialize sync service for offline support (async, don't await in reducer)
+            import('../../services/syncService').then(syncServiceModule => {
+              syncServiceModule.default.initialize();
+              logger.info('[Auth] Sync service initialized after pairing');
+            }).catch(error => {
+              logger.error('[Auth] Error initializing sync service after pairing', { error });
+            });
             logger.info('[Auth] Services initialized successfully after pairing');
           } catch (error) {
             logger.error('[Auth] Error initializing services after pairing', { error });
@@ -468,6 +475,13 @@ const authSlice = createSlice({
           try {
             dataSyncService.initialize();
             analyticsService.initialize(action.payload.credentials.apiKey);
+            // Initialize sync service for offline support (async, don't await in reducer)
+            import('../../services/syncService').then(syncServiceModule => {
+              syncServiceModule.default.initialize();
+              logger.info('[Auth] Sync service initialized from storage');
+            }).catch(error => {
+              logger.error('[Auth] Error initializing sync service from storage', { error });
+            });
             logger.info('[Auth] Services initialized successfully from storage');
           } catch (error) {
             logger.error('[Auth] Error initializing services', { error });

@@ -7,12 +7,12 @@
  */
 
 import logger from '../utils/logger';
-import { DebugEventSource } from '../utils/debugEventSource';
 import masjidDisplayClient from '../api/masjidDisplayClient';
 import updateService from './updateService';
 import storageService from './storageService';
 import localforage from 'localforage';
 import { analyticsService } from './analyticsService';
+import unifiedSSEService from './unifiedSSEService';
 
 // Event Types for SSE Remote Control
 const REMOTE_COMMAND_TYPES = {
@@ -50,13 +50,7 @@ export interface ConnectionStatus {
 }
 
 class RemoteControlService {
-  private eventSource: EventSource | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private baseReconnectDelay = 5000; // 5 seconds
   private commandListeners: Set<(command: RemoteCommand) => void> = new Set();
-  private connectionUrl: string | null = null;
   private lastCommandTimestamp: Record<string, number> = {};
   private commandCooldownMs = 2000; // 2 seconds cooldown between commands
   private commandQueue: RemoteCommand[] = [];
@@ -64,9 +58,12 @@ class RemoteControlService {
   private connectionStatusListeners: Set<(status: ConnectionStatus) => void> = new Set();
   private maxStoredResponses = 50;
   private isInitializing = false; // Prevent duplicate initialization
+  private unregisterHandlers: (() => void)[] = []; // Track registered handlers for cleanup
+  private processedCommandIds: Set<string> = new Set(); // Track processed command IDs to prevent duplicates
+  private commandIdCleanupTimers: Map<string, NodeJS.Timeout> = new Map(); // Track cleanup timers for command IDs
 
   /**
-   * Initialize the SSE connection for remote control
+   * Initialize the remote control service using the unified SSE connection
    */
   public initialize(baseURL: string): void {
     // Prevent duplicate initialization
@@ -75,256 +72,144 @@ class RemoteControlService {
       return;
     }
     
-    // If already connected, don't reinitialize
-    if (this.eventSource && this.eventSource.readyState === EventSource.OPEN) {
-      logger.debug('RemoteControlService: Already connected, skipping initialization');
-      return;
-    }
-    
     this.isInitializing = true;
-    logger.info('RemoteControlService: Initializing', { baseURL });
-    console.log('🎮 RemoteControlService: Initializing with baseURL:', baseURL);
+    logger.info('RemoteControlService: Initializing with unified SSE service', { baseURL });
+    console.log('🎮 RemoteControlService: Initializing with unified SSE service');
     
-    this.connectToEventSource(baseURL);
+    // Ensure unified SSE service is initialized
+    unifiedSSEService.initialize(baseURL);
+    
+    // Register handlers for all remote command types
+    this.registerEventHandlers();
+    
     this.isInitializing = false;
   }
-
+  
   /**
-   * Connect to the SSE endpoint for remote commands
+   * Register event handlers with the unified SSE service
    */
-  private connectToEventSource(baseURL: string): void {
-    try {
-      // Close existing connection if any
-      if (this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = null;
-      }
-      
-      // Get credentials for authentication
-      const credentials = this.getCredentials();
-      
-      // Use the SSE endpoint (same as emergency alerts)
-      const endpoint = '/api/sse';
-      
-      // Build URL with authentication parameters
-      let connectionUrl = `${baseURL}${endpoint}`;
-      
-      if (credentials && credentials.screenId) {
-        const params = new URLSearchParams();
-        params.append('screenId', credentials.screenId);
-        
-        if (credentials.apiKey) {
-          params.append('apiKey', credentials.apiKey);
-        }
-        
-        connectionUrl = `${connectionUrl}?${params.toString()}`;
-        
-        logger.info(`RemoteControlService: Connecting to SSE with authentication`, {
-          hasScreenId: !!credentials.screenId,
-          hasApiKey: !!credentials.apiKey
-        });
-        console.log(`🎮 RemoteControlService: Connecting to SSE with screenId: ${credentials.screenId}`);
-      } else {
-        logger.warn('RemoteControlService: No credentials available for SSE connection');
-        console.warn('🎮 RemoteControlService: Connecting to SSE without credentials');
-      }
-      
-      this.connectionUrl = connectionUrl;
-      
-      logger.info(`RemoteControlService: Connecting to SSE at ${this.connectionUrl}`);
-      
-      // Create a new EventSource
-      let eventSource: EventSource;
-      if (process.env.NODE_ENV === 'development') {
-        eventSource = new DebugEventSource(this.connectionUrl, {
-          withCredentials: true,
-        }) as unknown as EventSource;
-      } else {
-        eventSource = new EventSource(this.connectionUrl, {
-          withCredentials: true,
-        });
-      }
-      
-      this.eventSource = eventSource;
-      
-      // Setup event listeners for remote commands
-      this.setupEventListeners(eventSource);
-      
-      // Handle open event
-      eventSource.onopen = this.handleConnectionOpen;
-      
-      // Handle error events
-      eventSource.onerror = (error) => {
-        console.error('🎮 RemoteControlService: SSE connection error:', error);
-        this.handleConnectionError(error);
-      };
-    } catch (error) {
-      logger.error('RemoteControlService: Error connecting to SSE', { error });
-      console.error('🎮 RemoteControlService: Error connecting to SSE:', error);
-      this.scheduleReconnect();
-    }
-  }
-
-  /**
-   * Set up event listeners for remote command events
-   */
-  private setupEventListeners(eventSource: EventSource): void {
-    logger.info('RemoteControlService: Setting up event listeners', {
-      eventTypes: Object.values(REMOTE_COMMAND_TYPES),
-    });
-    console.log('🎮 RemoteControlService: Registering listeners for:', Object.values(REMOTE_COMMAND_TYPES));
-    
-    // Listen for each type of remote command
-    Object.values(REMOTE_COMMAND_TYPES).forEach(commandType => {
-      eventSource.addEventListener(commandType, this.handleRemoteCommand);
-      logger.debug(`RemoteControlService: Registered listener for ${commandType}`);
-    });
-    
-    // Also listen for generic 'remote_command' event
-    eventSource.addEventListener('remote_command', this.handleRemoteCommand);
-    eventSource.addEventListener('remoteCommand', this.handleRemoteCommand);
-    
-    // CRITICAL: Also listen to default 'message' event in case server sends events without event type
-    eventSource.addEventListener('message', (event: MessageEvent) => {
-      logger.debug('RemoteControlService: Received default message event', {
-        data: event.data,
-        type: event.type,
-        lastEventId: (event as any).lastEventId,
+  private registerEventHandlers(): void {
+    // Clean up any existing handlers first
+    if (this.unregisterHandlers.length > 0) {
+      logger.info('RemoteControlService: Cleaning up existing event handlers before re-registering', {
+        handlerCount: this.unregisterHandlers.length,
       });
-      console.log('🎮 RemoteControlService: Default message event received:', event.data);
+      console.log(`🎮 RemoteControlService: Cleaning up ${this.unregisterHandlers.length} existing handler(s)`);
+    }
+    this.unregisterHandlers.forEach(unregister => unregister());
+    this.unregisterHandlers = [];
+    
+    // Register handler for each command type
+    Object.values(REMOTE_COMMAND_TYPES).forEach(commandType => {
+      const unregister = unifiedSSEService.addEventListener(commandType, (event: MessageEvent) => {
+        console.log(`🎮🎮🎮 RemoteControlService: ${commandType} event received via unified SSE!`, {
+          eventType: event.type,
+          data: event.data,
+          timestamp: new Date().toISOString(),
+        });
+        logger.info(`RemoteControlService: ${commandType} event received`, {
+          type: event.type,
+          data: event.data,
+        });
+        try {
+          this.handleRemoteCommand(event);
+        } catch (error) {
+          console.error(`🎮 RemoteControlService: Error in ${commandType} handler:`, error);
+          logger.error(`RemoteControlService: Error handling ${commandType} event`, { error });
+        }
+      });
+      this.unregisterHandlers.push(unregister);
+    });
+    
+    // Also listen for generic 'remote_command' events
+    const unregisterRemoteCommand = unifiedSSEService.addEventListener('remote_command', (event: MessageEvent) => {
+      console.log('🎮 RemoteControlService: remote_command event received:', event.data);
+      this.handleRemoteCommand(event);
+    });
+    this.unregisterHandlers.push(unregisterRemoteCommand);
+    
+    const unregisterRemoteCommandAlt = unifiedSSEService.addEventListener('remoteCommand', (event: MessageEvent) => {
+      console.log('🎮 RemoteControlService: remoteCommand event received:', event.data);
+      this.handleRemoteCommand(event);
+    });
+    this.unregisterHandlers.push(unregisterRemoteCommandAlt);
+    
+    // Listen to default 'message' event for commands without specific type
+    const unregisterMessage = unifiedSSEService.addEventListener('message', (event: MessageEvent) => {
+      const messageEvent = event as MessageEvent;
+      const eventType = (messageEvent as any).type || 'message';
+      
+      console.log(`🎮🎮🎮 RemoteControlService: MESSAGE event received via unified SSE!`, {
+        eventType,
+        data: messageEvent.data,
+        originalType: messageEvent.type,
+      });
+      
+      logger.info('RemoteControlService: Message event received', {
+        eventType,
+        data: messageEvent.data,
+        originalType: messageEvent.type,
+      });
       
       // Try to parse and handle as remote command
       try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        const data = typeof messageEvent.data === 'string' ? JSON.parse(messageEvent.data) : messageEvent.data;
+        
+        console.log('🎮 RemoteControlService: Parsed message data:', data);
+        
+        // Check if this is a remote command
         if (data && (data.type || data.commandType)) {
-          // It looks like a remote command, handle it
-          this.handleRemoteCommand(event);
+          logger.info('RemoteControlService: Message event contains command, handling', {
+            commandType: data.type || data.commandType,
+          });
+          console.log('🎮 RemoteControlService: Message event contains command, handling:', data.type || data.commandType);
+          this.handleRemoteCommand(messageEvent);
         }
       } catch (error) {
         // Not JSON or not a command, ignore
-        logger.debug('RemoteControlService: Message event is not a remote command');
+        logger.debug('RemoteControlService: Message event is not a remote command', { error });
       }
     });
+    this.unregisterHandlers.push(unregisterMessage);
     
-    logger.info('RemoteControlService: All event listeners registered');
-  }
-
-  /**
-   * Get credentials for authentication
-   */
-  private getCredentials() {
-    try {
-      const apiKey = localStorage.getItem('masjid_api_key') || localStorage.getItem('apiKey');
-      const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
-      
-      if (apiKey && screenId) {
-        return { apiKey, screenId };
-      }
-      
-      return null;
-    } catch (error) {
-      logger.error('RemoteControlService: Error getting credentials', { error });
-      return null;
-    }
-  }
-
-  /**
-   * Handle successful connection
-   */
-  private handleConnectionOpen = (): void => {
-    this.reconnectAttempts = 0;
-    const readyState = this.eventSource?.readyState;
-    const readyStateText = readyState === EventSource.OPEN ? 'OPEN' : 
-                          readyState === EventSource.CONNECTING ? 'CONNECTING' : 
-                          readyState === EventSource.CLOSED ? 'CLOSED' : 'UNKNOWN';
-    
-    logger.info('RemoteControlService: SSE connection established', {
-      url: this.connectionUrl,
-      readyState,
-      readyStateText,
+    logger.info('RemoteControlService: All event handlers registered with unified SSE service', {
+      totalHandlers: this.unregisterHandlers.length,
+      commandTypes: Object.values(REMOTE_COMMAND_TYPES),
     });
-    console.log(`🎮 RemoteControlService: SSE connection established! ReadyState: ${readyStateText} (${readyState})`);
-    console.log(`🎮 RemoteControlService: Connection URL: ${this.connectionUrl}`);
-    
-    // Log registered event listeners for debugging
-    if (this.eventSource) {
-      console.log('🎮 RemoteControlService: EventSource ready, listeners should be active');
-    }
-    
-    // Notify connection status listeners
-    this.notifyConnectionStatusChange();
-  };
-
-  /**
-   * Handle connection errors
-   */
-  private handleConnectionError = (error: Event): void => {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
-    const readyState = this.eventSource?.readyState;
-    
-    logger.error('RemoteControlService: SSE connection error', { 
-      error: errorMessage,
-      readyState,
-      url: this.connectionUrl,
-      reconnectAttempts: this.reconnectAttempts,
-    });
-    console.error('🎮 RemoteControlService: SSE connection error:', error);
-    
-    // Check for authentication errors (401, 403)
-    if (readyState === EventSource.CLOSED) {
-      logger.warn('RemoteControlService: SSE connection closed - possible authentication error');
-    }
-    
-    // Clean up existing connection
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
-    
-    // Notify connection status listeners
-    this.notifyConnectionStatusChange(errorMessage);
-    
-    this.scheduleReconnect();
-  };
-
-  /**
-   * Schedule a reconnection attempt with exponential backoff
-   */
-  private scheduleReconnect(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-    }
-
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger.warn('RemoteControlService: Maximum reconnect attempts reached');
-      return;
-    }
-
-    const delay = Math.min(
-      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-      60000 // Max 1 minute
-    ) * (0.8 + Math.random() * 0.4); // Add 20% jitter
-
-    logger.info(`RemoteControlService: Scheduling reconnect in ${delay / 1000}s (attempt ${this.reconnectAttempts + 1})`);
-    
-    this.reconnectTimeout = setTimeout(() => {
-      if (this.eventSource) {
-        this.eventSource.close();
-      }
-      this.reconnectAttempts++;
-      
-      const baseURL = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000' 
-        : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-        
-      this.connectToEventSource(baseURL);
-    }, delay);
+    console.log(`🎮 RemoteControlService: All event handlers registered successfully (${this.unregisterHandlers.length} handlers)`);
   }
+
 
   /**
    * Handle a remote command event
    */
   private handleRemoteCommand = (event: MessageEvent): void => {
+    console.log('🎮 RemoteControlService: handleRemoteCommand called!', {
+      eventType: (event as any).type,
+      data: event.data,
+      isOnline: navigator.onLine,
+    });
+    
+    // Don't process commands when offline
+    if (!navigator.onLine) {
+      logger.warn('RemoteControlService: Ignoring command - device is offline');
+      console.warn('🎮 RemoteControlService: Command blocked - device offline');
+      return;
+    }
+    
+    // CRITICAL: Verify unified SSE connection is ready before processing events
+    const connectionStatus = unifiedSSEService.getConnectionStatus();
+    if (!connectionStatus.connected) {
+      logger.warn('RemoteControlService: Ignoring command - unified SSE connection not ready', {
+        readyState: connectionStatus.readyState,
+        connected: connectionStatus.connected,
+      });
+      console.warn('🎮 RemoteControlService: Command blocked - unified SSE connection not ready', {
+        readyState: connectionStatus.readyState,
+      });
+      return;
+    }
+
     const eventType = (event as any).type || 'message';
     logger.info('RemoteControlService: Remote command event received', {
       eventType,
@@ -369,6 +254,17 @@ class RemoteControlService {
         timestamp: commandData.timestamp,
       });
       
+      // CRITICAL: Check for duplicate command IDs to prevent processing the same command multiple times
+      // This prevents the same SSE event from being handled by multiple event listeners
+      if (this.processedCommandIds.has(commandData.commandId)) {
+        logger.warn('RemoteControlService: Duplicate command detected, skipping', {
+          commandId: commandData.commandId,
+          type: commandData.type,
+        });
+        console.warn('🎮 RemoteControlService: Duplicate command detected, skipping:', commandData.commandId);
+        return;
+      }
+      
       // Check cooldown to prevent command spam
       const now = Date.now();
       const lastTime = this.lastCommandTimestamp[commandData.type] || 0;
@@ -399,6 +295,18 @@ class RemoteControlService {
         
         return;
       }
+      
+      // Mark command as processed BEFORE execution to prevent duplicate processing
+      // This must happen after throttling check but before execution
+      this.processedCommandIds.add(commandData.commandId);
+      
+      // Schedule cleanup of command ID after 5 seconds
+      // This allows legitimate retries after a delay but prevents immediate duplicates
+      const cleanupTimer = setTimeout(() => {
+        this.processedCommandIds.delete(commandData.commandId);
+        this.commandIdCleanupTimers.delete(commandData.commandId);
+      }, 5000);
+      this.commandIdCleanupTimers.set(commandData.commandId, cleanupTimer);
       
       this.lastCommandTimestamp[commandData.type] = now;
       
@@ -449,12 +357,21 @@ class RemoteControlService {
     let response: RemoteCommandResponse;
     
     try {
+      // Log the command type and expected values for debugging
+      logger.debug('RemoteControlService: Executing command switch', {
+        commandType: command.type,
+        expectedRestartApp: REMOTE_COMMAND_TYPES.RESTART_APP,
+        typeMatch: command.type === REMOTE_COMMAND_TYPES.RESTART_APP,
+      });
+      
       switch (command.type) {
         case REMOTE_COMMAND_TYPES.FORCE_UPDATE:
           response = await this.handleForceUpdate(command);
           break;
           
         case REMOTE_COMMAND_TYPES.RESTART_APP:
+        case 'RESTART_APP': // Also handle string literal for compatibility
+          logger.info('RemoteControlService: Matched RESTART_APP case');
           response = await this.handleRestartApp(command);
           break;
           
@@ -685,7 +602,8 @@ class RemoteControlService {
       await localforage.clear();
       logger.info('Cleared localforage');
       
-      // Clear localStorage (except credentials)
+      // Clear localStorage (except credentials and pairing state)
+      // CRITICAL: Preserve Redux persist state which contains auth state
       const preserveKeys = [
         'masjid_api_key',
         'masjid_screen_id',
@@ -694,14 +612,29 @@ class RemoteControlService {
         'device_id',
         'masjidconnect_credentials',
         'isPaired',
+        'masjidconnect-root', // Redux persist state - contains auth, content, emergency slices
       ];
       
-      Object.keys(localStorage).forEach(key => {
+      const allKeys = Object.keys(localStorage);
+      const keysToRemove: string[] = [];
+      const keysPreserved: string[] = [];
+      
+      allKeys.forEach(key => {
         if (!preserveKeys.includes(key)) {
+          keysToRemove.push(key);
           localStorage.removeItem(key);
+        } else {
+          keysPreserved.push(key);
         }
       });
-      logger.info('Cleared localStorage (preserved credentials)');
+      
+      logger.info('Cleared localStorage (preserved credentials and Redux state)', {
+        preserved: keysPreserved,
+        removed: keysToRemove.length,
+        removedKeys: keysToRemove.slice(0, 10), // Log first 10 removed keys for debugging
+      });
+      console.log('🧹 Clear Cache: Preserved keys:', keysPreserved);
+      console.log('🧹 Clear Cache: Removed', keysToRemove.length, 'keys');
       
       // Clear service worker cache
       if ('caches' in window) {
@@ -713,10 +646,36 @@ class RemoteControlService {
       // Invalidate API caches
       masjidDisplayClient.invalidateAllCaches();
       
+      // CRITICAL: Cleanup all SSE connections before reload to prevent stale connections
+      logger.info('RemoteControlService: Cleaning up SSE connections before reload');
+      
+      // Cleanup this service's connection
+      this.cleanup();
+      
+      // Cleanup other SSE services
+      try {
+        const { default: emergencyAlertService } = await import('./emergencyAlertService');
+        emergencyAlertService.cleanup();
+        logger.info('RemoteControlService: Cleaned up emergency alert service');
+      } catch (error) {
+        logger.warn('RemoteControlService: Could not cleanup emergency alert service', { error });
+      }
+      
+      try {
+        const { default: orientationEventService } = await import('./orientationEventService');
+        orientationEventService.cleanup();
+        logger.info('RemoteControlService: Cleaned up orientation event service');
+      } catch (error) {
+        logger.warn('RemoteControlService: Could not cleanup orientation event service', { error });
+      }
+      
       // Dispatch event for UI feedback
       window.dispatchEvent(new CustomEvent('remote:clear-cache', {
         detail: { commandId: command.commandId }
       }));
+      
+      // Small delay after cleanup to ensure connections are closed
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Reload page to apply changes
       setTimeout(() => {
@@ -992,49 +951,45 @@ class RemoteControlService {
     });
   }
 
+
   /**
-   * Get connection status
+   * Get connection status (delegates to unified SSE service)
    */
   public getConnectionStatus(): ConnectionStatus {
-    return {
-      connected: this.eventSource !== null && this.eventSource.readyState === EventSource.OPEN,
-      url: this.connectionUrl,
-      readyState: this.eventSource ? this.eventSource.readyState : null,
-      reconnectAttempts: this.reconnectAttempts,
-    };
+    return unifiedSSEService.getConnectionStatus();
   }
 
   /**
-   * Notify all connection status listeners of status changes
-   */
-  private notifyConnectionStatusChange(lastError?: string): void {
-    const status = this.getConnectionStatus();
-    if (lastError) {
-      (status as ConnectionStatus).lastError = lastError;
-    }
-    
-    this.connectionStatusListeners.forEach(listener => {
-      try {
-        listener(status);
-      } catch (error) {
-        logger.error('RemoteControlService: Error notifying connection status listener', { error });
-      }
-    });
-    
-    // Dispatch custom event for UI components
-    window.dispatchEvent(new CustomEvent('remote-control:connection-status', {
-      detail: status,
-    }));
-  }
-
-  /**
-   * Add a listener for connection status changes
+   * Add a listener for connection status changes (delegates to unified SSE service)
    */
   public addConnectionStatusListener(callback: (status: ConnectionStatus) => void): () => void {
+    // Subscribe to unified SSE service connection status
+    const unregister = unifiedSSEService.addConnectionStatusListener((status) => {
+      // Also notify our own listeners
+      this.connectionStatusListeners.forEach(listener => {
+        try {
+          listener(status);
+        } catch (error) {
+          logger.error('RemoteControlService: Error notifying connection status listener', { error });
+        }
+      });
+      
+      // Dispatch custom event for UI components
+      window.dispatchEvent(new CustomEvent('remote-control:connection-status', {
+        detail: status,
+      }));
+      
+      // Call the callback
+      callback(status);
+    });
+    
     this.connectionStatusListeners.add(callback);
+    
     // Immediately call with current status
     callback(this.getConnectionStatus());
+    
     return () => {
+      unregister();
       this.connectionStatusListeners.delete(callback);
     };
   }
@@ -1078,20 +1033,23 @@ class RemoteControlService {
   public cleanup(): void {
     logger.info('RemoteControlService: Cleaning up');
     
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    // Unregister all event handlers
+    this.unregisterHandlers.forEach(unregister => unregister());
+    this.unregisterHandlers = [];
     
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
+    // Clear all command ID cleanup timers
+    this.commandIdCleanupTimers.forEach(timer => clearTimeout(timer));
+    this.commandIdCleanupTimers.clear();
+    
+    // Note: We don't close the unified SSE connection here as other services may be using it
+    // The unified service manages its own lifecycle
     
     this.commandListeners.clear();
     this.connectionStatusListeners.clear();
     this.commandQueue = [];
     this.commandsInProgress.clear();
+    this.processedCommandIds.clear();
+    this.isInitializing = false;
   }
 }
 

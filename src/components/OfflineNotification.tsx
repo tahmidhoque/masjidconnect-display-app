@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Snackbar, Alert, AlertTitle, Tooltip } from '@mui/material';
-import WifiOffIcon from '@mui/icons-material/WifiOff';
-import { useTheme } from '@mui/material/styles';
+import { Box, Typography, Snackbar, Alert, AlertTitle } from '@mui/material';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import CloudOffIcon from '@mui/icons-material/CloudOff';
+import { formatDistanceToNow } from 'date-fns';
 
 interface OfflineNotificationProps {
   position?: {
@@ -12,25 +13,26 @@ interface OfflineNotificationProps {
 }
 
 const OfflineNotification: React.FC<OfflineNotificationProps> = ({
-  position = { vertical: 'bottom', horizontal: 'left' },
+  position = { vertical: 'top', horizontal: 'right' },
   showNotification = true
 }) => {
-  const theme = useTheme();
-  const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
-  const [lastOfflineTime, setLastOfflineTime] = useState<Date | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
 
   // Handle network status changes
   useEffect(() => {
     const handleOnline = () => {
-      setIsOffline(false);
+      setIsOnline(true);
+      setLastSyncTime(new Date());
       setSnackbarOpen(true);
       setTimeout(() => setSnackbarOpen(false), 3000);
+      console.log('[OfflineIndicator] Connection restored');
     };
 
     const handleOffline = () => {
-      setIsOffline(true);
-      setLastOfflineTime(new Date());
+      setIsOnline(false);
+      console.log('[OfflineIndicator] Connection lost');
     };
 
     window.addEventListener('online', handleOnline);
@@ -42,34 +44,19 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
     };
   }, []);
 
-  // Format time since offline
-  const formatTimeSinceOffline = (): string => {
-    if (!lastOfflineTime) return '';
-    
-    const now = new Date();
-    const diffInMs = now.getTime() - lastOfflineTime.getTime();
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'just now';
-    if (diffInMinutes === 1) return '1 minute ago';
-    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours === 1) return '1 hour ago';
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays === 1) return '1 day ago';
-    return `${diffInDays} days ago`;
-  };
+  // Don't show if always online and never had a sync time
+  if (isOnline && !lastSyncTime && !showNotification) {
+    return null;
+  }
 
-  if (!isOffline) {
+  // Show success snackbar when coming back online
+  if (isOnline && snackbarOpen) {
     return (
       <Snackbar 
         open={snackbarOpen} 
         autoHideDuration={3000} 
         onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: position.vertical, horizontal: position.horizontal }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
         <Alert severity="success" sx={{ width: '100%' }}>
           <AlertTitle>Connection Restored</AlertTitle>
@@ -79,59 +66,44 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
     );
   }
 
+  // Don't show offline indicator if showNotification is false
   if (!showNotification) {
     return null;
   }
 
-  // Footer-integrated indicator for offline status
+  // Enhanced offline/online indicator
   return (
     <Box
       sx={{
         position: 'fixed',
-        [position.vertical]: 8,
-        [position.horizontal]: 8,
-        zIndex: 999,
+        top: 16,
+        right: 16,
+        backgroundColor: isOnline ? 'success.main' : 'error.main',
+        color: 'white',
+        padding: 2,
+        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        zIndex: 9999,
+        boxShadow: 3,
       }}
     >
-      <Tooltip
-        title={
-          <Box>
-            <Typography variant="body2" fontWeight="bold">Offline Mode</Typography>
-            {lastOfflineTime && (
-              <Typography variant="caption" component="div">
-                Disconnected {formatTimeSinceOffline()}
-              </Typography>
-            )}
-          </Box>
-        }
-        arrow
-        placement="top"
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            backgroundColor: theme.palette.primary.dark,
-            color: theme.palette.primary.contrastText,
-            fontSize: '0.75rem',
-            opacity: 0.8,
-            '&:hover': {
-              opacity: 1,
-            }
-          }}
-        >
-          <WifiOffIcon 
-            sx={{ 
-              fontSize: '0.875rem',
-              marginRight: '4px' 
-            }} 
-          />
-          <Typography variant="caption">Offline</Typography>
-        </Box>
-      </Tooltip>
+      {isOnline ? (
+        <>
+          <CloudDoneIcon />
+          <Typography variant="body2">
+            Online{lastSyncTime && ` • Synced ${formatDistanceToNow(lastSyncTime, { addSuffix: true })}`}
+          </Typography>
+        </>
+      ) : (
+        <>
+          <CloudOffIcon />
+          <Typography variant="body2">
+            Offline Mode • Showing cached content
+          </Typography>
+        </>
+      )}
     </Box>
   );
 };

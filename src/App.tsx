@@ -1,5 +1,6 @@
 import React, { useEffect, Suspense, lazy, useCallback } from 'react';
 import { Box, ThemeProvider, CssBaseline } from '@mui/material';
+import { useDispatch } from 'react-redux';
 
 import theme from './theme/theme';
 import logger from './utils/logger';
@@ -22,6 +23,8 @@ import useKioskMode from './hooks/useKioskMode';
 import useInitializationFlow from './hooks/useInitializationFlow';
 import useFactoryReset from './hooks/useFactoryReset';
 import useLoadingStateManager from './hooks/useLoadingStateManager';
+import { setOffline } from './store/slices/uiSlice';
+import offlineStorage from './services/offlineStorageService';
 import { ComponentPreloader, initializeMemoryManagement, rpiMemoryManager } from './utils/performanceUtils';
 import { crashLogger } from './utils/crashLogger';
 import './utils/crashReportViewer';
@@ -232,6 +235,37 @@ const App: React.FC = () => {
 
   // Initialize factory reset functionality
   const { isModalOpen, closeModal, confirmReset, isResetting } = useFactoryReset();
+
+  // Setup network status listener and offline storage cleanup
+  const dispatch = useDispatch();
+  useEffect(() => {
+    // Initialize offline storage cleanup on startup
+    offlineStorage.clearExpiredContent().catch(error => {
+      logger.error('[App] Error clearing expired cache on startup', { error });
+    });
+
+    // Setup network status listeners
+    const handleOnline = () => {
+      dispatch(setOffline(false));
+      logger.info('[App] Network connection restored');
+    };
+
+    const handleOffline = () => {
+      dispatch(setOffline(true));
+      logger.warn('[App] Network connection lost');
+    };
+
+    // Set initial offline state
+    dispatch(setOffline(!navigator.onLine));
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [dispatch]);
 
   // ADDED: Initialize memory management for stability on Raspberry Pi (conditionally)
   useEffect(() => {

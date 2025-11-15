@@ -1,8 +1,8 @@
 import { EmergencyAlert } from '../api/models';
 import logger from '../utils/logger';
 import storageService from './storageService';
-import { DebugEventSource } from '../utils/debugEventSource';
 import { AlertColorSchemeKey } from '../components/common/EmergencyAlertOverlay';
+import unifiedSSEService from './unifiedSSEService';
 
 // Event Types for SSE
 const EVENT_TYPES = {
@@ -15,19 +15,14 @@ const EVENT_TYPES = {
 const STORAGE_KEY = 'emergency_alert';
 
 class EmergencyAlertService {
-  private eventSource: EventSource | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private baseReconnectDelay = 5000; // 5 seconds
   private listeners: Set<(alert: EmergencyAlert | null) => void> = new Set();
   private currentAlert: EmergencyAlert | null = null;
   private expirationTimer: NodeJS.Timeout | null = null;
-  private connectionUrl: string | null = null;
   private isInitializing = false; // Prevent duplicate initialization
+  private unregisterHandlers: (() => void)[] = []; // Track registered handlers for cleanup
 
   /**
-   * Initialize the SSE connection to listen for emergency alerts
+   * Initialize the emergency alert service using the unified SSE connection
    */
   public initialize(baseURL: string): void {
     // Prevent duplicate initialization
@@ -36,208 +31,82 @@ class EmergencyAlertService {
       return;
     }
     
-    // If already connected, don't reinitialize
-    if (this.eventSource && this.eventSource.readyState === EventSource.OPEN) {
-      logger.debug('EmergencyAlertService: Already connected, skipping initialization');
-      return;
-    }
-    
     this.isInitializing = true;
-    logger.info('EmergencyAlertService: Initializing', { baseURL });
-    console.log('🚨 EmergencyAlertService: Initializing with baseURL:', baseURL);
+    logger.info('EmergencyAlertService: Initializing with unified SSE service', { baseURL });
+    console.log('🚨 EmergencyAlertService: Initializing with unified SSE service');
+    
+    // Load any saved alert
     this.loadSavedAlert();
     
-    // Try connecting with both endpoints to ensure compatibility
-    this.connectToEventSource(baseURL);
+    // Ensure unified SSE service is initialized
+    unifiedSSEService.initialize(baseURL);
+    
+    // Register handlers for emergency alert events
+    this.registerEventHandlers();
+    
     this.isInitializing = false;
   }
-
+  
   /**
-   * Connect to the SSE endpoint
+   * Register event handlers with the unified SSE service
    */
-  private connectToEventSource(baseURL: string): void {
-    try {
-      // Close existing connection if any
-      if (this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = null;
-      }
-      
-      // CRITICAL FIX: Get credentials and include them in the connection URL
-      const credentials = this.getCredentials();
-      
-      // Use the correct endpoint for SSE
-      const endpoint = '/api/sse';
-      
-      // Build URL with authentication parameters
-      // EventSource doesn't support custom headers, so we must use query params
-      let connectionUrl = `${baseURL}${endpoint}`;
-      
-      if (credentials && credentials.screenId) {
-        const params = new URLSearchParams();
-        params.append('screenId', credentials.screenId);
-        
-        // Also add API key if available (though screenId should be sufficient)
-        if (credentials.apiKey) {
-          params.append('apiKey', credentials.apiKey);
+  private registerEventHandlers(): void {
+    // Clean up any existing handlers first
+    this.unregisterHandlers.forEach(unregister => unregister());
+    this.unregisterHandlers = [];
+    
+    // Register handler for each emergency alert event type
+    Object.values(EVENT_TYPES).forEach(eventType => {
+      const unregister = unifiedSSEService.addEventListener(eventType, (event: MessageEvent) => {
+        console.log(`🚨 EmergencyAlertService: ${eventType} event received via unified SSE!`, event.data);
+        try {
+          if (eventType === EVENT_TYPES.ALERT) {
+            this.handleAlertEvent(event);
+          } else if (eventType === EVENT_TYPES.UPDATE) {
+            this.handleUpdateEvent(event);
+          } else if (eventType === EVENT_TYPES.CANCEL) {
+            this.handleCancelEvent(event);
+          }
+        } catch (error) {
+          console.error(`🚨 EmergencyAlertService: Error in ${eventType} handler:`, error);
+          logger.error(`EmergencyAlertService: Error handling ${eventType} event`, { error });
         }
-        
-        connectionUrl = `${connectionUrl}?${params.toString()}`;
-        
-        logger.info(`EmergencyAlertService: Connecting to SSE with authentication`, {
-          hasScreenId: !!credentials.screenId,
-          hasApiKey: !!credentials.apiKey
-        });
-        console.log(`🚨 EmergencyAlertService: Connecting to SSE with screenId: ${credentials.screenId}`);
-      } else {
-        logger.warn('EmergencyAlertService: No credentials available for SSE connection');
-        console.warn('🚨 EmergencyAlertService: Connecting to SSE without credentials (may not work properly)');
-      }
-      
-      this.connectionUrl = connectionUrl;
-      
-      logger.info(`EmergencyAlertService: Connecting to SSE at ${this.connectionUrl}`);
-      console.log(`🚨 EmergencyAlertService: Connecting to SSE at ${this.connectionUrl}`);
-      
-      // Create a new EventSource
-      let eventSource: EventSource;
-      if (process.env.NODE_ENV === 'development') {
-        // Cast DebugEventSource to EventSource for compatibility
-        eventSource = new DebugEventSource(this.connectionUrl, {
-          withCredentials: true,
-        }) as unknown as EventSource;
-      } else {
-        eventSource = new EventSource(this.connectionUrl, {
-          withCredentials: true,
-        });
-      }
-      
-      this.eventSource = eventSource;
-      
-      // Setup event listeners
-      this.setupEventListeners(eventSource);
-      
-      // Handle open event
-      eventSource.onopen = this.handleConnectionOpen;
-      
-      // Handle error events
-      eventSource.onerror = (error) => {
-        console.error('SSE connection error:', error);
-        this.handleConnectionError(error);
-      };
-    } catch (error) {
-      logger.error('EmergencyAlertService: Error connecting to SSE', { error });
-      console.error('🚨 EmergencyAlertService: Error connecting to SSE:', error);
-      this.scheduleReconnect();
-    }
+      });
+      this.unregisterHandlers.push(unregister);
+    });
+    
+    // Also listen for alternative event names
+    const altNames = ['emergency_alert', 'emergencyAlert', 'emergency', 'alert'];
+    altNames.forEach(eventName => {
+      const unregister = unifiedSSEService.addEventListener(eventName, (event: MessageEvent) => {
+        console.log(`🚨 EmergencyAlertService: ${eventName} event received via unified SSE!`, event.data);
+        this.handleAlertEvent(event);
+      });
+      this.unregisterHandlers.push(unregister);
+    });
+    
+    logger.info('EmergencyAlertService: All event handlers registered with unified SSE service');
+    console.log('🚨 EmergencyAlertService: All event handlers registered successfully');
   }
 
-  /**
-   * Set up event listeners for the EventSource
-   */
-  private setupEventListeners(eventSource: EventSource): void {
-    // Set up event listeners for different alert types
-    eventSource.addEventListener(EVENT_TYPES.ALERT, this.handleAlertEvent);
-    eventSource.addEventListener(EVENT_TYPES.UPDATE, this.handleUpdateEvent);
-    eventSource.addEventListener(EVENT_TYPES.CANCEL, this.handleCancelEvent);
-    
-    // Add listeners for alternative event names
-    eventSource.addEventListener('emergency_alert', this.handleAlertEvent);
-    eventSource.addEventListener('emergencyAlert', this.handleAlertEvent);
-    eventSource.addEventListener('emergency', this.handleAlertEvent);
-    eventSource.addEventListener('alert', this.handleAlertEvent);
-  }
-
-  /**
-   * Get credentials for authentication
-   */
-  private getCredentials() {
-    try {
-      // First try to get from storage service
-      const apiKey = localStorage.getItem('masjid_api_key') || localStorage.getItem('apiKey');
-      const screenId = localStorage.getItem('masjid_screen_id') || localStorage.getItem('screenId');
-      
-      if (apiKey && screenId) {
-        return { apiKey, screenId };
-      }
-      
-      return null;
-    } catch (error) {
-      logger.error('EmergencyAlertService: Error getting credentials', { error });
-      return null;
-    }
-  }
-
-  /**
-   * Handle successful connection
-   */
-  private handleConnectionOpen = (): void => {
-    this.reconnectAttempts = 0;
-    logger.info('EmergencyAlertService: SSE connection established');
-    console.log('🚨 EmergencyAlertService: SSE connection established!');
-    
-    // Load any saved alert data
-    this.loadSavedAlert();
-  };
-
-  /**
-   * Handle connection errors
-   */
-  private handleConnectionError = (error: Event): void => {
-    logger.error('EmergencyAlertService: SSE connection error', { error });
-    console.error('🚨 EmergencyAlertService: SSE connection error:', error);
-    
-    // Clean up existing connection
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
-    
-    this.scheduleReconnect();
-  };
-
-  /**
-   * Schedule a reconnection attempt with exponential backoff
-   */
-  private scheduleReconnect(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-    }
-
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger.warn('EmergencyAlertService: Maximum reconnect attempts reached');
-      return;
-    }
-
-    // Calculate backoff time with exponential increase and jitter
-    const delay = Math.min(
-      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-      60000 // Max 1 minute
-    ) * (0.8 + Math.random() * 0.4); // Add 20% jitter
-
-    logger.info(`EmergencyAlertService: Scheduling reconnect in ${delay / 1000}s (attempt ${this.reconnectAttempts + 1})`);
-    
-    // Follow exact reconnection logic from documentation
-    this.reconnectTimeout = setTimeout(() => {
-      if (this.eventSource) {
-        this.eventSource.close();
-      }
-      this.reconnectAttempts++;
-      
-      // Use the development URL in development mode for consistency
-      const baseURL = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000' 
-        : (process.env.REACT_APP_API_URL || 'https://api.masjid.app');
-        
-      this.connectToEventSource(baseURL);
-    }, delay);
-  }
 
   /**
    * Handle a new emergency alert
    */
   private handleAlertEvent = (event: MessageEvent): void => {
     console.log('🚨 EmergencyAlertService: EMERGENCY_ALERT event received:', event.data);
+    
+    // CRITICAL: Verify unified SSE connection is ready before processing events
+    const connectionStatus = unifiedSSEService.getConnectionStatus();
+    if (!connectionStatus.connected) {
+      logger.warn('EmergencyAlertService: Ignoring alert - unified SSE connection not ready', {
+        readyState: connectionStatus.readyState,
+        connected: connectionStatus.connected,
+      });
+      console.warn('🚨 EmergencyAlertService: Alert blocked - unified SSE connection not ready');
+      return;
+    }
+    
     try {
       let alertData: EmergencyAlert;
       
@@ -308,6 +177,13 @@ class EmergencyAlertService {
    * Handle an update to an existing alert
    */
   private handleUpdateEvent = (event: MessageEvent): void => {
+    // CRITICAL: Verify unified SSE connection is ready before processing events
+    const connectionStatus = unifiedSSEService.getConnectionStatus();
+    if (!connectionStatus.connected) {
+      logger.warn('EmergencyAlertService: Ignoring update - unified SSE connection not ready');
+      return;
+    }
+    
     try {
       let alertData: EmergencyAlert;
       
@@ -334,6 +210,13 @@ class EmergencyAlertService {
    */
   private handleCancelEvent = (event: MessageEvent): void => {
     console.log('🚨 EmergencyAlertService: EMERGENCY_CANCEL event received, raw data:', event.data);
+    
+    // CRITICAL: Verify unified SSE connection is ready before processing events
+    const connectionStatus = unifiedSSEService.getConnectionStatus();
+    if (!connectionStatus.connected) {
+      logger.warn('EmergencyAlertService: Ignoring cancel - unified SSE connection not ready');
+      return;
+    }
     
     try {
       // Handle different formats of cancel data
@@ -518,15 +401,12 @@ class EmergencyAlertService {
   public cleanup(): void {
     logger.info('EmergencyAlertService: Cleaning up');
     
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    // Unregister all event handlers
+    this.unregisterHandlers.forEach(unregister => unregister());
+    this.unregisterHandlers = [];
     
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
+    // Note: We don't close the unified SSE connection here as other services may be using it
+    // The unified service manages its own lifecycle
     
     if (this.expirationTimer) {
       clearTimeout(this.expirationTimer);
@@ -534,16 +414,19 @@ class EmergencyAlertService {
     }
     
     this.listeners.clear();
+    this.currentAlert = null;
+    this.isInitializing = false;
   }
 
   /**
-   * Get current connection status for debugging
+   * Get current connection status (delegates to unified SSE service)
    */
   public getConnectionStatus(): { connected: boolean, url: string | null, readyState: number | null } {
+    const status = unifiedSSEService.getConnectionStatus();
     return {
-      connected: this.eventSource !== null && this.eventSource.readyState === 1,
-      url: this.connectionUrl,
-      readyState: this.eventSource ? this.eventSource.readyState : null
+      connected: status.connected,
+      url: status.url,
+      readyState: status.readyState,
     };
   }
 
