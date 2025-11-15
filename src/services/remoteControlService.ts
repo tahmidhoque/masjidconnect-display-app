@@ -346,13 +346,8 @@ class RemoteControlService {
       commandId: command.commandId,
     });
     
-    // Dispatch event to notify UI that command was received
-    window.dispatchEvent(new CustomEvent('remote:command-received', {
-      detail: {
-        type: command.type,
-        commandId: command.commandId,
-      }
-    }));
+    // Removed: Command received event dispatch - no longer needed for production
+    // Each command has its own specific notification, so a generic "received" notification is redundant
     
     let response: RemoteCommandResponse;
     

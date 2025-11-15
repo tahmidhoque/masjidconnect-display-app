@@ -19,8 +19,6 @@ import WarningIcon from '@mui/icons-material/Warning';
 import logger from '../../utils/logger';
 import updateService from '../../services/updateService';
 import useFactoryReset from '../../hooks/useFactoryReset';
-import { useAppDispatch } from '../../store/hooks';
-import { addNotification } from '../../store/slices/uiSlice';
 
 interface RemoteCommandNotificationProps {
   position?: {
@@ -35,21 +33,80 @@ interface CountdownCommand {
   commandId: string;
 }
 
+/**
+ * Maps technical command types to user-friendly display names
+ */
+const getCommandDisplayName = (commandType: string): string => {
+  const commandMap: Record<string, string> = {
+    'FORCE_UPDATE': 'Update Check',
+    'RESTART_APP': 'App Restart',
+    'RELOAD_CONTENT': 'Content Reload',
+    'CLEAR_CACHE': 'Cache Clear',
+    'UPDATE_SETTINGS': 'Settings Update',
+    'FACTORY_RESET': 'Factory Reset',
+    'CAPTURE_SCREENSHOT': 'Screenshot Capture',
+    'unknown': 'Unknown Command',
+  };
+  
+  return commandMap[commandType] || commandType;
+};
+
+/**
+ * Maps technical command types to user-friendly action descriptions
+ */
+const getCommandActionDescription = (commandType: string, success: boolean = true): string => {
+  const actionMap: Record<string, { success: string; failure: string }> = {
+    'FORCE_UPDATE': {
+      success: 'Update check completed',
+      failure: 'Update check failed',
+    },
+    'RESTART_APP': {
+      success: 'App restart initiated',
+      failure: 'App restart failed',
+    },
+    'RELOAD_CONTENT': {
+      success: 'Content reload completed',
+      failure: 'Content reload failed',
+    },
+    'CLEAR_CACHE': {
+      success: 'Cache cleared successfully',
+      failure: 'Cache clear failed',
+    },
+    'UPDATE_SETTINGS': {
+      success: 'Settings updated successfully',
+      failure: 'Settings update failed',
+    },
+    'FACTORY_RESET': {
+      success: 'Factory reset initiated',
+      failure: 'Factory reset failed',
+    },
+    'CAPTURE_SCREENSHOT': {
+      success: 'Screenshot captured successfully',
+      failure: 'Screenshot capture failed',
+    },
+  };
+  
+  const action = actionMap[commandType];
+  if (!action) {
+    return success ? 'Command executed successfully' : 'Command failed to execute';
+  }
+  
+  return success ? action.success : action.failure;
+};
+
 const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
   position = { vertical: 'top', horizontal: 'center' },
 }) => {
-  const dispatch = useAppDispatch();
   const [countdownCommand, setCountdownCommand] = useState<CountdownCommand | null>(null);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [showReloadMessage, setShowReloadMessage] = useState(false);
   const [showSettingsMessage, setShowSettingsMessage] = useState(false);
   const [showScreenshotMessage, setShowScreenshotMessage] = useState(false);
   const [showForceUpdateProgress, setShowForceUpdateProgress] = useState(false);
-  const [showCommandReceived, setShowCommandReceived] = useState(false);
   const [showCommandThrottled, setShowCommandThrottled] = useState(false);
   const [showCommandCompleted, setShowCommandCompleted] = useState(false);
-  const [commandReceivedType, setCommandReceivedType] = useState<string>('');
   const [commandCompletedType, setCommandCompletedType] = useState<string>('');
+  const [commandCompletedOriginalType, setCommandCompletedOriginalType] = useState<string>('');
   const [commandCompletedSuccess, setCommandCompletedSuccess] = useState<boolean>(true);
 
   const { confirmReset } = useFactoryReset();
@@ -107,31 +164,16 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
 
   // Listen for remote command events
   useEffect(() => {
-    const handleCommandReceived = (event: CustomEvent) => {
-      logger.info('Remote command received event', { type: event.detail?.type });
-      const commandType = event.detail?.type || 'unknown';
-      setCommandReceivedType(commandType);
-      setShowCommandReceived(true);
-      
-      // Also add to Redux notifications
-      dispatch(addNotification({
-        type: 'info',
-        message: `Remote command received: ${commandType}`,
-        duration: 3000,
-      }));
-      
-      setTimeout(() => setShowCommandReceived(false), 3000);
-    };
+    // Note: Command received event listener removed - no longer needed
+    // Each command has its own specific notification, so a generic "received" notification is redundant
 
     const handleCommandThrottled = (event: CustomEvent) => {
       logger.info('Remote command throttled event', { type: event.detail?.type });
+      const commandType = event.detail?.type || 'unknown';
+      const displayName = getCommandDisplayName(commandType);
       setShowCommandThrottled(true);
       
-      dispatch(addNotification({
-        type: 'warning',
-        message: `Command ${event.detail?.type || 'unknown'} is queued (throttled)`,
-        duration: 3000,
-      }));
+      // Removed Redux notification dispatch - Snackbar notification is sufficient
       
       setTimeout(() => setShowCommandThrottled(false), 3000);
     };
@@ -144,15 +186,37 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
       const commandType = event.detail?.type || 'unknown';
       const success = event.detail?.success !== false;
       
-      setCommandCompletedType(commandType);
+      // Commands that have their own specific notifications don't need completion notifications
+      // These commands already provide user feedback:
+      // - FORCE_UPDATE: Shows "Checking for Updates" progress
+      // - RESTART_APP: Shows countdown notification
+      // - RELOAD_CONTENT: Shows "Content Reloading" notification
+      // - UPDATE_SETTINGS: Shows "Settings Updated" notification
+      // - FACTORY_RESET: Shows countdown notification
+      // - CAPTURE_SCREENSHOT: Shows "Screenshot Captured" notification
+      // - CLEAR_CACHE: Triggers reload, no need for completion notification
+      const commandsWithSpecificNotifications = [
+        'FORCE_UPDATE',
+        'RESTART_APP',
+        'RELOAD_CONTENT',
+        'UPDATE_SETTINGS',
+        'FACTORY_RESET',
+        'CAPTURE_SCREENSHOT',
+        'CLEAR_CACHE',
+      ];
+      
+      if (commandsWithSpecificNotifications.includes(commandType)) {
+        // Don't show completion notification - command already has specific feedback
+        logger.debug('Skipping completion notification - command has specific notification', { commandType });
+        return;
+      }
+      
+      // Only show completion notification for unknown/other commands
+      const displayName = getCommandDisplayName(commandType);
+      setCommandCompletedType(displayName);
+      setCommandCompletedOriginalType(commandType);
       setCommandCompletedSuccess(success);
       setShowCommandCompleted(true);
-      
-      dispatch(addNotification({
-        type: success ? 'success' : 'error',
-        message: `Command ${commandType} ${success ? 'completed successfully' : 'failed'}`,
-        duration: 3000,
-      }));
       
       setTimeout(() => setShowCommandCompleted(false), 3000);
     };
@@ -240,7 +304,7 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
       setTimeout(() => setShowForceUpdateProgress(false), 5000);
     };
 
-    window.addEventListener('remote:command-received', handleCommandReceived as EventListener);
+    // Removed: remote:command-received listener - no longer needed for production
     window.addEventListener('remote:command-throttled', handleCommandThrottled as EventListener);
     window.addEventListener('remote:command-completed', handleCommandCompleted as EventListener);
     window.addEventListener('remote:restart-app', handleRestartApp as EventListener);
@@ -251,7 +315,7 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
     window.addEventListener('remote:force-update', handleForceUpdate);
 
     return () => {
-      window.removeEventListener('remote:command-received', handleCommandReceived as EventListener);
+      // Removed: remote:command-received listener cleanup - no longer needed
       window.removeEventListener('remote:command-throttled', handleCommandThrottled as EventListener);
       window.removeEventListener('remote:command-completed', handleCommandCompleted as EventListener);
       window.removeEventListener('remote:restart-app', handleRestartApp as EventListener);
@@ -261,7 +325,7 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
       window.removeEventListener('remote:screenshot-captured', handleScreenshot);
       window.removeEventListener('remote:force-update', handleForceUpdate);
     };
-  }, [dispatch]);
+  }, []);
 
   // Render countdown notification
   if (countdownCommand) {
@@ -393,28 +457,6 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
     );
   }
 
-  // Render command received notification
-  if (showCommandReceived) {
-    return (
-      <Snackbar
-        open={showCommandReceived}
-        autoHideDuration={3000}
-        onClose={() => setShowCommandReceived(false)}
-        anchorOrigin={position}
-      >
-        <Alert
-          icon={<SystemUpdateIcon />}
-          severity="info"
-          onClose={() => setShowCommandReceived(false)}
-          sx={{ borderRadius: '8px' }}
-        >
-          <AlertTitle sx={{ fontWeight: 600 }}>Remote Command Received</AlertTitle>
-          Processing command: {commandReceivedType}
-        </Alert>
-      </Snackbar>
-    );
-  }
-
   // Render command throttled notification
   if (showCommandThrottled) {
     return (
@@ -455,7 +497,7 @@ const RemoteCommandNotification: React.FC<RemoteCommandNotificationProps> = ({
           <AlertTitle sx={{ fontWeight: 600 }}>
             {commandCompletedSuccess ? 'Command Completed' : 'Command Failed'}
           </AlertTitle>
-          Command {commandCompletedType} {commandCompletedSuccess ? 'executed successfully' : 'failed to execute'}.
+          {getCommandActionDescription(commandCompletedOriginalType, commandCompletedSuccess)}
         </Alert>
       </Snackbar>
     );
