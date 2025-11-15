@@ -1,16 +1,20 @@
 /**
  * Update Service
- * 
+ *
  * Provides a clean interface for handling OTA updates through Electron's
  * auto-updater. This service wraps Electron IPC calls and manages update state.
  */
 
-import logger from '../utils/logger';
-import { getCurrentVersion } from '../utils/versionManager';
+import logger from "../utils/logger";
+import { getCurrentVersion } from "../utils/versionManager";
 
 // Check if we're running in Electron
 const isElectron = () => {
-  return typeof window !== 'undefined' && window.electron !== undefined && window.electron.updater !== undefined;
+  return (
+    typeof window !== "undefined" &&
+    window.electron !== undefined &&
+    window.electron.updater !== undefined
+  );
 };
 
 export interface UpdateInfo {
@@ -24,13 +28,13 @@ export interface DownloadProgress {
   total: number;
 }
 
-export type UpdateEventType = 
-  | 'checking'
-  | 'available'
-  | 'not-available'
-  | 'downloading'
-  | 'downloaded'
-  | 'error';
+export type UpdateEventType =
+  | "checking"
+  | "available"
+  | "not-available"
+  | "downloading"
+  | "downloaded"
+  | "error";
 
 export interface UpdateEvent {
   type: UpdateEventType;
@@ -39,7 +43,8 @@ export interface UpdateEvent {
 
 class UpdateService {
   private updateListeners: Set<(event: UpdateEvent) => void> = new Set();
-  private progressListeners: Set<(progress: DownloadProgress) => void> = new Set();
+  private progressListeners: Set<(progress: DownloadProgress) => void> =
+    new Set();
   private unsubscribeFunctions: (() => void)[] = [];
 
   constructor() {
@@ -55,41 +60,49 @@ class UpdateService {
   private setupElectronListeners(): void {
     if (!window.electron?.updater) return;
 
-    logger.info('Setting up update service listeners');
+    logger.info("Setting up update service listeners");
 
     // Update available listener
-    const unsub1 = window.electron.updater.onUpdateAvailable((info: UpdateInfo) => {
-      logger.info('Update available', { version: info.version });
-      this.notifyListeners({ type: 'available', data: info });
-    });
+    const unsub1 = window.electron.updater.onUpdateAvailable(
+      (info: UpdateInfo) => {
+        logger.info("Update available", { version: info.version });
+        this.notifyListeners({ type: "available", data: info });
+      },
+    );
     this.unsubscribeFunctions.push(unsub1);
 
     // Download progress listener
-    const unsub2 = window.electron.updater.onDownloadProgress((progress: DownloadProgress) => {
-      logger.debug('Update download progress', { percent: progress.percent });
-      this.notifyListeners({ type: 'downloading', data: progress });
-      this.notifyProgressListeners(progress);
-    });
+    const unsub2 = window.electron.updater.onDownloadProgress(
+      (progress: DownloadProgress) => {
+        logger.debug("Update download progress", { percent: progress.percent });
+        this.notifyListeners({ type: "downloading", data: progress });
+        this.notifyProgressListeners(progress);
+      },
+    );
     this.unsubscribeFunctions.push(unsub2);
 
     // Update downloaded listener
-    const unsub3 = window.electron.updater.onUpdateDownloaded((info: UpdateInfo) => {
-      logger.info('Update downloaded', { version: info.version });
-      this.notifyListeners({ type: 'downloaded', data: info });
-    });
+    const unsub3 = window.electron.updater.onUpdateDownloaded(
+      (info: UpdateInfo) => {
+        logger.info("Update downloaded", { version: info.version });
+        this.notifyListeners({ type: "downloaded", data: info });
+      },
+    );
     this.unsubscribeFunctions.push(unsub3);
 
     // Update error listener
     const unsub4 = window.electron.updater.onUpdateError((error: Error) => {
-      logger.error('Update error', { error: error.message });
-      this.notifyListeners({ type: 'error', data: error });
+      logger.error("Update error", { error: error.message });
+      this.notifyListeners({ type: "error", data: error });
     });
     this.unsubscribeFunctions.push(unsub4);
 
     // Update message listener (generic messages)
-    const unsub5 = window.electron.updater.onUpdateMessage((message: string) => {
-      logger.debug('Update message', { message });
-    });
+    const unsub5 = window.electron.updater.onUpdateMessage(
+      (message: string) => {
+        logger.debug("Update message", { message });
+      },
+    );
     this.unsubscribeFunctions.push(unsub5);
   }
 
@@ -98,27 +111,30 @@ class UpdateService {
    */
   public async checkForUpdates(): Promise<boolean> {
     if (!isElectron()) {
-      logger.warn('Update check requested but not running in Electron');
+      logger.warn("Update check requested but not running in Electron");
       return false;
     }
 
     try {
-      logger.info('Checking for updates');
-      this.notifyListeners({ type: 'checking' });
+      logger.info("Checking for updates");
+      this.notifyListeners({ type: "checking" });
 
       const result = await window.electron!.updater.checkForUpdates();
-      
+
       if (result.success) {
-        logger.info('Update check completed successfully');
+        logger.info("Update check completed successfully");
         return true;
       } else {
-        logger.error('Update check failed', { error: result.error });
-        this.notifyListeners({ type: 'error', data: { message: result.error } });
+        logger.error("Update check failed", { error: result.error });
+        this.notifyListeners({
+          type: "error",
+          data: { message: result.error },
+        });
         return false;
       }
     } catch (error: any) {
-      logger.error('Error checking for updates', { error: error.message });
-      this.notifyListeners({ type: 'error', data: error });
+      logger.error("Error checking for updates", { error: error.message });
+      this.notifyListeners({ type: "error", data: error });
       return false;
     }
   }
@@ -128,26 +144,29 @@ class UpdateService {
    */
   public async downloadUpdate(): Promise<boolean> {
     if (!isElectron()) {
-      logger.warn('Update download requested but not running in Electron');
+      logger.warn("Update download requested but not running in Electron");
       return false;
     }
 
     try {
-      logger.info('Downloading update');
-      
+      logger.info("Downloading update");
+
       const result = await window.electron!.updater.downloadUpdate();
-      
+
       if (result.success) {
-        logger.info('Update download started successfully');
+        logger.info("Update download started successfully");
         return true;
       } else {
-        logger.error('Update download failed', { error: result.error });
-        this.notifyListeners({ type: 'error', data: { message: result.error } });
+        logger.error("Update download failed", { error: result.error });
+        this.notifyListeners({
+          type: "error",
+          data: { message: result.error },
+        });
         return false;
       }
     } catch (error: any) {
-      logger.error('Error downloading update', { error: error.message });
-      this.notifyListeners({ type: 'error', data: error });
+      logger.error("Error downloading update", { error: error.message });
+      this.notifyListeners({ type: "error", data: error });
       return false;
     }
   }
@@ -157,26 +176,29 @@ class UpdateService {
    */
   public async installUpdate(): Promise<boolean> {
     if (!isElectron()) {
-      logger.warn('Update install requested but not running in Electron');
+      logger.warn("Update install requested but not running in Electron");
       return false;
     }
 
     try {
-      logger.info('Installing update and restarting app');
-      
+      logger.info("Installing update and restarting app");
+
       const result = await window.electron!.updater.installUpdate();
-      
+
       if (result.success) {
-        logger.info('Update installation initiated');
+        logger.info("Update installation initiated");
         return true;
       } else {
-        logger.error('Update installation failed', { error: result.error });
-        this.notifyListeners({ type: 'error', data: { message: result.error } });
+        logger.error("Update installation failed", { error: result.error });
+        this.notifyListeners({
+          type: "error",
+          data: { message: result.error },
+        });
         return false;
       }
     } catch (error: any) {
-      logger.error('Error installing update', { error: error.message });
-      this.notifyListeners({ type: 'error', data: error });
+      logger.error("Error installing update", { error: error.message });
+      this.notifyListeners({ type: "error", data: error });
       return false;
     }
   }
@@ -186,24 +208,24 @@ class UpdateService {
    */
   public async restartApp(): Promise<boolean> {
     if (!isElectron()) {
-      logger.warn('App restart requested but not running in Electron');
+      logger.warn("App restart requested but not running in Electron");
       return false;
     }
 
     try {
-      logger.info('Restarting app');
-      
+      logger.info("Restarting app");
+
       const result = await window.electron!.updater.restartApp();
-      
+
       if (result.success) {
-        logger.info('App restart initiated');
+        logger.info("App restart initiated");
         return true;
       } else {
-        logger.error('App restart failed', { error: result.error });
+        logger.error("App restart failed", { error: result.error });
         return false;
       }
     } catch (error: any) {
-      logger.error('Error restarting app', { error: error.message });
+      logger.error("Error restarting app", { error: error.message });
       return false;
     }
   }
@@ -228,7 +250,9 @@ class UpdateService {
   /**
    * Add a listener for download progress events
    */
-  public addProgressListener(callback: (progress: DownloadProgress) => void): () => void {
+  public addProgressListener(
+    callback: (progress: DownloadProgress) => void,
+  ): () => void {
     this.progressListeners.add(callback);
     return () => {
       this.progressListeners.delete(callback);
@@ -239,11 +263,11 @@ class UpdateService {
    * Notify all update listeners
    */
   private notifyListeners(event: UpdateEvent): void {
-    this.updateListeners.forEach(listener => {
+    this.updateListeners.forEach((listener) => {
       try {
         listener(event);
       } catch (error) {
-        logger.error('Error notifying update listener', { error });
+        logger.error("Error notifying update listener", { error });
       }
     });
   }
@@ -252,11 +276,11 @@ class UpdateService {
    * Notify all progress listeners
    */
   private notifyProgressListeners(progress: DownloadProgress): void {
-    this.progressListeners.forEach(listener => {
+    this.progressListeners.forEach((listener) => {
       try {
         listener(progress);
       } catch (error) {
-        logger.error('Error notifying progress listener', { error });
+        logger.error("Error notifying progress listener", { error });
       }
     });
   }
@@ -272,8 +296,8 @@ class UpdateService {
    * Clean up resources
    */
   public cleanup(): void {
-    logger.info('Cleaning up update service');
-    this.unsubscribeFunctions.forEach(unsub => unsub());
+    logger.info("Cleaning up update service");
+    this.unsubscribeFunctions.forEach((unsub) => unsub());
     this.unsubscribeFunctions = [];
     this.updateListeners.clear();
     this.progressListeners.clear();
@@ -283,4 +307,3 @@ class UpdateService {
 // Create and export a singleton instance
 const updateService = new UpdateService();
 export default updateService;
-

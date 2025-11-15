@@ -3,11 +3,13 @@
 **Date:** October 12, 2025
 
 ## Overview
+
 This document tracks the cleanup performed on the MasjidConnect Display App repository to remove unnecessary files and organize documentation.
 
 ## Shell Scripts Removed (21 files)
 
 ### RPI Build & Installation Scripts (11 files)
+
 - `after-install.sh` - RPI post-installation script
 - `auto-update-service.sh` - RPI auto-update service
 - `build-and-install-rpi.sh` - RPI build and installation script
@@ -23,6 +25,7 @@ This document tracks the cleanup performed on the MasjidConnect Display App repo
 **Rationale:** All RPI-related scripts removed as RPI build process will be rebuilt from scratch.
 
 ### Debug & Temporary Fix Scripts (6 files)
+
 - `clear-app-data.sh` - Debug utility
 - `clear-electron-data-fix.sh` - Temporary fix script
 - `find-electron-data.sh` - Debug utility
@@ -33,6 +36,7 @@ This document tracks the cleanup performed on the MasjidConnect Display App repo
 **Rationale:** These were temporary debug scripts no longer needed.
 
 ### Development & Testing Scripts (4 files)
+
 - `create-icon.sh` - Icon generation script (icon already exists)
 - `start-production-clean.sh` - Redundant production start script
 - `start-production.sh` - Redundant production start script
@@ -43,6 +47,7 @@ This document tracks the cleanup performed on the MasjidConnect Display App repo
 ## Documentation Files Moved to docs/ (27 files)
 
 ### Optimization & Performance Documentation
+
 - `4K_OPTIMIZATION_SUMMARY.md`
 - `BUG_FIXES_SUMMARY.md`
 - `LOADING_AND_SSE_FIX_SUMMARY.md`
@@ -52,12 +57,14 @@ This document tracks the cleanup performed on the MasjidConnect Display App repo
 - `RPI_OPTIMIZATION_SUMMARY.md`
 
 ### RPI Documentation
+
 - `quick-setup-rpi.md`
 - `README-RASPBERRY-PI.md`
 - `RPI_RESTART_DEBUGGING_GUIDE.md`
 - `RPI-GETTING-STARTED.md`
 
 ### Testing Documentation
+
 - `README_TESTING.md`
 - `SKIPPED_TESTS.md`
 - `TEST_IMPLEMENTATION_SUMMARY.md`
@@ -70,6 +77,7 @@ This document tracks the cleanup performed on the MasjidConnect Display App repo
 - `TESTS_FIXED_SUMMARY.md`
 
 ### Configuration & Setup Documentation
+
 - `display-app-analytics-integration-spec.md`
 - `ELECTRON_README.md`
 - `EMERGENCY_ALERT_TIMING_FIX.md`
@@ -80,24 +88,30 @@ This document tracks the cleanup performed on the MasjidConnect Display App repo
 ## Other Cleanup
 
 ### Backup Files Removed (3 files)
+
 - `assets/icon.png.bak`
 - `electron/main.js.bak`
 - `src/styles/hardwareAcceleration.css.bak`
 
 ### Directories Removed
+
 - `rpi_debug_logs/` - Old RPI debug logs from July 2025
 
 ## Current State
 
 ### Root Directory
+
 The root directory now contains only essential files:
+
 - Core config files: `package.json`, `tsconfig.json`, `jest.config.js`, `config-overrides.js`
 - Main README: `README.md`
 - Standard directories: `src/`, `public/`, `electron/`, `scripts/`, `docs/`, `assets/`
 - Cursor rules: `app.cursorrules`
 
 ### Documentation Organization
+
 All documentation is now organized in the `docs/` folder with 40 markdown files covering:
+
 - API documentation
 - Implementation guides
 - Configuration guides
@@ -107,7 +121,9 @@ All documentation is now organized in the `docs/` folder with 40 markdown files 
 - RPI-specific guides
 
 ### Scripts Directory
+
 Kept useful scripts in `scripts/` directory:
+
 - `install-fonts.sh` - Font installation script
 - `optimize-raspberry-pi.sh` - RPI optimization script
 - `prepare-rpi-build.js` - RPI build preparation script
@@ -124,4 +140,3 @@ Kept useful scripts in `scripts/` directory:
 - Only `README.md` remains in root as the primary project documentation
 - The `scripts/` directory was preserved as it contains actively used utility scripts
 - All test files in `src/__tests__/` were kept intact
-

@@ -1,4 +1,4 @@
-import logger from './logger';
+import logger from "./logger";
 
 // Utility interfaces
 interface MemoryInfo {
@@ -36,7 +36,7 @@ export class SystemMetricsCollector {
   private lastFrameTime = Date.now();
   private currentFrameRate = 60; // Default assumption
   private contentErrors = 0;
-  private currentContent = '';
+  private currentContent = "";
   private lastContentLoadTime = 0;
 
   constructor() {
@@ -50,16 +50,16 @@ export class SystemMetricsCollector {
     const updateFrameRate = () => {
       this.frameCount++;
       const currentTime = Date.now();
-      
+
       if (currentTime - this.lastFrameTime >= 1000) {
         this.currentFrameRate = this.frameCount;
         this.frameCount = 0;
         this.lastFrameTime = currentTime;
       }
-      
+
       requestAnimationFrame(updateFrameRate);
     };
-    
+
     requestAnimationFrame(updateFrameRate);
   }
 
@@ -70,15 +70,18 @@ export class SystemMetricsCollector {
   async getCPUUsage(): Promise<number> {
     try {
       // For web apps, we can approximate CPU usage using performance metrics
-      if (typeof window !== 'undefined' && window.performance) {
+      if (typeof window !== "undefined" && window.performance) {
         const now = performance.now();
-        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-        
+        const navigation = performance.getEntriesByType(
+          "navigation",
+        )[0] as PerformanceNavigationTiming;
+
         if (navigation) {
           // Calculate processing time as a percentage of total time
-          const processingTime = navigation.loadEventEnd - navigation.fetchStart;
+          const processingTime =
+            navigation.loadEventEnd - navigation.fetchStart;
           const totalTime = now;
-          
+
           // This is a rough approximation
           const cpuUsage = Math.min((processingTime / totalTime) * 100, 100);
           return Math.max(cpuUsage, 0);
@@ -86,7 +89,7 @@ export class SystemMetricsCollector {
       }
 
       // If in Electron, try to get actual CPU usage
-      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      if (typeof window !== "undefined" && (window as any).electronAPI) {
         const electronAPI = (window as any).electronAPI;
         if (electronAPI.getCPUUsage) {
           return await electronAPI.getCPUUsage();
@@ -96,7 +99,7 @@ export class SystemMetricsCollector {
       // Fallback: estimate based on recent performance
       return this.estimateCPUFromPerformance();
     } catch (error) {
-      logger.error('Failed to get CPU usage', { error });
+      logger.error("Failed to get CPU usage", { error });
       return 0;
     }
   }
@@ -107,15 +110,17 @@ export class SystemMetricsCollector {
   private estimateCPUFromPerformance(): number {
     try {
       // Use performance observer to estimate CPU load
-      const entries = performance.getEntriesByType('measure');
+      const entries = performance.getEntriesByType("measure");
       const recentEntries = entries.slice(-10); // Last 10 measurements
-      
+
       if (recentEntries.length > 0) {
-        const avgDuration = recentEntries.reduce((sum, entry) => sum + entry.duration, 0) / recentEntries.length;
+        const avgDuration =
+          recentEntries.reduce((sum, entry) => sum + entry.duration, 0) /
+          recentEntries.length;
         // Convert to a rough CPU percentage (this is an approximation)
         return Math.min(avgDuration / 10, 100);
       }
-      
+
       return 15; // Default assumption for web apps
     } catch (error) {
       return 15;
@@ -128,24 +133,27 @@ export class SystemMetricsCollector {
   getMemoryUsage(): number {
     try {
       const nav = navigator as ExtendedNavigator;
-      
+
       // Try different memory APIs
       const memoryInfo = nav.memory || window.performance?.memory;
-      
+
       if (memoryInfo) {
         const { usedJSHeapSize, jsHeapSizeLimit } = memoryInfo;
         return (usedJSHeapSize / jsHeapSizeLimit) * 100;
       }
 
       // If in Electron, try to get system memory
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.getMemoryUsage) {
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.getMemoryUsage
+      ) {
         return (window as any).electronAPI.getMemoryUsage();
       }
 
       // Fallback estimate
       return 25; // Conservative estimate for web apps
     } catch (error) {
-      logger.error('Failed to get memory usage', { error });
+      logger.error("Failed to get memory usage", { error });
       return 25;
     }
   }
@@ -155,7 +163,7 @@ export class SystemMetricsCollector {
    */
   async getStorageUsage(): Promise<number> {
     try {
-      if ('storage' in navigator && 'estimate' in navigator.storage) {
+      if ("storage" in navigator && "estimate" in navigator.storage) {
         const estimate = await navigator.storage.estimate();
         if (estimate.usage && estimate.quota) {
           return (estimate.usage / estimate.quota) * 100;
@@ -163,13 +171,16 @@ export class SystemMetricsCollector {
       }
 
       // Fallback for older browsers or Electron
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.getStorageUsage) {
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.getStorageUsage
+      ) {
         return await (window as any).electronAPI.getStorageUsage();
       }
 
       return 10; // Conservative estimate
     } catch (error) {
-      logger.error('Failed to get storage usage', { error });
+      logger.error("Failed to get storage usage", { error });
       return 10;
     }
   }
@@ -180,21 +191,21 @@ export class SystemMetricsCollector {
   async measureNetworkLatency(): Promise<number> {
     try {
       const start = performance.now();
-      
+
       // Use the same API base URL for consistency
-      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${baseUrl}/api/ping`, { 
-        method: 'HEAD',
-        cache: 'no-cache'
+      const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:3000";
+      const response = await fetch(`${baseUrl}/api/ping`, {
+        method: "HEAD",
+        cache: "no-cache",
       });
-      
+
       if (response.ok) {
         return performance.now() - start;
       }
-      
+
       return -1; // Indicate network error
     } catch (error) {
-      logger.debug('Network latency measurement failed', { error });
+      logger.debug("Network latency measurement failed", { error });
       return -1;
     }
   }
@@ -205,15 +216,16 @@ export class SystemMetricsCollector {
   getBandwidthUsage(): number {
     try {
       const nav = navigator as ExtendedNavigator;
-      const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
-      
+      const connection =
+        nav.connection || nav.mozConnection || nav.webkitConnection;
+
       if (connection && connection.downlink) {
         return connection.downlink; // Returns Mbps
       }
-      
+
       return 0; // Unknown
     } catch (error) {
-      logger.error('Failed to get bandwidth usage', { error });
+      logger.error("Failed to get bandwidth usage", { error });
       return 0;
     }
   }
@@ -232,13 +244,16 @@ export class SystemMetricsCollector {
     try {
       // Most browsers don't allow reading screen brightness for privacy
       // In Electron, we might have access to system APIs
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.getDisplayBrightness) {
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.getDisplayBrightness
+      ) {
         return await (window as any).electronAPI.getDisplayBrightness();
       }
-      
+
       return 80; // Default assumption
     } catch (error) {
-      logger.error('Failed to get display brightness', { error });
+      logger.error("Failed to get display brightness", { error });
       return 80;
     }
   }
@@ -250,8 +265,8 @@ export class SystemMetricsCollector {
     try {
       return `${window.screen.width}x${window.screen.height}`;
     } catch (error) {
-      logger.error('Failed to get resolution', { error });
-      return '1920x1080'; // Default assumption
+      logger.error("Failed to get resolution", { error });
+      return "1920x1080"; // Default assumption
     }
   }
 
@@ -260,13 +275,16 @@ export class SystemMetricsCollector {
    */
   async getTemperature(): Promise<number | undefined> {
     try {
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.getTemperature) {
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.getTemperature
+      ) {
         return await (window as any).electronAPI.getTemperature();
       }
-      
+
       return undefined; // Not available in web browsers
     } catch (error) {
-      logger.error('Failed to get temperature', { error });
+      logger.error("Failed to get temperature", { error });
       return undefined;
     }
   }
@@ -276,13 +294,16 @@ export class SystemMetricsCollector {
    */
   async getPowerConsumption(): Promise<number | undefined> {
     try {
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.getPowerConsumption) {
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.getPowerConsumption
+      ) {
         return await (window as any).electronAPI.getPowerConsumption();
       }
-      
+
       return undefined; // Not available in web browsers
     } catch (error) {
-      logger.error('Failed to get power consumption', { error });
+      logger.error("Failed to get power consumption", { error });
       return undefined;
     }
   }
@@ -292,18 +313,21 @@ export class SystemMetricsCollector {
    */
   async getAmbientLight(): Promise<number | undefined> {
     try {
-      if ('AmbientLightSensor' in window) {
+      if ("AmbientLightSensor" in window) {
         // This is an experimental API, very limited browser support
         return undefined;
       }
-      
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.getAmbientLight) {
+
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.getAmbientLight
+      ) {
         return await (window as any).electronAPI.getAmbientLight();
       }
-      
+
       return undefined;
     } catch (error) {
-      logger.error('Failed to get ambient light', { error });
+      logger.error("Failed to get ambient light", { error });
       return undefined;
     }
   }
@@ -314,22 +338,28 @@ export class SystemMetricsCollector {
   getSignalStrength(): number {
     try {
       const nav = navigator as ExtendedNavigator;
-      const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
-      
+      const connection =
+        nav.connection || nav.mozConnection || nav.webkitConnection;
+
       if (connection && connection.effectiveType) {
         // Map connection types to approximate signal strength
         switch (connection.effectiveType) {
-          case '4g': return 90;
-          case '3g': return 70;
-          case '2g': return 50;
-          case 'slow-2g': return 30;
-          default: return 80;
+          case "4g":
+            return 90;
+          case "3g":
+            return 70;
+          case "2g":
+            return 50;
+          case "slow-2g":
+            return 30;
+          default:
+            return 80;
         }
       }
-      
+
       return 80; // Default assumption
     } catch (error) {
-      logger.error('Failed to get signal strength', { error });
+      logger.error("Failed to get signal strength", { error });
       return 80;
     }
   }
@@ -340,18 +370,19 @@ export class SystemMetricsCollector {
   getConnectionType(): string {
     try {
       const nav = navigator as ExtendedNavigator;
-      const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
-      
+      const connection =
+        nav.connection || nav.mozConnection || nav.webkitConnection;
+
       if (connection && connection.effectiveType) {
         // For web, we typically have wifi/cellular info
-        return connection.effectiveType.includes('g') ? 'cellular' : 'wifi';
+        return connection.effectiveType.includes("g") ? "cellular" : "wifi";
       }
-      
+
       // Default assumption for display apps
-      return 'wifi';
+      return "wifi";
     } catch (error) {
-      logger.error('Failed to get connection type', { error });
-      return 'wifi';
+      logger.error("Failed to get connection type", { error });
+      return "wifi";
     }
   }
 
@@ -388,4 +419,4 @@ export class SystemMetricsCollector {
 }
 
 // Create a singleton instance
-export const systemMetrics = new SystemMetricsCollector(); 
+export const systemMetrics = new SystemMetricsCollector();

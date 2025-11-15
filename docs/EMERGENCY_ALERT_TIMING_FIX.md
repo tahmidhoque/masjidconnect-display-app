@@ -68,7 +68,7 @@ export interface EmergencyAlert {
     remaining: number; // Remaining time in milliseconds (server-calculated)
     autoCloseAt: string; // ISO date string when alert should auto-close
   };
-  action?: 'show' | 'hide' | 'update'; // Action to perform
+  action?: "show" | "hide" | "update"; // Action to perform
 }
 ```
 
@@ -91,7 +91,11 @@ const timeUntilExpiry = Math.max(0, expiresAt - now);
 // NEW: Prefer timing.remaining (server-calculated)
 let timeUntilExpiry: number;
 
-if (alert.timing && typeof alert.timing.remaining === 'number' && alert.timing.remaining > 0) {
+if (
+  alert.timing &&
+  typeof alert.timing.remaining === "number" &&
+  alert.timing.remaining > 0
+) {
   // Use server-calculated remaining time (no clock sync needed!)
   timeUntilExpiry = alert.timing.remaining;
   console.log(`Using server-calculated remaining time: ${timeUntilExpiry}ms`);

@@ -63,7 +63,7 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
   const systemHealth = useSelector(selectSystemHealth);
   const networkStatus = useSelector(selectNetworkStatus);
   const activeErrors = useSelector(
-    (state: RootState) => state.errors.activeErrors
+    (state: RootState) => state.errors.activeErrors,
   );
 
   // Auto-hide logic
@@ -154,8 +154,8 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
             !networkStatus.isOnline
               ? " (Offline)"
               : !networkStatus.isApiReachable
-              ? " (API Unreachable)"
-              : ""
+                ? " (API Unreachable)"
+                : ""
           }`}
           arrow
           placement={position.includes("right") ? "left" : "right"}
@@ -273,8 +273,8 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
                   !networkStatus.isOnline
                     ? "Offline"
                     : !networkStatus.isApiReachable
-                    ? "API Unreachable"
-                    : "Connected"
+                      ? "API Unreachable"
+                      : "Connected"
                 }
                 size="small"
                 color={
@@ -329,8 +329,8 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
                   systemHealth.api === "healthy"
                     ? "success"
                     : systemHealth.api === "degraded"
-                    ? "warning"
-                    : "error"
+                      ? "warning"
+                      : "error"
                 }
                 variant="outlined"
               />
@@ -373,8 +373,8 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
                   systemHealth.memory === "healthy"
                     ? "success"
                     : systemHealth.memory === "high"
-                    ? "warning"
-                    : "error"
+                      ? "warning"
+                      : "error"
                 }
                 variant="outlined"
               />
@@ -447,7 +447,7 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
                             test: true,
                             timestamp: new Date().toISOString(),
                           },
-                        })
+                        }),
                       );
                     }}
                     sx={{ fontSize: "0.7rem" }}
@@ -469,7 +469,7 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
                             test: true,
                             timestamp: new Date().toISOString(),
                           },
-                        })
+                        }),
                       );
                     }}
                     sx={{ fontSize: "0.7rem" }}
@@ -492,7 +492,7 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
                             test: true,
                             timestamp: new Date().toISOString(),
                           },
-                        })
+                        }),
                       );
                     }}
                     sx={{ fontSize: "0.7rem" }}

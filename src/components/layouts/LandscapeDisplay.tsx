@@ -25,23 +25,23 @@ const LandscapeDisplay: React.FC = () => {
 
   // Redux selectors
   const masjidName = useSelector(
-    (state: RootState) => state.content.masjidName
+    (state: RootState) => state.content.masjidName,
   );
   const showPrayerAnnouncement = useSelector(
-    (state: RootState) => state.content.showPrayerAnnouncement
+    (state: RootState) => state.content.showPrayerAnnouncement,
   );
   const prayerAnnouncementName = useSelector(
-    (state: RootState) => state.content.prayerAnnouncementName
+    (state: RootState) => state.content.prayerAnnouncementName,
   );
   const isPrayerJamaat = useSelector(
-    (state: RootState) => state.content.isPrayerJamaat
+    (state: RootState) => state.content.isPrayerJamaat,
   );
 
   // Redux action wrapper
   const setPrayerAnnouncementHandler = (
     show: boolean,
     prayerName: string,
-    isJamaat: boolean
+    isJamaat: boolean,
   ) => {
     dispatch(setPrayerAnnouncement({ show, prayerName, isJamaat }));
   };
@@ -60,7 +60,7 @@ const LandscapeDisplay: React.FC = () => {
         `LandscapeDisplay: Prayer announcement active for ${prayerAnnouncementName}`,
         {
           isJamaat: isPrayerJamaat,
-        }
+        },
       );
     }
   }, [showPrayerAnnouncement, prayerAnnouncementName, isPrayerJamaat]);
@@ -85,7 +85,7 @@ const LandscapeDisplay: React.FC = () => {
       else prayerName = "Isha";
 
       logger.warn(
-        `No nextPrayer available, using fallback prayer name: ${prayerName}`
+        `No nextPrayer available, using fallback prayer name: ${prayerName}`,
       );
     }
 
@@ -96,7 +96,7 @@ const LandscapeDisplay: React.FC = () => {
     }
 
     logger.info(
-      `Prayer countdown complete for ${prayerName}, isJamaat: ${isJamaat}`
+      `Prayer countdown complete for ${prayerName}, isJamaat: ${isJamaat}`,
     );
 
     // Use a ref to prevent duplicate announcements for the same prayer
@@ -112,7 +112,7 @@ const LandscapeDisplay: React.FC = () => {
       // Double check that the announcement hasn't been shown already
       if (!showPrayerAnnouncement) {
         logger.info(
-          `Setting prayer announcement for ${prayerName}, isJamaat: ${isJamaat}`
+          `Setting prayer announcement for ${prayerName}, isJamaat: ${isJamaat}`,
         );
 
         try {
@@ -124,12 +124,12 @@ const LandscapeDisplay: React.FC = () => {
             if (!showPrayerAnnouncement) {
               // If state didn't update, try one more time
               logger.warn(
-                `Prayer announcement state didn't update, trying again directly`
+                `Prayer announcement state didn't update, trying again directly`,
               );
               setPrayerAnnouncementHandler(true, prayerName, isJamaat);
             } else {
               logger.info(
-                `Prayer announcement verified to be showing for ${prayerName}`
+                `Prayer announcement verified to be showing for ${prayerName}`,
               );
             }
           }, 100);

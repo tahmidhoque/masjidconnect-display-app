@@ -48,18 +48,22 @@ The API key is obtained during the screen pairing process and should be stored s
 The analytics system supports four main types of data collection:
 
 ### 1. Heartbeat Data (`type: "heartbeat"`)
+
 - **Frequency:** Every 30 seconds
 - **Purpose:** Monitor system health and performance metrics
 
 ### 2. Content View Data (`type: "content_view"`)
+
 - **Frequency:** When content starts/stops displaying
 - **Purpose:** Track content engagement and display statistics
 
 ### 3. Error Reporting (`type: "error"`)
+
 - **Frequency:** When errors occur
 - **Purpose:** Monitor system stability and identify issues
 
 ### 4. Schedule Events (`type: "schedule_event"`)
+
 - **Frequency:** When scheduled content changes
 - **Purpose:** Track schedule adherence and content transitions
 
@@ -89,27 +93,27 @@ All requests should follow this structure:
     // System Performance (REQUIRED)
     cpuUsage: number,              // CPU usage percentage (0-100)
     memoryUsage: number,           // Memory usage percentage (0-100)
-    
+
     // Storage & Network (REQUIRED)
     storageUsed: number,           // Storage used percentage (0-100)
     networkLatency: number,        // Network latency in milliseconds
     bandwidthUsage: number,        // Current bandwidth usage in Mbps
-    
+
     // Display Metrics (REQUIRED)
     frameRate: number,             // Current frame rate (fps)
     displayBrightness: number,     // Display brightness percentage (0-100)
     resolution: string,            // Current resolution (e.g., "1920x1080")
-    
+
     // Hardware Monitoring (OPTIONAL)
     temperature?: number,          // Device temperature in Celsius
     powerConsumption?: number,     // Power consumption in watts
     ambientLight?: number,         // Ambient light sensor reading (0-100)
-    
+
     // Content Information (REQUIRED)
     currentContent: string,        // ID or name of currently displayed content
     contentLoadTime: number,       // Time taken to load current content (ms)
     contentErrors: number,         // Number of content errors since last heartbeat
-    
+
     // Network Details (REQUIRED)
     signalStrength: number,        // WiFi/Network signal strength percentage (0-100)
     connectionType: string         // Connection type: "wifi", "ethernet", "cellular"
@@ -174,6 +178,7 @@ All requests should follow this structure:
 ### 1. Data Collection Timing
 
 #### Heartbeat Collection
+
 ```typescript
 // Send heartbeat every 30 seconds
 setInterval(() => {
@@ -182,6 +187,7 @@ setInterval(() => {
 ```
 
 #### Content View Tracking
+
 ```typescript
 // Track when content starts
 function onContentStart(contentId: string, contentType: string) {
@@ -191,7 +197,7 @@ function onContentStart(contentId: string, contentType: string) {
     contentId,
     contentType,
     startTime,
-    viewComplete: false
+    viewComplete: false,
   };
 }
 
@@ -199,19 +205,22 @@ function onContentStart(contentId: string, contentType: string) {
 function onContentEnd() {
   if (currentContentView) {
     const endTime = new Date().toISOString();
-    const duration = new Date(endTime).getTime() - new Date(currentContentView.startTime).getTime();
-    
+    const duration =
+      new Date(endTime).getTime() -
+      new Date(currentContentView.startTime).getTime();
+
     sendContentView({
       ...currentContentView,
       endTime,
       duration,
-      viewComplete: true
+      viewComplete: true,
     });
   }
 }
 ```
 
 #### Error Reporting
+
 ```typescript
 // Report errors immediately
 function reportError(error: Error, type: ErrorType) {
@@ -219,7 +228,7 @@ function reportError(error: Error, type: ErrorType) {
     errorType: type,
     message: error.message,
     stack: error.stack,
-    resolved: false
+    resolved: false,
   });
 }
 ```
@@ -227,14 +236,15 @@ function reportError(error: Error, type: ErrorType) {
 ### 2. System Metrics Collection
 
 #### CPU Usage (Example for Electron apps)
+
 ```typescript
 // For Electron applications
-const os = require('os');
+const os = require("os");
 
 function getCPUUsage(): Promise<number> {
   return new Promise((resolve) => {
     const startMeasure = process.cpuUsage();
-    
+
     setTimeout(() => {
       const endMeasure = process.cpuUsage(startMeasure);
       const totalUsage = endMeasure.user + endMeasure.system;
@@ -246,6 +256,7 @@ function getCPUUsage(): Promise<number> {
 ```
 
 #### Memory Usage
+
 ```typescript
 function getMemoryUsage(): number {
   const totalMem = os.totalmem();
@@ -256,11 +267,12 @@ function getMemoryUsage(): number {
 ```
 
 #### Network Latency
+
 ```typescript
 async function measureNetworkLatency(): Promise<number> {
   const start = Date.now();
   try {
-    await fetch('/api/ping', { method: 'HEAD' });
+    await fetch("/api/ping", { method: "HEAD" });
     return Date.now() - start;
   } catch (error) {
     return -1; // Indicate network error
@@ -271,6 +283,7 @@ async function measureNetworkLatency(): Promise<number> {
 ### 3. Display Metrics
 
 #### Frame Rate Monitoring
+
 ```typescript
 let frameCount = 0;
 let lastFrameTime = Date.now();
@@ -278,14 +291,14 @@ let lastFrameTime = Date.now();
 function updateFrameRate() {
   frameCount++;
   const currentTime = Date.now();
-  
+
   if (currentTime - lastFrameTime >= 1000) {
     const fps = frameCount;
     frameCount = 0;
     lastFrameTime = currentTime;
     return fps;
   }
-  
+
   requestAnimationFrame(updateFrameRate);
 }
 ```
@@ -293,18 +306,19 @@ function updateFrameRate() {
 ### 4. Content Tracking
 
 #### Content Load Time
+
 ```typescript
 async function loadContent(contentId: string): Promise<void> {
   const startTime = Date.now();
-  
+
   try {
     await fetchAndDisplayContent(contentId);
     const loadTime = Date.now() - startTime;
-    
+
     // Include load time in next heartbeat
     lastContentLoadTime = loadTime;
   } catch (error) {
-    reportError(error, 'CONTENT');
+    reportError(error, "CONTENT");
   }
 }
 ```
@@ -314,26 +328,32 @@ async function loadContent(contentId: string): Promise<void> {
 ## Error Handling
 
 ### Network Errors
+
 - Implement retry logic with exponential backoff
 - Queue data locally if network is unavailable
 - Send queued data when connection is restored
 
 ### Data Validation
+
 - Validate all data before sending
 - Ensure timestamps are in ISO 8601 format
 - Check that numeric values are within expected ranges
 
 ### Example Error Handling
+
 ```typescript
-async function sendAnalyticsData(data: AnalyticsData, retries = 3): Promise<void> {
+async function sendAnalyticsData(
+  data: AnalyticsData,
+  retries = 3,
+): Promise<void> {
   try {
-    const response = await fetch('/api/displays/heartbeat', {
-      method: 'POST',
+    const response = await fetch("/api/displays/heartbeat", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_KEY}`,
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
@@ -347,7 +367,7 @@ async function sendAnalyticsData(data: AnalyticsData, retries = 3): Promise<void
     } else {
       // Queue for later or log error
       queueFailedData(data);
-      console.error('Failed to send analytics data:', error);
+      console.error("Failed to send analytics data:", error);
     }
   }
 }
@@ -365,7 +385,7 @@ class AnalyticsManager {
   private baseUrl: string;
   private heartbeatInterval: NodeJS.Timeout;
   private contentErrors = 0;
-  private currentContent = '';
+  private currentContent = "";
   private lastContentLoadTime = 0;
 
   constructor(apiKey: string, baseUrl: string) {
@@ -383,9 +403,9 @@ class AnalyticsManager {
   private async sendHeartbeat() {
     try {
       const heartbeatData = await this.collectHeartbeatData();
-      await this.sendData('heartbeat', heartbeatData);
+      await this.sendData("heartbeat", heartbeatData);
     } catch (error) {
-      console.error('Failed to send heartbeat:', error);
+      console.error("Failed to send heartbeat:", error);
     }
   }
 
@@ -406,36 +426,36 @@ class AnalyticsManager {
       signalStrength: await this.getSignalStrength(),
       connectionType: this.getConnectionType(),
       powerConsumption: await this.getPowerConsumption(),
-      ambientLight: await this.getAmbientLight()
+      ambientLight: await this.getAmbientLight(),
     };
   }
 
   public async sendContentView(data: ContentViewData) {
-    await this.sendData('content_view', data);
+    await this.sendData("content_view", data);
   }
 
   public async sendError(data: ErrorData) {
-    await this.sendData('error', data);
+    await this.sendData("error", data);
   }
 
   public async sendScheduleEvent(data: ScheduleEventData) {
-    await this.sendData('schedule_event', data);
+    await this.sendData("schedule_event", data);
   }
 
   private async sendData(type: string, data: any) {
     const payload = {
       type,
       timestamp: new Date().toISOString(),
-      data
+      data,
     };
 
     const response = await fetch(`${this.baseUrl}/api/displays/heartbeat`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -467,10 +487,10 @@ const analytics = new AnalyticsManager(screenApiKey, backendUrl);
 // Track content changes
 function displayContent(contentId: string, contentType: string) {
   const startTime = new Date().toISOString();
-  
+
   // Display the content
   showContent(contentId);
-  
+
   // Track the view
   setTimeout(() => {
     analytics.sendContentView({
@@ -479,30 +499,30 @@ function displayContent(contentId: string, contentType: string) {
       startTime,
       endTime: new Date().toISOString(),
       duration: 5000, // 5 seconds
-      viewComplete: true
+      viewComplete: true,
     });
   }, 5000);
 }
 
 // Report errors
-window.addEventListener('error', (event) => {
+window.addEventListener("error", (event) => {
   analytics.sendError({
-    errorType: 'SYSTEM',
+    errorType: "SYSTEM",
     message: event.error.message,
     stack: event.error.stack,
-    resolved: false
+    resolved: false,
   });
 });
 
 // Track schedule events
 function onScheduleChange(scheduleId: string, contentId: string) {
   analytics.sendScheduleEvent({
-    eventType: 'content_change',
+    eventType: "content_change",
     scheduleId,
     contentId,
     expectedStartTime: new Date().toISOString(),
     actualStartTime: new Date().toISOString(),
-    delay: 0
+    delay: 0,
   });
 }
 ```
@@ -512,22 +532,26 @@ function onScheduleChange(scheduleId: string, contentId: string) {
 ## Testing Guidelines
 
 ### 1. Development Testing
+
 - Test against local backend: `http://localhost:3000`
 - Verify all data types are sent correctly
 - Check authentication with valid API keys
 - Test error scenarios and retry logic
 
 ### 2. Data Validation Testing
+
 - Ensure all required fields are present
 - Verify data types and ranges
 - Test with invalid data to ensure proper error handling
 
 ### 3. Performance Testing
+
 - Monitor impact of analytics collection on display performance
 - Test under various network conditions
 - Verify heartbeat timing accuracy
 
 ### 4. Integration Testing
+
 - Verify data appears correctly in admin dashboard
 - Test analytics filtering and time range selection
 - Confirm all metrics are calculated correctly
@@ -560,8 +584,8 @@ For development, implement a debug mode that logs all analytics data before send
 
 ```typescript
 if (DEBUG_MODE) {
-  console.log('Sending analytics data:', JSON.stringify(payload, null, 2));
+  console.log("Sending analytics data:", JSON.stringify(payload, null, 2));
 }
 ```
 
-This specification should provide the display app development team with all necessary information to implement comprehensive analytics and heartbeat functionality that integrates seamlessly with the MasjidConnect backend system. 
+This specification should provide the display app development team with all necessary information to implement comprehensive analytics and heartbeat functionality that integrates seamlessly with the MasjidConnect backend system.

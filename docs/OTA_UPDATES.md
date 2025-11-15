@@ -41,6 +41,7 @@ The update system consists of several components:
 ```
 
 Version follows semantic versioning (MAJOR.MINOR.PATCH):
+
 - MAJOR: Breaking changes
 - MINOR: New features, backward-compatible
 - PATCH: Bug fixes, backward-compatible
@@ -48,17 +49,20 @@ Version follows semantic versioning (MAJOR.MINOR.PATCH):
 ### Step 2: Prepare the Release
 
 1. Commit version changes:
+
 ```sh
 git add package.json
 git commit -m "Bump version to 0.1.1"
 ```
 
 2. Tag the release:
+
 ```sh
 git tag v0.1.1
 ```
 
 3. Push changes and tags:
+
 ```sh
 git push
 git push --tags
@@ -67,16 +71,19 @@ git push --tags
 ### Step 3: Build and Publish
 
 1. Set up GitHub authentication:
+
 ```sh
 export GH_TOKEN=your_github_token
 ```
 
 2. Build and publish:
+
 ```sh
 npm run electron:build:publish
 ```
 
 This command:
+
 - Builds the React app
 - Packages the Electron app for all configured platforms
 - Uploads artifacts to GitHub Releases
@@ -102,6 +109,7 @@ This command:
 Before publishing a production release:
 
 1. Test with a pre-release version:
+
 ```json
 {
   "version": "0.1.1-beta.1"
@@ -109,6 +117,7 @@ Before publishing a production release:
 ```
 
 2. Build and publish the beta:
+
 ```sh
 npm run electron:build:publish
 ```
@@ -152,10 +161,10 @@ setInterval(() => {
 }, UPDATE_CHECK_INTERVAL);
 
 // Configure auto download behavior
-autoUpdater.autoDownload = true;           // Download updates automatically
-autoUpdater.allowDowngrade = false;        // Prevent downgrading to older versions
-autoUpdater.allowPrerelease = false;       // Ignore pre-release versions
-autoUpdater.autoInstallOnAppQuit = true;   // Install when app quits
+autoUpdater.autoDownload = true; // Download updates automatically
+autoUpdater.allowDowngrade = false; // Prevent downgrading to older versions
+autoUpdater.allowPrerelease = false; // Ignore pre-release versions
+autoUpdater.autoInstallOnAppQuit = true; // Install when app quits
 ```
 
 ## Troubleshooting Updates
@@ -185,6 +194,7 @@ Update logs are available in the app's log files:
 - **Linux/Raspberry Pi**: `~/.config/masjidconnect-display-app/logs/main.log`
 
 The logs contain detailed information about the update process, including:
+
 - Update check timestamps
 - Available updates
 - Download progress
@@ -219,4 +229,4 @@ Potential enhancements to the update system:
 
 - [Electron Builder Documentation](https://www.electron.build/)
 - [electron-updater API](https://www.electron.build/auto-update)
-- [GitHub Releases Documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases) 
+- [GitHub Releases Documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)

@@ -5,12 +5,18 @@
  * particularly for integrating notifications into the footer.
  */
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
+} from "react";
 
 export interface Notification {
   id: string;
   key?: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: "info" | "success" | "warning" | "error";
   title: string;
   message: string;
   icon?: ReactNode;
@@ -25,12 +31,14 @@ export interface Notification {
 
 interface NotificationContextType {
   notifications: Notification[];
-  addNotification: (notification: Omit<Notification, 'id'>) => string;
+  addNotification: (notification: Omit<Notification, "id">) => string;
   removeNotification: (id: string) => void;
   getCurrentNotification: () => Notification | null;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined,
+);
 
 export const useNotifications = (): NotificationContextType => {
   const context = useContext(NotificationContext);
@@ -38,7 +46,7 @@ export const useNotifications = (): NotificationContextType => {
     // Return a safe default instead of throwing, to handle cases where provider isn't available yet
     return {
       notifications: [],
-      addNotification: () => '',
+      addNotification: () => "",
       removeNotification: () => {},
       getCurrentNotification: () => null,
     };
@@ -50,40 +58,50 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({
+  children,
+}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
-    const id = `notification-${Date.now()}-${Math.random()}`;
-    const newNotification: Notification = {
-      ...notification,
-      id,
-      autoHide: notification.autoHide ?? 3000,
-    };
+  const addNotification = useCallback(
+    (notification: Omit<Notification, "id">) => {
+      const id = `notification-${Date.now()}-${Math.random()}`;
+      const newNotification: Notification = {
+        ...notification,
+        id,
+        autoHide: notification.autoHide ?? 3000,
+      };
 
-    setNotifications((prev) => {
-      // If notification has a key, replace existing notification with same key
-      if (notification.key) {
-        return [...prev.filter((n) => n.key !== notification.key), newNotification];
+      setNotifications((prev) => {
+        // If notification has a key, replace existing notification with same key
+        if (notification.key) {
+          return [
+            ...prev.filter((n) => n.key !== notification.key),
+            newNotification,
+          ];
+        }
+        return [...prev, newNotification];
+      });
+
+      if (newNotification.autoHide && newNotification.autoHide > 0) {
+        setTimeout(() => {
+          removeNotification(id);
+        }, newNotification.autoHide);
       }
-      return [...prev, newNotification];
-    });
 
-    if (newNotification.autoHide && newNotification.autoHide > 0) {
-      setTimeout(() => {
-        removeNotification(id);
-      }, newNotification.autoHide);
-    }
-
-    return id;
-  }, []);
+      return id;
+    },
+    [],
+  );
 
   const removeNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
   const getCurrentNotification = useCallback(() => {
-    return notifications.length > 0 ? notifications[notifications.length - 1] : null;
+    return notifications.length > 0
+      ? notifications[notifications.length - 1]
+      : null;
   }, [notifications]);
 
   return (
@@ -99,4 +117,3 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     </NotificationContext.Provider>
   );
 };
-

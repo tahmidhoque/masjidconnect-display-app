@@ -1,5 +1,5 @@
 // Log levels
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 // Log entry interface
 interface LogEntry {
@@ -20,7 +20,11 @@ const MAX_LOG_HISTORY = 100;
  * @param message Log message
  * @param data Additional data to include in the log
  */
-export function log(level: LogLevel, message: string, data: Record<string, any> = {}): void {
+export function log(
+  level: LogLevel,
+  message: string,
+  data: Record<string, any> = {},
+): void {
   // Create log entry
   const logEntry: LogEntry = {
     timestamp: new Date().toISOString(),
@@ -30,7 +34,7 @@ export function log(level: LogLevel, message: string, data: Record<string, any> 
   };
 
   // Add screenId if available in localStorage
-  const screenId = localStorage.getItem('masjid_screen_id');
+  const screenId = localStorage.getItem("masjid_screen_id");
   if (screenId) {
     logEntry.screenId = screenId;
   }
@@ -43,21 +47,21 @@ export function log(level: LogLevel, message: string, data: Record<string, any> 
 
   // Output to console with appropriate styling
   const logString = JSON.stringify(logEntry);
-  
+
   switch (level) {
-    case 'debug':
-      console.debug(`%c${logString}`, 'color: gray');
+    case "debug":
+      console.debug(`%c${logString}`, "color: gray");
       break;
-    case 'info':
-      console.info(`%c${logString}`, 'color: blue');
+    case "info":
+      console.info(`%c${logString}`, "color: blue");
       break;
-    case 'warn':
-      console.warn(`%c${logString}`, 'color: orange');
+    case "warn":
+      console.warn(`%c${logString}`, "color: orange");
       break;
-    case 'error':
-      console.error(`%c${logString}`, 'color: red');
+    case "error":
+      console.error(`%c${logString}`, "color: red");
       // Store last error for heartbeat
-      if (typeof data.error === 'string') {
+      if (typeof data.error === "string") {
         setLastError(`${message}: ${data.error}`);
       } else {
         setLastError(message);
@@ -72,7 +76,7 @@ export function log(level: LogLevel, message: string, data: Record<string, any> 
  */
 export function setLastError(errorMessage: string): void {
   // Store in localStorage for persistence
-  localStorage.setItem('masjid_last_error', errorMessage);
+  localStorage.setItem("masjid_last_error", errorMessage);
 }
 
 /**
@@ -80,7 +84,7 @@ export function setLastError(errorMessage: string): void {
  * @returns Last error message or null
  */
 export function getLastError(): string | null {
-  return localStorage.getItem('masjid_last_error');
+  return localStorage.getItem("masjid_last_error");
 }
 
 /**
@@ -99,10 +103,14 @@ export function clearLogHistory(): void {
 }
 
 // Convenience methods
-export const debug = (message: string, data: Record<string, any> = {}): void => log('debug', message, data);
-export const info = (message: string, data: Record<string, any> = {}): void => log('info', message, data);
-export const warn = (message: string, data: Record<string, any> = {}): void => log('warn', message, data);
-export const error = (message: string, data: Record<string, any> = {}): void => log('error', message, data);
+export const debug = (message: string, data: Record<string, any> = {}): void =>
+  log("debug", message, data);
+export const info = (message: string, data: Record<string, any> = {}): void =>
+  log("info", message, data);
+export const warn = (message: string, data: Record<string, any> = {}): void =>
+  log("warn", message, data);
+export const error = (message: string, data: Record<string, any> = {}): void =>
+  log("error", message, data);
 
 export default {
   log,
@@ -114,4 +122,4 @@ export default {
   clearLogHistory,
   getLastError,
   setLastError,
-}; 
+};

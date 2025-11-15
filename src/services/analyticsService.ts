@@ -7,20 +7,20 @@ import {
   AnalyticsResponse,
   ErrorType,
   ScheduleEventType,
-} from '../api/models';
-import { systemMetrics } from '../utils/systemMetrics';
-import logger from '../utils/logger';
-import localforage from 'localforage';
-import masjidDisplayClient from '../api/masjidDisplayClient';
-import { RemoteCommandResponse } from './remoteControlService';
-import updateProgressService from './updateProgressService';
+} from "../api/models";
+import { systemMetrics } from "../utils/systemMetrics";
+import logger from "../utils/logger";
+import localforage from "localforage";
+import masjidDisplayClient from "../api/masjidDisplayClient";
+import { RemoteCommandResponse } from "./remoteControlService";
+import updateProgressService from "./updateProgressService";
 
 // Analytics configuration
 const ANALYTICS_CONFIG = {
   HEARTBEAT_INTERVAL: 30000, // 30 seconds as specified
   MAX_RETRY_ATTEMPTS: 3,
   RETRY_DELAYS: [1000, 2000, 4000], // Exponential backoff: 1s, 2s, 4s
-  QUEUE_STORAGE_KEY: 'analytics_queue',
+  QUEUE_STORAGE_KEY: "analytics_queue",
   MAX_QUEUE_SIZE: 100,
 };
 
@@ -44,7 +44,7 @@ export class AnalyticsService {
   private isProcessingQueue = false;
 
   constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    this.baseUrl = process.env.REACT_APP_API_URL || "http://localhost:3000";
     this.loadQueueFromStorage();
   }
 
@@ -54,15 +54,15 @@ export class AnalyticsService {
   async initialize(apiKey: string): Promise<void> {
     this.apiKey = apiKey;
     this.isInitialized = true;
-    
-    logger.info('Analytics service initialized', { hasApiKey: !!apiKey });
-    
+
+    logger.info("Analytics service initialized", { hasApiKey: !!apiKey });
+
     // Initialize update progress service
     updateProgressService.initialize();
-    
+
     // Start heartbeat collection
     this.startHeartbeat();
-    
+
     // Process any queued data
     await this.processQueue();
   }
@@ -75,9 +75,9 @@ export class AnalyticsService {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
-    
+
     this.isInitialized = false;
-    logger.info('Analytics service stopped');
+    logger.info("Analytics service stopped");
   }
 
   /**
@@ -87,11 +87,11 @@ export class AnalyticsService {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
-    
+
     this.heartbeatInterval = setInterval(async () => {
       await this.sendHeartbeat();
     }, ANALYTICS_CONFIG.HEARTBEAT_INTERVAL);
-    
+
     // Send initial heartbeat immediately
     setTimeout(() => this.sendHeartbeat(), 1000);
   }
@@ -102,20 +102,24 @@ export class AnalyticsService {
   private async sendHeartbeat(): Promise<void> {
     try {
       const heartbeatData = await this.collectHeartbeatData();
-      const result = await this.sendAnalyticsData('heartbeat', heartbeatData);
-      
+      const result = await this.sendAnalyticsData("heartbeat", heartbeatData);
+
       // If heartbeat was sent successfully and contained command responses, clear them
-      if (result && heartbeatData.commandResponses && heartbeatData.commandResponses.length > 0) {
+      if (
+        result &&
+        heartbeatData.commandResponses &&
+        heartbeatData.commandResponses.length > 0
+      ) {
         this.clearSentCommandResponses();
-        logger.debug('Cleared sent command responses', { 
-          count: heartbeatData.commandResponses.length 
+        logger.debug("Cleared sent command responses", {
+          count: heartbeatData.commandResponses.length,
         });
       }
-      
+
       // Reset content errors after successful heartbeat
       systemMetrics.resetContentErrors();
     } catch (error) {
-      logger.error('Failed to send heartbeat', { error });
+      logger.error("Failed to send heartbeat", { error });
     }
   }
 
@@ -125,23 +129,25 @@ export class AnalyticsService {
   private async getAppVersion(): Promise<string> {
     try {
       // Try to get version from Electron app
-      if (typeof window !== 'undefined' && window.electron?.app?.getVersion) {
+      if (typeof window !== "undefined" && window.electron?.app?.getVersion) {
         const version = await window.electron.app.getVersion();
-        return version || process.env.REACT_APP_VERSION || 'unknown';
+        return version || process.env.REACT_APP_VERSION || "unknown";
       }
-      
+
       // Fallback to environment variable
-      return process.env.REACT_APP_VERSION || 'unknown';
+      return process.env.REACT_APP_VERSION || "unknown";
     } catch (error) {
-      logger.error('Failed to get app version', { error });
-      return process.env.REACT_APP_VERSION || 'unknown';
+      logger.error("Failed to get app version", { error });
+      return process.env.REACT_APP_VERSION || "unknown";
     }
   }
 
   /**
    * Collect comprehensive heartbeat data
    */
-  private async collectHeartbeatData(): Promise<HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] }> {
+  private async collectHeartbeatData(): Promise<
+    HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] }
+  > {
     const [
       cpuUsage,
       storageUsed,
@@ -167,62 +173,69 @@ export class AnalyticsService {
     const appVersion = await this.getAppVersion();
 
     // Get platform information
-    const platform = typeof window !== 'undefined' ? window.navigator.platform : 'unknown';
-    
+    const platform =
+      typeof window !== "undefined" ? window.navigator.platform : "unknown";
+
     // Get electron version
-    const electronVersion = typeof window !== 'undefined' && window.electron?.versions?.electron
-      ? window.electron.versions.electron
-      : undefined;
+    const electronVersion =
+      typeof window !== "undefined" && window.electron?.versions?.electron
+        ? window.electron.versions.electron
+        : undefined;
 
     // Get update progress if available - extract just the progress number
     const updateProgressObj = updateProgressService.getProgress();
-    const updateProgress = updateProgressObj?.progress !== undefined ? updateProgressObj.progress : undefined;
+    const updateProgress =
+      updateProgressObj?.progress !== undefined
+        ? updateProgressObj.progress
+        : undefined;
 
-    const heartbeatData: HeartbeatAnalyticsData & { commandResponses?: RemoteCommandResponse[] } = {
+    const heartbeatData: HeartbeatAnalyticsData & {
+      commandResponses?: RemoteCommandResponse[];
+    } = {
       // Application Information (REQUIRED)
       appVersion,
       platform,
       ...(electronVersion && { electronVersion }),
-      
+
       // System Performance (REQUIRED)
       cpuUsage,
       memoryUsage: systemMetrics.getMemoryUsage(),
-      
+
       // Storage & Network (REQUIRED)
       storageUsed,
       networkLatency: Math.max(networkLatency, 0), // Ensure non-negative
       bandwidthUsage: systemMetrics.getBandwidthUsage(),
-      
+
       // Display Metrics (REQUIRED)
       frameRate: systemMetrics.getFrameRate(),
       displayBrightness,
       resolution: systemMetrics.getResolution(),
-      
+
       // Hardware Monitoring (OPTIONAL)
       ...(temperature !== undefined && { temperature }),
       ...(powerConsumption !== undefined && { powerConsumption }),
       ...(ambientLight !== undefined && { ambientLight }),
-      
+
       // Content Information (REQUIRED)
-      currentContent: systemMetrics.getCurrentContent() || 'none',
+      currentContent: systemMetrics.getCurrentContent() || "none",
       contentLoadTime: systemMetrics.getContentLoadTime(),
       contentErrors: systemMetrics.getContentErrors(),
-      
+
       // Network Details (REQUIRED)
       signalStrength: systemMetrics.getSignalStrength(),
       connectionType: systemMetrics.getConnectionType(),
-      
+
       // Update Progress (OPTIONAL - included when available, as number 0-100)
       ...(updateProgress !== undefined && { updateProgress }),
-      
+
       // Command Responses (OPTIONAL - included if any pending)
       ...(commandResponses.length > 0 && { commandResponses }),
     };
 
-    logger.debug('Collected heartbeat data', { 
+    logger.debug("Collected heartbeat data", {
       appVersion,
       platform,
-      cpuUsage, 
+      cpuUsage,
       memoryUsage: heartbeatData.memoryUsage,
       currentContent: heartbeatData.currentContent,
       commandResponseCount: commandResponses.length,
@@ -237,32 +250,32 @@ export class AnalyticsService {
    * Send content view analytics
    */
   async sendContentView(data: ContentViewAnalyticsData): Promise<void> {
-    await this.sendAnalyticsData('content_view', data);
+    await this.sendAnalyticsData("content_view", data);
   }
 
   /**
    * Send error analytics
    */
   async sendError(data: ErrorAnalyticsData): Promise<void> {
-    await this.sendAnalyticsData('error', data);
+    await this.sendAnalyticsData("error", data);
   }
 
   /**
    * Send schedule event analytics
    */
   async sendScheduleEvent(data: ScheduleEventAnalyticsData): Promise<void> {
-    await this.sendAnalyticsData('schedule_event', data);
+    await this.sendAnalyticsData("schedule_event", data);
   }
 
   /**
    * Helper method to create and send analytics data
    */
   private async sendAnalyticsData(
-    type: AnalyticsRequest['type'], 
-    data: any
+    type: AnalyticsRequest["type"],
+    data: any,
   ): Promise<boolean> {
     if (!this.isInitialized || !this.apiKey) {
-      logger.warn('Analytics service not initialized, queuing data', { type });
+      logger.warn("Analytics service not initialized, queuing data", { type });
       await this.queueData(type, data);
       return false;
     }
@@ -275,10 +288,10 @@ export class AnalyticsService {
 
     try {
       await this.sendToAPI(analyticsRequest);
-      logger.debug('Analytics data sent successfully', { type });
+      logger.debug("Analytics data sent successfully", { type });
       return true;
     } catch (error) {
-      logger.error('Failed to send analytics data', { type, error });
+      logger.error("Failed to send analytics data", { type, error });
       await this.queueData(type, data);
       return false;
     }
@@ -287,16 +300,21 @@ export class AnalyticsService {
   /**
    * Send data to the analytics API
    */
-  private async sendToAPI(request: AnalyticsRequest, retryCount = 0): Promise<AnalyticsResponse> {
+  private async sendToAPI(
+    request: AnalyticsRequest,
+    retryCount = 0,
+  ): Promise<AnalyticsResponse> {
     if (!this.apiKey) {
-      throw new Error('No API key available');
+      throw new Error("No API key available");
     }
 
     // Use the API client's sendAnalyticsData method
     const result = await masjidDisplayClient.sendAnalyticsData(request);
 
     if (!result.success) {
-      throw new Error(`Analytics API error: ${result.error || 'Unknown error'}`);
+      throw new Error(
+        `Analytics API error: ${result.error || "Unknown error"}`,
+      );
     }
 
     return result.data || { success: true };
@@ -305,7 +323,10 @@ export class AnalyticsService {
   /**
    * Queue data for later sending
    */
-  private async queueData(type: AnalyticsRequest['type'], data: any): Promise<void> {
+  private async queueData(
+    type: AnalyticsRequest["type"],
+    data: any,
+  ): Promise<void> {
     const queueItem: QueuedAnalyticsData = {
       id: `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       data: {
@@ -325,7 +346,10 @@ export class AnalyticsService {
     }
 
     await this.saveQueueToStorage();
-    logger.debug('Analytics data queued', { type, queueSize: this.queue.length });
+    logger.debug("Analytics data queued", {
+      type,
+      queueSize: this.queue.length,
+    });
   }
 
   /**
@@ -345,28 +369,35 @@ export class AnalyticsService {
       for (const item of itemsToProcess) {
         try {
           await this.sendToAPI(item.data);
-          logger.debug('Queued analytics data sent successfully', { id: item.id, type: item.data.type });
+          logger.debug("Queued analytics data sent successfully", {
+            id: item.id,
+            type: item.data.type,
+          });
         } catch (error) {
           item.retryCount++;
-          
+
           if (item.retryCount < ANALYTICS_CONFIG.MAX_RETRY_ATTEMPTS) {
             // Re-queue with backoff
-            const delay = ANALYTICS_CONFIG.RETRY_DELAYS[item.retryCount - 1] || ANALYTICS_CONFIG.RETRY_DELAYS[ANALYTICS_CONFIG.RETRY_DELAYS.length - 1];
+            const delay =
+              ANALYTICS_CONFIG.RETRY_DELAYS[item.retryCount - 1] ||
+              ANALYTICS_CONFIG.RETRY_DELAYS[
+                ANALYTICS_CONFIG.RETRY_DELAYS.length - 1
+              ];
             setTimeout(() => {
               this.queue.push(item);
             }, delay);
-            
-            logger.debug('Analytics data queued for retry', { 
-              id: item.id, 
+
+            logger.debug("Analytics data queued for retry", {
+              id: item.id,
               type: item.data.type,
               retryCount: item.retryCount,
-              delay 
+              delay,
             });
           } else {
-            logger.error('Analytics data dropped after max retries', { 
-              id: item.id, 
+            logger.error("Analytics data dropped after max retries", {
+              id: item.id,
               type: item.data.type,
-              error 
+              error,
             });
           }
         }
@@ -385,7 +416,7 @@ export class AnalyticsService {
     try {
       await localforage.setItem(ANALYTICS_CONFIG.QUEUE_STORAGE_KEY, this.queue);
     } catch (error) {
-      logger.error('Failed to save analytics queue to storage', { error });
+      logger.error("Failed to save analytics queue to storage", { error });
     }
   }
 
@@ -394,13 +425,17 @@ export class AnalyticsService {
    */
   private async loadQueueFromStorage(): Promise<void> {
     try {
-      const savedQueue = await localforage.getItem<QueuedAnalyticsData[]>(ANALYTICS_CONFIG.QUEUE_STORAGE_KEY);
+      const savedQueue = await localforage.getItem<QueuedAnalyticsData[]>(
+        ANALYTICS_CONFIG.QUEUE_STORAGE_KEY,
+      );
       if (savedQueue && Array.isArray(savedQueue)) {
         this.queue = savedQueue;
-        logger.info('Loaded analytics queue from storage', { queueSize: this.queue.length });
+        logger.info("Loaded analytics queue from storage", {
+          queueSize: this.queue.length,
+        });
       }
     } catch (error) {
-      logger.error('Failed to load analytics queue from storage', { error });
+      logger.error("Failed to load analytics queue from storage", { error });
     }
   }
 
@@ -427,7 +462,7 @@ export class AnalyticsService {
     message: string,
     errorCode?: string,
     stack?: string,
-    resolved = false
+    resolved = false,
   ): Promise<void> {
     const errorData: ErrorAnalyticsData = {
       errorType,
@@ -448,13 +483,15 @@ export class AnalyticsService {
     expectedStartTime: string,
     actualStartTime: string,
     scheduleId?: string,
-    contentId?: string
+    contentId?: string,
   ): Promise<void> {
     const eventData: ScheduleEventAnalyticsData = {
       eventType,
       expectedStartTime,
       actualStartTime,
-      delay: new Date(actualStartTime).getTime() - new Date(expectedStartTime).getTime(),
+      delay:
+        new Date(actualStartTime).getTime() -
+        new Date(expectedStartTime).getTime(),
       ...(scheduleId && { scheduleId }),
       ...(contentId && { contentId }),
     };
@@ -467,22 +504,27 @@ export class AnalyticsService {
    */
   private getPendingCommandResponses(): RemoteCommandResponse[] {
     try {
-      const storedResponses = localStorage.getItem('pending_command_responses');
+      const storedResponses = localStorage.getItem("pending_command_responses");
       if (!storedResponses) {
         return [];
       }
-      
+
       const responses = JSON.parse(storedResponses) as RemoteCommandResponse[];
-      
+
       // Validate that it's an array
       if (!Array.isArray(responses)) {
-        logger.warn('AnalyticsService: Invalid command responses format in localStorage');
+        logger.warn(
+          "AnalyticsService: Invalid command responses format in localStorage",
+        );
         return [];
       }
-      
+
       return responses;
     } catch (error) {
-      logger.error('AnalyticsService: Error retrieving pending command responses', { error });
+      logger.error(
+        "AnalyticsService: Error retrieving pending command responses",
+        { error },
+      );
       return [];
     }
   }
@@ -492,10 +534,12 @@ export class AnalyticsService {
    */
   private clearSentCommandResponses(): void {
     try {
-      localStorage.removeItem('pending_command_responses');
-      logger.debug('AnalyticsService: Cleared sent command responses');
+      localStorage.removeItem("pending_command_responses");
+      logger.debug("AnalyticsService: Cleared sent command responses");
     } catch (error) {
-      logger.error('AnalyticsService: Error clearing sent command responses', { error });
+      logger.error("AnalyticsService: Error clearing sent command responses", {
+        error,
+      });
     }
   }
 
@@ -520,4 +564,4 @@ export class AnalyticsService {
 }
 
 // Create singleton instance
-export const analyticsService = new AnalyticsService(); 
+export const analyticsService = new AnalyticsService();

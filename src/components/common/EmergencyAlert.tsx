@@ -32,10 +32,10 @@ import EmergencyAlertOverlay from "./EmergencyAlertOverlay";
  */
 const EmergencyAlert: React.FC = () => {
   const hasActiveAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert !== null
+    (state: RootState) => state.emergency.currentAlert !== null,
   );
   const currentAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert
+    (state: RootState) => state.emergency.currentAlert,
   );
   const [visible, setVisible] = useState(false);
   const [delayedVisible, setDelayedVisible] = useState(false);

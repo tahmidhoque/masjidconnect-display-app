@@ -41,23 +41,23 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
   // Redux selectors
   const isAuthenticated = useSelector(
-    (state: RootState) => state.auth.isAuthenticated
+    (state: RootState) => state.auth.isAuthenticated,
   );
   const orientation = useSelector((state: RootState) => state.ui.orientation);
   const masjidName = useSelector(
-    (state: RootState) => state.content.masjidName
+    (state: RootState) => state.content.masjidName,
   );
   const contentLoading = useSelector(
-    (state: RootState) => state.content.isLoading
+    (state: RootState) => state.content.isLoading,
   );
   const loadingMessage = useSelector(
-    (state: RootState) => state.ui.loadingMessage
+    (state: RootState) => state.ui.loadingMessage,
   );
   const isInitializing = useSelector(
-    (state: RootState) => state.ui.isInitializing
+    (state: RootState) => state.ui.isInitializing,
   );
   const initializationStage = useSelector(
-    (state: RootState) => state.ui.initializationStage
+    (state: RootState) => state.ui.initializationStage,
   );
 
   // State for controlling visibility and animations
@@ -109,7 +109,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
   // Get component animation styles
   const getComponentAnimation = (
     componentId: string,
-    visible: boolean = true
+    visible: boolean = true,
   ) => {
     if (!visible) {
       return {

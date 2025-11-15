@@ -63,14 +63,14 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
   const currentError = useSelector(selectCurrentError);
   const isRecovering = useSelector(selectIsRecovering);
   const networkStatus = useSelector(
-    (state: RootState) => state.errors.networkStatus
+    (state: RootState) => state.errors.networkStatus,
   );
 
   // Local state
   const [isVisible, setIsVisible] = useState(false);
   const [recoveryProgress, setRecoveryProgress] = useState(0);
   const [autoHideTimer, setAutoHideTimer] = useState<NodeJS.Timeout | null>(
-    null
+    null,
   );
 
   // Handle recovery process
@@ -98,7 +98,7 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
         completeRecovery({
           success: true,
           message: "Issue resolved successfully",
-        })
+        }),
       );
     } catch (error) {
       logger.error("[GracefulErrorOverlay] Recovery failed", { error });
@@ -107,7 +107,7 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
           success: false,
           message:
             error instanceof Error ? error.message : "Unknown recovery error",
-        })
+        }),
       );
     }
   };
@@ -362,10 +362,10 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
                     {currentError.code === ErrorCode.NET_OFFLINE
                       ? "Connection Lost"
                       : currentError.code === ErrorCode.AUTH_SCREEN_NOT_PAIRED
-                      ? "Pairing Required"
-                      : currentError.code === ErrorCode.API_SERVER_DOWN
-                      ? "Service Unavailable"
-                      : "System Alert"}
+                        ? "Pairing Required"
+                        : currentError.code === ErrorCode.API_SERVER_DOWN
+                          ? "Service Unavailable"
+                          : "System Alert"}
                   </Typography>
 
                   <Typography
@@ -550,8 +550,8 @@ const GracefulErrorOverlay: React.FC<GracefulErrorOverlayProps> = ({
                     {currentError.code === ErrorCode.NET_OFFLINE
                       ? "Connection Issue"
                       : currentError.code === ErrorCode.DATA_SYNC_FAILED
-                      ? "Data Sync Issue"
-                      : "System Notice"}
+                        ? "Data Sync Issue"
+                        : "System Notice"}
                   </Typography>
 
                   {!isRecovering && (

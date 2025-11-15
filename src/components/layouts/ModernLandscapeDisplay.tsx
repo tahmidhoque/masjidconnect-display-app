@@ -60,7 +60,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
 
   // Use optimized selectors to reduce re-renders
   const { masjidName, hasPrayerTimes } = useAppSelector(
-    selectLandscapeDisplayData
+    selectLandscapeDisplayData,
   );
 
   // ✅ PERFORMANCE: Use memoized hooks to prevent unnecessary recalculations
@@ -100,7 +100,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
       carousel: getComponentAnimation("carousel"),
       footer: getComponentAnimation("footer"),
     }),
-    [getComponentAnimation]
+    [getComponentAnimation],
   );
 
   // Memoized style objects for better performance - now using getSizeRem values
@@ -116,7 +116,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
       px: getSizeRem(1),
       py: getSizeRem(1),
     }),
-    [getSizeRem]
+    [getSizeRem],
   );
 
   const mainContentWithGap = useMemo(
@@ -124,7 +124,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
       ...mainContentStyles,
       gap: getSizeRem(1.5),
     }),
-    [getSizeRem]
+    [getSizeRem],
   );
 
   const rightColumnWithGap = useMemo(
@@ -132,7 +132,7 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
       ...rightColumnStyles,
       gap: getSizeRem(1),
     }),
-    [getSizeRem]
+    [getSizeRem],
   );
 
   // ✅ PERFORMANCE: Optimized memoized components with value change detection
@@ -177,18 +177,18 @@ const ModernLandscapeDisplay: React.FC = memo(() => {
         onCountdownComplete={handleCountdownComplete}
       />
     ),
-    [handleCountdownComplete]
+    [handleCountdownComplete],
   );
 
   // ✅ PERFORMANCE: Static components that never change
   const MemoizedCarousel = useMemo(
     () => <ContentCarousel variant="landscape" />,
-    []
+    [],
   );
 
   const MemoizedFooter = useMemo(
     () => <ModernFooter logoSrc={logoGold} orientation="landscape" />,
-    []
+    [],
   );
 
   // ✅ PERFORMANCE: Throttled performance monitoring to prevent log spam

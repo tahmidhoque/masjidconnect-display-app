@@ -51,10 +51,10 @@ const GlassmorphicCombinedPrayerCard: React.FC<
 
   // Redux selectors
   const prayerTimes = useSelector(
-    (state: RootState) => state.content.prayerTimes
+    (state: RootState) => state.content.prayerTimes,
   );
   const isLoading = useSelector(
-    (state: RootState) => state.content.isLoadingPrayerTimes
+    (state: RootState) => state.content.isLoadingPrayerTimes,
   );
 
   // Redux action wrapper
@@ -62,7 +62,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
     (forceRefresh: boolean = false) => {
       dispatch(refreshPrayerTimes({ forceRefresh }));
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Local state to handle initial loading and retry logic
@@ -70,7 +70,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   const [retryCount, setRetryCount] = useState(0);
   // Start with loading false if we already have prayer times data
   const [localLoading, setLocalLoading] = useState(
-    !prayerTimes && !nextPrayer && todaysPrayerTimes.length === 0
+    !prayerTimes && !nextPrayer && todaysPrayerTimes.length === 0,
   );
 
   // Use refs to track component state between renders
@@ -102,7 +102,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
             ? JSON.stringify(prayerTimes).substring(0, 100) + "..."
             : "null",
           timeSinceLastRefresh: `${Math.round(timeSinceLastRefresh / 1000)}s`,
-        }
+        },
       );
 
       // Only retry if sufficient time has passed since last refresh
@@ -117,14 +117,14 @@ const GlassmorphicCombinedPrayerCard: React.FC<
         // DISABLED: This was causing rapid firing loops
         // Conservative approach - let Redux handle refreshes
         logger.info(
-          "[GlassmorphicCombinedPrayerCard] Skipping aggressive refresh to prevent rapid firing"
+          "[GlassmorphicCombinedPrayerCard] Skipping aggressive refresh to prevent rapid firing",
         );
       } else {
         // If we're trying to refresh too frequently, wait a bit
         logger.debug(
           `[GlassmorphicCombinedPrayerCard] Throttling refresh, will retry in ${Math.ceil(
-            (MIN_REFRESH_INTERVAL - timeSinceLastRefresh) / 1000
-          )}s`
+            (MIN_REFRESH_INTERVAL - timeSinceLastRefresh) / 1000,
+          )}s`,
         );
 
         // DISABLED: This was causing rapid firing loops
@@ -141,7 +141,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
             hasNextPrayer: !!nextPrayer,
             prayerTimesCount: todaysPrayerTimes.length,
             retryCount,
-          }
+          },
         );
         setLocalLoading(false);
 
@@ -172,7 +172,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   useEffect(() => {
     if (nextPrayer && todaysPrayerTimes.length > 0 && localLoading) {
       logger.info(
-        "[GlassmorphicCombinedPrayerCard] Data available, clearing local loading state"
+        "[GlassmorphicCombinedPrayerCard] Data available, clearing local loading state",
       );
       setLocalLoading(false);
     }
@@ -181,7 +181,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   // Force refresh when mounted to ensure we have fresh data
   useEffect(() => {
     logger.info(
-      "[GlassmorphicCombinedPrayerCard] Component mounted, triggering initial data refresh"
+      "[GlassmorphicCombinedPrayerCard] Component mounted, triggering initial data refresh",
     );
     lastRefreshTimeRef.current = Date.now();
     refreshPrayerTimesHandler();
@@ -190,7 +190,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         logger.info(
-          "[GlassmorphicCombinedPrayerCard] Window became visible, refreshing data"
+          "[GlassmorphicCombinedPrayerCard] Window became visible, refreshing data",
         );
         lastRefreshTimeRef.current = Date.now();
         refreshPrayerTimesHandler();
@@ -221,20 +221,20 @@ const GlassmorphicCombinedPrayerCard: React.FC<
             timestamp: new Date(event.detail.timestamp).toISOString(),
             hasNextPrayer: !!nextPrayer,
             hasFormattedTimes: todaysPrayerTimes.length,
-          }
+          },
         );
       }
     };
 
     window.addEventListener(
       "contentUpdated",
-      handleContentUpdate as EventListener
+      handleContentUpdate as EventListener,
     );
 
     return () => {
       window.removeEventListener(
         "contentUpdated",
-        handleContentUpdate as EventListener
+        handleContentUpdate as EventListener,
       );
     };
   }, [nextPrayer, todaysPrayerTimes.length]);
@@ -243,17 +243,20 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   useEffect(() => {
     // Set up an interval to refresh prayer times every 15 minutes
     // This ensures the display is always up to date, even if other mechanisms fail
-    const refreshInterval = setInterval(() => {
-      const now = Date.now();
-      if (now - lastRefreshTimeRef.current > 15 * 60 * 1000) {
-        // Only if last refresh was >15 min ago
-        logger.debug(
-          "[GlassmorphicCombinedPrayerCard] Performing periodic data refresh check"
-        );
-        lastRefreshTimeRef.current = now;
-        refreshPrayerTimesHandler();
-      }
-    }, 15 * 60 * 1000); // 15 minutes
+    const refreshInterval = setInterval(
+      () => {
+        const now = Date.now();
+        if (now - lastRefreshTimeRef.current > 15 * 60 * 1000) {
+          // Only if last refresh was >15 min ago
+          logger.debug(
+            "[GlassmorphicCombinedPrayerCard] Performing periodic data refresh check",
+          );
+          lastRefreshTimeRef.current = now;
+          refreshPrayerTimesHandler();
+        }
+      },
+      15 * 60 * 1000,
+    ); // 15 minutes
 
     return () => {
       clearInterval(refreshInterval);
@@ -311,7 +314,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
       }
     }
   `,
-    []
+    [],
   );
 
   const isPortrait = orientation === "portrait";
@@ -342,7 +345,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
               (prayerTimes.data &&
                 prayerTimes.data[0] &&
                 (prayerTimes.data[0].jummahKhutbah ||
-                  prayerTimes.data[0].jummahJamaat)))))
+                  prayerTimes.data[0].jummahJamaat))))),
     );
   }, [isJumuahToday, jumuahDisplayTime, jumuahKhutbahTime, prayerTimes]);
 
@@ -352,7 +355,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
       logger.info(
         `[GlassmorphicCombinedPrayerCard] Countdown completed for ${
           isJamaat ? "jamaat" : "adhan"
-        } time`
+        } time`,
       );
 
       // Ensure we immediately refresh prayer times to get the next prayer
@@ -363,7 +366,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
         onCountdownComplete(isJamaat);
       }
     },
-    [refreshPrayerTimesHandler, onCountdownComplete]
+    [refreshPrayerTimesHandler, onCountdownComplete],
   );
 
   // Helper to get background color for prayer row
@@ -411,7 +414,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
           alignItems: "center",
           background: `linear-gradient(135deg, ${alpha(
             theme.palette.primary.dark,
-            0.7
+            0.7,
           )} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
         }}
       >
@@ -433,7 +436,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   // Fallback for when retries are exhausted but still no data
   if (!nextPrayer) {
     logger.error(
-      "[GlassmorphicCombinedPrayerCard] Failed to load prayer times after retries"
+      "[GlassmorphicCombinedPrayerCard] Failed to load prayer times after retries",
     );
     return (
       <GlassmorphicCard
@@ -454,7 +457,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
           alignItems: "center",
           background: `linear-gradient(135deg, ${alpha(
             theme.palette.primary.dark,
-            0.7
+            0.7,
           )} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
           p: 3,
         }}
@@ -523,7 +526,7 @@ const GlassmorphicCombinedPrayerCard: React.FC<
           mr: isPortrait ? 0 : 0.5, // No right margin in portrait
           background: `linear-gradient(135deg, ${alpha(
             theme.palette.primary.dark,
-            0.7
+            0.7,
           )} 0%, ${alpha(theme.palette.primary.main, 0.7)} 100%)`,
           borderTop: `1px solid ${alpha("#ffffff", 0.5)}`,
           borderLeft: `1px solid ${alpha("#ffffff", 0.5)}`,
@@ -551,13 +554,13 @@ const GlassmorphicCombinedPrayerCard: React.FC<
             pb: isPortrait ? getSizeRem(0.8) : getSizeRem(0.6),
             borderBottom: `1px solid ${alpha(
               theme.palette.warning.main,
-              0.25
+              0.25,
             )}`,
             position: "relative",
             zIndex: 1,
             background: `linear-gradient(to bottom, ${alpha(
               theme.palette.secondary.dark,
-              0.2
+              0.2,
             )}, transparent)`,
           }}
         >

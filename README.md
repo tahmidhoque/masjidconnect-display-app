@@ -63,6 +63,7 @@ Environment variables control the configuration of the application. They are bak
 ### Required for Production
 
 **`REACT_APP_API_URL`** - Main API endpoint URL
+
 - **Required**: Yes, for production builds
 - **Default**: `https://portal.masjidconnect.co.uk/api`
 - **Description**: The base URL for all API calls to the MasjidConnect backend
@@ -71,36 +72,43 @@ Environment variables control the configuration of the application. They are bak
 ### Automatically Set (No Action Needed)
 
 **`REACT_APP_VERSION`** - App version number
+
 - Automatically set from `package.json` during build via build scripts
 - Used for version tracking and analytics
 
 **`NODE_ENV`** - Environment mode
+
 - Automatically set by `react-scripts` (`production` or `development`)
 - Used throughout the codebase for conditional logic
 
 ### Optional - Development/Debugging
 
 **`REACT_APP_USE_CORS_PROXY`** - Enable CORS proxy in development
+
 - **Default**: `false`
 - **Description**: Only used when set to `'true'` and `NODE_ENV=development`
 - **Usage**: Enable when developing locally and encountering CORS issues
 
 **`REACT_APP_CORS_PROXY_URL`** - CORS proxy URL
+
 - **Default**: `https://cors-anywhere.herokuapp.com/`
 - **Description**: Only used when `REACT_APP_USE_CORS_PROXY=true` and `NODE_ENV=development`
 
 ### Optional - Electron-Specific
 
 **`ELECTRON_DEBUG`** - Enable Electron debug mode
+
 - **Default**: `false`
 - **Description**: Enables DevTools and development features in Electron
 
 **`UPDATE_CHANNEL`** - Electron updater channel
+
 - **Default**: `'latest'`
 - **Options**: `'latest'`, `'beta'`, `'alpha'`
 - **Description**: Controls which update channel the app checks for updates
 
 **`DISABLE_UPDATES`** - Disable automatic update checks
+
 - **Description**: Set to any value to disable automatic update checks
 
 ### Setting Up Environment Variables
@@ -108,11 +116,13 @@ Environment variables control the configuration of the application. They are bak
 #### Local Development
 
 1. Copy `.env.example` to `.env`:
+
    ```bash
    cp .env.example .env
    ```
 
 2. Edit `.env` and set your values:
+
    ```bash
    REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
    ```
@@ -135,9 +145,11 @@ Or use a `.env` file (same as development).
 Environment variables are configured via GitHub Secrets. See [GitHub Actions Environment Setup](docs/GITHUB_ACTIONS_ENV_SETUP.md) for detailed instructions.
 
 **Required GitHub Secrets:**
+
 - `REACT_APP_API_URL` - API endpoint URL (recommended, falls back to default if not set)
 
 **Automatically Available:**
+
 - `GITHUB_TOKEN` - Provided automatically by GitHub Actions for publishing releases
 
 For more detailed information, see [Environment Variables Documentation](docs/ENVIRONMENT_VARIABLES.md).
@@ -200,6 +212,7 @@ The MasjidConnect Display App includes robust offline support features:
 ### Development Testing:
 
 You can test offline capabilities by:
+
 1. Loading the app while online
 2. Using browser dev tools to switch to offline mode (Network tab)
 3. Refreshing the page to see offline behavior
@@ -264,9 +277,10 @@ During installation, the application:
 ## Troubleshooting
 
 If you experience thermal throttling:
+
 - Ensure your Raspberry Pi has adequate cooling (heatsink/fan)
 - The app automatically limits GPU usage but may still require cooling
-- For extreme cases, add a small 5V fan connected to the GPIO pins 
+- For extreme cases, add a small 5V fan connected to the GPIO pins
 
 # Cross-Compiling for Raspberry Pi
 
@@ -275,6 +289,7 @@ When building for Raspberry Pi (armv7l/arm64) on macOS, there are known issues w
 ## Method 1: Build on the Raspberry Pi directly
 
 1. Clone the repository on the Raspberry Pi:
+
 ```bash
 git clone https://github.com/masjidSolutions/masjidconnect-display-app.git
 cd masjidconnect-display-app
@@ -282,6 +297,7 @@ npm install
 ```
 
 2. Build the application:
+
 ```bash
 npm run electron:build
 ```
@@ -291,6 +307,7 @@ npm run electron:build
 Cross-compilation can be more reliable using Docker:
 
 1. Create a Dockerfile for building:
+
 ```dockerfile
 FROM electronuserland/builder:16
 
@@ -302,6 +319,7 @@ RUN electron-builder --linux deb --armv7l
 ```
 
 2. Build using Docker:
+
 ```bash
 docker build -t masjidconnect-builder .
 docker run --rm -v ${PWD}/dist:/app/dist masjidconnect-builder
@@ -311,12 +329,14 @@ docker run --rm -v ${PWD}/dist:/app/dist masjidconnect-builder
 
 If you're unable to build a proper .deb file, you can:
 
-1. Build a ZIP package: 
+1. Build a ZIP package:
+
 ```bash
 npm run electron:build:armhf # This builds a ZIP file
 ```
 
 2. Extract on the Raspberry Pi and run the installation script:
+
 ```bash
 unzip masjidconnect-display-0.1.0-armv7l.zip -d /opt/masjidconnect-display
 sudo chmod +x /opt/masjidconnect-display/masjidconnect-display
@@ -346,11 +366,13 @@ For the best performance on Raspberry Pi devices, follow these recommendations:
 
 1. Install Raspberry Pi OS (32-bit or 64-bit)
 2. Update your system:
+
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
 3. Install required dependencies:
+
 ```bash
 sudo apt install -y libglib2.0-0 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libgtk-3-0 libgbm1 libasound2
 ```
@@ -369,6 +391,7 @@ sudo nano /boot/config.txt
 ```
 
 Add/modify these lines:
+
 ```
 gpu_mem=128
 dtoverlay=vc4-kms-v3d
@@ -385,9 +408,10 @@ ls -la /home/pi/.config/autostart/masjidconnect-display.desktop
 ## Monitoring Performance
 
 To monitor for thermal throttling:
+
 ```bash
 vcgencmd measure_temp
 vcgencmd get_throttled
 ```
 
-If the temperature exceeds 80°C regularly or throttling occurs, improve cooling. 
+If the temperature exceeds 80°C regularly or throttling occurs, improve cooling.

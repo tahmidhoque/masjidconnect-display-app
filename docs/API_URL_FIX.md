@@ -27,10 +27,11 @@ Changed `src/api/masjidDisplayClient.ts`:
 
 ```typescript
 // Before:
-let baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+let baseURL = process.env.REACT_APP_API_URL || "http://localhost:3000";
 
 // After:
-let baseURL = process.env.REACT_APP_API_URL || 'https://portal.masjidconnect.co.uk/api';
+let baseURL =
+  process.env.REACT_APP_API_URL || "https://portal.masjidconnect.co.uk/api";
 ```
 
 **Why both changes?**
@@ -152,7 +153,6 @@ If you still see a blank screen after this fix:
    ```
 
 3. **Check Network Tab** (F12 → Network)
-
    - Are requests going to `portal.masjidconnect.co.uk`?
    - What status codes are returned? (200 = good, 404/500 = error)
    - Any CORS errors?
@@ -160,8 +160,8 @@ If you still see a blank screen after this fix:
 4. **Check Authentication**
    ```javascript
    // In console
-   localStorage.getItem('masjid_api_key');
-   localStorage.getItem('masjid_screen_id');
+   localStorage.getItem("masjid_api_key");
+   localStorage.getItem("masjid_screen_id");
    // Should return your credentials, not null
    ```
 
@@ -261,7 +261,6 @@ If you see 401 Unauthorized:
 ## Files Changed
 
 1. **`.env`** (CREATED)
-
    - Sets `REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api`
 
 2. **`src/api/masjidDisplayClient.ts`** (MODIFIED)

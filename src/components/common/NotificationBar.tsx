@@ -5,49 +5,52 @@
  * Replaces Snackbar popups with inline notifications that respect orientation.
  */
 
-import React, { useEffect, useCallback, useRef } from 'react';
-import SystemUpdateIcon from '@mui/icons-material/SystemUpdate';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import CachedIcon from '@mui/icons-material/Cached';
-import SettingsIcon from '@mui/icons-material/Settings';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningIcon from '@mui/icons-material/Warning';
-import DownloadIcon from '@mui/icons-material/Download';
-import logger from '../../utils/logger';
-import updateService from '../../services/updateService';
-import useFactoryReset from '../../hooks/useFactoryReset';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import React, { useEffect, useCallback, useRef } from "react";
+import SystemUpdateIcon from "@mui/icons-material/SystemUpdate";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import CachedIcon from "@mui/icons-material/Cached";
+import SettingsIcon from "@mui/icons-material/Settings";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningIcon from "@mui/icons-material/Warning";
+import DownloadIcon from "@mui/icons-material/Download";
+import logger from "../../utils/logger";
+import updateService from "../../services/updateService";
+import useFactoryReset from "../../hooks/useFactoryReset";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   selectUpdateState,
   downloadUpdate,
   installUpdate,
   dismissUpdateNotification,
-} from '../../store/slices/updateSlice';
-import { useNotifications } from '../../contexts/NotificationContext';
+} from "../../store/slices/updateSlice";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 interface NotificationBarProps {
   /**
    * Filter which notification types to show.
    * If not provided, shows all notifications.
    */
-  types?: ('remote-command' | 'update')[];
+  types?: ("remote-command" | "update")[];
 }
 
-const NotificationBar: React.FC<NotificationBarProps> = ({
-  types,
-}) => {
+const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
   const dispatch = useAppDispatch();
   const updateState = useAppSelector(selectUpdateState);
   const { confirmReset } = useFactoryReset();
-  const { addNotification, removeNotification, getCurrentNotification } = useNotifications();
-  
+  const { addNotification, removeNotification, getCurrentNotification } =
+    useNotifications();
+
   // Refs for tracking
   const currentCommandIdRef = useRef<string | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [countdownSeconds, setCountdownSeconds] = React.useState<number | null>(null);
-  const [countdownType, setCountdownType] = React.useState<'restart' | 'factory-reset' | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = React.useState<number | null>(
+    null,
+  );
+  const [countdownType, setCountdownType] = React.useState<
+    "restart" | "factory-reset" | null
+  >(null);
 
   // Handle countdown timer
   useEffect(() => {
@@ -56,7 +59,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
       }
-      
+
       if (countdownSeconds === 0 && countdownType) {
         executeCountdownCommand();
       }
@@ -83,16 +86,16 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
   const executeCountdownCommand = useCallback(async () => {
     if (!countdownType) return;
 
-    logger.info('Executing countdown command', { type: countdownType });
+    logger.info("Executing countdown command", { type: countdownType });
 
     try {
-      if (countdownType === 'restart') {
+      if (countdownType === "restart") {
         await updateService.restartApp();
-      } else if (countdownType === 'factory-reset') {
+      } else if (countdownType === "factory-reset") {
         await confirmReset();
       }
     } catch (error) {
-      logger.error('Error executing countdown command', { error });
+      logger.error("Error executing countdown command", { error });
     }
 
     currentCommandIdRef.current = null;
@@ -102,70 +105,70 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
 
   // Cancel countdown
   const cancelCountdown = useCallback(() => {
-    logger.info('Countdown cancelled by user', { type: countdownType });
+    logger.info("Countdown cancelled by user", { type: countdownType });
     currentCommandIdRef.current = null;
     setCountdownType(null);
     setCountdownSeconds(null);
     const current = getCurrentNotification();
-    if (current && current.key === 'countdown') {
+    if (current && current.key === "countdown") {
       removeNotification(current.id);
     }
   }, [countdownType, getCurrentNotification, removeNotification]);
 
   // Listen for remote command events
   useEffect(() => {
-    if (types && !types.includes('remote-command')) {
+    if (types && !types.includes("remote-command")) {
       return;
     }
     const handleRestartApp = (event: CustomEvent) => {
-      const incomingCommandId = event.detail?.commandId || 'unknown';
+      const incomingCommandId = event.detail?.commandId || "unknown";
       const countdown = event.detail?.countdown || 10;
-      
+
       if (currentCommandIdRef.current === incomingCommandId) {
         return;
       }
-      
+
       currentCommandIdRef.current = incomingCommandId;
-      setCountdownType('restart');
+      setCountdownType("restart");
       setCountdownSeconds(countdown);
-      
+
       addNotification({
-        type: 'warning',
-        title: 'Restarting App',
+        type: "warning",
+        title: "Restarting App",
         message: `Restarting in ${countdown}s`,
         icon: <RestartAltIcon />,
         autoHide: 0,
-        key: 'countdown',
+        key: "countdown",
       });
     };
 
     const handleFactoryReset = (event: CustomEvent) => {
-      const incomingCommandId = event.detail?.commandId || 'unknown';
+      const incomingCommandId = event.detail?.commandId || "unknown";
       const countdown = event.detail?.countdown || 30;
-      
+
       if (currentCommandIdRef.current === incomingCommandId) {
         return;
       }
-      
+
       currentCommandIdRef.current = incomingCommandId;
-      setCountdownType('factory-reset');
+      setCountdownType("factory-reset");
       setCountdownSeconds(countdown);
-      
+
       addNotification({
-        type: 'warning',
-        title: 'Factory Reset',
+        type: "warning",
+        title: "Factory Reset",
         message: `Resetting in ${countdown}s`,
         icon: <DeleteForeverIcon />,
         autoHide: 0,
-        key: 'countdown',
+        key: "countdown",
       });
     };
 
     const handleReloadContent = () => {
       addNotification({
-        type: 'info',
-        title: 'Reloading Content',
-        message: 'Refreshing content...',
+        type: "info",
+        title: "Reloading Content",
+        message: "Refreshing content...",
         icon: <CachedIcon />,
         autoHide: 3000,
       });
@@ -173,9 +176,9 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
 
     const handleUpdateSettings = () => {
       addNotification({
-        type: 'success',
-        title: 'Settings Updated',
-        message: 'Settings updated',
+        type: "success",
+        title: "Settings Updated",
+        message: "Settings updated",
         icon: <SettingsIcon />,
         autoHide: 3000,
       });
@@ -183,9 +186,9 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
 
     const handleScreenshot = () => {
       addNotification({
-        type: 'success',
-        title: 'Screenshot Captured',
-        message: 'Screenshot sent',
+        type: "success",
+        title: "Screenshot Captured",
+        message: "Screenshot sent",
         icon: <CameraAltIcon />,
         autoHide: 3000,
       });
@@ -193,36 +196,38 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
 
     const handleCommandThrottled = (event: CustomEvent) => {
       addNotification({
-        type: 'warning',
-        title: 'Command Queued',
-        message: 'Command queued',
+        type: "warning",
+        title: "Command Queued",
+        message: "Command queued",
         icon: <WarningIcon />,
         autoHide: 3000,
       });
     };
 
     const handleCommandCompleted = (event: CustomEvent) => {
-      const commandType = event.detail?.type || 'unknown';
+      const commandType = event.detail?.type || "unknown";
       const success = event.detail?.success !== false;
-      
+
       const commandsWithSpecificNotifications = [
-        'FORCE_UPDATE',
-        'RESTART_APP',
-        'RELOAD_CONTENT',
-        'UPDATE_SETTINGS',
-        'FACTORY_RESET',
-        'CAPTURE_SCREENSHOT',
-        'CLEAR_CACHE',
+        "FORCE_UPDATE",
+        "RESTART_APP",
+        "RELOAD_CONTENT",
+        "UPDATE_SETTINGS",
+        "FACTORY_RESET",
+        "CAPTURE_SCREENSHOT",
+        "CLEAR_CACHE",
       ];
-      
+
       if (commandsWithSpecificNotifications.includes(commandType)) {
         return;
       }
-      
+
       addNotification({
-        type: success ? 'success' : 'error',
-        title: success ? 'Command Completed' : 'Command Failed',
-        message: success ? 'Command executed successfully' : 'Command failed to execute',
+        type: success ? "success" : "error",
+        title: success ? "Command Completed" : "Command Failed",
+        message: success
+          ? "Command executed successfully"
+          : "Command failed to execute",
         icon: <CheckCircleIcon />,
         autoHide: 3000,
       });
@@ -230,115 +235,171 @@ const NotificationBar: React.FC<NotificationBarProps> = ({
 
     const handleForceUpdate = () => {
       addNotification({
-        type: 'info',
-        title: 'Checking for Updates',
-        message: 'Downloading update if available...',
+        type: "info",
+        title: "Checking for Updates",
+        message: "Downloading update if available...",
         icon: <SystemUpdateIcon />,
         progress: 0,
         autoHide: 5000,
       });
     };
 
-    window.addEventListener('remote:restart-app', handleRestartApp as EventListener);
-    window.addEventListener('remote:factory-reset', handleFactoryReset as EventListener);
-    window.addEventListener('remote:reload-content', handleReloadContent);
-    window.addEventListener('remote:update-settings', handleUpdateSettings);
-    window.addEventListener('remote:screenshot-captured', handleScreenshot);
-    window.addEventListener('remote:command-throttled', handleCommandThrottled as EventListener);
-    window.addEventListener('remote:command-completed', handleCommandCompleted as EventListener);
-    window.addEventListener('remote:force-update', handleForceUpdate);
+    window.addEventListener(
+      "remote:restart-app",
+      handleRestartApp as EventListener,
+    );
+    window.addEventListener(
+      "remote:factory-reset",
+      handleFactoryReset as EventListener,
+    );
+    window.addEventListener("remote:reload-content", handleReloadContent);
+    window.addEventListener("remote:update-settings", handleUpdateSettings);
+    window.addEventListener("remote:screenshot-captured", handleScreenshot);
+    window.addEventListener(
+      "remote:command-throttled",
+      handleCommandThrottled as EventListener,
+    );
+    window.addEventListener(
+      "remote:command-completed",
+      handleCommandCompleted as EventListener,
+    );
+    window.addEventListener("remote:force-update", handleForceUpdate);
 
     return () => {
-      window.removeEventListener('remote:restart-app', handleRestartApp as EventListener);
-      window.removeEventListener('remote:factory-reset', handleFactoryReset as EventListener);
-      window.removeEventListener('remote:reload-content', handleReloadContent);
-      window.removeEventListener('remote:update-settings', handleUpdateSettings);
-      window.removeEventListener('remote:screenshot-captured', handleScreenshot);
-      window.removeEventListener('remote:command-throttled', handleCommandThrottled as EventListener);
-      window.removeEventListener('remote:command-completed', handleCommandCompleted as EventListener);
-      window.removeEventListener('remote:force-update', handleForceUpdate);
+      window.removeEventListener(
+        "remote:restart-app",
+        handleRestartApp as EventListener,
+      );
+      window.removeEventListener(
+        "remote:factory-reset",
+        handleFactoryReset as EventListener,
+      );
+      window.removeEventListener("remote:reload-content", handleReloadContent);
+      window.removeEventListener(
+        "remote:update-settings",
+        handleUpdateSettings,
+      );
+      window.removeEventListener(
+        "remote:screenshot-captured",
+        handleScreenshot,
+      );
+      window.removeEventListener(
+        "remote:command-throttled",
+        handleCommandThrottled as EventListener,
+      );
+      window.removeEventListener(
+        "remote:command-completed",
+        handleCommandCompleted as EventListener,
+      );
+      window.removeEventListener("remote:force-update", handleForceUpdate);
     };
   }, [addNotification, cancelCountdown, types]);
 
   // Handle update notifications
   useEffect(() => {
-    if (types && !types.includes('update')) {
+    if (types && !types.includes("update")) {
       return;
     }
-    if (updateState.updateAvailable && !updateState.downloading && !updateState.updateDownloaded) {
+    if (
+      updateState.updateAvailable &&
+      !updateState.downloading &&
+      !updateState.updateDownloaded
+    ) {
       const current = getCurrentNotification();
-      if (!current || current.key !== 'update-available') {
+      if (!current || current.key !== "update-available") {
         addNotification({
-          type: 'info',
-          title: 'Update Available',
+          type: "info",
+          title: "Update Available",
           message: `Update ${updateState.latestVersion} available`,
           icon: <SystemUpdateIcon />,
           autoHide: 5000,
-          key: 'update-available',
+          key: "update-available",
         });
       }
     } else if (updateState.downloading) {
       const current = getCurrentNotification();
-      if (current && current.key === 'update-downloading') {
+      if (current && current.key === "update-downloading") {
         // Update existing notification
         removeNotification(current.id);
       }
       addNotification({
-        type: 'info',
-        title: 'Downloading Update',
+        type: "info",
+        title: "Downloading Update",
         message: `Downloading ${updateState.downloadProgress.toFixed(0)}%`,
         icon: <DownloadIcon />,
         autoHide: 0,
-        key: 'update-downloading',
+        key: "update-downloading",
       });
     } else if (updateState.updateReady) {
       const current = getCurrentNotification();
-      if (!current || current.key !== 'update-ready') {
+      if (!current || current.key !== "update-ready") {
         addNotification({
-          type: 'success',
-          title: 'Update Ready',
+          type: "success",
+          title: "Update Ready",
           message: `Update ${updateState.latestVersion} ready`,
           icon: <SystemUpdateIcon />,
           autoHide: 5000,
-          key: 'update-ready',
+          key: "update-ready",
         });
       }
     } else if (updateState.error) {
       addNotification({
-        type: 'error',
-        title: 'Update Error',
-        message: updateState.error.length > 30 ? updateState.error.substring(0, 30) + '...' : updateState.error,
+        type: "error",
+        title: "Update Error",
+        message:
+          updateState.error.length > 30
+            ? updateState.error.substring(0, 30) + "..."
+            : updateState.error,
         icon: <WarningIcon />,
         autoHide: 6000,
       });
     }
-  }, [updateState, addNotification, removeNotification, dispatch, types, getCurrentNotification]);
+  }, [
+    updateState,
+    addNotification,
+    removeNotification,
+    dispatch,
+    types,
+    getCurrentNotification,
+  ]);
 
   // Update countdown notification
   useEffect(() => {
     if (countdownSeconds !== null && countdownType) {
       const current = getCurrentNotification();
-      if (current && current.key === 'countdown') {
+      if (current && current.key === "countdown") {
         // Remove old notification and add updated one
         removeNotification(current.id);
         addNotification({
-          type: 'warning',
-          title: countdownType === 'restart' ? 'Restarting App' : 'Factory Reset',
+          type: "warning",
+          title:
+            countdownType === "restart" ? "Restarting App" : "Factory Reset",
           message:
-            countdownType === 'restart'
+            countdownType === "restart"
               ? `Restarting in ${countdownSeconds}s`
               : `Resetting in ${countdownSeconds}s`,
-          icon: countdownType === 'restart' ? <RestartAltIcon /> : <DeleteForeverIcon />,
+          icon:
+            countdownType === "restart" ? (
+              <RestartAltIcon />
+            ) : (
+              <DeleteForeverIcon />
+            ),
           autoHide: 0,
-          key: 'countdown',
+          key: "countdown",
         });
       }
     }
-  }, [countdownSeconds, countdownType, getCurrentNotification, removeNotification, addNotification, cancelCountdown]);
+  }, [
+    countdownSeconds,
+    countdownType,
+    getCurrentNotification,
+    removeNotification,
+    addNotification,
+    cancelCountdown,
+  ]);
 
   // This component doesn't render anything - it just manages notifications via context
   return null;
 };
 
 export default NotificationBar;
-

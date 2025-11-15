@@ -41,6 +41,7 @@ Download the latest release from:
 https://github.com/masjidSolutions/masjidconnect-display-app/releases
 
 Available packages:
+
 - macOS: `.dmg`
 - Raspberry Pi / Linux: `.AppImage` or `.deb`
 
@@ -99,4 +100,4 @@ If you encounter any issues, please report them on the [GitHub issues page](http
 
 ## License
 
-This project is proprietary software owned by MasjidConnect. 
+This project is proprietary software owned by MasjidConnect.

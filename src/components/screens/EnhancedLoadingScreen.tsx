@@ -4,7 +4,10 @@ import useRotationHandling from "../../hooks/useRotationHandling";
 import { useAppSelector } from "../../store/hooks";
 import logoGold from "../../assets/logos/logo-gold.svg";
 import type { AppPhase } from "../../hooks/useLoadingStateManager";
-import { getDevicePerformanceProfile, isHighStrainDevice } from "../../utils/performanceUtils";
+import {
+  getDevicePerformanceProfile,
+  isHighStrainDevice,
+} from "../../utils/performanceUtils";
 
 // SIMPLIFIED: Removed complex static logo system that was causing flickering
 // Now using a simple, stable React component approach
@@ -54,7 +57,8 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
   // Get performance profile for optimizations
   const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
   const isHighStrain = isHighStrainDevice();
-  const shouldDisableAnimations = !performanceProfile.recommendations.enableAnimations;
+  const shouldDisableAnimations =
+    !performanceProfile.recommendations.enableAnimations;
 
   // Component state
   const [isFullyVisible, setIsFullyVisible] = useState(false);
@@ -85,13 +89,33 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
     // Load elements progressively with delays for 4K displays
     const timeouts: NodeJS.Timeout[] = [];
 
-    timeouts.push(setTimeout(() => setElementsLoaded(prev => ({ ...prev, logo: true })), 100));
-    timeouts.push(setTimeout(() => setElementsLoaded(prev => ({ ...prev, spinner: true })), 300));
-    timeouts.push(setTimeout(() => setElementsLoaded(prev => ({ ...prev, progress: true })), 500));
-    timeouts.push(setTimeout(() => setElementsLoaded(prev => ({ ...prev, status: true })), 700));
+    timeouts.push(
+      setTimeout(
+        () => setElementsLoaded((prev) => ({ ...prev, logo: true })),
+        100,
+      ),
+    );
+    timeouts.push(
+      setTimeout(
+        () => setElementsLoaded((prev) => ({ ...prev, spinner: true })),
+        300,
+      ),
+    );
+    timeouts.push(
+      setTimeout(
+        () => setElementsLoaded((prev) => ({ ...prev, progress: true })),
+        500,
+      ),
+    );
+    timeouts.push(
+      setTimeout(
+        () => setElementsLoaded((prev) => ({ ...prev, status: true })),
+        700,
+      ),
+    );
 
     return () => {
-      timeouts.forEach(timeout => clearTimeout(timeout));
+      timeouts.forEach((timeout) => clearTimeout(timeout));
     };
   }, [isHighStrain]);
 
@@ -254,7 +278,9 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               alignItems: "center",
               justifyContent: "center",
               opacity: 1,
-              transition: shouldDisableAnimations ? "none" : "opacity 0.3s ease-in-out",
+              transition: shouldDisableAnimations
+                ? "none"
+                : "opacity 0.3s ease-in-out",
             }}
           >
             <img
@@ -264,7 +290,9 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
                 width: isHighStrain ? "100px" : "130px", // Smaller for 4K
                 height: "auto",
                 maxHeight: "80px",
-                filter: isHighStrain ? "none" : "drop-shadow(0 8px 16px rgba(0,0,0,0.3))", // Remove shadow for 4K
+                filter: isHighStrain
+                  ? "none"
+                  : "drop-shadow(0 8px 16px rgba(0,0,0,0.3))", // Remove shadow for 4K
                 display: "block",
                 imageRendering: isHighStrain ? "pixelated" : "auto", // Optimize for 4K
               }}
@@ -282,7 +310,9 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               alignItems: "center",
               justifyContent: "center",
               opacity: 1,
-              transition: shouldDisableAnimations ? "none" : "opacity 0.3s ease-in-out",
+              transition: shouldDisableAnimations
+                ? "none"
+                : "opacity 0.3s ease-in-out",
             }}
           >
             <Box
@@ -302,7 +332,9 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               mb: 3,
               height: "40px",
               opacity: 1,
-              transition: shouldDisableAnimations ? "none" : "opacity 0.3s ease-in-out",
+              transition: shouldDisableAnimations
+                ? "none"
+                : "opacity 0.3s ease-in-out",
             }}
           >
             <Box
@@ -324,7 +356,9 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
                   width: `${Math.max(0, Math.min(100, displayProgress))}%`,
                   backgroundColor: getProgressColor(currentPhase),
                   borderRadius: 3,
-                  transition: shouldDisableAnimations ? "none" : "width 0.3s ease-out",
+                  transition: shouldDisableAnimations
+                    ? "none"
+                    : "width 0.3s ease-out",
                   transformOrigin: "left",
                 }}
               />
@@ -358,7 +392,9 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               flexDirection: "column",
               justifyContent: "center",
               opacity: 1,
-              transition: shouldDisableAnimations ? "none" : "opacity 0.3s ease-in-out",
+              transition: shouldDisableAnimations
+                ? "none"
+                : "opacity 0.3s ease-in-out",
             }}
           >
             <Typography
@@ -420,10 +456,12 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
           left: 0,
           zIndex: 1000,
           opacity: isExiting ? 0 : 1,
-          transform: isExiting && !shouldDisableAnimations ? "scale(0.98)" : "scale(1)",
-          transition: isExiting && !shouldDisableAnimations
-            ? `opacity ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`
-            : "none",
+          transform:
+            isExiting && !shouldDisableAnimations ? "scale(0.98)" : "scale(1)",
+          transition:
+            isExiting && !shouldDisableAnimations
+              ? `opacity ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`
+              : "none",
         }}
       >
         {shouldRotate ? (

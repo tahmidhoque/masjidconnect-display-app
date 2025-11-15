@@ -1,8 +1,8 @@
-import React from 'react';
+import React from "react";
 
 /**
  * Throttled Timer Utility
- * 
+ *
  * Prevents multiple overlapping timers and optimizes countdown performance
  * by using a single global timer with throttled updates
  */
@@ -24,7 +24,11 @@ class ThrottledTimerManager {
   /**
    * Subscribe to throttled timer updates
    */
-  subscribe(id: string, callback: TimerCallback, interval: number = 1000): void {
+  subscribe(
+    id: string,
+    callback: TimerCallback,
+    interval: number = 1000,
+  ): void {
     this.subscriptions.set(id, {
       id,
       callback,
@@ -78,13 +82,16 @@ class ThrottledTimerManager {
 
     this.subscriptions.forEach((subscription) => {
       const timeSinceLastRun = now - subscription.lastRun;
-      
+
       if (timeSinceLastRun >= subscription.interval) {
         try {
           subscription.callback();
           subscription.lastRun = now;
         } catch (error) {
-          console.error(`ThrottledTimer callback error for ${subscription.id}:`, error);
+          console.error(
+            `ThrottledTimer callback error for ${subscription.id}:`,
+            error,
+          );
         }
       }
     });
@@ -115,9 +122,9 @@ export const throttledTimer = new ThrottledTimerManager();
 export const useThrottledTimer = (
   callback: TimerCallback,
   interval: number = 1000,
-  enabled: boolean = true
+  enabled: boolean = true,
 ) => {
-  const idRef = React.useRef<string>('');
+  const idRef = React.useRef<string>("");
   const callbackRef = React.useRef<TimerCallback>(callback);
 
   // Update callback ref
@@ -133,9 +140,13 @@ export const useThrottledTimer = (
     idRef.current = id;
 
     // Subscribe to throttled timer
-    throttledTimer.subscribe(id, () => {
-      callbackRef.current();
-    }, interval);
+    throttledTimer.subscribe(
+      id,
+      () => {
+        callbackRef.current();
+      },
+      interval,
+    );
 
     // Cleanup on unmount
     return () => {
@@ -153,4 +164,4 @@ export const useThrottledTimer = (
   }, []);
 };
 
-export default throttledTimer; 
+export default throttledTimer;

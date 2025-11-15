@@ -66,6 +66,7 @@ sudo reboot
 ```
 
 This script performs the following optimizations:
+
 - Sets CPU governor to performance mode
 - Reduces swappiness to minimize disk I/O
 - Configures GPU memory allocation
@@ -92,6 +93,7 @@ console.log(PerformanceMonitor.getPerformanceStats());
 ```
 
 Example output:
+
 ```json
 {
   "averageRenderTime": 12.5,
@@ -128,9 +130,9 @@ The app automatically applies CSS classes based on device performance:
 // Check memory usage
 if (window.performance?.memory) {
   const memory = window.performance.memory;
-  console.log('Memory usage:', {
-    used: (memory.usedJSHeapSize / 1024 / 1024).toFixed(2) + 'MB',
-    total: (memory.totalJSHeapSize / 1024 / 1024).toFixed(2) + 'MB'
+  console.log("Memory usage:", {
+    used: (memory.usedJSHeapSize / 1024 / 1024).toFixed(2) + "MB",
+    total: (memory.totalJSHeapSize / 1024 / 1024).toFixed(2) + "MB",
   });
 }
 ```
@@ -198,16 +200,19 @@ sudo systemctl start masjidconnect-display.service
 ### 10. Monitor and Maintain Performance
 
 1. **Monitor Temperature**:
+
    ```bash
    vcgencmd measure_temp
    ```
 
 2. **Check CPU Usage**:
+
    ```bash
    top
    ```
 
 3. **Memory Usage**:
+
    ```bash
    free -h
    ```
@@ -224,12 +229,14 @@ sudo systemctl start masjidconnect-display.service
 ## Performance Benchmarks
 
 ### Before Optimizations (Raspberry Pi 3B+)
+
 - Average render time: ~45ms
 - Content carousel transitions: Choppy
 - Memory usage: ~150MB
 - Animation smoothness: Poor
 
 ### After Optimizations (Raspberry Pi 3B+)
+
 - Average render time: ~15ms
 - Content carousel transitions: Smooth
 - Memory usage: ~85MB
@@ -281,8 +288,8 @@ You can override performance settings if needed:
 
 ```javascript
 // In browser console
-document.documentElement.style.setProperty('--transition-duration', '50ms');
-document.documentElement.style.setProperty('--animation-duration', '100ms');
+document.documentElement.style.setProperty("--transition-duration", "50ms");
+document.documentElement.style.setProperty("--animation-duration", "100ms");
 ```
 
 ### Overclocking (Raspberry Pi 3B+ Only)
@@ -321,4 +328,4 @@ iotop
 
 ## Conclusion
 
-With these optimizations, the MasjidConnect Display App should run smoothly on Raspberry Pi 3B+ and perform excellently on Raspberry Pi 4. The automatic device detection ensures optimal performance without manual configuration, while the monitoring tools help identify and resolve any issues that may arise. 
+With these optimizations, the MasjidConnect Display App should run smoothly on Raspberry Pi 3B+ and perform excellently on Raspberry Pi 4. The automatic device detection ensures optimal performance without manual configuration, while the monitoring tools help identify and resolve any issues that may arise.

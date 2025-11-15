@@ -413,7 +413,6 @@ After launching, verify:
 ### 4. Test OTA Updates (if configured)
 
 1. **Check for updates manually:**
-
    - Updates should check on app start
    - Look for update notification if newer version exists
 

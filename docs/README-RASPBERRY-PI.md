@@ -35,6 +35,7 @@ chmod +x build-rpi-package.sh
 ```
 
 The build script handles:
+
 - Installing dependencies if needed
 - Creating necessary installation scripts
 - Building the React app
@@ -104,10 +105,12 @@ sudo apt install --only-upgrade masjidconnect-display
 ### Installation Issues
 
 If the installation fails:
+
 - Check the installation log: `cat /var/log/masjidconnect-install.log`
 - Verify package dependencies are satisfied
 
-If you see an error about "_apt" user and unsandboxed downloads:
+If you see an error about "\_apt" user and unsandboxed downloads:
+
 - This is a permissions issue with APT. You can fix it by running:
   ```bash
   sudo sh -c 'echo "APT::Sandbox::User \"_apt\";" > /etc/apt/apt.conf.d/99temp-allow-sandbox'
@@ -117,6 +120,7 @@ If you see an error about "_apt" user and unsandboxed downloads:
 ### Missing Library Errors
 
 If you see "libgbm.so.1 cannot open shared object file: no such file or directory":
+
 - Install the missing library manually:
   ```bash
   sudo apt update
@@ -127,18 +131,21 @@ If you see "libgbm.so.1 cannot open shared object file: no such file or director
 ### Display Issues
 
 If there are rendering issues:
+
 - Edit `/boot/config.txt` and ensure proper GPU memory allocation (at least 128MB)
 - Add `dtoverlay=vc4-fkms-v3d` to `/boot/config.txt`
 
 ### Permission Issues
 
 If the app doesn't launch properly:
+
 - Check permissions: `sudo chmod +x /opt/masjidconnect-display/masjidconnect-display`
 - Check logs: `cat /var/log/masjidconnect-install.log`
 
 ### Auto-update Issues
 
 If auto-updates aren't working:
+
 - Ensure internet connectivity
 - Check logs at `~/.config/masjidconnect-display/logs/main.log`
 
@@ -153,9 +160,10 @@ If auto-updates aren't working:
 ## Build Process Details
 
 The build process includes:
+
 1. Building the React application
 2. Creating optimized electron packages for ARM architectures
 3. Setting up desktop integration via the after-install script
 4. Configuring auto-update through GitHub releases
 
-For more technical details, examine the `build-rpi-package.sh` script. 
+For more technical details, examine the `build-rpi-package.sh` script.

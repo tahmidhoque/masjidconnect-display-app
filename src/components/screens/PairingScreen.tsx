@@ -95,7 +95,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
             code: ErrorCode.NET_CONNECTION_FAILED,
             message: "Unable to connect to the server",
             severity: ErrorSeverity.CRITICAL,
-          })
+          }),
         );
       }
     } finally {
@@ -109,7 +109,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
     async (code: string) => {
       if (pollingRef.current || !code) {
         console.log(
-          "[PairingScreen] Polling already active or no code provided"
+          "[PairingScreen] Polling already active or no code provided",
         );
         return;
       }
@@ -150,7 +150,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
           // Screen transition is now handled by useInitializationFlow automatically
           // But let's also log the current auth state to verify
           console.log(
-            "[PairingScreen] Pairing complete - checking current auth state"
+            "[PairingScreen] Pairing complete - checking current auth state",
           );
         } else {
           console.log(
@@ -159,7 +159,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
               actionFulfilled: checkPairingStatus.fulfilled.match(resultAction),
               isPaired: (resultAction.payload as any)?.isPaired,
               payload: resultAction.payload,
-            }
+            },
           );
           pollingRef.current = false; // Allow next poll
           setTimeout(() => {
@@ -179,7 +179,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
               code: ErrorCode.AUTH_PAIRING_FAILED,
               message: "Failed to check pairing status",
               severity: ErrorSeverity.MEDIUM,
-            })
+            }),
           );
 
           // Retry after delay
@@ -191,7 +191,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
         }
       }
     },
-    [dispatch, onPairingComplete]
+    [dispatch, onPairingComplete],
   );
 
   // Request a new code if the current one expires
@@ -203,7 +203,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
       !requestInProgress.current
     ) {
       console.log(
-        "[PairingScreen] Detected expired code, requesting a new one"
+        "[PairingScreen] Detected expired code, requesting a new one",
       );
       handleRefresh();
     }
@@ -220,7 +220,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
     // If we already have a valid pairing code, start polling
     if (pairingCode && !isPairingCodeExpired) {
       console.log(
-        "[PairingScreen] Valid pairing code exists, will start polling"
+        "[PairingScreen] Valid pairing code exists, will start polling",
       );
 
       // Start polling after a reasonable delay
@@ -239,7 +239,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
 
     // If no pairing code, the initialization flow will handle requesting one
     console.log(
-      "[PairingScreen] Waiting for pairing code from initialization flow..."
+      "[PairingScreen] Waiting for pairing code from initialization flow...",
     );
 
     return () => {
@@ -297,7 +297,7 @@ const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
           severity: ErrorSeverity.MEDIUM,
           source: "PairingScreen",
           metadata: { pairingError },
-        })
+        }),
       );
 
       // Only request a new code if the error is about an expired code

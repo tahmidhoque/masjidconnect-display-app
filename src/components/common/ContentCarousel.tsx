@@ -109,7 +109,7 @@ const contentTypeConfig: Record<
 
 // Helper function to get content type config safely
 const getContentTypeConfig = (
-  type: string | undefined
+  type: string | undefined,
 ): (typeof contentTypeConfig)[ExtendedContentItemType] => {
   if (!type || !(type in contentTypeConfig)) {
     return contentTypeConfig["CUSTOM"];
@@ -191,7 +191,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   const defaultDuration = 30; // Default duration in seconds
   const userInteractionTimeout = 60000; // 1 minute before resuming auto-rotation after user interaction
   const FADE_TRANSITION_DURATION = 500; // Duration for fade transitions
-  
+
   // Auto-scroll constants
   const READING_SPEED_CHARS_PER_SECOND = 3.5; // ~200 words/minute = ~3.5 chars/second
   const MIN_DISPLAY_TIME_MS = 5000; // Minimum 5 seconds per item
@@ -223,7 +223,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
     const container = contentContainerRef.current;
     const content = scrollableContentRef.current;
-    
+
     // Get actual scrollable dimensions
     const containerHeight = container.clientHeight;
     const contentHeight = content.scrollHeight;
@@ -240,20 +240,25 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     // Calculate scroll duration based on content length and reading speed
     const contentText = content.textContent || "";
     const charCount = contentText.length;
-    
+
     // Base reading time: characters / reading speed
     const readingTimeMs = (charCount / READING_SPEED_CHARS_PER_SECOND) * 1000;
-    
+
     // Scroll animation time: distance / scroll speed (for one direction)
-    const scrollAnimationTimeMs = (scrollDistance / SCROLL_SPEED_PX_PER_SECOND) * 1000;
-    
+    const scrollAnimationTimeMs =
+      (scrollDistance / SCROLL_SPEED_PX_PER_SECOND) * 1000;
+
     // Scroll duration is the animation time for one direction
     const scrollDuration = Math.max(1000, scrollAnimationTimeMs); // Minimum 1 second scroll
-    
+
     // Total time needed: initial pause + scroll down + pause at bottom + scroll up
     const initialPauseMs = 1000; // 1 second pause at top
-    const totalTimeNeeded = initialPauseMs + scrollDuration + SCROLL_PAUSE_AT_BOTTOM_MS + scrollDuration;
-    
+    const totalTimeNeeded =
+      initialPauseMs +
+      scrollDuration +
+      SCROLL_PAUSE_AT_BOTTOM_MS +
+      scrollDuration;
+
     // Ensure minimum display time
     const totalDisplayTime = Math.max(MIN_DISPLAY_TIME_MS, totalTimeNeeded);
 
@@ -296,7 +301,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       const startTime = Date.now();
       const startPosition = scrollableContentRef.current.scrollTop;
       // Ensure we scroll to the actual maximum scroll position
-      const maxScroll = scrollableContentRef.current.scrollHeight - scrollableContentRef.current.clientHeight;
+      const maxScroll =
+        scrollableContentRef.current.scrollHeight -
+        scrollableContentRef.current.clientHeight;
       const endPosition = Math.max(scrollEndPositionRef.current, maxScroll);
       const duration = scrollDurationRef.current;
 
@@ -315,11 +322,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         const progress = Math.min(elapsed / duration, 1);
 
         // Ease-in-out easing function for smooth scrolling
-        const easeInOut = progress < 0.5
-          ? 2 * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        const easeInOut =
+          progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-        const currentPosition = startPosition + (endPosition - startPosition) * easeInOut;
+        const currentPosition =
+          startPosition + (endPosition - startPosition) * easeInOut;
         scrollableContentRef.current.scrollTop = currentPosition;
 
         if (progress < 1) {
@@ -361,11 +370,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         const progress = Math.min(elapsed / duration, 1);
 
         // Ease-in-out easing function for smooth scrolling
-        const easeInOut = progress < 0.5
-          ? 2 * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        const easeInOut =
+          progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-        const currentPosition = startPosition + (endPosition - startPosition) * easeInOut;
+        const currentPosition =
+          startPosition + (endPosition - startPosition) * easeInOut;
         scrollableContentRef.current.scrollTop = currentPosition;
 
         if (progress < 1) {
@@ -450,7 +461,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           if (!item.contentItem) {
             logger.debug(
               `ContentCarousel: Item ${index} missing contentItem property`,
-              { item }
+              { item },
             );
             return null;
           }
@@ -578,7 +589,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         currentItem?.contentItem?.duration || defaultDuration;
 
       let displayTimeMs = displayTimeSeconds * 1000;
-      
+
       // If auto-scroll might be needed, wait a bit for overflow detection to complete
       // This ensures we have the correct timing before setting the rotation timer
       const setupRotationTimer = () => {
@@ -587,33 +598,33 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           // Use the stored total display time (includes scroll down + pause + scroll up)
           displayTimeMs = Math.max(displayTimeMs, totalDisplayTimeRef.current);
         }
-        
+
         setCurrentItemDisplayTime(displayTimeMs);
 
         // Start a timer to change to the next item
         timerRef.current = setTimeout(() => {
-        // Only proceed if we have more than one item
-        if (contentItems.length <= 1) return;
+          // Only proceed if we have more than one item
+          if (contentItems.length <= 1) return;
 
-        // Preload next item for smoother transition
-        const nextIdx = (currentItemIndex + 1) % contentItems.length;
-        setNextItemIndex(nextIdx);
+          // Preload next item for smoother transition
+          const nextIdx = (currentItemIndex + 1) % contentItems.length;
+          setNextItemIndex(nextIdx);
 
-        // Signal we're changing items (causes a fade out)
-        setIsChangingItem(true);
+          // Signal we're changing items (causes a fade out)
+          setIsChangingItem(true);
 
-        // Short timeout to allow fade out to complete
-        setTimeout(() => {
-          // Change to the next item
-          setCurrentItemIndex(nextIdx);
-          setNextItemIndex(null);
-
-          // Short timeout before fading back in with the new item
+          // Short timeout to allow fade out to complete
           setTimeout(() => {
-            setIsChangingItem(false);
-          }, 50); // Very short delay to ensure DOM update
-        }, FADE_TRANSITION_DURATION - 50); // Slightly less than full transition time
-      }, displayTimeMs);
+            // Change to the next item
+            setCurrentItemIndex(nextIdx);
+            setNextItemIndex(null);
+
+            // Short timeout before fading back in with the new item
+            setTimeout(() => {
+              setIsChangingItem(false);
+            }, 50); // Very short delay to ensure DOM update
+          }, FADE_TRANSITION_DURATION - 50); // Slightly less than full transition time
+        }, displayTimeMs);
       };
 
       // If we might need auto-scroll, wait a bit for overflow detection
@@ -661,26 +672,32 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   // Reset scroll position and detect overflow when content changes
   useEffect(() => {
     if (contentLoading || contentItems.length === 0) return;
-    
+
     // Reset scroll position when item changes
     resetScrollPosition();
-    
+
     // Wait for DOM to update, then detect overflow
     const timeoutId = setTimeout(() => {
       detectOverflowAndCalculateTiming();
     }, 100); // Small delay to ensure DOM is updated
-    
+
     return () => clearTimeout(timeoutId);
-  }, [currentItemIndex, contentItems, contentLoading, resetScrollPosition, detectOverflowAndCalculateTiming]);
+  }, [
+    currentItemIndex,
+    contentItems,
+    contentLoading,
+    resetScrollPosition,
+    detectOverflowAndCalculateTiming,
+  ]);
 
   // Handle window resize - recalculate overflow
   useEffect(() => {
     const handleResize = () => {
       if (contentLoading || contentItems.length === 0) return;
-      
+
       // Stop current scroll if active
       stopAutoScroll();
-      
+
       // Recalculate overflow after resize
       setTimeout(() => {
         detectOverflowAndCalculateTiming();
@@ -689,12 +706,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [contentLoading, contentItems, stopAutoScroll, detectOverflowAndCalculateTiming]);
+  }, [
+    contentLoading,
+    contentItems,
+    stopAutoScroll,
+    detectOverflowAndCalculateTiming,
+  ]);
 
   // Start auto-scroll when overflow is detected
   useEffect(() => {
     if (!needsAutoScroll || isScrolling || isChangingItem) return;
-    
+
     // Ensure timing is calculated before starting scroll
     if (scrollDurationRef.current === 0) {
       // Timing not ready yet, wait a bit
@@ -705,13 +727,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       }, 200);
       return () => clearTimeout(timeoutId);
     }
-    
+
     // Small delay before starting scroll to allow reading at top
     const startDelay = 1000; // 1 second pause at top
     const timeoutId = setTimeout(() => {
       performAutoScroll();
     }, startDelay);
-    
+
     return () => clearTimeout(timeoutId);
   }, [needsAutoScroll, isScrolling, isChangingItem, performAutoScroll]);
 
@@ -872,7 +894,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         </Box>
       );
     },
-    []
+    [],
   );
 
   // Process and format verse/hadith content correctly
@@ -1054,7 +1076,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     switch (contentType) {
       case "VERSE_HADITH":
         contentToShow = formatVerseHadithContent(
-          currentItem.contentItem.content
+          currentItem.contentItem.content,
         );
         break;
 
@@ -1371,14 +1393,16 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
       // Reset scroll position and recalculate overflow
       resetScrollPosition();
-      
+
       // Recalculate overflow after orientation change
       setTimeout(() => {
         detectOverflowAndCalculateTiming();
       }, 200);
 
       lastOrientationRef.current = orientation;
-      logger.debug("ContentCarousel: Orientation changed, resetting timer and scroll");
+      logger.debug(
+        "ContentCarousel: Orientation changed, resetting timer and scroll",
+      );
     }
   }, [orientation, resetScrollPosition, detectOverflowAndCalculateTiming]);
 

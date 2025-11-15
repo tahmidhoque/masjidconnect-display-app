@@ -28,11 +28,11 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
   // Get notification color based on type
   const getNotificationColor = (type: string) => {
     switch (type) {
-      case 'success':
+      case "success":
         return theme.palette.success.main;
-      case 'warning':
+      case "warning":
         return theme.palette.warning.main;
-      case 'error':
+      case "error":
         return theme.palette.error.main;
       default:
         return theme.palette.info.main;
@@ -70,10 +70,10 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
       }}
     >
       {/* Powered by section - always centered */}
-      <Box 
-        sx={{ 
-          display: "flex", 
-          alignItems: "center", 
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
           gap: getSizeRem(1),
           minWidth: 0,
           overflow: "hidden",

@@ -1,13 +1,13 @@
 /**
  * Version Management Utilities
- * 
+ *
  * Provides utilities for semantic versioning operations including:
  * - Version parsing and validation
  * - Version comparison
  * - Version increment operations
  */
 
-import logger from './logger';
+import logger from "./logger";
 
 export interface SemanticVersion {
   major: number;
@@ -24,20 +24,21 @@ export interface SemanticVersion {
 export function parseVersion(versionString: string): SemanticVersion | null {
   try {
     // Remove 'v' prefix if present
-    const cleanVersion = versionString.replace(/^v/, '');
-    
+    const cleanVersion = versionString.replace(/^v/, "");
+
     // Regex for semantic versioning
-    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
-    
+    const semverRegex =
+      /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
     const match = cleanVersion.match(semverRegex);
-    
+
     if (!match) {
-      logger.warn('Invalid version format', { versionString });
+      logger.warn("Invalid version format", { versionString });
       return null;
     }
-    
+
     const [, major, minor, patch, prerelease, build] = match;
-    
+
     return {
       major: parseInt(major, 10),
       minor: parseInt(minor, 10),
@@ -46,7 +47,7 @@ export function parseVersion(versionString: string): SemanticVersion | null {
       build: build || undefined,
     };
   } catch (error) {
-    logger.error('Error parsing version', { versionString, error });
+    logger.error("Error parsing version", { versionString, error });
     return null;
   }
 }
@@ -56,15 +57,15 @@ export function parseVersion(versionString: string): SemanticVersion | null {
  */
 export function versionToString(version: SemanticVersion): string {
   let versionString = `${version.major}.${version.minor}.${version.patch}`;
-  
+
   if (version.prerelease) {
     versionString += `-${version.prerelease}`;
   }
-  
+
   if (version.build) {
     versionString += `+${version.build}`;
   }
-  
+
   return versionString;
 }
 
@@ -75,40 +76,40 @@ export function versionToString(version: SemanticVersion): string {
 export function compareVersions(v1: string, v2: string): number {
   const version1 = parseVersion(v1);
   const version2 = parseVersion(v2);
-  
+
   if (!version1 || !version2) {
-    logger.error('Cannot compare invalid versions', { v1, v2 });
+    logger.error("Cannot compare invalid versions", { v1, v2 });
     return 0;
   }
-  
+
   // Compare major version
   if (version1.major !== version2.major) {
     return version1.major > version2.major ? 1 : -1;
   }
-  
+
   // Compare minor version
   if (version1.minor !== version2.minor) {
     return version1.minor > version2.minor ? 1 : -1;
   }
-  
+
   // Compare patch version
   if (version1.patch !== version2.patch) {
     return version1.patch > version2.patch ? 1 : -1;
   }
-  
+
   // If both have no prerelease, they're equal
   if (!version1.prerelease && !version2.prerelease) {
     return 0;
   }
-  
+
   // Version without prerelease is greater than version with prerelease
   if (!version1.prerelease) return 1;
   if (!version2.prerelease) return -1;
-  
+
   // Compare prerelease versions lexicographically
   if (version1.prerelease < version2.prerelease) return -1;
   if (version1.prerelease > version2.prerelease) return 1;
-  
+
   return 0;
 }
 
@@ -145,37 +146,37 @@ export function isValidVersion(versionString: string): boolean {
  */
 export function incrementVersion(
   currentVersion: string,
-  type: 'major' | 'minor' | 'patch'
+  type: "major" | "minor" | "patch",
 ): string | null {
   const version = parseVersion(currentVersion);
-  
+
   if (!version) {
-    logger.error('Cannot increment invalid version', { currentVersion });
+    logger.error("Cannot increment invalid version", { currentVersion });
     return null;
   }
-  
+
   // Remove prerelease and build metadata when incrementing
   const newVersion: SemanticVersion = {
     major: version.major,
     minor: version.minor,
     patch: version.patch,
   };
-  
+
   switch (type) {
-    case 'major':
+    case "major":
       newVersion.major += 1;
       newVersion.minor = 0;
       newVersion.patch = 0;
       break;
-    case 'minor':
+    case "minor":
       newVersion.minor += 1;
       newVersion.patch = 0;
       break;
-    case 'patch':
+    case "patch":
       newVersion.patch += 1;
       break;
   }
-  
+
   return versionToString(newVersion);
 }
 
@@ -185,14 +186,17 @@ export function incrementVersion(
 export function getCurrentVersion(): string {
   // In production builds, the version might be embedded differently
   // For now, we'll use a constant that will be replaced during build
-  return process.env.REACT_APP_VERSION || '0.0.1';
+  return process.env.REACT_APP_VERSION || "0.0.1";
 }
 
 /**
  * Format version for display with optional prefix
  */
-export function formatVersionDisplay(version: string, includePrefix: boolean = true): string {
-  const prefix = includePrefix ? 'v' : '';
+export function formatVersionDisplay(
+  version: string,
+  includePrefix: boolean = true,
+): string {
+  const prefix = includePrefix ? "v" : "";
   return `${prefix}${version}`;
 }
 
@@ -210,27 +214,26 @@ export function isPrerelease(versionString: string): boolean {
 export function getReleaseType(oldVersion: string, newVersion: string): string {
   const v1 = parseVersion(oldVersion);
   const v2 = parseVersion(newVersion);
-  
-  if (!v1 || !v2) {
-    return 'unknown';
-  }
-  
-  if (v2.major > v1.major) {
-    return 'major';
-  }
-  
-  if (v2.minor > v1.minor) {
-    return 'minor';
-  }
-  
-  if (v2.patch > v1.patch) {
-    return 'patch';
-  }
-  
-  if (v2.prerelease && !v1.prerelease) {
-    return 'prerelease';
-  }
-  
-  return 'none';
-}
 
+  if (!v1 || !v2) {
+    return "unknown";
+  }
+
+  if (v2.major > v1.major) {
+    return "major";
+  }
+
+  if (v2.minor > v1.minor) {
+    return "minor";
+  }
+
+  if (v2.patch > v1.patch) {
+    return "patch";
+  }
+
+  if (v2.prerelease && !v1.prerelease) {
+    return "prerelease";
+  }
+
+  return "none";
+}

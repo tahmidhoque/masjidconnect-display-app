@@ -32,7 +32,7 @@ const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = memo(
     enableIntersectionObserver = false,
   }) => {
     const [shouldRender, setShouldRender] = useState(
-      !enableIntersectionObserver
+      !enableIntersectionObserver,
     );
     const [isDelayComplete, setIsDelayComplete] = useState(delay === 0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = memo(
           {
             rootMargin: "50px", // Start loading 50px before component comes into view
             threshold: 0.1,
-          }
+          },
         );
 
         if (containerRef.current) {
@@ -122,7 +122,7 @@ const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = memo(
         )}
       </Box>
     );
-  }
+  },
 );
 
 LazyComponentWrapper.displayName = "LazyComponentWrapper";
@@ -137,7 +137,7 @@ export function createLazyComponent<T extends React.ComponentType<any>>(
     delay?: number;
     fallback?: React.ReactNode;
     enableIntersectionObserver?: boolean;
-  } = {}
+  } = {},
 ) {
   const LazyComponent = lazy(importFn);
 
@@ -158,7 +158,7 @@ export function createLazyComponent<T extends React.ComponentType<any>>(
 export function useStaggeredLoading(
   count: number,
   baseDelay: number = 100,
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
   const [loadedCount, setLoadedCount] = useState(enabled ? 0 : count);
   const isLowPower = useRef(isLowPowerDevice());

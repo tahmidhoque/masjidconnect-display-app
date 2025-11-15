@@ -26,12 +26,14 @@ This guide provides comprehensive information about the testing infrastructure f
 ### Configuration
 
 Tests are configured through:
+
 - `src/setupTests.ts` - Global test setup and mocks
 - `package.json` - Jest configuration via react-scripts
 
 ### Test Utilities
 
 Located in `src/test-utils/`:
+
 - **mocks.ts**: Mock data factories and utilities
 - **test-providers.tsx**: Provider wrappers for testing components
 
@@ -59,6 +61,7 @@ npm test -- --testNamePattern="should create error response"
 ### Watch Mode Options
 
 When in watch mode, press:
+
 - `a` - Run all tests
 - `f` - Run only failed tests
 - `p` - Filter by file name pattern
@@ -112,7 +115,7 @@ src/
 ### Basic Test Structure
 
 ```typescript
-describe('ComponentName or FunctionName', () => {
+describe("ComponentName or FunctionName", () => {
   // Setup
   beforeEach(() => {
     jest.clearAllMocks();
@@ -123,16 +126,16 @@ describe('ComponentName or FunctionName', () => {
     // cleanup code
   });
 
-  describe('specific functionality', () => {
-    it('should do something specific', () => {
+  describe("specific functionality", () => {
+    it("should do something specific", () => {
       // Arrange
-      const input = 'test';
-      
+      const input = "test";
+
       // Act
       const result = someFunction(input);
-      
+
       // Assert
-      expect(result).toBe('expected');
+      expect(result).toBe("expected");
     });
   });
 });
@@ -147,10 +150,10 @@ import {
   mockScreenContent,
   createSuccessResponse,
   createErrorResponse,
-} from '../../test-utils/mocks';
+} from "../../test-utils/mocks";
 
-describe('API Test', () => {
-  it('should handle successful response', async () => {
+describe("API Test", () => {
+  it("should handle successful response", async () => {
     const mockResponse = createSuccessResponse(mockScreenContent);
     // Use mock data in test
   });
@@ -167,16 +170,16 @@ import userEvent from '@testing-library/user-event';
 describe('MyComponent', () => {
   it('should render correctly', () => {
     renderWithProviders(<MyComponent />);
-    
+
     expect(screen.getByText('Hello')).toBeInTheDocument();
   });
 
   it('should handle user interaction', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MyComponent />);
-    
+
     await user.click(screen.getByRole('button'));
-    
+
     expect(screen.getByText('Clicked')).toBeInTheDocument();
   });
 });
@@ -191,9 +194,9 @@ import { mockReduxState } from '../../test-utils/mocks';
 describe('Component with Redux', () => {
   it('should use Redux state', () => {
     const store = setupStore(mockReduxState);
-    
+
     renderWithProviders(<MyComponent />, { store });
-    
+
     // Test component behavior with store
   });
 });
@@ -202,16 +205,16 @@ describe('Component with Redux', () => {
 ### Testing Async Operations
 
 ```typescript
-import { waitFor } from '@testing-library/react';
+import { waitFor } from "@testing-library/react";
 
-describe('Async Test', () => {
-  it('should handle async operations', async () => {
+describe("Async Test", () => {
+  it("should handle async operations", async () => {
     const promise = asyncFunction();
-    
+
     await waitFor(() => {
       expect(mockFunction).toHaveBeenCalled();
     });
-    
+
     const result = await promise;
     expect(result).toBeDefined();
   });
@@ -225,11 +228,11 @@ describe('Async Test', () => {
 Test the API client by mocking axios:
 
 ```typescript
-import axios from 'axios';
-jest.mock('axios');
+import axios from "axios";
+jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('API Client', () => {
+describe("API Client", () => {
   beforeEach(() => {
     mockedAxios.create.mockReturnValue({
       request: jest.fn(),
@@ -240,7 +243,7 @@ describe('API Client', () => {
     } as any);
   });
 
-  it('should make API call', async () => {
+  it("should make API call", async () => {
     // Test implementation
   });
 });
@@ -251,16 +254,17 @@ describe('API Client', () => {
 Test services by mocking dependencies:
 
 ```typescript
-import masjidDisplayClient from '../api/masjidDisplayClient';
-jest.mock('../api/masjidDisplayClient');
+import masjidDisplayClient from "../api/masjidDisplayClient";
+jest.mock("../api/masjidDisplayClient");
 
-describe('DataSyncService', () => {
+describe("DataSyncService", () => {
   beforeEach(() => {
-    (masjidDisplayClient.getScreenContent as jest.Mock)
-      .mockResolvedValue(mockResponse);
+    (masjidDisplayClient.getScreenContent as jest.Mock).mockResolvedValue(
+      mockResponse,
+    );
   });
-  
-  it('should sync data', async () => {
+
+  it("should sync data", async () => {
     // Test implementation
   });
 });
@@ -271,13 +275,13 @@ describe('DataSyncService', () => {
 Test hooks using `renderHook` from React Testing Library:
 
 ```typescript
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from "@testing-library/react";
 
-describe('useCustomHook', () => {
-  it('should return expected value', () => {
+describe("useCustomHook", () => {
+  it("should return expected value", () => {
     const { result } = renderHook(() => useCustomHook());
-    
-    expect(result.current.value).toBe('expected');
+
+    expect(result.current.value).toBe("expected");
   });
 });
 ```
@@ -287,12 +291,12 @@ describe('useCustomHook', () => {
 Always test error scenarios:
 
 ```typescript
-describe('Error Handling', () => {
-  it('should handle errors gracefully', async () => {
-    mockFunction.mockRejectedValue(new Error('Failed'));
-    
+describe("Error Handling", () => {
+  it("should handle errors gracefully", async () => {
+    mockFunction.mockRejectedValue(new Error("Failed"));
+
     const result = await functionUnderTest();
-    
+
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
   });
@@ -304,16 +308,16 @@ describe('Error Handling', () => {
 Test boundary conditions:
 
 ```typescript
-describe('Edge Cases', () => {
-  it('should handle empty input', () => {
+describe("Edge Cases", () => {
+  it("should handle empty input", () => {
     expect(processData([])).toEqual([]);
   });
 
-  it('should handle null input', () => {
+  it("should handle null input", () => {
     expect(processData(null)).toBeNull();
   });
 
-  it('should handle undefined input', () => {
+  it("should handle undefined input", () => {
     expect(processData(undefined)).toBeUndefined();
   });
 });
@@ -336,18 +340,21 @@ it('debug test', () => {
 ### Debugging Async Issues
 
 ```typescript
-import { waitFor } from '@testing-library/react';
+import { waitFor } from "@testing-library/react";
 
-it('async debug', async () => {
+it("async debug", async () => {
   // Add logging
-  console.log('Before async call');
-  
-  await waitFor(() => {
-    console.log('Inside waitFor');
-    expect(condition).toBe(true);
-  }, { timeout: 5000 }); // Increase timeout for debugging
-  
-  console.log('After async call');
+  console.log("Before async call");
+
+  await waitFor(
+    () => {
+      console.log("Inside waitFor");
+      expect(condition).toBe(true);
+    },
+    { timeout: 5000 },
+  ); // Increase timeout for debugging
+
+  console.log("After async call");
 });
 ```
 
@@ -387,6 +394,7 @@ npm test -- --coverage --coverageReporters=html --watchAll=false
 ### Coverage Thresholds
 
 Current thresholds (can be configured in package.json):
+
 - Statements: 80%
 - Branches: 80%
 - Functions: 80%
@@ -395,6 +403,7 @@ Current thresholds (can be configured in package.json):
 ### Viewing Coverage
 
 After running tests with coverage:
+
 1. Open `coverage/lcov-report/index.html` in browser
 2. Navigate through files to see line-by-line coverage
 3. Red lines = not covered
@@ -407,18 +416,18 @@ After running tests with coverage:
 Each test should be independent:
 
 ```typescript
-describe('Isolated Tests', () => {
+describe("Isolated Tests", () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
     // Reset any global state
   });
 
-  it('test 1', () => {
+  it("test 1", () => {
     // This test doesn't depend on test 2
   });
 
-  it('test 2', () => {
+  it("test 2", () => {
     // This test doesn't depend on test 1
   });
 });
@@ -437,13 +446,13 @@ it('should return user data when API call succeeds', () => { ... });
 ### 3. Arrange-Act-Assert Pattern
 
 ```typescript
-it('should calculate total', () => {
+it("should calculate total", () => {
   // Arrange - Set up test data
   const items = [1, 2, 3];
-  
+
   // Act - Execute the function
   const result = calculateTotal(items);
-  
+
   // Assert - Verify the result
   expect(result).toBe(6);
 });
@@ -453,10 +462,10 @@ it('should calculate total', () => {
 
 ```typescript
 // Mock at the top of the file
-jest.mock('../external-service');
+jest.mock("../external-service");
 
-describe('Tests', () => {
-  it('should use mocked service', () => {
+describe("Tests", () => {
+  it("should use mocked service", () => {
     // Service is automatically mocked
   });
 });
@@ -466,13 +475,13 @@ describe('Tests', () => {
 
 ```typescript
 // ❌ Bad - Testing implementation
-it('should call setState', () => {
+it("should call setState", () => {
   expect(component.setState).toHaveBeenCalled();
 });
 
 // ✅ Good - Testing user-visible behavior
-it('should display success message after submission', async () => {
-  await user.click(screen.getByRole('button', { name: /submit/i }));
+it("should display success message after submission", async () => {
+  await user.click(screen.getByRole("button", { name: /submit/i }));
   expect(screen.getByText(/success/i)).toBeInTheDocument();
 });
 ```
@@ -487,7 +496,7 @@ it('should display success message after submission', async () => {
 jest.setTimeout(10000); // 10 seconds
 
 // Or per test
-it('long test', async () => {
+it("long test", async () => {
   // test code
 }, 10000);
 ```
@@ -498,7 +507,7 @@ it('long test', async () => {
 
 ```typescript
 await waitFor(() => {
-  expect(screen.getByText('Updated')).toBeInTheDocument();
+  expect(screen.getByText("Updated")).toBeInTheDocument();
 });
 ```
 
@@ -507,9 +516,9 @@ await waitFor(() => {
 **Solution**: Ensure mock is hoisted above imports
 
 ```typescript
-jest.mock('./module'); // Must be at the top
+jest.mock("./module"); // Must be at the top
 
-import { something } from './module';
+import { something } from "./module";
 ```
 
 ### Issue: Canvas Errors
@@ -530,7 +539,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: "16"
       - run: npm ci
       - run: npm test -- --coverage --watchAll=false
       - uses: codecov/codecov-action@v2
@@ -547,19 +556,19 @@ jobs:
 ### Common Jest Matchers
 
 ```typescript
-expect(value).toBe(expected);           // Strict equality
-expect(value).toEqual(expected);        // Deep equality
-expect(value).toBeTruthy();             // Truthy value
-expect(value).toBeFalsy();              // Falsy value
-expect(value).toBeNull();               // null
-expect(value).toBeUndefined();          // undefined
-expect(value).toBeDefined();            // not undefined
-expect(array).toContain(item);          // Array contains
-expect(string).toMatch(/pattern/);      // Regex match
-expect(fn).toHaveBeenCalled();          // Mock was called
-expect(fn).toHaveBeenCalledWith(arg);   // Mock called with args
-expect(value).toBeGreaterThan(3);       // Numeric comparison
-expect(value).toBeCloseTo(0.3, 1);      // Floating point
+expect(value).toBe(expected); // Strict equality
+expect(value).toEqual(expected); // Deep equality
+expect(value).toBeTruthy(); // Truthy value
+expect(value).toBeFalsy(); // Falsy value
+expect(value).toBeNull(); // null
+expect(value).toBeUndefined(); // undefined
+expect(value).toBeDefined(); // not undefined
+expect(array).toContain(item); // Array contains
+expect(string).toMatch(/pattern/); // Regex match
+expect(fn).toHaveBeenCalled(); // Mock was called
+expect(fn).toHaveBeenCalledWith(arg); // Mock called with args
+expect(value).toBeGreaterThan(3); // Numeric comparison
+expect(value).toBeCloseTo(0.3, 1); // Floating point
 ```
 
 ### Testing Library Queries
@@ -597,4 +606,3 @@ findAllBy...
 
 **Last Updated**: October 2025
 **Maintainer**: MasjidConnect Development Team
-

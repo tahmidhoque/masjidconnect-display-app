@@ -1,17 +1,20 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../store';
-import logger from '../utils/logger';
-import { getDevicePerformanceProfile, isHighStrainDevice } from '../utils/performanceUtils';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../store";
+import logger from "../utils/logger";
+import {
+  getDevicePerformanceProfile,
+  isHighStrainDevice,
+} from "../utils/performanceUtils";
 
-export type AppPhase = 
-  | 'initializing'     // App is starting up
-  | 'checking'         // Checking credentials  
-  | 'pairing'          // Showing pairing screen
-  | 'loading-content'  // Loading display content
-  | 'preparing'        // Content loaded, preparing display
-  | 'ready'            // Display is ready to show
-  | 'displaying';      // Actively displaying content
+export type AppPhase =
+  | "initializing" // App is starting up
+  | "checking" // Checking credentials
+  | "pairing" // Showing pairing screen
+  | "loading-content" // Loading display content
+  | "preparing" // Content loaded, preparing display
+  | "ready" // Display is ready to show
+  | "displaying"; // Actively displaying content
 
 interface LoadingStateManagerOptions {
   minimumLoadingDuration?: number;
@@ -36,7 +39,7 @@ interface LoadingStateManager {
 const getLoadingDurations = () => {
   const profile = getDevicePerformanceProfile();
   const isHighStrain = isHighStrainDevice();
-  
+
   if (isHighStrain) {
     // Much faster loading for 4K RPi displays
     return {
@@ -44,7 +47,7 @@ const getLoadingDurations = () => {
       contentReadyDelay: 300,
       transitionDuration: 200,
     };
-  } else if (profile.profile === 'low') {
+  } else if (profile.profile === "low") {
     // Slightly faster for low-power devices
     return {
       minimumLoadingDuration: 1500,
@@ -63,40 +66,52 @@ const getLoadingDurations = () => {
 
 /**
  * useLoadingStateManager - Unified loading state management
- * 
+ *
  * Coordinates all loading states across the app to provide smooth,
  * predictable transitions without rapid state changes or flashing.
  * Enhanced with 4K display optimizations and better stability.
  */
 export default function useLoadingStateManager(
-  options: LoadingStateManagerOptions = {}
+  options: LoadingStateManagerOptions = {},
 ): LoadingStateManager {
   const performanceDurations = getLoadingDurations();
   const isHighStrain = isHighStrainDevice();
-  
+
   const {
     minimumLoadingDuration = performanceDurations.minimumLoadingDuration,
     contentReadyDelay = performanceDurations.contentReadyDelay,
-    transitionDuration = performanceDurations.transitionDuration
+    transitionDuration = performanceDurations.transitionDuration,
   } = options;
 
   // Redux state
-  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated,
+  );
   const isPairing = useSelector((state: RootState) => state.auth.isPairing);
   const pairingCode = useSelector((state: RootState) => state.auth.pairingCode);
-  const isInitializing = useSelector((state: RootState) => state.ui.isInitializing);
-  const initializationStage = useSelector((state: RootState) => state.ui.initializationStage);
-  const contentLoading = useSelector((state: RootState) => state.content.isLoading);
-  const screenContent = useSelector((state: RootState) => state.content.screenContent);
-  const prayerTimes = useSelector((state: RootState) => state.content.prayerTimes);
+  const isInitializing = useSelector(
+    (state: RootState) => state.ui.isInitializing,
+  );
+  const initializationStage = useSelector(
+    (state: RootState) => state.ui.initializationStage,
+  );
+  const contentLoading = useSelector(
+    (state: RootState) => state.content.isLoading,
+  );
+  const screenContent = useSelector(
+    (state: RootState) => state.content.screenContent,
+  );
+  const prayerTimes = useSelector(
+    (state: RootState) => state.content.prayerTimes,
+  );
 
   // Internal state
-  const [currentPhase, setCurrentPhase] = useState<AppPhase>('initializing');
+  const [currentPhase, setCurrentPhase] = useState<AppPhase>("initializing");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowLoadingScreen, setShouldShowLoadingScreen] = useState(true);
   const [shouldShowDisplay, setShouldShowDisplay] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('Starting up...');
+  const [statusMessage, setStatusMessage] = useState("Starting up...");
 
   // Refs for timing control and debouncing
   const phaseStartTime = useRef<number>(Date.now());
@@ -116,28 +131,44 @@ export default function useLoadingStateManager(
   // Calculate progress based on current phase
   const calculateProgress = useCallback((phase: AppPhase) => {
     switch (phase) {
-      case 'initializing': return 5;
-      case 'checking': return 20;
-      case 'pairing': return 35;
-      case 'loading-content': return 65;
-      case 'preparing': return 85;
-      case 'ready': return 95;
-      case 'displaying': return 100;
-      default: return 0;
+      case "initializing":
+        return 5;
+      case "checking":
+        return 20;
+      case "pairing":
+        return 35;
+      case "loading-content":
+        return 65;
+      case "preparing":
+        return 85;
+      case "ready":
+        return 95;
+      case "displaying":
+        return 100;
+      default:
+        return 0;
     }
   }, []);
 
   // Get status message for current phase
   const getStatusMessage = useCallback((phase: AppPhase) => {
     switch (phase) {
-      case 'initializing': return 'Starting up...';
-      case 'checking': return 'Checking credentials...';
-      case 'pairing': return 'Ready to pair';
-      case 'loading-content': return 'Loading content...';
-      case 'preparing': return 'Preparing display...';
-      case 'ready': return 'Almost ready...';
-      case 'displaying': return 'Connected';
-      default: return 'Loading...';
+      case "initializing":
+        return "Starting up...";
+      case "checking":
+        return "Checking credentials...";
+      case "pairing":
+        return "Ready to pair";
+      case "loading-content":
+        return "Loading content...";
+      case "preparing":
+        return "Preparing display...";
+      case "ready":
+        return "Almost ready...";
+      case "displaying":
+        return "Connected";
+      default:
+        return "Loading...";
     }
   }, []);
 
@@ -148,105 +179,123 @@ export default function useLoadingStateManager(
   }, []);
 
   // Debounced phase transition to prevent rapid changes
-  const transitionToPhaseDebounced = useCallback((newPhase: AppPhase, skipMinimumDuration = false) => {
-    const now = Date.now();
-    const timeSinceLastChange = now - lastPhaseChangeTime.current;
-    const minimumChangeInterval = 500; // Minimum time between phase changes
+  const transitionToPhaseDebounced = useCallback(
+    (newPhase: AppPhase, skipMinimumDuration = false) => {
+      const now = Date.now();
+      const timeSinceLastChange = now - lastPhaseChangeTime.current;
+      const minimumChangeInterval = 500; // Minimum time between phase changes
 
-    // Clear any pending transitions
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
+      // Clear any pending transitions
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
 
-    pendingPhaseRef.current = newPhase;
+      pendingPhaseRef.current = newPhase;
 
-    const executeTransition = () => {
-      const pendingPhase = pendingPhaseRef.current;
-      if (!pendingPhase || pendingPhase === currentPhase) return;
+      const executeTransition = () => {
+        const pendingPhase = pendingPhaseRef.current;
+        if (!pendingPhase || pendingPhase === currentPhase) return;
 
-      const currentTime = Date.now();
-      const elapsedTime = currentTime - phaseStartTime.current;
-      const minimumTimeRemaining = skipMinimumDuration ? 0 : Math.max(0, minimumLoadingDuration - elapsedTime);
+        const currentTime = Date.now();
+        const elapsedTime = currentTime - phaseStartTime.current;
+        const minimumTimeRemaining = skipMinimumDuration
+          ? 0
+          : Math.max(0, minimumLoadingDuration - elapsedTime);
 
-      logger.info(`[LoadingStateManager] Transitioning: ${currentPhase} -> ${pendingPhase}`, {
-        elapsedTime,
-        minimumTimeRemaining,
-        skipMinimumDuration
-      });
+        logger.info(
+          `[LoadingStateManager] Transitioning: ${currentPhase} -> ${pendingPhase}`,
+          {
+            elapsedTime,
+            minimumTimeRemaining,
+            skipMinimumDuration,
+          },
+        );
 
-      const doTransition = () => {
-        setIsTransitioning(true);
-        setCurrentPhase(pendingPhase);
-        setProgress(calculateProgress(pendingPhase));
-        setStatusMessage(getStatusMessage(pendingPhase));
-        phaseStartTime.current = Date.now();
-        lastPhaseChangeTime.current = Date.now();
+        const doTransition = () => {
+          setIsTransitioning(true);
+          setCurrentPhase(pendingPhase);
+          setProgress(calculateProgress(pendingPhase));
+          setStatusMessage(getStatusMessage(pendingPhase));
+          phaseStartTime.current = Date.now();
+          lastPhaseChangeTime.current = Date.now();
 
-        // Handle specific phase transitions
-        setTimeout(() => {
-          setIsTransitioning(false);
-          
-          // Update display flags based on new phase
-          if (pendingPhase === 'pairing') {
-            setShouldShowLoadingScreen(false);
-            setShouldShowDisplay(false);
-          } else if (pendingPhase === 'preparing') {
-            // Auto-transition from preparing to ready
-            setShouldShowLoadingScreen(true);
-            setShouldShowDisplay(false);
-            
-            contentReadyTimer.current = setTimeout(() => {
-              setCurrentPhase('ready');
-              setProgress(95);
-              setStatusMessage('Almost ready...');
-              
-              // Then transition to displaying
-              setTimeout(() => {
+          // Handle specific phase transitions
+          setTimeout(() => {
+            setIsTransitioning(false);
+
+            // Update display flags based on new phase
+            if (pendingPhase === "pairing") {
+              setShouldShowLoadingScreen(false);
+              setShouldShowDisplay(false);
+            } else if (pendingPhase === "preparing") {
+              // Auto-transition from preparing to ready
+              setShouldShowLoadingScreen(true);
+              setShouldShowDisplay(false);
+
+              contentReadyTimer.current = setTimeout(() => {
+                setCurrentPhase("ready");
+                setProgress(95);
+                setStatusMessage("Almost ready...");
+
+                // Then transition to displaying
+                setTimeout(() => {
+                  setShouldShowLoadingScreen(false);
+                  setShouldShowDisplay(true);
+                  setCurrentPhase("displaying");
+                  setProgress(100);
+                  setStatusMessage("Connected");
+                }, 800);
+              }, 1000);
+            } else if (pendingPhase === "ready") {
+              // Direct transition to displaying from ready
+              setShouldShowLoadingScreen(true);
+              setShouldShowDisplay(false);
+
+              contentReadyTimer.current = setTimeout(() => {
                 setShouldShowLoadingScreen(false);
                 setShouldShowDisplay(true);
-                setCurrentPhase('displaying');
+                setCurrentPhase("displaying");
                 setProgress(100);
-                setStatusMessage('Connected');
-              }, 800);
-            }, 1000);
-          } else if (pendingPhase === 'ready') {
-            // Direct transition to displaying from ready
-            setShouldShowLoadingScreen(true);
-            setShouldShowDisplay(false);
-            
-            contentReadyTimer.current = setTimeout(() => {
+                setStatusMessage("Connected");
+              }, contentReadyDelay);
+            } else if (pendingPhase === "displaying") {
               setShouldShowLoadingScreen(false);
               setShouldShowDisplay(true);
-              setCurrentPhase('displaying');
-              setProgress(100);
-              setStatusMessage('Connected');
-            }, contentReadyDelay);
-          } else if (pendingPhase === 'displaying') {
-            setShouldShowLoadingScreen(false);
-            setShouldShowDisplay(true);
-          } else {
-            setShouldShowLoadingScreen(true);
-            setShouldShowDisplay(false);
-          }
-        }, transitionDuration);
+            } else {
+              setShouldShowLoadingScreen(true);
+              setShouldShowDisplay(false);
+            }
+          }, transitionDuration);
+        };
+
+        if (minimumTimeRemaining > 0) {
+          transitionTimer.current = setTimeout(
+            doTransition,
+            minimumTimeRemaining,
+          );
+        } else {
+          doTransition();
+        }
       };
 
-      if (minimumTimeRemaining > 0) {
-        transitionTimer.current = setTimeout(doTransition, minimumTimeRemaining);
+      // If enough time has passed since last change, execute immediately
+      if (timeSinceLastChange >= minimumChangeInterval || skipMinimumDuration) {
+        executeTransition();
       } else {
-        doTransition();
+        // Otherwise, debounce it
+        const delay = minimumChangeInterval - timeSinceLastChange;
+        debounceTimer.current = setTimeout(executeTransition, delay);
       }
-    };
-
-    // If enough time has passed since last change, execute immediately
-    if (timeSinceLastChange >= minimumChangeInterval || skipMinimumDuration) {
-      executeTransition();
-    } else {
-      // Otherwise, debounce it
-      const delay = minimumChangeInterval - timeSinceLastChange;
-      debounceTimer.current = setTimeout(executeTransition, delay);
-    }
-  }, [currentPhase, minimumLoadingDuration, contentReadyDelay, transitionDuration, calculateProgress, getStatusMessage]);
+    },
+    [
+      currentPhase,
+      minimumLoadingDuration,
+      contentReadyDelay,
+      transitionDuration,
+      calculateProgress,
+      getStatusMessage,
+    ],
+  );
 
   // Main phase determination logic with stability improvements
   useEffect(() => {
@@ -264,69 +313,78 @@ export default function useLoadingStateManager(
     if (!isAuthenticated && !isPairing && !pairingCode) {
       // No authentication, not pairing
       if (isInitializing) {
-        targetPhase = initializationStage === 'checking' ? 'checking' : 'initializing';
+        targetPhase =
+          initializationStage === "checking" ? "checking" : "initializing";
       } else {
-        targetPhase = 'checking';
+        targetPhase = "checking";
       }
     } else if (!isAuthenticated && (isPairing || pairingCode)) {
       // In pairing mode
-      targetPhase = 'pairing';
+      targetPhase = "pairing";
     } else if (isAuthenticated && (contentLoading || !hasMinimumContent())) {
       // Authenticated but content not ready
       // CRITICAL FIX: Don't show loading screen for routine prayer time updates
-      if (currentPhase === 'displaying' && hasMinimumContent()) {
+      if (currentPhase === "displaying" && hasMinimumContent()) {
         // If we're already displaying and have content, stay displaying
         // This prevents loading screen during routine prayer time updates
-        targetPhase = 'displaying';
-        logger.debug(`[LoadingStateManager] Staying in display mode during routine update`, {
-          contentLoading,
-          hasContent: hasMinimumContent(),
-          currentPhase
-        });
+        targetPhase = "displaying";
+        logger.debug(
+          `[LoadingStateManager] Staying in display mode during routine update`,
+          {
+            contentLoading,
+            hasContent: hasMinimumContent(),
+            currentPhase,
+          },
+        );
       } else if (!contentLoading && hasMinimumContent()) {
         // CRITICAL FIX: If not loading and we have content, proceed to preparing
         // This handles the case after pairing completes
-        targetPhase = 'preparing';
-        logger.info('[LoadingStateManager] Content available after auth, proceeding to preparing');
+        targetPhase = "preparing";
+        logger.info(
+          "[LoadingStateManager] Content available after auth, proceeding to preparing",
+        );
       } else {
         // Only show loading if we truly don't have content to display
-        targetPhase = 'loading-content';
+        targetPhase = "loading-content";
       }
     } else if (isAuthenticated && hasMinimumContent()) {
       // Authenticated with content - ready to display
-      if (currentPhase === 'displaying') {
-        targetPhase = 'displaying'; // Stay displaying
-      } else if (currentPhase === 'ready') {
-        targetPhase = 'ready'; // Let the timer handle transition to displaying
-      } else if (currentPhase === 'preparing') {
-        targetPhase = 'preparing'; // Let the timer handle transition to ready
+      if (currentPhase === "displaying") {
+        targetPhase = "displaying"; // Stay displaying
+      } else if (currentPhase === "ready") {
+        targetPhase = "ready"; // Let the timer handle transition to displaying
+      } else if (currentPhase === "preparing") {
+        targetPhase = "preparing"; // Let the timer handle transition to ready
       } else {
         // CRITICAL FIX: Fast-track to preparing when authenticated with content
-        targetPhase = 'preparing';
-        logger.info('[LoadingStateManager] Fast-tracking to preparing phase');
+        targetPhase = "preparing";
+        logger.info("[LoadingStateManager] Fast-tracking to preparing phase");
       }
     } else {
       // Fallback
-      targetPhase = 'checking';
+      targetPhase = "checking";
     }
 
     // Only transition if phase actually needs to change and we're not currently transitioning
     if (targetPhase !== currentPhase && !isTransitioning) {
-      logger.info(`[LoadingStateManager] Phase change needed: ${currentPhase} -> ${targetPhase}`, {
-        isAuthenticated,
-        isPairing,
-        pairingCode: !!pairingCode,
-        isInitializing,
-        initializationStage,
-        contentLoading,
-        hasContent: hasMinimumContent()
-      });
-      
+      logger.info(
+        `[LoadingStateManager] Phase change needed: ${currentPhase} -> ${targetPhase}`,
+        {
+          isAuthenticated,
+          isPairing,
+          pairingCode: !!pairingCode,
+          isInitializing,
+          initializationStage,
+          contentLoading,
+          hasContent: hasMinimumContent(),
+        },
+      );
+
       transitionToPhaseDebounced(targetPhase);
     }
   }, [
     isAuthenticated,
-    isPairing, 
+    isPairing,
     pairingCode,
     isInitializing,
     initializationStage,
@@ -334,7 +392,7 @@ export default function useLoadingStateManager(
     hasMinimumContent,
     currentPhase,
     isTransitioning,
-    transitionToPhaseDebounced
+    transitionToPhaseDebounced,
   ]);
 
   // CRITICAL FIX: Failsafe timeout to prevent infinite loading
@@ -343,36 +401,42 @@ export default function useLoadingStateManager(
     if (failsafeTimer.current) {
       clearTimeout(failsafeTimer.current);
     }
-    
+
     // If we're in a loading phase and have content and authentication, set a failsafe
-    const loadingPhases: AppPhase[] = ['loading-content', 'preparing', 'ready'];
-    if (loadingPhases.includes(currentPhase) && isAuthenticated && hasMinimumContent()) {
+    const loadingPhases: AppPhase[] = ["loading-content", "preparing", "ready"];
+    if (
+      loadingPhases.includes(currentPhase) &&
+      isAuthenticated &&
+      hasMinimumContent()
+    ) {
       const FAILSAFE_TIMEOUT = 10000; // 10 seconds max
-      
-      logger.info('[LoadingStateManager] Setting failsafe timeout', { 
-        currentPhase, 
-        timeout: FAILSAFE_TIMEOUT 
+
+      logger.info("[LoadingStateManager] Setting failsafe timeout", {
+        currentPhase,
+        timeout: FAILSAFE_TIMEOUT,
       });
-      
+
       failsafeTimer.current = setTimeout(() => {
-        logger.warn('[LoadingStateManager] ⚠️ FAILSAFE TRIGGERED - Forcing transition to display');
-        
+        logger.warn(
+          "[LoadingStateManager] ⚠️ FAILSAFE TRIGGERED - Forcing transition to display",
+        );
+
         // Force immediate transition to displaying
-        setCurrentPhase('displaying');
+        setCurrentPhase("displaying");
         setShouldShowLoadingScreen(false);
         setShouldShowDisplay(true);
         setProgress(100);
-        setStatusMessage('Connected');
+        setStatusMessage("Connected");
       }, FAILSAFE_TIMEOUT);
     }
-    
+
     return () => {
       if (failsafeTimer.current) {
         clearTimeout(failsafeTimer.current);
       }
     };
   }, [currentPhase, isAuthenticated, hasMinimumContent]);
-  
+
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
@@ -392,9 +456,11 @@ export default function useLoadingStateManager(
   }, []);
 
   // Calculate derived loading state - be more conservative about when to hide loading
-  const isLoading = currentPhase !== 'displaying' && currentPhase !== 'pairing';
-  const actualShouldShowLoading = shouldShowLoadingScreen && currentPhase !== 'displaying';
-  const actualShouldShowDisplay = shouldShowDisplay && currentPhase === 'displaying';
+  const isLoading = currentPhase !== "displaying" && currentPhase !== "pairing";
+  const actualShouldShowLoading =
+    shouldShowLoadingScreen && currentPhase !== "displaying";
+  const actualShouldShowDisplay =
+    shouldShowDisplay && currentPhase === "displaying";
 
   return {
     currentPhase,
@@ -404,6 +470,6 @@ export default function useLoadingStateManager(
     isTransitioning,
     progress,
     statusMessage,
-    forcePhase
+    forcePhase,
   };
-} 
+}

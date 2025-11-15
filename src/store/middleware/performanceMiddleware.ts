@@ -1,9 +1,9 @@
-import { createListenerMiddleware, isAnyOf } from '@reduxjs/toolkit';
-import type { RootState } from '../index';
-import { refreshAllContent, refreshPrayerTimes } from '../slices/contentSlice';
-import { setOrientation } from '../slices/uiSlice';
-import { isLowPowerDevice, throttle } from '../../utils/performanceUtils';
-import logger from '../../utils/logger';
+import { createListenerMiddleware, isAnyOf } from "@reduxjs/toolkit";
+import type { RootState } from "../index";
+import { refreshAllContent, refreshPrayerTimes } from "../slices/contentSlice";
+import { setOrientation } from "../slices/uiSlice";
+import { isLowPowerDevice, throttle } from "../../utils/performanceUtils";
+import logger from "../../utils/logger";
 
 // Performance monitoring
 let actionCount = 0;
@@ -13,9 +13,12 @@ const PERFORMANCE_CHECK_INTERVAL = 5000; // Check every 5 seconds
 export const performanceMiddleware = createListenerMiddleware();
 
 // Throttle expensive actions on low-power devices
-const throttledRefreshContent = throttle((dispatch: any) => {
-  dispatch(refreshAllContent({ forceRefresh: false }));
-}, isLowPowerDevice() ? 15000 : 10000); // 15s for RPi vs 10s for others
+const throttledRefreshContent = throttle(
+  (dispatch: any) => {
+    dispatch(refreshAllContent({ forceRefresh: false }));
+  },
+  isLowPowerDevice() ? 15000 : 10000,
+); // 15s for RPi vs 10s for others
 
 // Monitor action frequency and warn about performance issues
 performanceMiddleware.startListening({
@@ -23,18 +26,19 @@ performanceMiddleware.startListening({
   effect: (action, listenerApi) => {
     actionCount++;
     const now = Date.now();
-    
+
     if (now - lastPerformanceCheck > PERFORMANCE_CHECK_INTERVAL) {
-      const actionsPerSecond = actionCount / (PERFORMANCE_CHECK_INTERVAL / 1000);
-      
+      const actionsPerSecond =
+        actionCount / (PERFORMANCE_CHECK_INTERVAL / 1000);
+
       if (isLowPowerDevice() && actionsPerSecond > 2) {
-        logger.warn('High action frequency detected on low-power device', {
+        logger.warn("High action frequency detected on low-power device", {
           actionsPerSecond,
           actionCount,
-          interval: PERFORMANCE_CHECK_INTERVAL
+          interval: PERFORMANCE_CHECK_INTERVAL,
         });
       }
-      
+
       // Reset counters
       actionCount = 0;
       lastPerformanceCheck = now;
@@ -49,15 +53,16 @@ performanceMiddleware.startListening({
     if (isLowPowerDevice()) {
       const state = listenerApi.getState() as RootState;
       const lastUpdated = state.content.lastUpdated;
-      
+
       if (lastUpdated) {
-        const timeSinceLastUpdate = Date.now() - new Date(lastUpdated).getTime();
+        const timeSinceLastUpdate =
+          Date.now() - new Date(lastUpdated).getTime();
         const minInterval = 30000; // 30 seconds minimum on RPi
-        
+
         if (timeSinceLastUpdate < minInterval) {
-          logger.debug('Throttling content refresh on low-power device', {
+          logger.debug("Throttling content refresh on low-power device", {
             timeSinceLastUpdate,
-            minInterval
+            minInterval,
           });
           return; // Skip this refresh
         }
@@ -72,9 +77,9 @@ let updateTimeout: NodeJS.Timeout | null = null;
 
 const flushPendingUpdates = (listenerApi: any) => {
   if (pendingUpdates.length > 0) {
-    logger.debug('Flushing batched updates', { count: pendingUpdates.length });
+    logger.debug("Flushing batched updates", { count: pendingUpdates.length });
     // Process all pending updates
-    pendingUpdates.forEach(update => {
+    pendingUpdates.forEach((update) => {
       // Apply the actual update
       listenerApi.dispatch(update);
     });
@@ -90,11 +95,11 @@ performanceMiddleware.startListening({
     if (isLowPowerDevice()) {
       // Batch UI updates to reduce re-render frequency
       pendingUpdates.push(action);
-      
+
       if (updateTimeout) {
         clearTimeout(updateTimeout);
       }
-      
+
       updateTimeout = setTimeout(() => {
         flushPendingUpdates(listenerApi);
       }, 100); // Batch for 100ms
@@ -103,7 +108,11 @@ performanceMiddleware.startListening({
 });
 
 // Memory usage monitoring for low-power devices
-if (isLowPowerDevice() && window.performance && (window.performance as any).memory) {
+if (
+  isLowPowerDevice() &&
+  window.performance &&
+  (window.performance as any).memory
+) {
   performanceMiddleware.startListening({
     predicate: () => true,
     effect: (action, listenerApi) => {
@@ -111,18 +120,18 @@ if (isLowPowerDevice() && window.performance && (window.performance as any).memo
       const usedMemoryMB = memoryInfo.usedJSHeapSize / 1024 / 1024;
       const totalMemoryMB = memoryInfo.totalJSHeapSize / 1024 / 1024;
       const usagePercent = (usedMemoryMB / totalMemoryMB) * 100;
-      
+
       if (usagePercent > 80) {
-        logger.warn('High memory usage detected', {
+        logger.warn("High memory usage detected", {
           usedMemoryMB: usedMemoryMB.toFixed(2),
           totalMemoryMB: totalMemoryMB.toFixed(2),
-          usagePercent: usagePercent.toFixed(1)
+          usagePercent: usagePercent.toFixed(1),
         });
-        
+
         // Trigger garbage collection if available
         if (window.gc) {
           window.gc();
-          logger.debug('Triggered garbage collection');
+          logger.debug("Triggered garbage collection");
         }
       }
     },
@@ -136,12 +145,14 @@ performanceMiddleware.startListening({
     if (isLowPowerDevice()) {
       // Defer non-critical UI updates after prayer time changes
       setTimeout(() => {
-        document.dispatchEvent(new CustomEvent('prayer-times-updated', {
-          detail: action.payload
-        }));
+        document.dispatchEvent(
+          new CustomEvent("prayer-times-updated", {
+            detail: action.payload,
+          }),
+        );
       }, 100);
     }
   },
 });
 
-export default performanceMiddleware; 
+export default performanceMiddleware;

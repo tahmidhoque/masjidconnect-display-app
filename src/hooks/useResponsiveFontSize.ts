@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 /**
  * Interface for screen size properties
@@ -18,7 +18,7 @@ interface ScreenSize {
 
 /**
  * useResponsiveFontSize
- * 
+ *
  * A custom hook that provides responsive sizing based on screen dimensions.
  * Optimized for 16:9 displays with special handling for 720p screens.
  */
@@ -26,17 +26,17 @@ const useResponsiveFontSize = () => {
   // Reference design dimensions (based on 1280x720)
   const BASE_WIDTH = 1280;
   const BASE_HEIGHT = 720;
-  
+
   // Calculate initial state for responsive values
   const getInitialState = () => {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const aspectRatio = width / height;
     const isLandscape = width > height;
-    
+
     // Calculate scale based on width for consistent sizing
     const scale = width / BASE_WIDTH;
-    
+
     return {
       viewportScale: Math.max(scale, 0.6), // Never scale below 60%
       screenSize: {
@@ -44,18 +44,24 @@ const useResponsiveFontSize = () => {
         height,
         isLargeScreen: width >= 1920 || height >= 1080,
         is720p: width <= 1280 || height <= 720,
-        is1080p: (width > 1280 && width <= 1920) || (height > 720 && height <= 1080),
-        is1440p: (width > 1920 && width <= 2560) || (height > 1080 && height <= 1440),
+        is1080p:
+          (width > 1280 && width <= 1920) || (height > 720 && height <= 1080),
+        is1440p:
+          (width > 1920 && width <= 2560) || (height > 1080 && height <= 1440),
         is4K: width > 3000 || height > 1600,
         isSmallerThan720p: width < 960 || height < 540,
         aspectRatio,
-        isLandscape
-      }
+        isLandscape,
+      },
     };
   };
-  
-  const [viewportScale, setViewportScale] = useState(() => getInitialState().viewportScale);
-  const [screenSize, setScreenSize] = useState<ScreenSize>(() => getInitialState().screenSize);
+
+  const [viewportScale, setViewportScale] = useState(
+    () => getInitialState().viewportScale,
+  );
+  const [screenSize, setScreenSize] = useState<ScreenSize>(
+    () => getInitialState().screenSize,
+  );
 
   // Update on window resize
   useEffect(() => {
@@ -64,22 +70,24 @@ const useResponsiveFontSize = () => {
       const height = window.innerHeight;
       const aspectRatio = width / height;
       const isLandscape = width > height;
-      
+
       // Calculate scale based on width for consistent sizing
       const scale = width / BASE_WIDTH;
-      
+
       setViewportScale(Math.max(scale, 0.6)); // Never scale below 60%
       setScreenSize({
         width,
         height,
         isLargeScreen: width >= 1920 || height >= 1080,
         is720p: width <= 1280 || height <= 720,
-        is1080p: (width > 1280 && width <= 1920) || (height > 720 && height <= 1080),
-        is1440p: (width > 1920 && width <= 2560) || (height > 1080 && height <= 1440),
+        is1080p:
+          (width > 1280 && width <= 1920) || (height > 720 && height <= 1080),
+        is1440p:
+          (width > 1920 && width <= 2560) || (height > 1080 && height <= 1440),
         is4K: width > 3000 || height > 1600,
         isSmallerThan720p: width < 960 || height < 540,
         aspectRatio,
-        isLandscape
+        isLandscape,
       });
     };
 
@@ -87,15 +95,15 @@ const useResponsiveFontSize = () => {
     handleResize();
 
     // Recalculate on resize
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Helper functions for responsive sizing
   const getSizeRem = (size: number) => `${size * viewportScale}rem`;
   const getSizePx = (size: number) => `${size * viewportScale}px`;
   const getSize = (size: number) => size * viewportScale;
-  
+
   // Define consistent font and element sizes
   const fontSizes = {
     // Heading sizes
@@ -106,41 +114,48 @@ const useResponsiveFontSize = () => {
     h4: getSizeRem(1.5),
     h5: getSizeRem(1.3),
     h6: getSizeRem(1.1),
-    
+
     // Body text sizes
     body1: getSizeRem(1.0),
     body2: getSizeRem(0.9),
     caption: getSizeRem(0.8),
     small: getSizeRem(0.7),
-    
+
     // Prayer times specific sizes - increased for better visibility
-    prayerName: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(1.3) // Larger in portrait 720p
-      : getSizeRem(1.0),
-    prayerTime: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(1.4) // Larger in portrait 720p
-      : getSizeRem(1.1),
-    prayerJamaat: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(1.3) // Larger in portrait 720p
-      : getSizeRem(1.0),
-    
+    prayerName:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(1.3) // Larger in portrait 720p
+        : getSizeRem(1.0),
+    prayerTime:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(1.4) // Larger in portrait 720p
+        : getSizeRem(1.1),
+    prayerJamaat:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(1.3) // Larger in portrait 720p
+        : getSizeRem(1.0),
+
     // Countdown sizes - significantly increased for 720p
-    countdownDigit: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(2.8) // Larger in portrait 720p
-      : getSizeRem(2.2),
-    countdownLabel: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(0.8) // Larger in portrait 720p
-      : getSizeRem(0.65),
-    
+    countdownDigit:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(2.8) // Larger in portrait 720p
+        : getSizeRem(2.2),
+    countdownLabel:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(0.8) // Larger in portrait 720p
+        : getSizeRem(0.65),
+
     // UI elements and headers
-    nextPrayerTitle: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(1.6) // Larger in portrait 720p
-      : getSizeRem(1.2),
-    headerText: screenSize.is720p && !screenSize.isLandscape 
-      ? getSizeRem(1.3) // Larger in portrait 720p
-      : getSizeRem(1.1),
+    nextPrayerTitle:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(1.6) // Larger in portrait 720p
+        : getSizeRem(1.2),
+    headerText:
+      screenSize.is720p && !screenSize.isLandscape
+        ? getSizeRem(1.3) // Larger in portrait 720p
+        : getSizeRem(1.1),
   };
-  
+
   // Calculate a proportional sidebar width based on screen resolution
   const calculateSidebarWidth = () => {
     // Base width calculations based on screen resolution
@@ -160,7 +175,7 @@ const useResponsiveFontSize = () => {
       return `${Math.max(Math.min(screenSize.width * 0.25, 360), 320)}px`;
     }
   };
-  
+
   // Layout measurements
   const layout = {
     prayerRowHeight: getSizePx(38),
@@ -172,15 +187,15 @@ const useResponsiveFontSize = () => {
     sidebarWidth: calculateSidebarWidth(),
   };
 
-  return { 
+  return {
     fontSizes,
     layout,
-    screenSize, 
+    screenSize,
     viewportScale,
     getSizeRem,
     getSizePx,
-    getSize
+    getSize,
   };
 };
 
-export default useResponsiveFontSize; 
+export default useResponsiveFontSize;

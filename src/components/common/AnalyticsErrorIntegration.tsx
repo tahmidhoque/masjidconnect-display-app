@@ -49,7 +49,7 @@ const AnalyticsErrorIntegration: React.FC = () => {
           error.userFriendlyMessage || error.message,
           error.code,
           error.metadata?.stack || undefined,
-          false // Initially not resolved
+          false, // Initially not resolved
         );
 
         // Mark as reported
@@ -72,7 +72,7 @@ const AnalyticsErrorIntegration: React.FC = () => {
     // Clean up resolved errors from our tracking
     const activeErrorIds = new Set(activeErrors.map((error) => error.id));
     const resolvedErrorIds = Array.from(reportedErrorIds.current).filter(
-      (id) => !activeErrorIds.has(id)
+      (id) => !activeErrorIds.has(id),
     );
 
     // Report resolved errors to analytics
@@ -84,7 +84,7 @@ const AnalyticsErrorIntegration: React.FC = () => {
           "Error resolved",
           errorId,
           undefined,
-          true // Resolved
+          true, // Resolved
         );
 
         logger.debug("Error resolution reported to analytics", { errorId });
@@ -115,7 +115,7 @@ export const useAnalyticsErrorReporting = () => {
       error: Error,
       errorType: ErrorType = "SYSTEM",
       errorCode?: string,
-      resolved = false
+      resolved = false,
     ) => {
       try {
         await analyticsService.reportError(
@@ -123,7 +123,7 @@ export const useAnalyticsErrorReporting = () => {
           error.message,
           errorCode,
           error.stack,
-          resolved
+          resolved,
         );
 
         logger.debug("Manual error reported to analytics", {
@@ -138,35 +138,35 @@ export const useAnalyticsErrorReporting = () => {
         });
       }
     },
-    []
+    [],
   );
 
   const reportNetworkError = React.useCallback(
     async (message: string, errorCode?: string) => {
       await reportError(new Error(message), "NETWORK", errorCode);
     },
-    [reportError]
+    [reportError],
   );
 
   const reportContentError = React.useCallback(
     async (message: string, errorCode?: string) => {
       await reportError(new Error(message), "CONTENT", errorCode);
     },
-    [reportError]
+    [reportError],
   );
 
   const reportApiError = React.useCallback(
     async (message: string, errorCode?: string) => {
       await reportError(new Error(message), "API", errorCode);
     },
-    [reportError]
+    [reportError],
   );
 
   const reportDisplayError = React.useCallback(
     async (message: string, errorCode?: string) => {
       await reportError(new Error(message), "DISPLAY", errorCode);
     },
-    [reportError]
+    [reportError],
   );
 
   return {
@@ -208,7 +208,7 @@ export class AnalyticsErrorBoundary extends React.Component<
         error.message,
         "COMPONENT_ERROR",
         error.stack,
-        false
+        false,
       );
 
       logger.debug("Component error reported to analytics", {

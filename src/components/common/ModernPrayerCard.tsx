@@ -54,10 +54,10 @@ const ModernPrayerCard: React.FC<ModernPrayerCardProps> = ({
 
   // Redux selectors
   const prayerTimes = useSelector(
-    (state: RootState) => state.content.prayerTimes
+    (state: RootState) => state.content.prayerTimes,
   );
   const isLoading = useSelector(
-    (state: RootState) => state.content.isLoadingPrayerTimes
+    (state: RootState) => state.content.isLoadingPrayerTimes,
   );
 
   const isPortrait = orientation === "portrait";
@@ -67,7 +67,7 @@ const ModernPrayerCard: React.FC<ModernPrayerCardProps> = ({
     (forceRefresh: boolean = false) => {
       dispatch(refreshPrayerTimes({ forceRefresh }));
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Local state to handle initial loading and retry logic
@@ -100,7 +100,7 @@ const ModernPrayerCard: React.FC<ModernPrayerCardProps> = ({
           hasPrayerTimes: !!prayerTimes,
           hasNextPrayer: !!nextPrayer,
           hasFormattedTimes: todaysPrayerTimes.length,
-        }
+        },
       );
 
       // Only refresh if enough time has passed and we haven't exceeded retry limit
@@ -126,7 +126,7 @@ const ModernPrayerCard: React.FC<ModernPrayerCardProps> = ({
         }, 3000);
       } else if (retryCount >= 3) {
         logger.error(
-          "[ModernPrayerCard] Maximum retry attempts reached for prayer times"
+          "[ModernPrayerCard] Maximum retry attempts reached for prayer times",
         );
         setLocalLoading(false); // Stop showing loading after max retries
       }

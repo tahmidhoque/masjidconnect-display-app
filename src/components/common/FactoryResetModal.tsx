@@ -57,7 +57,7 @@ const FactoryResetModal: React.FC<FactoryResetModalProps> = ({
           break;
       }
     },
-    [open, onConfirm, onCancel]
+    [open, onConfirm, onCancel],
   );
 
   // Set up keyboard listeners

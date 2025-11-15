@@ -16,7 +16,7 @@ import { POLLING_INTERVALS } from "../../api/masjidDisplayClient";
 const AuthErrorDetector: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const isAuthenticated = useSelector(
-    (state: RootState) => state.auth.isAuthenticated
+    (state: RootState) => state.auth.isAuthenticated,
   );
   const [lastCheckTime, setLastCheckTime] = useState<number>(Date.now());
   const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0);
@@ -43,7 +43,7 @@ const AuthErrorDetector: React.FC = () => {
     // Set up periodic check based on the heartbeat interval from the integration guide
     checkIntervalRef.current = window.setInterval(
       checkAuthStatus,
-      checkInterval
+      checkInterval,
     );
 
     return () => {

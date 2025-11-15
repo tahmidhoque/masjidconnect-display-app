@@ -1,5 +1,5 @@
-import localforage from 'localforage';
-import logger from '../utils/logger';
+import localforage from "localforage";
+import logger from "../utils/logger";
 
 /**
  * Interface for cached content with expiration metadata
@@ -13,26 +13,46 @@ interface CachedContent {
 /**
  * Content type keys for different storage stores
  */
-type ContentType = 'content' | 'prayer-times' | 'events' | 'announcements' | 'images';
+type ContentType =
+  | "content"
+  | "prayer-times"
+  | "events"
+  | "announcements"
+  | "images";
 
 /**
  * Enhanced Offline Storage Service
- * 
+ *
  * Provides TTL-based caching with separate stores per content type.
  * Automatically handles expiration and cleanup of expired content.
  */
 class OfflineStorageService {
   private stores: Record<ContentType, LocalForage> = {
-    content: localforage.createInstance({ name: 'MasjidConnect', storeName: 'content' }),
-    'prayer-times': localforage.createInstance({ name: 'MasjidConnect', storeName: 'prayer-times' }),
-    events: localforage.createInstance({ name: 'MasjidConnect', storeName: 'events' }),
-    announcements: localforage.createInstance({ name: 'MasjidConnect', storeName: 'announcements' }),
-    images: localforage.createInstance({ name: 'MasjidConnect', storeName: 'images' }),
+    content: localforage.createInstance({
+      name: "MasjidConnect",
+      storeName: "content",
+    }),
+    "prayer-times": localforage.createInstance({
+      name: "MasjidConnect",
+      storeName: "prayer-times",
+    }),
+    events: localforage.createInstance({
+      name: "MasjidConnect",
+      storeName: "events",
+    }),
+    announcements: localforage.createInstance({
+      name: "MasjidConnect",
+      storeName: "announcements",
+    }),
+    images: localforage.createInstance({
+      name: "MasjidConnect",
+      storeName: "images",
+    }),
   };
 
   /**
    * Store content with expiration
-   * 
+   *
    * @param type - Content type (content, prayer-times, events, announcements, images)
    * @param key - Unique key for the cached item
    * @param data - Data to cache
@@ -42,13 +62,13 @@ class OfflineStorageService {
     type: ContentType,
     key: string,
     data: any,
-    ttlSeconds: number = 86400 // 24 hours default
+    ttlSeconds: number = 86400, // 24 hours default
   ): Promise<void> {
     try {
       const cached: CachedContent = {
         data,
         timestamp: Date.now(),
-        expiresAt: Date.now() + (ttlSeconds * 1000),
+        expiresAt: Date.now() + ttlSeconds * 1000,
       };
 
       await this.stores[type].setItem(key, cached);
@@ -64,7 +84,7 @@ class OfflineStorageService {
 
   /**
    * Retrieve content if not expired
-   * 
+   *
    * @param type - Content type
    * @param key - Unique key for the cached item
    * @returns Cached data or null if not found or expired
@@ -83,27 +103,30 @@ class OfflineStorageService {
       if (now > cached.expiresAt) {
         logger.debug(`[OfflineStorage] Cache expired for ${type}/${key}`, {
           expiredAt: new Date(cached.expiresAt).toISOString(),
-          age: Math.round((now - cached.expiresAt) / 1000 / 60) + ' minutes',
+          age: Math.round((now - cached.expiresAt) / 1000 / 60) + " minutes",
         });
         await this.stores[type].removeItem(key);
         return null;
       }
 
       logger.debug(`[OfflineStorage] Retrieved ${type}/${key}`, {
-        age: Math.round((now - cached.timestamp) / 1000 / 60) + ' minutes',
-        expiresIn: Math.round((cached.expiresAt - now) / 1000 / 60) + ' minutes',
+        age: Math.round((now - cached.timestamp) / 1000 / 60) + " minutes",
+        expiresIn:
+          Math.round((cached.expiresAt - now) / 1000 / 60) + " minutes",
       });
 
       return cached.data;
     } catch (error) {
-      logger.error(`[OfflineStorage] Error retrieving ${type}/${key}`, { error });
+      logger.error(`[OfflineStorage] Error retrieving ${type}/${key}`, {
+        error,
+      });
       return null;
     }
   }
 
   /**
    * Check if content exists and is not expired
-   * 
+   *
    * @param type - Content type
    * @param key - Unique key for the cached item
    * @returns true if content exists and is valid
@@ -128,7 +151,7 @@ class OfflineStorageService {
 
   /**
    * Remove a specific cached item
-   * 
+   *
    * @param type - Content type
    * @param key - Unique key for the cached item
    */
@@ -143,7 +166,7 @@ class OfflineStorageService {
 
   /**
    * Clear all content of a specific type
-   * 
+   *
    * @param type - Content type
    */
   async clearType(type: ContentType): Promise<void> {
@@ -177,21 +200,28 @@ class OfflineStorageService {
         }
 
         if (removedCount > 0) {
-          logger.info(`[OfflineStorage] Removed ${removedCount} expired items from ${storeName}`);
+          logger.info(
+            `[OfflineStorage] Removed ${removedCount} expired items from ${storeName}`,
+          );
         }
       } catch (error) {
-        logger.error(`[OfflineStorage] Error clearing expired content from ${storeName}`, { error });
+        logger.error(
+          `[OfflineStorage] Error clearing expired content from ${storeName}`,
+          { error },
+        );
       }
     }
 
     if (totalRemoved > 0) {
-      logger.info(`[OfflineStorage] Cleaned up ${totalRemoved} expired items total`);
+      logger.info(
+        `[OfflineStorage] Cleaned up ${totalRemoved} expired items total`,
+      );
     }
   }
 
   /**
    * Get storage statistics
-   * 
+   *
    * @returns Storage statistics including item counts and estimated size
    */
   async getStorageStats(): Promise<{
@@ -226,7 +256,9 @@ class OfflineStorageService {
         totalItems += validCount;
         expiredCount += expiredInStore;
       } catch (error) {
-        logger.error(`[OfflineStorage] Error getting stats for ${storeName}`, { error });
+        logger.error(`[OfflineStorage] Error getting stats for ${storeName}`, {
+          error,
+        });
         byType[storeName] = 0;
       }
     }
@@ -247,10 +279,12 @@ class OfflineStorageService {
    */
   async clearAll(): Promise<void> {
     try {
-      await Promise.all(Object.values(this.stores).map(store => store.clear()));
-      logger.info('[OfflineStorage] Cleared all cached content');
+      await Promise.all(
+        Object.values(this.stores).map((store) => store.clear()),
+      );
+      logger.info("[OfflineStorage] Cleared all cached content");
     } catch (error) {
-      logger.error('[OfflineStorage] Error clearing all content', { error });
+      logger.error("[OfflineStorage] Error clearing all content", { error });
       throw error;
     }
   }
@@ -259,5 +293,3 @@ class OfflineStorageService {
 // Export singleton instance
 const offlineStorage = new OfflineStorageService();
 export default offlineStorage;
-
-

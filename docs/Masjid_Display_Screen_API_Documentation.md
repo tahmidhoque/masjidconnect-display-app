@@ -7,7 +7,9 @@ This document outlines the APIs available for the display screen application tha
 ## Authentication
 
 ### Screen Authentication
+
 All display screen API requests must include:
+
 - `Authorization` header with `Bearer {apiKey}`
 - `X-Screen-ID` header with the screen's unique ID
 
@@ -18,16 +20,21 @@ These credentials are obtained during the pairing process.
 ### 1. Screen Pairing
 
 #### A. Check Unpaired Screens
+
 ```
 GET /api/screens/unpaired
 ```
+
 Returns a list of screens that are in the PAIRING state.
 
 #### B. Pair a Screen
+
 ```
 POST /api/screens/pair
 ```
+
 **Request Body:**
+
 ```json
 {
   "pairingCode": "string",
@@ -37,7 +44,9 @@ POST /api/screens/pair
   }
 }
 ```
+
 **Response:**
+
 ```json
 {
   "screen": {
@@ -49,14 +58,18 @@ POST /api/screens/pair
 ```
 
 ### 2. Screen Heartbeat
+
 ```
 POST /api/screen/heartbeat
 ```
+
 **Headers:**
+
 - `Authorization: Bearer {apiKey}`
 - `X-Screen-ID: {screenId}`
 
 **Request Body:**
+
 ```json
 {
   "status": "ONLINE",
@@ -67,7 +80,9 @@ POST /api/screen/heartbeat
   }
 }
 ```
+
 **Response:**
+
 ```json
 {
   "success": true,
@@ -75,7 +90,9 @@ POST /api/screen/heartbeat
     "id": "string",
     "name": "string",
     "orientation": "LANDSCAPE | PORTRAIT",
-    "schedule": { /* schedule details */ },
+    "schedule": {
+      /* schedule details */
+    },
     "masjid": {
       "id": "string",
       "name": "string",
@@ -86,14 +103,18 @@ POST /api/screen/heartbeat
 ```
 
 ### 3. Fetch Screen Content
+
 ```
 GET /api/screen/content
 ```
+
 **Headers:**
+
 - `Authorization: Bearer {apiKey}`
 - `X-Screen-ID: {screenId}`
 
 **Response:**
+
 ```json
 {
   "screen": {
@@ -180,6 +201,7 @@ Query Parameters:
 ```
 
 **Response Example:**
+
 ```json
 {
   "prayerTimes": [
@@ -196,7 +218,7 @@ Query Parameters:
       "asrJamaat": "17:15",
       "maghribJamaat": "19:40",
       "ishaJamaat": "21:30"
-    },
+    }
     // Additional days...
   ]
 }
@@ -215,6 +237,7 @@ Query Parameters:
 ```
 
 **Response Example:**
+
 ```json
 {
   "events": [
@@ -231,7 +254,7 @@ Query Parameters:
 }
 ```
 
-### 3. Current Prayer Status 
+### 3. Current Prayer Status
 
 **Gap:** There's no API to determine the current prayer status (e.g., which prayer is next, time until next prayer).
 
@@ -242,12 +265,13 @@ GET /api/screen/prayer-status
 ```
 
 **Response Example:**
+
 ```json
 {
   "currentPrayer": "ASR",
   "currentPrayerTime": "16:45",
   "currentPrayerJamaat": "17:15",
-  "nextPrayer": "MAGHRIB", 
+  "nextPrayer": "MAGHRIB",
   "nextPrayerTime": "19:30",
   "nextPrayerJamaat": "19:40",
   "timeUntilNextPrayer": "02:45:00",
@@ -266,6 +290,7 @@ PUT /api/screen/config
 ```
 
 **Request Body:**
+
 ```json
 {
   "orientation": "LANDSCAPE | PORTRAIT",
@@ -288,6 +313,7 @@ GET /api/screen/offline-data
 ```
 
 **Response Example:**
+
 ```json
 {
   "contentItems": [...],
@@ -310,6 +336,7 @@ WebSocket: /api/ws/screen
 ```
 
 **Events:**
+
 - `content-updated`: When content items are updated
 - `prayer-times-updated`: When prayer times are updated
 - `config-updated`: When screen configuration is updated
@@ -388,7 +415,7 @@ The display screen application should be structured as follows:
 To fulfill the identified gaps, the following new API endpoints should be implemented:
 
 1. Create `/api/screen/prayer-times` endpoint
-2. Create `/api/screen/events` endpoint 
+2. Create `/api/screen/events` endpoint
 3. Create `/api/screen/prayer-status` endpoint
 4. Create `/api/screen/config` endpoint
 5. Create `/api/screen/offline-data` endpoint
@@ -426,4 +453,4 @@ To fulfill the identified gaps, the following new API endpoints should be implem
 4. **User Acceptance Testing**
    - Verify content displays correctly
    - Ensure prayer times are accurate
-   - Test in real mosque environments 
+   - Test in real mosque environments

@@ -3,6 +3,7 @@
 ## Issue
 
 The MasjidConnect Display App is experiencing CORS (Cross-Origin Resource Sharing) errors when trying to access several API endpoints:
+
 - `/content`
 - `/prayer-status`
 - `/prayer-times`
@@ -17,31 +18,36 @@ These errors prevent the application from properly caching data for offline use.
 If you're using Express.js, add the following middleware to your server:
 
 ```javascript
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
 const app = express();
 
 // Enable CORS for all routes with proper configuration
-app.use(cors({
-  origin: '*', // Allow all origins, or specify ['http://localhost:3001', 'https://your-production-domain.com']
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Screen-ID'],
-  credentials: true,
-  maxAge: 86400 // 24 hours
-}));
+app.use(
+  cors({
+    origin: "*", // Allow all origins, or specify ['http://localhost:3001', 'https://your-production-domain.com']
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Screen-ID"],
+    credentials: true,
+    maxAge: 86400, // 24 hours
+  }),
+);
 
 // Set headers on all responses (alternative approach)
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Screen-ID');
-  res.header('Access-Control-Max-Age', '86400');
-  
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Screen-ID",
+  );
+  res.header("Access-Control-Max-Age", "86400");
+
   // Handle preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
-  
+
   next();
 });
 ```
@@ -51,21 +57,27 @@ app.use((req, res, next) => {
 If you're using Node.js without Express:
 
 ```javascript
-const http = require('http');
+const http = require("http");
 
 const server = http.createServer((req, res) => {
   // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Screen-ID');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Screen-ID",
+  );
+  res.setHeader("Access-Control-Max-Age", "86400");
+
   // Handle preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     res.statusCode = 200;
     return res.end();
   }
-  
+
   // Continue with normal request handling
   // ...
 });
@@ -137,10 +149,12 @@ For local development where frontend and backend are on different ports:
 
 ```javascript
 // Configure CORS more specifically
-app.use(cors({
-  origin: ['http://localhost:3001', 'http://127.0.0.1:3001'], 
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:3001", "http://127.0.0.1:3001"],
+    credentials: true,
+  }),
+);
 ```
 
 ### Testing CORS without Backend Changes
@@ -148,21 +162,25 @@ app.use(cors({
 If you can't immediately change the backend, you can test with a CORS proxy during development:
 
 1. Install a CORS proxy package:
+
 ```bash
 npm install -g cors-anywhere
 ```
 
 2. Run the proxy server:
+
 ```bash
 cors-anywhere
 ```
 
 3. Modify your API client to use the proxy:
+
 ```javascript
 // Change your API base URL
-const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:8080/http://your-api-server.com' // CORS proxy URL
-  : 'http://your-api-server.com';
+const API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8080/http://your-api-server.com" // CORS proxy URL
+    : "http://your-api-server.com";
 ```
 
 ## Security Considerations
@@ -184,4 +202,4 @@ curl -H "Origin: http://localhost:3001" \
   http://your-api-server.com/api/prayer-times
 ```
 
-You should see the CORS headers in the response. 
+You should see the CORS headers in the response.

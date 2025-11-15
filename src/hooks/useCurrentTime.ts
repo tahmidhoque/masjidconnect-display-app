@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
 /**
  * Global time manager to prevent multiple timer conflicts
@@ -15,19 +15,19 @@ class GlobalTimeManager {
    */
   subscribe(callback: (time: Date) => void): () => void {
     this.subscribers.add(callback);
-    
+
     // Start timer if this is the first subscription
     if (!this.isRunning) {
       this.startTimer();
     }
-    
+
     // Return current time immediately
     callback(this.currentTime);
-    
+
     // Return unsubscribe function
     return () => {
       this.subscribers.delete(callback);
-      
+
       // Stop timer if no more subscribers
       if (this.subscribers.size === 0) {
         this.stopTimer();
@@ -42,24 +42,24 @@ class GlobalTimeManager {
     if (this.isRunning) return;
 
     this.isRunning = true;
-    
+
     // Use a more precise timer approach
     const updateTime = () => {
       this.currentTime = new Date();
-      
+
       // Notify all subscribers
-      this.subscribers.forEach(callback => {
+      this.subscribers.forEach((callback) => {
         try {
           callback(this.currentTime);
         } catch (error) {
-          console.error('Error in time subscriber callback:', error);
+          console.error("Error in time subscriber callback:", error);
         }
       });
     };
 
     // Update immediately
     updateTime();
-    
+
     // Set up interval - use more precise timing
     this.timer = setInterval(updateTime, 1000);
   }
@@ -95,11 +95,11 @@ class GlobalTimeManager {
   forceUpdate(): void {
     if (this.isRunning) {
       this.currentTime = new Date();
-      this.subscribers.forEach(callback => {
+      this.subscribers.forEach((callback) => {
         try {
           callback(this.currentTime);
         } catch (error) {
-          console.error('Error in forced time update:', error);
+          console.error("Error in forced time update:", error);
         }
       });
     }
@@ -114,7 +114,9 @@ const globalTimeManager = new GlobalTimeManager();
  * Prevents multiple timer conflicts that cause skipped seconds
  */
 export const useCurrentTime = (): Date => {
-  const [currentTime, setCurrentTime] = useState(() => globalTimeManager.getCurrentTime());
+  const [currentTime, setCurrentTime] = useState(() =>
+    globalTimeManager.getCurrentTime(),
+  );
   const callbackRef = useRef<(time: Date) => void>();
 
   // Create stable callback reference
@@ -193,4 +195,4 @@ if (process.env.NODE_ENV === 'development') {
 }
 */
 
-export default useCurrentTime; 
+export default useCurrentTime;

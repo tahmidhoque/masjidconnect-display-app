@@ -19,6 +19,7 @@ This guide provides quick setup instructions for running the MasjidConnect Displ
    - Use `arm64` package for 64-bit Raspberry Pi OS (Pi 4, newer models)
 
 2. Install the package:
+
    ```bash
    sudo apt update
    sudo apt install -y ./masjidconnect-display-0.1.0-arm64.deb
@@ -43,16 +44,21 @@ For the best experience, set up your Raspberry Pi in kiosk mode:
 
 1. Install Raspberry Pi OS Lite (64-bit recommended for Pi 4)
 2. Configure auto-login:
+
    ```bash
    sudo raspi-config
    ```
+
    Navigate to System Options > Boot / Auto Login > Desktop Autologin
 
 3. Disable screen blanking:
+
    ```bash
    sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
    ```
+
    Add these lines:
+
    ```
    @xset s off
    @xset -dpms
@@ -87,4 +93,4 @@ If you encounter issues:
 - For display issues, ensure GPU memory is at least 128MB in `/boot/config.txt`
 - If the app doesn't start automatically, check `/etc/xdg/autostart/` for the desktop file
 
-Need more help? Visit [MasjidConnect Support](https://masjidconnect.com/support) 
+Need more help? Visit [MasjidConnect Support](https://masjidconnect.com/support)

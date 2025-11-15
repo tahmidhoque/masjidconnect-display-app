@@ -1,4 +1,4 @@
-import logger from './logger';
+import logger from "./logger";
 
 interface GPUOptimizationSettings {
   reduceAnimations: boolean;
@@ -17,7 +17,7 @@ class RPiGPUOptimizer {
       reduceAnimations: true,
       limitParallelRendering: true,
       forceGarbageCollection: true,
-      reduceTextureQuality: true
+      reduceTextureQuality: true,
     };
   }
 
@@ -29,18 +29,18 @@ class RPiGPUOptimizer {
 
     // Only optimize on likely RPi environments
     if (!this.isRaspberryPi()) {
-      logger.debug('GPU Optimizer: Not running on RPi, skipping optimizations');
+      logger.debug("GPU Optimizer: Not running on RPi, skipping optimizations");
       return;
     }
 
-    logger.info('GPU Optimizer: Initializing RPi GPU optimizations');
-    
+    logger.info("GPU Optimizer: Initializing RPi GPU optimizations");
+
     this.applyGPUOptimizations();
     this.setupMemoryCleanup();
     this.monitorGPUHealth();
-    
+
     this.isOptimized = true;
-    logger.info('GPU Optimizer: RPi optimizations applied');
+    logger.info("GPU Optimizer: RPi optimizations applied");
   }
 
   /**
@@ -49,13 +49,15 @@ class RPiGPUOptimizer {
   private isRaspberryPi(): boolean {
     const userAgent = navigator.userAgent.toLowerCase();
     const platform = navigator.platform.toLowerCase();
-    
+
     // Check for RPi indicators
-    return userAgent.includes('raspberry') ||
-           platform.includes('arm') ||
-           userAgent.includes('linux arm') ||
-           // Check for specific RPi GPU indicators
-           this.hasRPiGPUIndicators();
+    return (
+      userAgent.includes("raspberry") ||
+      platform.includes("arm") ||
+      userAgent.includes("linux arm") ||
+      // Check for specific RPi GPU indicators
+      this.hasRPiGPUIndicators()
+    );
   }
 
   /**
@@ -63,23 +65,26 @@ class RPiGPUOptimizer {
    */
   private hasRPiGPUIndicators(): boolean {
     try {
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      
+      const canvas = document.createElement("canvas");
+      const gl =
+        canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+
       if (!gl || !(gl instanceof WebGLRenderingContext)) return false;
-      
-      const renderer = gl.getParameter(gl.RENDERER) || '';
-      const vendor = gl.getParameter(gl.VENDOR) || '';
-      
+
+      const renderer = gl.getParameter(gl.RENDERER) || "";
+      const vendor = gl.getParameter(gl.VENDOR) || "";
+
       // Clean up
       canvas.remove();
-      
+
       // Look for VideoCore/Broadcom indicators
-      return renderer.toLowerCase().includes('videocore') ||
-             vendor.toLowerCase().includes('broadcom') ||
-             renderer.toLowerCase().includes('vc4');
+      return (
+        renderer.toLowerCase().includes("videocore") ||
+        vendor.toLowerCase().includes("broadcom") ||
+        renderer.toLowerCase().includes("vc4")
+      );
     } catch (error) {
-      logger.debug('GPU Optimizer: Could not detect GPU info', { error });
+      logger.debug("GPU Optimizer: Could not detect GPU info", { error });
       return false;
     }
   }
@@ -89,7 +94,7 @@ class RPiGPUOptimizer {
    */
   private applyGPUOptimizations(): void {
     // Inject CSS optimizations
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
       /* RPi GPU Optimizations */
       * {
@@ -129,7 +134,7 @@ class RPiGPUOptimizer {
         transform: none !important;
       }
     `;
-    style.setAttribute('data-rpi-optimization', 'true');
+    style.setAttribute("data-rpi-optimization", "true");
     document.head.appendChild(style);
   }
 
@@ -155,12 +160,11 @@ class RPiGPUOptimizer {
 
       // Clean up any detached canvases
       this.cleanupDetachedCanvases();
-      
+
       // Log GPU memory status
       this.logGPUMemoryStatus();
-      
     } catch (error) {
-      logger.debug('GPU Optimizer: Cleanup error', { error });
+      logger.debug("GPU Optimizer: Cleanup error", { error });
     }
   }
 
@@ -168,20 +172,22 @@ class RPiGPUOptimizer {
    * Clean up detached canvas elements that might be leaking GPU memory
    */
   private cleanupDetachedCanvases(): void {
-    const canvases = document.querySelectorAll('canvas');
+    const canvases = document.querySelectorAll("canvas");
     let cleanedCount = 0;
-    
-    canvases.forEach(canvas => {
+
+    canvases.forEach((canvas) => {
       // Check if canvas is detached or hidden
       if (!canvas.isConnected || canvas.offsetParent === null) {
-        const context = canvas.getContext('2d') || canvas.getContext('webgl');
+        const context = canvas.getContext("2d") || canvas.getContext("webgl");
         if (context) {
           try {
             // Clear canvas content
             if (context instanceof CanvasRenderingContext2D) {
               context.clearRect(0, 0, canvas.width, canvas.height);
             } else if (context instanceof WebGLRenderingContext) {
-              context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+              context.clear(
+                context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT,
+              );
             }
             cleanedCount++;
           } catch (error) {
@@ -200,13 +206,13 @@ class RPiGPUOptimizer {
    * Log GPU memory status for monitoring
    */
   private logGPUMemoryStatus(): void {
-    if ('memory' in (performance as any)) {
+    if ("memory" in (performance as any)) {
       const memory = (performance as any).memory;
       const gpuMemoryUsageMB = memory.usedJSHeapSize / 1024 / 1024;
-      
-      logger.debug('GPU Optimizer: Memory status', {
+
+      logger.debug("GPU Optimizer: Memory status", {
         jsHeapUsed: `${gpuMemoryUsageMB.toFixed(1)}MB`,
-        jsHeapLimit: `${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1)}MB`
+        jsHeapLimit: `${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1)}MB`,
       });
     }
   }
@@ -216,19 +222,19 @@ class RPiGPUOptimizer {
    */
   private monitorGPUHealth(): void {
     // Listen for WebGL context lost events
-    document.addEventListener('webglcontextlost', (event) => {
-      logger.warn('GPU Optimizer: WebGL context lost detected', {
+    document.addEventListener("webglcontextlost", (event) => {
+      logger.warn("GPU Optimizer: WebGL context lost detected", {
         type: event.type,
-        target: event.target
+        target: event.target,
       });
-      
+
       // Prevent default to allow context restoration
       event.preventDefault();
     });
 
     // Listen for context restored events
-    document.addEventListener('webglcontextrestored', () => {
-      logger.info('GPU Optimizer: WebGL context restored');
+    document.addEventListener("webglcontextrestored", () => {
+      logger.info("GPU Optimizer: WebGL context restored");
     });
   }
 
@@ -236,10 +242,10 @@ class RPiGPUOptimizer {
    * Emergency GPU optimization for when buffer errors occur
    */
   public emergencyOptimization(): void {
-    logger.warn('GPU Optimizer: Applying emergency optimizations');
-    
+    logger.warn("GPU Optimizer: Applying emergency optimizations");
+
     // Disable all animations immediately
-    const emergencyStyle = document.createElement('style');
+    const emergencyStyle = document.createElement("style");
     emergencyStyle.textContent = `
       *, *::before, *::after {
         animation-duration: 0s !important;
@@ -250,7 +256,7 @@ class RPiGPUOptimizer {
         transform: none !important;
       }
     `;
-    emergencyStyle.setAttribute('data-emergency-optimization', 'true');
+    emergencyStyle.setAttribute("data-emergency-optimization", "true");
     document.head.appendChild(emergencyStyle);
 
     // Force immediate cleanup
@@ -267,13 +273,15 @@ class RPiGPUOptimizer {
     }
 
     // Remove optimization styles
-    const optimizationStyles = document.querySelectorAll('style[data-rpi-optimization]');
-    optimizationStyles.forEach(style => style.remove());
+    const optimizationStyles = document.querySelectorAll(
+      "style[data-rpi-optimization]",
+    );
+    optimizationStyles.forEach((style) => style.remove());
 
     this.isOptimized = false;
-    logger.info('GPU Optimizer: Cleanup completed');
+    logger.info("GPU Optimizer: Cleanup completed");
   }
 }
 
 // Export singleton instance
-export const rpiGPUOptimizer = new RPiGPUOptimizer(); 
+export const rpiGPUOptimizer = new RPiGPUOptimizer();

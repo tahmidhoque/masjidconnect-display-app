@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 const root = ReactDOM.createRoot(
-  document.getElementById("root") as HTMLElement
+  document.getElementById("root") as HTMLElement,
 );
 
 root.render(
@@ -33,7 +33,7 @@ root.render(
         <App />
       </PersistGate>
     </Provider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 
 // Check if we are NOT running in Electron before registering the service worker
@@ -63,7 +63,7 @@ if (typeof window.electron === "undefined") {
       // Listen for controller change (SW activation)
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         console.log(
-          "Service worker controller changed - new version activated"
+          "Service worker controller changed - new version activated",
         );
         // Don't reload the page here either
       });

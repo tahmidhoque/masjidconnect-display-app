@@ -3,9 +3,10 @@
 ## Authentication & Device Pairing
 
 ### Device Pairing Process
+
 1. **Register Display for Pairing**
    - **Endpoint:** `POST /api/screens/unpaired`
-   - **Request Body:** 
+   - **Request Body:**
      ```json
      {
        "deviceInfo": {
@@ -64,11 +65,13 @@
 ## Regular API Usage (After Pairing)
 
 For all subsequent requests, include the API key in the headers:
+
 ```
 Authorization: Bearer {apiKey}
 ```
 
 ### Heartbeat (Status Update)
+
 - **Endpoint:** `POST /api/screen/heartbeat`
 - **Frequency:** Every 30-60 seconds
 - **Request Body:**
@@ -76,7 +79,9 @@ Authorization: Bearer {apiKey}
   {
     "screenId": "screen-id",
     "status": "ONLINE",
-    "deviceInfo": { /* device info object */ }
+    "deviceInfo": {
+      /* device info object */
+    }
   }
   ```
 - **Response:** Status 200 OK
@@ -86,7 +91,6 @@ Authorization: Bearer {apiKey}
 1. **Get Screen-Specific Content**
    - **Endpoint:** `GET /api/screen/content?screenId={screenId}`
    - **Response:** Content items to display including announcements, events, verses, etc.
-   
 2. **Get Current Prayer Times**
    - **Endpoint:** `GET /api/screen/prayer-times?screenId={screenId}`
    - **Response:**
@@ -195,9 +199,9 @@ Authorization: Bearer {apiKey}
 ```javascript
 // Initialization
 async function initializeDisplay() {
-  const apiKey = localStorage.getItem('apiKey');
-  const screenId = localStorage.getItem('screenId');
-  
+  const apiKey = localStorage.getItem("apiKey");
+  const screenId = localStorage.getItem("screenId");
+
   if (apiKey && screenId) {
     // Already paired, start regular content cycle
     startHeartbeat();
@@ -212,33 +216,36 @@ async function initializeDisplay() {
 async function startPairing() {
   try {
     const deviceInfo = getDeviceInfo();
-    const response = await fetch('/api/screens/unpaired', {
-      method: 'POST',
+    const response = await fetch("/api/screens/unpaired", {
+      method: "POST",
       body: JSON.stringify({ deviceInfo }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: { "Content-Type": "application/json" },
     });
-    
+
     const data = await response.json();
     displayPairingCode(data.pairingCode);
-    
+
     // Start polling to check pairing status
     startPairingStatusCheck(data.pairingCode);
   } catch (error) {
-    showError('Failed to start pairing process');
+    showError("Failed to start pairing process");
   }
 }
 
 // Regular content fetching
 async function fetchPrayerTimes() {
   try {
-    const response = await fetch(`/api/screen/prayer-times?screenId=${screenId}`, {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
-    
+    const response = await fetch(
+      `/api/screen/prayer-times?screenId=${screenId}`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      },
+    );
+
     if (response.ok) {
       const prayerTimes = await response.json();
       updatePrayerTimesDisplay(prayerTimes);
-      localStorage.setItem('cachedPrayerTimes', JSON.stringify(prayerTimes));
+      localStorage.setItem("cachedPrayerTimes", JSON.stringify(prayerTimes));
     } else if (response.status === 401) {
       // API key invalid, need to re-pair
       clearCredentials();
@@ -246,10 +253,10 @@ async function fetchPrayerTimes() {
     }
   } catch (error) {
     // Use cached prayer times
-    const cachedTimes = localStorage.getItem('cachedPrayerTimes');
+    const cachedTimes = localStorage.getItem("cachedPrayerTimes");
     if (cachedTimes) {
       updatePrayerTimesDisplay(JSON.parse(cachedTimes));
     }
   }
 }
-``` 
+```

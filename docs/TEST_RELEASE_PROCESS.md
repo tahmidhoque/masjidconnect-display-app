@@ -37,6 +37,7 @@ npm run rpi:build:arm64  # For Raspberry Pi 4/5
 ```
 
 **Verify artifacts**:
+
 ```bash
 ls -lh dist/*.deb
 # Should see:
@@ -51,6 +52,7 @@ npm run release:validate
 ```
 
 This checks:
+
 - ✅ Version format
 - ✅ Artifacts exist
 - ✅ Checksums valid
@@ -70,18 +72,21 @@ git push origin v0.0.2-beta.1
 ### Step 5: GitHub Actions Build
 
 GitHub Actions will automatically:
+
 1. Detect the tag push
 2. Build for both architectures
 3. Create a GitHub release (marked as pre-release)
 4. Attach .deb files
 
 **Monitor the build**:
+
 - Go to: https://github.com/masjidSolutions/masjidconnect-display-app/actions
 - Watch the "Build and Release" workflow
 
 ### Step 6: Verify GitHub Release
 
 Check the release was created:
+
 - URL: https://github.com/masjidSolutions/masjidconnect-display-app/releases
 - Should see: "Release v0.0.2-beta.1" (marked as Pre-release)
 - Should have .deb files for both architectures
@@ -91,19 +96,22 @@ Check the release was created:
 On a Raspberry Pi with the app installed:
 
 **Option A: Manual Update Check**
+
 ```bash
 # The app checks automatically every hour
 # Or trigger manually via admin portal FORCE_UPDATE command
 ```
 
 **Option B: Test Update Detection Code**
+
 ```javascript
 // In browser console or test script
-const updateService = require('./src/services/updateService');
+const updateService = require("./src/services/updateService");
 updateService.checkForUpdates();
 ```
 
 **Check logs**:
+
 ```bash
 # On Raspberry Pi
 cat ~/.config/masjidconnect-display/logs/main.log | grep -i update
@@ -112,12 +120,14 @@ cat ~/.config/masjidconnect-display/logs/main.log | grep -i update
 ### Step 8: Verify Admin Portal Detection
 
 The admin portal should:
+
 1. See the new version in heartbeat data (`appVersion` field)
 2. Show update available if device is on older version
 3. Allow triggering FORCE_UPDATE command
 4. Display update progress in heartbeat
 
 **Check heartbeat data**:
+
 - Look for `appVersion: "0.0.2-beta.1"` in heartbeat
 - Look for `updateProgress` object when update is in progress
 
@@ -143,18 +153,21 @@ The admin portal should:
 **Important**: electron-updater is configured with `allowPrerelease: false`
 
 This means:
+
 - ✅ Pre-releases are created on GitHub
 - ❌ Devices won't auto-update to pre-releases
 - ✅ Can test update detection manually
 - ✅ Admin portal can see version info
 
 **To test pre-release updates** (if needed):
+
 - Temporarily set `allowPrerelease: true` in `electron/main.js`
 - Or manually install pre-release .deb file
 
 ## Expected Results
 
 ### GitHub Release
+
 - ✅ Release created with tag `v0.0.2-beta.1`
 - ✅ Marked as "Pre-release"
 - ✅ Contains .deb files for armv7l and arm64
@@ -162,12 +175,14 @@ This means:
 - ✅ Has checksums
 
 ### Update Detection
+
 - ✅ electron-updater can see the release
 - ✅ Version comparison works correctly
 - ✅ Update progress tracked
 - ✅ Heartbeat includes version and update status
 
 ### Admin Portal
+
 - ✅ Shows device version in dashboard
 - ✅ Can trigger FORCE_UPDATE
 - ✅ Receives update progress via heartbeat
@@ -176,22 +191,26 @@ This means:
 ## Troubleshooting
 
 ### Release Not Created
+
 - Check GitHub Actions logs
 - Verify tag was pushed: `git ls-remote --tags origin`
 - Check workflow permissions
 
 ### Update Not Detected
+
 - Verify release is published (not draft)
 - Check electron-updater logs
 - Verify `allowPrerelease` setting matches your needs
 - Check network connectivity
 
 ### Admin Portal Not Showing Version
+
 - Verify heartbeat includes `appVersion` field
 - Check analytics service is initialized
 - Verify version is being read correctly
 
 ### Build Fails
+
 - Check build logs in GitHub Actions
 - Verify all dependencies installed
 - Check Node.js version (18+)
@@ -213,4 +232,3 @@ git push origin :refs/tags/v0.0.2-beta.1
 2. Test on actual Raspberry Pi hardware
 3. Monitor update adoption
 4. Verify version reporting in admin portal
-

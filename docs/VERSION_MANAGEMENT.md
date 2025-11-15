@@ -23,22 +23,18 @@ MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]
 ### Version Components
 
 - **MAJOR**: Incompatible API changes or major feature overhauls
-
   - Example: `1.0.0` → `2.0.0`
   - When: Breaking changes, complete redesign
 
 - **MINOR**: New features, backward-compatible
-
   - Example: `1.0.0` → `1.1.0`
   - When: New remote control commands, UI enhancements
 
 - **PATCH**: Bug fixes, backward-compatible
-
   - Example: `1.0.0` → `1.0.1`
   - When: Bug fixes, security patches, minor improvements
 
 - **PRERELEASE** (optional): Pre-release versions
-
   - Example: `1.1.0-beta.1`, `1.1.0-rc.1`
   - When: Testing before stable release
 
@@ -221,19 +217,16 @@ const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 ### Update Flow
 
 1. **Check Phase**:
-
    - App checks GitHub Releases API
    - Compares current version with latest release
    - Shows notification if update available
 
 2. **Download Phase**:
-
    - Downloads update in background
    - Shows progress bar to user
    - Does not interrupt app usage
 
 3. **Ready Phase**:
-
    - Download complete
    - Persistent notification shown
    - User can install now or later
@@ -345,7 +338,10 @@ Current version is displayed in:
 Implementation:
 
 ```typescript
-import { getCurrentVersion, formatVersionDisplay } from './utils/versionManager';
+import {
+  getCurrentVersion,
+  formatVersionDisplay,
+} from "./utils/versionManager";
 
 const version = getCurrentVersion();
 const display = formatVersionDisplay(version); // "v1.2.0"

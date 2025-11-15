@@ -12,12 +12,12 @@
   /* Reduce animation complexity */
   --transition-duration: var(--low-power-transition);
   --animation-duration: var(--low-power-animation);
-  
+
   /* Disable expensive effects */
   text-shadow: none !important;
   filter: none !important;
   backdrop-filter: none !important;
-  
+
   /* Optimize transforms */
   backface-visibility: hidden;
   perspective: none;
@@ -43,7 +43,9 @@
 /* Simplified animations for low-power devices */
 .low-power-device [class*="carousel"],
 .low-power-device [class*="transition"] {
-  transition: opacity var(--low-power-transition), transform var(--low-power-transition) !important;
+  transition:
+    opacity var(--low-power-transition),
+    transform var(--low-power-transition) !important;
   animation-duration: var(--low-power-animation) !important;
 }
 
@@ -65,7 +67,7 @@
 /* Reduce gradient complexity */
 .low-power-device [style*="linear-gradient"],
 .low-power-device [style*="radial-gradient"] {
-  background: var(--fallback-color, #0A2647) !important;
+  background: var(--fallback-color, #0a2647) !important;
 }
 
 /* Optimize SVG performance */
@@ -100,13 +102,13 @@
     font-size: 0.9em;
     line-height: 1.4;
   }
-  
+
   .prayer-times-card {
     /* Simplify prayer card styling */
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     border-radius: 4px;
   }
-  
+
   .background-pattern {
     /* Disable complex background patterns */
     display: none;
@@ -142,4 +144,4 @@
   will-change: auto !important;
   filter: none !important;
   backdrop-filter: none !important;
-} 
+}

@@ -9,15 +9,15 @@ const mockAxiosInstance = {
   head: jest.fn(() => Promise.resolve({ data: {} })),
   options: jest.fn(() => Promise.resolve({ data: {} })),
   interceptors: {
-    request: { 
-      use: jest.fn(), 
+    request: {
+      use: jest.fn(),
       eject: jest.fn(),
-      handlers: []
+      handlers: [],
     },
-    response: { 
-      use: jest.fn(), 
+    response: {
+      use: jest.fn(),
       eject: jest.fn(),
-      handlers: []
+      handlers: [],
     },
   },
   defaults: {
@@ -50,4 +50,3 @@ module.exports = axiosMock;
 module.exports.default = axiosMock;
 module.exports.create = axiosMock.create;
 module.exports.isAxiosError = axiosMock.isAxiosError;
-

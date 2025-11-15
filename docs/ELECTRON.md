@@ -30,12 +30,14 @@ The MasjidConnect Display App has been converted to an Electron desktop applicat
 ### Setup
 
 1. Clone the repository:
+
    ```sh
    git clone https://github.com/masjidSolutions/masjidconnect-display-app.git
    cd masjidconnect-display-app
    ```
 
 2. Install dependencies:
+
    ```sh
    npm install
    ```
@@ -93,28 +95,33 @@ The app uses `electron-updater` for automatic updates. The update process works 
 To create a new release with auto-update capability:
 
 1. Update the version in `package.json`:
+
    ```json
    "version": "0.1.0" -> "version": "0.1.1"
    ```
 
 2. Commit the changes:
+
    ```sh
    git add package.json
    git commit -m "Bump version to 0.1.1"
    ```
 
 3. Create a Git tag:
+
    ```sh
    git tag v0.1.1
    ```
 
 4. Push changes and tags:
+
    ```sh
    git push
    git push --tags
    ```
 
 5. Build and publish:
+
    ```sh
    npm run electron:build:publish
    ```
@@ -161,6 +168,7 @@ On a Raspberry Pi:
 To make the app start automatically on boot:
 
 1. Create a desktop entry:
+
    ```sh
    mkdir -p ~/.config/autostart
    touch ~/.config/autostart/masjidconnect.desktop
@@ -190,10 +198,11 @@ To make the app start automatically on boot:
 ### App Crashes on Startup
 
 1. Check Electron logs:
+
    ```sh
    # On macOS
    cat ~/Library/Logs/masjidconnect-display-app/main.log
-   
+
    # On Linux/Raspberry Pi
    cat ~/.config/masjidconnect-display-app/logs/main.log
    ```
@@ -206,4 +215,4 @@ The app is designed to work offline, but requires internet connectivity for upda
 
 1. Ensure the device has a working internet connection for updates
 2. Check firewall settings to ensure the app can communicate with GitHub
-3. If behind a proxy, configure proxy settings for the system 
+3. If behind a proxy, configure proxy settings for the system

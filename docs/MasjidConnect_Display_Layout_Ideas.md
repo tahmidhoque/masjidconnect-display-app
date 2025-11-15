@@ -32,6 +32,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Prayer times displayed in left sidebar (always visible)
 - Main content area for announcements, events, etc.
 - Next prayer highlighted prominently in sidebar
@@ -56,6 +57,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Compact prayer times row below header
 - Next prayer displayed prominently with countdown
 - Large main content area for featured content
@@ -80,6 +82,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Prayer times in top-left quadrant
 - Featured content (e.g., verse of the day) in top-right
 - Secondary content (announcements, events) in bottom section
@@ -109,6 +112,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Compact prayer times row at top
 - Large main content area
 - Next prayer countdown prominently at bottom
@@ -138,6 +142,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Next prayer with countdown at top (high visibility)
 - All prayer times in middle section
 - Content area for announcements, events, etc.
@@ -167,6 +172,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Prayer-focused layout
 - Next prayer prominently displayed
 - Grid layout for all prayer times
@@ -197,6 +203,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Special layout for Fridays
 - Prominent display of Jumu'ah time and countdown
 - Khutbah (sermon) and prayer times clearly separated
@@ -222,6 +229,7 @@ This document outlines various layout ideas for the MasjidConnect Display App, f
 ```
 
 **Features:**
+
 - Ramadan-specific information (Suhoor/Iftar times)
 - Next prayer countdown
 - Taraweeh prayer time highlighted
@@ -247,4 +255,4 @@ While the current phase focuses on a non-interactive display, future phases coul
 
 ## Conclusion
 
-These layout ideas provide a starting point for the MasjidConnect Display App. The implementation should prioritize prayer times visibility while maintaining a clean, readable design that works well in both orientations. As the app evolves, additional layouts can be added for special purposes or to accommodate new content types. 
+These layout ideas provide a starting point for the MasjidConnect Display App. The implementation should prioritize prayer times visibility while maintaining a clean, readable design that works well in both orientations. As the app evolves, additional layouts can be added for special purposes or to accommodate new content types.

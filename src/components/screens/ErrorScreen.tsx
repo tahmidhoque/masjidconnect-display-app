@@ -1,8 +1,11 @@
-import React from 'react';
-import { Box, Typography, Paper, Container, Button } from '@mui/material';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import { getCurrentVersion, formatVersionDisplay } from '../../utils/versionManager';
+import React from "react";
+import { Box, Typography, Paper, Container, Button } from "@mui/material";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import {
+  getCurrentVersion,
+  formatVersionDisplay,
+} from "../../utils/versionManager";
 
 interface ErrorScreenProps {
   message?: string;
@@ -16,7 +19,11 @@ interface ErrorScreenProps {
  * Displays an error message with optional details and a retry button.
  * Used when the app encounters a fatal error.
  */
-const ErrorScreen: React.FC<ErrorScreenProps> = ({ message = 'An error occurred', details, onRetry }) => {
+const ErrorScreen: React.FC<ErrorScreenProps> = ({
+  message = "An error occurred",
+  details,
+  onRetry,
+}) => {
   const handleRetry = () => {
     if (onRetry) {
       onRetry();
@@ -29,13 +36,13 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({ message = 'An error occurred'
   return (
     <Box
       sx={{
-        height: '100vh',
-        width: '100vw',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F4F4F4',
+        height: "100vh",
+        width: "100vw",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#F4F4F4",
       }}
     >
       <Container maxWidth="md">
@@ -44,8 +51,8 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({ message = 'An error occurred'
           sx={{
             p: 6,
             borderRadius: 4,
-            textAlign: 'center',
-            backgroundColor: '#fff',
+            textAlign: "center",
+            backgroundColor: "#fff",
           }}
         >
           <ErrorOutlineIcon color="error" sx={{ fontSize: 64, mb: 2 }} />
@@ -73,7 +80,14 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({ message = 'An error occurred'
         </Paper>
       </Container>
 
-      <Box sx={{ position: 'fixed', bottom: 16, width: '100%', textAlign: 'center' }}>
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 16,
+          width: "100%",
+          textAlign: "center",
+        }}
+      >
         <Typography variant="body2" color="text.secondary">
           MasjidConnect Display {formatVersionDisplay(getCurrentVersion())}
         </Typography>

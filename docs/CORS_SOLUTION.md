@@ -1,18 +1,22 @@
 # CORS Solution for MasjidConnect Display App
 
 ## Overview
+
 This document explains how the MasjidConnect Display App handles Cross-Origin Resource Sharing (CORS) issues that may arise when connecting to backend API services, especially during local development.
 
 ## What is CORS?
+
 CORS (Cross-Origin Resource Sharing) is a security mechanism that restricts HTTP requests from scripts running in a browser from accessing resources from a different domain than the one that served the original script. The backend server must explicitly allow cross-origin requests by setting specific HTTP headers.
 
 ## Implemented Solution
 
 ### 1. User-Friendly Error Handling
+
 - **CorsErrorNotification Component**: A dedicated component that displays when CORS errors are detected, providing clear information about the issue and how to resolve it.
 - **Detailed Error Information**: Shows which endpoint failed and provides instructions for fixing the issue on the backend.
 
 ### 2. Temporary Development Workaround
+
 - **CORS Proxy Integration**: The app can use a CORS proxy for development purposes, which can be enabled via environment variables.
 - **Configuration Options**:
   ```
@@ -21,6 +25,7 @@ CORS (Cross-Origin Resource Sharing) is a security mechanism that restricts HTTP
   ```
 
 ### 3. API Client Enhancement
+
 - The `masjidDisplayClient.ts` has been enhanced to:
   - Detect CORS errors accurately
   - Provide detailed error information
@@ -30,6 +35,7 @@ CORS (Cross-Origin Resource Sharing) is a security mechanism that restricts HTTP
 ## How to Enable the CORS Proxy for Development
 
 1. Create or modify your `.env.local` file:
+
    ```
    REACT_APP_USE_CORS_PROXY=true
    REACT_APP_CORS_PROXY_URL=https://cors-anywhere.herokuapp.com/
@@ -67,4 +73,4 @@ The response should include the appropriate `Access-Control-Allow-*` headers.
 
 ## Conclusion
 
-With these changes, the MasjidConnect Display App now provides a better experience when encountering CORS issues, with clear error messages and temporary workarounds for development, while guiding developers toward the proper backend solution. 
+With these changes, the MasjidConnect Display App now provides a better experience when encountering CORS issues, with clear error messages and temporary workarounds for development, while guiding developers toward the proper backend solution.

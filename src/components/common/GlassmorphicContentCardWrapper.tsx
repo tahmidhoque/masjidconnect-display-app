@@ -1,69 +1,66 @@
-import React from 'react';
-import { Box, Typography, alpha, useTheme } from '@mui/material';
-import GlassmorphicContentCard from './GlassmorphicContentCard';
-import useResponsiveFontSize from '../../hooks/useResponsiveFontSize';
+import React from "react";
+import { Box, Typography, alpha, useTheme } from "@mui/material";
+import GlassmorphicContentCard from "./GlassmorphicContentCard";
+import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 
 interface GlassmorphicContentCardWrapperProps {
   title: string;
   titleGradient: string;
   content: string;
   fontSize: string;
-  variant: 'landscape' | 'portrait';
+  variant: "landscape" | "portrait";
   itemType: string;
 }
 
 /**
  * GlassmorphicContentCardWrapper component
- * 
+ *
  * Wraps the GlassmorphicContentCard to display formatted content items
  * with appropriate styling based on content type.
  */
-const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperProps> = ({
-  title,
-  titleGradient,
-  content,
-  fontSize,
-  variant,
-  itemType
-}) => {
+const GlassmorphicContentCardWrapper: React.FC<
+  GlassmorphicContentCardWrapperProps
+> = ({ title, titleGradient, content, fontSize, variant, itemType }) => {
   const theme = useTheme();
   const { fontSizes } = useResponsiveFontSize();
-  
+
   // Determine color type based on item type
-  let colorType: 'primary' | 'secondary' | 'info' = 'primary';
+  let colorType: "primary" | "secondary" | "info" = "primary";
   let isUrgent = false;
-  
+
   switch (itemType) {
-    case 'ANNOUNCEMENT':
-      colorType = 'secondary';
+    case "ANNOUNCEMENT":
+      colorType = "secondary";
       break;
-    case 'EVENT':
-      colorType = 'info';
+    case "EVENT":
+      colorType = "info";
       break;
-    case 'VERSE_HADITH':
-      colorType = 'primary';
+    case "VERSE_HADITH":
+      colorType = "primary";
       break;
     default:
-      colorType = 'primary';
+      colorType = "primary";
   }
-  
+
   // Check if item is marked as urgent
-  if (title.toLowerCase().includes('urgent') || 
-      title.toLowerCase().includes('important') ||
-      title.toLowerCase().includes('emergency')) {
+  if (
+    title.toLowerCase().includes("urgent") ||
+    title.toLowerCase().includes("important") ||
+    title.toLowerCase().includes("emergency")
+  ) {
     isUrgent = true;
   }
-  
+
   // Try to parse content if it's a JSON string
   const formatVerseHadithContent = () => {
     try {
       // Check if the content is JSON string
-      if (content.startsWith('{') && content.includes('"type"')) {
+      if (content.startsWith("{") && content.includes('"type"')) {
         const parsedContent = JSON.parse(content);
-        const arabicText = parsedContent.arabicText || '';
-        const translation = parsedContent.translation || '';
-        const reference = parsedContent.reference || parsedContent.source || '';
-        
+        const arabicText = parsedContent.arabicText || "";
+        const translation = parsedContent.translation || "";
+        const reference = parsedContent.reference || parsedContent.source || "";
+
         return (
           <>
             {arabicText && (
@@ -72,44 +69,44 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
                 sx={{
                   fontSize: fontSize,
                   lineHeight: 1.6,
-                  textAlign: 'center',
-                  color: '#FFFFFF',
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                  textAlign: "center",
+                  color: "#FFFFFF",
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
                   mb: 3,
-                  fontWeight: 'medium',
-                  direction: 'rtl'
+                  fontWeight: "medium",
+                  direction: "rtl",
                 }}
               >
                 {arabicText}
               </Typography>
             )}
-            
+
             {translation && (
               <Typography
                 sx={{
                   fontSize: arabicText ? fontSizes.h6 : fontSize,
                   lineHeight: 1.6,
-                  textAlign: 'center',
-                  color: '#FFFFFF',
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                  textAlign: "center",
+                  color: "#FFFFFF",
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
                   fontFamily: "'Poppins', Arial, sans-serif",
-                  mb: 3
+                  mb: 3,
                 }}
               >
                 {translation}
               </Typography>
             )}
-            
+
             {reference && (
               <Typography
                 sx={{
                   fontSize: fontSizes.body2,
-                  textAlign: 'center',
-                  color: alpha('#FFFFFF', 0.85),
-                  fontStyle: 'italic',
-                  marginTop: 'auto',
+                  textAlign: "center",
+                  color: alpha("#FFFFFF", 0.85),
+                  fontStyle: "italic",
+                  marginTop: "auto",
                   fontFamily: "'Poppins', Arial, sans-serif",
-                  mt: 2
+                  mt: 2,
                 }}
               >
                 {reference}
@@ -119,37 +116,37 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
         );
       }
     } catch (e) {
-      console.error('Error parsing JSON content:', e);
+      console.error("Error parsing JSON content:", e);
       // Fall through to regular content formatting
     }
-    
+
     // Handle regular string content
     return null;
   };
-  
+
   // Format content based on type
   const formatContent = () => {
-    if (itemType === 'VERSE_HADITH') {
+    if (itemType === "VERSE_HADITH") {
       // Try JSON parsing first
       const jsonContent = formatVerseHadithContent();
       if (jsonContent) return jsonContent;
-      
+
       // More flexible parsing for regular text verse/hadith content
-      let verseText = '';
-      let reference = '';
-      
+      let verseText = "";
+      let reference = "";
+
       // Try different parsing approaches
-      if (content.includes('\n\n')) {
+      if (content.includes("\n\n")) {
         // Standard format with double newline
-        const parts = content.split('\n\n');
+        const parts = content.split("\n\n");
         verseText = parts[0];
-        reference = parts.slice(1).join('\n\n');
-      } else if (content.includes('\n')) {
+        reference = parts.slice(1).join("\n\n");
+      } else if (content.includes("\n")) {
         // Format with single newlines, use last line as reference
-        const lines = content.split('\n');
+        const lines = content.split("\n");
         if (lines.length > 1) {
-          reference = lines.pop() || '';
-          verseText = lines.join('\n');
+          reference = lines.pop() || "";
+          verseText = lines.join("\n");
         } else {
           verseText = content;
         }
@@ -157,34 +154,34 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
         // No clear separation, just use the whole content
         verseText = content;
       }
-      
+
       return (
         <>
           <Typography
             sx={{
               fontSize,
               lineHeight: 1.6,
-              textAlign: 'center',
-              color: '#FFFFFF',
-              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+              textAlign: "center",
+              color: "#FFFFFF",
+              textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
               fontFamily: "'Poppins', Arial, sans-serif",
               mb: 3,
-              fontWeight: 'medium'
+              fontWeight: "medium",
             }}
           >
             {verseText}
           </Typography>
-          
+
           {reference && (
             <Typography
               sx={{
                 fontSize: fontSizes.body2,
-                textAlign: 'center',
-                color: alpha('#FFFFFF', 0.85),
-                fontStyle: 'italic',
-                marginTop: 'auto',
+                textAlign: "center",
+                color: alpha("#FFFFFF", 0.85),
+                fontStyle: "italic",
+                marginTop: "auto",
                 fontFamily: "'Poppins', Arial, sans-serif",
-                mt: 2
+                mt: 2,
               }}
             >
               {reference}
@@ -193,25 +190,25 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
         </>
       );
     }
-    
+
     // Default rendering for all other content types
     return (
       <Typography
         sx={{
           fontSize,
           lineHeight: 1.5,
-          textAlign: 'center',
-          whiteSpace: 'pre-line',
-          color: '#FFFFFF',
-          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-          fontFamily: "'Poppins', Arial, sans-serif"
+          textAlign: "center",
+          whiteSpace: "pre-line",
+          color: "#FFFFFF",
+          textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
+          fontFamily: "'Poppins', Arial, sans-serif",
         }}
       >
         {content}
       </Typography>
     );
   };
-  
+
   return (
     <GlassmorphicContentCard
       orientation={variant}
@@ -220,13 +217,13 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
     >
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-start', // Revert to flex-start to maintain original layout
-          alignItems: 'center', 
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-start", // Revert to flex-start to maintain original layout
+          alignItems: "center",
           padding: 3,
-          height: '100%',
-          overflow: 'auto'
+          height: "100%",
+          overflow: "auto",
         }}
       >
         {/* Title with white color and color tint */}
@@ -235,27 +232,27 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
           sx={{
             fontWeight: 700,
             marginBottom: 3,
-            textAlign: 'center',
-            color: '#FFFFFF',
+            textAlign: "center",
+            color: "#FFFFFF",
             textShadow: `0 0 10px ${theme.palette[colorType].main}`,
             fontFamily: "'Poppins', Arial, sans-serif",
-            width: '100%'
+            width: "100%",
           }}
         >
           {title}
         </Typography>
-        
+
         {/* Content centered in the card */}
         <Box
           sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: '100%',
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            width: "100%",
             flex: 1,
-            overflow: 'auto',
-            py: 2 // Add vertical padding instead of changing container dimensions
+            overflow: "auto",
+            py: 2, // Add vertical padding instead of changing container dimensions
           }}
         >
           {formatContent()}
@@ -265,4 +262,4 @@ const GlassmorphicContentCardWrapper: React.FC<GlassmorphicContentCardWrapperPro
   );
 };
 
-export default GlassmorphicContentCardWrapper; 
+export default GlassmorphicContentCardWrapper;

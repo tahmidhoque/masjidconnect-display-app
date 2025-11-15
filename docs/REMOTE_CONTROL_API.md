@@ -404,7 +404,7 @@ Common error scenarios:
 
 ```typescript
 // Express.js example
-app.post('/api/admin/remote-command', async (req, res) => {
+app.post("/api/admin/remote-command", async (req, res) => {
   const { screenIds, commandType, payload } = req.body;
 
   const command = {
@@ -418,7 +418,9 @@ app.post('/api/admin/remote-command', async (req, res) => {
   screenIds.forEach((screenId) => {
     const connection = sseConnections.get(screenId);
     if (connection) {
-      connection.write(`event: ${commandType}\n` + `data: ${JSON.stringify(command)}\n\n`);
+      connection.write(
+        `event: ${commandType}\n` + `data: ${JSON.stringify(command)}\n\n`,
+      );
     }
   });
 
@@ -426,7 +428,7 @@ app.post('/api/admin/remote-command', async (req, res) => {
   await db.commands.insert({
     ...command,
     screenIds,
-    status: 'sent',
+    status: "sent",
   });
 
   res.json({ success: true, command });
@@ -437,7 +439,7 @@ app.post('/api/admin/remote-command', async (req, res) => {
 
 ```typescript
 // In heartbeat/analytics endpoint
-app.post('/api/displays/heartbeat', async (req, res) => {
+app.post("/api/displays/heartbeat", async (req, res) => {
   const { screenId, commandResponses } = req.body;
 
   if (commandResponses && commandResponses.length > 0) {
@@ -446,10 +448,10 @@ app.post('/api/displays/heartbeat', async (req, res) => {
       await db.commands.update(
         { commandId: response.commandId },
         {
-          status: response.success ? 'completed' : 'failed',
+          status: response.success ? "completed" : "failed",
           response: response,
           completedAt: new Date(),
-        }
+        },
       );
     }
   }

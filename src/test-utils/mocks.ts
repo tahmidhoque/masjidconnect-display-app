@@ -15,56 +15,56 @@ import {
   EmergencyAlert,
   Schedule,
   ContentItem,
-} from '../api/models';
+} from "../api/models";
 
 // ============================================================================
 // API Response Mocks
 // ============================================================================
 
 export const mockApiCredentials: ApiCredentials = {
-  apiKey: 'test-api-key-123',
-  screenId: 'test-screen-id-456',
+  apiKey: "test-api-key-123",
+  screenId: "test-screen-id-456",
 };
 
 export const mockPrayerTimes: PrayerTimes = {
-  date: '2024-01-15',
-  fajr: '05:30',
-  sunrise: '07:00',
-  zuhr: '12:30',
-  asr: '15:00',
-  maghrib: '17:30',
-  isha: '19:00',
-  fajrJamaat: '05:45',
-  zuhrJamaat: '13:00',
-  asrJamaat: '15:30',
-  maghribJamaat: '17:35',
-  ishaJamaat: '19:30',
-  jummahKhutbah: '13:00',
-  jummahJamaat: '13:30',
+  date: "2024-01-15",
+  fajr: "05:30",
+  sunrise: "07:00",
+  zuhr: "12:30",
+  asr: "15:00",
+  maghrib: "17:30",
+  isha: "19:00",
+  fajrJamaat: "05:45",
+  zuhrJamaat: "13:00",
+  asrJamaat: "15:30",
+  maghribJamaat: "17:35",
+  ishaJamaat: "19:30",
+  jummahKhutbah: "13:00",
+  jummahJamaat: "13:30",
 };
 
 export const mockPrayerTimesArray: PrayerTimes[] = [
   mockPrayerTimes,
   {
     ...mockPrayerTimes,
-    date: '2024-01-16',
+    date: "2024-01-16",
   },
 ];
 
 export const mockContentItem: ContentItem = {
-  id: 'content-1',
-  type: 'ANNOUNCEMENT',
-  title: 'Test Announcement',
-  content: { text: 'This is a test announcement' },
+  id: "content-1",
+  type: "ANNOUNCEMENT",
+  title: "Test Announcement",
+  content: { text: "This is a test announcement" },
   duration: 5000,
 };
 
 export const mockSchedule: Schedule = {
-  id: 'schedule-1',
-  name: 'Default Schedule',
+  id: "schedule-1",
+  name: "Default Schedule",
   items: [
     {
-      id: 'item-1',
+      id: "item-1",
       order: 1,
       contentItem: mockContentItem,
     },
@@ -73,18 +73,18 @@ export const mockSchedule: Schedule = {
 
 export const mockScreenContent: ScreenContent = {
   screen: {
-    id: 'screen-1',
-    name: 'Main Display',
-    orientation: 'LANDSCAPE',
+    id: "screen-1",
+    name: "Main Display",
+    orientation: "LANDSCAPE",
     contentConfig: {},
     masjid: {
-      name: 'Test Masjid',
-      timezone: 'America/New_York',
+      name: "Test Masjid",
+      timezone: "America/New_York",
     },
   },
   masjid: {
-    name: 'Test Masjid',
-    timezone: 'America/New_York',
+    name: "Test Masjid",
+    timezone: "America/New_York",
   },
   schedule: mockSchedule,
   prayerTimes: mockPrayerTimes,
@@ -99,38 +99,38 @@ export const mockHeartbeatResponse: HeartbeatResponse = {
 export const mockEventsResponse: EventsResponse = {
   events: [
     {
-      id: 'event-1',
-      title: 'Community Iftar',
-      description: 'Join us for iftar',
-      location: 'Main Hall',
-      startDate: '2024-03-15T18:00:00Z',
-      endDate: '2024-03-15T20:00:00Z',
-      category: 'Community',
+      id: "event-1",
+      title: "Community Iftar",
+      description: "Join us for iftar",
+      location: "Main Hall",
+      startDate: "2024-03-15T18:00:00Z",
+      endDate: "2024-03-15T20:00:00Z",
+      category: "Community",
     },
   ],
 };
 
 export const mockPairingCodeResponse: RequestPairingCodeResponse = {
-  pairingCode: 'ABC123',
+  pairingCode: "ABC123",
   expiresAt: new Date(Date.now() + 600000).toISOString(),
 };
 
 export const mockPairingStatusResponse: CheckPairingStatusResponse = {
   isPaired: true,
   paired: true,
-  screenId: 'test-screen-id',
-  apiKey: 'test-api-key',
-  masjidId: 'test-masjid-id',
+  screenId: "test-screen-id",
+  apiKey: "test-api-key",
+  masjidId: "test-masjid-id",
 };
 
 export const mockEmergencyAlert: EmergencyAlert = {
-  id: 'alert-1',
-  title: 'Emergency Alert',
-  message: 'This is a test emergency alert',
-  color: '#f44336',
+  id: "alert-1",
+  title: "Emergency Alert",
+  message: "This is a test emergency alert",
+  color: "#f44336",
   expiresAt: new Date(Date.now() + 300000).toISOString(),
   createdAt: new Date().toISOString(),
-  masjidId: 'test-masjid-id',
+  masjidId: "test-masjid-id",
 };
 
 // ============================================================================
@@ -170,7 +170,7 @@ export function createCachedResponse<T>(data: T): ApiResponse<T> {
 export const mockAxiosResponse = <T>(data: T, status = 200) => ({
   data,
   status,
-  statusText: 'OK',
+  statusText: "OK",
   headers: {},
   config: {} as any,
 });
@@ -182,7 +182,7 @@ export const mockAxiosError = (message: string, status?: number) => {
     error.response = {
       status,
       data: { message },
-      statusText: 'Error',
+      statusText: "Error",
       headers: {},
       config: {} as any,
     };
@@ -196,9 +196,11 @@ export const mockAxiosError = (message: string, status?: number) => {
 
 export const createLocalForageMock = () => {
   const storage = new Map<string, any>();
-  
+
   return {
-    getItem: jest.fn((key: string) => Promise.resolve(storage.get(key) || null)),
+    getItem: jest.fn((key: string) =>
+      Promise.resolve(storage.get(key) || null),
+    ),
     setItem: jest.fn((key: string, value: any) => {
       storage.set(key, value);
       return Promise.resolve(value);
@@ -245,8 +247,8 @@ export const mockReduxState = {
     errors: [],
   },
   ui: {
-    theme: 'light',
-    orientation: 'LANDSCAPE',
+    theme: "light",
+    orientation: "LANDSCAPE",
     isKioskMode: false,
   },
 };
@@ -273,25 +275,28 @@ export const restoreDate = () => {
 // ============================================================================
 
 export const setOnline = (online: boolean) => {
-  Object.defineProperty(navigator, 'onLine', {
+  Object.defineProperty(navigator, "onLine", {
     writable: true,
     value: online,
   });
 };
 
 export const triggerOnlineEvent = () => {
-  window.dispatchEvent(new Event('online'));
+  window.dispatchEvent(new Event("online"));
 };
 
 export const triggerOfflineEvent = () => {
-  window.dispatchEvent(new Event('offline'));
+  window.dispatchEvent(new Event("offline"));
 };
 
 // ============================================================================
 // Custom Event Mocks
 // ============================================================================
 
-export const waitForCustomEvent = (eventName: string, timeout = 1000): Promise<CustomEvent> => {
+export const waitForCustomEvent = (
+  eventName: string,
+  timeout = 1000,
+): Promise<CustomEvent> => {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       window.removeEventListener(eventName, handler);
@@ -312,7 +317,8 @@ export const waitForCustomEvent = (eventName: string, timeout = 1000): Promise<C
 // Wait Utilities
 // ============================================================================
 
-export const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const waitFor = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-export const flushPromises = () => new Promise(resolve => setImmediate(resolve));
-
+export const flushPromises = () =>
+  new Promise((resolve) => setImmediate(resolve));

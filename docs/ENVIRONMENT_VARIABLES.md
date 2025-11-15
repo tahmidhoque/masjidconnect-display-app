@@ -5,6 +5,7 @@ Complete reference for all environment variables used in the MasjidConnect Displ
 ## Overview
 
 Environment variables are baked into the build at compile time (not runtime). This means:
+
 - Variables must be set **before** building
 - Changing variables requires rebuilding the application
 - React requires the `REACT_APP_` prefix for client-side variables
@@ -19,6 +20,7 @@ Environment variables are baked into the build at compile time (not runtime). Th
 **Description**: The base URL for all API calls to the MasjidConnect backend.
 
 **Used in:**
+
 - `src/api/masjidDisplayClient.ts` - Main API client
 - `src/services/analyticsService.ts` - Analytics service
 - `src/store/middleware/emergencyMiddleware.ts` - Emergency alerts
@@ -27,6 +29,7 @@ Environment variables are baked into the build at compile time (not runtime). Th
 - `src/utils/adminUrlUtils.ts` - Admin URL generation
 
 **Example:**
+
 ```bash
 REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
 ```
@@ -42,10 +45,12 @@ REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
 **Description**: Application version number used for version tracking and analytics.
 
 **How it's set:**
+
 - Build scripts use `cross-env REACT_APP_VERSION=$npm_package_version`
 - Automatically extracts version from `package.json`
 
 **Used in:**
+
 - `src/services/analyticsService.ts` - Version tracking
 - `src/utils/versionManager.ts` - Version management
 
@@ -58,12 +63,14 @@ REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
 **Description**: Environment mode used throughout the codebase for conditional logic.
 
 **Used in:**
+
 - Conditional feature flags
 - Development vs production optimisations
 - Debug logging control
 - Performance settings
 
 **Values:**
+
 - `development` - Development mode with debugging enabled
 - `production` - Production mode with optimisations enabled
 
@@ -77,14 +84,17 @@ REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
 **Description**: Enable CORS proxy in development mode only.
 
 **Usage:**
+
 - Only effective when `NODE_ENV=development`
 - Set to `'true'` to enable CORS proxy
 - Used when developing locally and encountering CORS issues
 
 **Used in:**
+
 - `src/api/masjidDisplayClient.ts` - CORS proxy application
 
 **Example:**
+
 ```bash
 REACT_APP_USE_CORS_PROXY=true
 ```
@@ -97,10 +107,12 @@ REACT_APP_USE_CORS_PROXY=true
 **Description**: CORS proxy URL used when `REACT_APP_USE_CORS_PROXY=true`.
 
 **Usage:**
+
 - Only used when `REACT_APP_USE_CORS_PROXY=true` and `NODE_ENV=development`
 - Override if using a different CORS proxy service
 
 **Example:**
+
 ```bash
 REACT_APP_CORS_PROXY_URL=https://cors-anywhere.herokuapp.com/
 ```
@@ -115,14 +127,17 @@ REACT_APP_CORS_PROXY_URL=https://cors-anywhere.herokuapp.com/
 **Description**: Enable Electron debug mode with DevTools.
 
 **Usage:**
+
 - Set to any value (e.g., `true`, `1`) to enable
 - Enables DevTools in Electron window
 - Useful for debugging Electron-specific issues
 
 **Used in:**
+
 - `electron/main.js` - DevTools configuration
 
 **Example:**
+
 ```bash
 ELECTRON_DEBUG=true
 ```
@@ -135,14 +150,17 @@ ELECTRON_DEBUG=true
 **Description**: Electron updater channel for update checks.
 
 **Values:**
+
 - `'latest'` - Stable releases (default)
 - `'beta'` - Beta releases
 - `'alpha'` - Alpha/pre-release versions
 
 **Used in:**
+
 - `electron/main.js` - Update channel configuration
 
 **Example:**
+
 ```bash
 UPDATE_CHANNEL=beta
 ```
@@ -155,13 +173,16 @@ UPDATE_CHANNEL=beta
 **Description**: Disable automatic update checks.
 
 **Usage:**
+
 - Set to any value (e.g., `true`, `1`) to disable
 - Useful for testing or when updates should be manually controlled
 
 **Used in:**
+
 - `electron/main.js` - Update check control
 
 **Example:**
+
 ```bash
 DISABLE_UPDATES=true
 ```
@@ -175,10 +196,12 @@ DISABLE_UPDATES=true
 **Description**: GitHub token for publishing releases to GitHub.
 
 **Usage:**
+
 - Automatically provided by GitHub Actions as `secrets.GITHUB_TOKEN`
 - For local publishing, set manually or use GitHub CLI
 
 **Used in:**
+
 - `scripts/build-rpi.sh` - Publishing builds
 - `.github/workflows/build-and-release.yml` - Release workflow
 
@@ -189,11 +212,13 @@ DISABLE_UPDATES=true
 ### Local Development
 
 1. **Create `.env` file** in the project root:
+
    ```bash
    cp .env.example .env
    ```
 
 2. **Edit `.env`** with your values:
+
    ```bash
    REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
    ```
@@ -206,6 +231,7 @@ DISABLE_UPDATES=true
 ### Production Builds
 
 **Option 1: Using `.env` file**
+
 ```bash
 # Create .env file
 echo "REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api" > .env
@@ -215,12 +241,14 @@ npm run build
 ```
 
 **Option 2: Using environment variables**
+
 ```bash
 export REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
 npm run build
 ```
 
 **Option 3: Inline with build command**
+
 ```bash
 REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api npm run build
 ```
@@ -255,6 +283,7 @@ React supports multiple environment files with different priorities:
 ### Default Values
 
 If a variable is not set, the codebase includes fallback defaults:
+
 - `REACT_APP_API_URL` → `https://portal.masjidconnect.co.uk/api`
 - `REACT_APP_VERSION` → `0.0.1` (if package.json version unavailable)
 - `UPDATE_CHANNEL` → `'latest'`
@@ -280,4 +309,3 @@ To verify environment variables are set correctly:
 - [GitHub Actions Environment Setup](GITHUB_ACTIONS_ENV_SETUP.md) - CI/CD configuration
 - [README.md](../README.md) - Quick start guide
 - [API URL Fix](../docs/API_URL_FIX.md) - Historical context on API URL configuration
-

@@ -25,7 +25,7 @@ const ModernPortraitDisplay: React.FC = () => {
 
   // Redux selectors
   const masjidName = useSelector(
-    (state: RootState) => state.content.masjidName
+    (state: RootState) => state.content.masjidName,
   );
 
   // Prayer times hook for date and hijri date

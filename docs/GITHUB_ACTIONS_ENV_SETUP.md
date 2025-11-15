@@ -59,6 +59,7 @@ The workflow sets environment variables in the `env:` blocks:
 ```
 
 **Key points:**
+
 - `${{ secrets.REACT_APP_API_URL }}` - Accesses the GitHub Secret
 - `|| 'https://portal.masjidconnect.co.uk/api'` - Fallback if secret not set
 - `REACT_APP_VERSION` - Automatically set from package.json
@@ -75,6 +76,7 @@ The workflow sets environment variables in the `env:` blocks:
 ### Expected Log Output
 
 When building, you should see:
+
 ```
 Building version: 0.0.2-beta.2
 Initializing MasjidDisplayClient with baseURL: https://portal.masjidconnect.co.uk/api
@@ -103,6 +105,7 @@ Initializing MasjidDisplayClient with baseURL: https://portal.masjidconnect.co.u
 **Error**: `REACT_APP_API_URL` is undefined or empty
 
 **Solution**:
+
 1. Verify the secret exists in repository settings
 2. Check the secret name matches exactly (case-sensitive)
 3. Ensure you're checking the correct repository
@@ -113,6 +116,7 @@ Initializing MasjidDisplayClient with baseURL: https://portal.masjidconnect.co.u
 **Error**: Build fails with API connection errors
 
 **Solution**:
+
 1. Verify `REACT_APP_API_URL` secret is set correctly
 2. Check the API URL is accessible from GitHub Actions runners
 3. Verify the URL format (should include protocol: `https://`)
@@ -123,6 +127,7 @@ Initializing MasjidDisplayClient with baseURL: https://portal.masjidconnect.co.u
 **Error**: Build uses wrong API URL
 
 **Solution**:
+
 1. Verify the secret value in repository settings
 2. Check workflow file uses `${{ secrets.REACT_APP_API_URL }}`
 3. Clear workflow cache if needed
@@ -137,6 +142,7 @@ To add new environment variables to the workflow:
    - Add new repository secret
 
 2. **Update workflow file**:
+
    ```yaml
    - name: Build React app
      run: npm run build:fix-paths
@@ -166,6 +172,7 @@ The environment variables are configured in:
 **File**: `.github/workflows/build-and-release.yml`
 
 **Lines**:
+
 - 66-73: Build React app environment variables
 - 90-96: Build Electron app environment variables
 
@@ -178,17 +185,20 @@ The environment variables are configured in:
 ## Quick Reference
 
 **Required Secret:**
+
 - `REACT_APP_API_URL` - API endpoint URL (recommended)
 
 **Automatically Available:**
+
 - `GITHUB_TOKEN` - For publishing releases
 
 **Workflow Syntax:**
+
 ```yaml
 env:
   REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'default-value' }}
 ```
 
 **Where to configure:**
-- Repository Settings → Secrets and variables → Actions → New repository secret
 
+- Repository Settings → Secrets and variables → Actions → New repository secret

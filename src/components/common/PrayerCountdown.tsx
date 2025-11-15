@@ -41,12 +41,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     (isJamaat: boolean) => {
       if (onCountdownComplete) {
         logger.info(
-          `[PrayerCountdown] Triggering countdown completion for ${prayerName}, isJamaat: ${isJamaat}`
+          `[PrayerCountdown] Triggering countdown completion for ${prayerName}, isJamaat: ${isJamaat}`,
         );
         onCountdownComplete(isJamaat);
       }
     },
-    [onCountdownComplete, prayerName]
+    [onCountdownComplete, prayerName],
   );
 
   // Stable timer function that doesn't recreate on every render
@@ -60,7 +60,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     const isValidTimeFormat = /^\d{1,2}:\d{2}$/.test(prayerTime);
     if (!isValidTimeFormat) {
       logger.error(
-        `Invalid prayer time format for ${prayerName}: ${prayerTime}`
+        `Invalid prayer time format for ${prayerName}: ${prayerTime}`,
       );
       return;
     }
@@ -76,7 +76,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
       if (isNaN(prayerHours) || isNaN(prayerMinutes)) {
         logger.error(
-          `[PrayerCountdown] Invalid prayer time format for ${prayerName}: ${prayerTime}`
+          `[PrayerCountdown] Invalid prayer time format for ${prayerName}: ${prayerTime}`,
         );
         return;
       }
@@ -98,7 +98,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
           if (isNaN(jamaatHours) || isNaN(jamaatMinutes)) {
             logger.error(
-              `[PrayerCountdown] Invalid jamaat time format for ${prayerName}: ${jamaatTime}`
+              `[PrayerCountdown] Invalid jamaat time format for ${prayerName}: ${jamaatTime}`,
             );
             // Set target to tomorrow's prayer
             targetDayjs = prayerDayjs.clone().add(1, "day");
@@ -109,13 +109,13 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             if (now.isBefore(jamaatDayjs)) {
               targetDayjs = jamaatDayjs.clone();
               shouldCountToJamaat = true;
-              
+
               // Only trigger state change if we're not already counting down to jamaat
               if (!countingDownToJamaat) {
                 // FIXED: Smooth transition without flashing animation
                 setCountingDownToJamaat(true);
                 logger.info(
-                  `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`
+                  `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`,
                 );
               }
             } else {
@@ -133,7 +133,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
                 countingDownToJamaat
               ) {
                 logger.info(
-                  `[CRITICAL] ${prayerName} jamaat just completed - triggering countdown completion`
+                  `[CRITICAL] ${prayerName} jamaat just completed - triggering countdown completion`,
                 );
                 triggerCountdownComplete(true);
               }
@@ -172,7 +172,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       // Update state with new countdown values using functional updates to avoid stale closures
       setHours(totalSeconds === 0 ? 0 : Math.floor(totalSeconds / 3600));
       setMinutes(
-        totalSeconds === 0 ? 0 : Math.floor((totalSeconds % 3600) / 60)
+        totalSeconds === 0 ? 0 : Math.floor((totalSeconds % 3600) / 60),
       );
       setSeconds(totalSeconds === 0 ? 0 : totalSeconds % 60);
 
@@ -181,7 +181,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         // Only log every 30 seconds, not every second
         logger.debug(
           `[PrayerCountdown] ${prayerName} countdown: ${Math.floor(
-            totalSeconds / 3600
+            totalSeconds / 3600,
           )}h ${Math.floor((totalSeconds % 3600) / 60)}m ${totalSeconds % 60}s`,
           {
             prayerName,
@@ -189,7 +189,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
             jamaatTime,
             countingDownToJamaat,
             targetTime: targetDayjs.format("YYYY-MM-DD HH:mm:ss"),
-          }
+          },
         );
       }
 
@@ -234,7 +234,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
                   setTimeout(() => {
                     setCountingDownToJamaat(true);
                     logger.info(
-                      `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`
+                      `[PrayerCountdown] Transitioning from ${prayerName} adhan to jamaat countdown`,
                     );
                   }, 1000); // Brief pause before transition
 
@@ -267,7 +267,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     prayerName,
     displayTimes,
     triggerCountdownComplete,
-    countingDownToJamaat // Added to dependencies to prevent stale state
+    countingDownToJamaat, // Added to dependencies to prevent stale state
   ]);
 
   // Update the ref whenever calculateRemainingTime changes
@@ -286,7 +286,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     const isValidTimeFormat = /^\d{1,2}:\d{2}$/.test(prayerTime);
     if (!isValidTimeFormat) {
       logger.error(
-        `Invalid prayer time format for ${prayerName}: ${prayerTime}`
+        `Invalid prayer time format for ${prayerName}: ${prayerTime}`,
       );
       return;
     }
@@ -309,13 +309,13 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
           setSeconds(0);
 
           logger.debug(
-            `[PrayerCountdown] Initial time set for ${prayerName} from pre-calculated value: ${h}hr ${m}min`
+            `[PrayerCountdown] Initial time set for ${prayerName} from pre-calculated value: ${h}hr ${m}min`,
           );
         }
       } catch (error) {
         logger.warn(
           "Error parsing pre-calculated time, will calculate fresh:",
-          { error: error instanceof Error ? error.message : String(error) }
+          { error: error instanceof Error ? error.message : String(error) },
         );
       }
     }

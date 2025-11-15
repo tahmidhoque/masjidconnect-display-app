@@ -1,15 +1,23 @@
 /**
  * Update Progress Service
- * 
+ *
  * Tracks update progress state and stores it for reporting in heartbeat data.
  * Listens to Electron IPC events for update state changes and persists progress
  * in localStorage for reporting across app restarts.
  */
 
-import logger from '../utils/logger';
+import logger from "../utils/logger";
 
 export interface UpdateProgress {
-  status: 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error' | 'not-available' | 'idle';
+  status:
+    | "checking"
+    | "available"
+    | "downloading"
+    | "downloaded"
+    | "installing"
+    | "error"
+    | "not-available"
+    | "idle";
   version?: string;
   progress?: number;
   error?: string;
@@ -33,17 +41,19 @@ class UpdateProgressService {
    */
   public initialize(): void {
     if (this.isInitialized) {
-      logger.warn('UpdateProgressService: Already initialized');
+      logger.warn("UpdateProgressService: Already initialized");
       return;
     }
 
     // Only initialize if running in Electron
-    if (typeof window === 'undefined' || !window.electron) {
-      logger.debug('UpdateProgressService: Not running in Electron, skipping initialization');
+    if (typeof window === "undefined" || !window.electron) {
+      logger.debug(
+        "UpdateProgressService: Not running in Electron, skipping initialization",
+      );
       return;
     }
 
-    logger.info('UpdateProgressService: Initializing');
+    logger.info("UpdateProgressService: Initializing");
 
     // Load any existing progress from localStorage
     this.loadProgressFromStorage();
@@ -52,49 +62,49 @@ class UpdateProgressService {
     if (window.electron.ipcRenderer) {
       // Listen for update-state-changed events
       const unsubscribeStateChanged = window.electron.ipcRenderer.on(
-        'update-state-changed',
-        this.handleUpdateStateChanged
+        "update-state-changed",
+        this.handleUpdateStateChanged,
       );
       this.unsubscribeFunctions.push(unsubscribeStateChanged);
 
       // Listen for individual update events for redundancy
       const unsubscribeAvailable = window.electron.ipcRenderer.on(
-        'update-available',
-        this.handleUpdateAvailable
+        "update-available",
+        this.handleUpdateAvailable,
       );
       this.unsubscribeFunctions.push(unsubscribeAvailable);
 
       const unsubscribeProgress = window.electron.ipcRenderer.on(
-        'download-progress',
-        this.handleDownloadProgress
+        "download-progress",
+        this.handleDownloadProgress,
       );
       this.unsubscribeFunctions.push(unsubscribeProgress);
 
       const unsubscribeDownloaded = window.electron.ipcRenderer.on(
-        'update-downloaded',
-        this.handleUpdateDownloaded
+        "update-downloaded",
+        this.handleUpdateDownloaded,
       );
       this.unsubscribeFunctions.push(unsubscribeDownloaded);
 
       const unsubscribeError = window.electron.ipcRenderer.on(
-        'update-error',
-        this.handleUpdateError
+        "update-error",
+        this.handleUpdateError,
       );
       this.unsubscribeFunctions.push(unsubscribeError);
     }
 
     this.isInitialized = true;
-    logger.info('UpdateProgressService: Initialized successfully');
+    logger.info("UpdateProgressService: Initialized successfully");
   }
 
   /**
    * Handle update state changed event from main process
    */
   private handleUpdateStateChanged = (state: UpdateState): void => {
-    logger.debug('UpdateProgressService: Update state changed', state);
+    logger.debug("UpdateProgressService: Update state changed", state);
 
     this.currentProgress = {
-      status: state.status as UpdateProgress['status'],
+      status: state.status as UpdateProgress["status"],
       version: state.version || undefined,
       progress: state.progress !== undefined ? state.progress : undefined,
       error: state.error || undefined,
@@ -109,10 +119,10 @@ class UpdateProgressService {
    * Handle update available event
    */
   private handleUpdateAvailable = (info: { version: string }): void => {
-    logger.debug('UpdateProgressService: Update available', info);
+    logger.debug("UpdateProgressService: Update available", info);
 
     this.currentProgress = {
-      status: 'available',
+      status: "available",
       version: info.version,
       progress: 0,
       timestamp: new Date().toISOString(),
@@ -130,10 +140,12 @@ class UpdateProgressService {
     transferred: number;
     total: number;
   }): void => {
-    logger.debug('UpdateProgressService: Download progress', { percent: progress.percent });
+    logger.debug("UpdateProgressService: Download progress", {
+      percent: progress.percent,
+    });
 
     this.currentProgress = {
-      status: 'downloading',
+      status: "downloading",
       version: this.currentProgress?.version,
       progress: progress.percent,
       timestamp: new Date().toISOString(),
@@ -146,10 +158,10 @@ class UpdateProgressService {
    * Handle update downloaded event
    */
   private handleUpdateDownloaded = (info: { version: string }): void => {
-    logger.debug('UpdateProgressService: Update downloaded', info);
+    logger.debug("UpdateProgressService: Update downloaded", info);
 
     this.currentProgress = {
-      status: 'downloaded',
+      status: "downloaded",
       version: info.version,
       progress: 100,
       timestamp: new Date().toISOString(),
@@ -161,11 +173,14 @@ class UpdateProgressService {
   /**
    * Handle update error event
    */
-  private handleUpdateError = (error: { message: string; stack?: string }): void => {
-    logger.error('UpdateProgressService: Update error', error);
+  private handleUpdateError = (error: {
+    message: string;
+    stack?: string;
+  }): void => {
+    logger.error("UpdateProgressService: Update error", error);
 
     this.currentProgress = {
-      status: 'error',
+      status: "error",
       version: this.currentProgress?.version,
       progress: this.currentProgress?.progress,
       error: error.message,
@@ -181,13 +196,18 @@ class UpdateProgressService {
   private storeProgress(): void {
     if (this.currentProgress) {
       try {
-        localStorage.setItem('update_progress', JSON.stringify(this.currentProgress));
-        logger.debug('UpdateProgressService: Progress stored', {
+        localStorage.setItem(
+          "update_progress",
+          JSON.stringify(this.currentProgress),
+        );
+        logger.debug("UpdateProgressService: Progress stored", {
           status: this.currentProgress.status,
           version: this.currentProgress.version,
         });
       } catch (error) {
-        logger.error('UpdateProgressService: Failed to store progress', { error });
+        logger.error("UpdateProgressService: Failed to store progress", {
+          error,
+        });
       }
     }
   }
@@ -197,16 +217,19 @@ class UpdateProgressService {
    */
   private loadProgressFromStorage(): void {
     try {
-      const stored = localStorage.getItem('update_progress');
+      const stored = localStorage.getItem("update_progress");
       if (stored) {
         this.currentProgress = JSON.parse(stored) as UpdateProgress;
-        logger.debug('UpdateProgressService: Progress loaded from storage', {
+        logger.debug("UpdateProgressService: Progress loaded from storage", {
           status: this.currentProgress?.status,
           version: this.currentProgress?.version,
         });
       }
     } catch (error) {
-      logger.error('UpdateProgressService: Failed to load progress from storage', { error });
+      logger.error(
+        "UpdateProgressService: Failed to load progress from storage",
+        { error },
+      );
       this.currentProgress = null;
     }
   }
@@ -218,13 +241,14 @@ class UpdateProgressService {
     // Try to get fresh state from main process if available
     if (window.electron?.ipcRenderer) {
       window.electron.ipcRenderer
-        .invoke('get-update-state')
+        .invoke("get-update-state")
         .then((state: UpdateState) => {
           if (state) {
             this.currentProgress = {
-              status: state.status as UpdateProgress['status'],
+              status: state.status as UpdateProgress["status"],
               version: state.version || undefined,
-              progress: state.progress !== undefined ? state.progress : undefined,
+              progress:
+                state.progress !== undefined ? state.progress : undefined,
               error: state.error || undefined,
               timestamp: new Date().toISOString(),
             };
@@ -232,7 +256,10 @@ class UpdateProgressService {
           }
         })
         .catch((error) => {
-          logger.debug('UpdateProgressService: Could not get update state from main process', { error });
+          logger.debug(
+            "UpdateProgressService: Could not get update state from main process",
+            { error },
+          );
         });
     }
 
@@ -245,11 +272,13 @@ class UpdateProgressService {
    */
   public clearProgress(): void {
     try {
-      localStorage.removeItem('update_progress');
+      localStorage.removeItem("update_progress");
       this.currentProgress = null;
-      logger.debug('UpdateProgressService: Progress cleared');
+      logger.debug("UpdateProgressService: Progress cleared");
     } catch (error) {
-      logger.error('UpdateProgressService: Failed to clear progress', { error });
+      logger.error("UpdateProgressService: Failed to clear progress", {
+        error,
+      });
     }
   }
 
@@ -257,12 +286,12 @@ class UpdateProgressService {
    * Clean up resources
    */
   public cleanup(): void {
-    logger.info('UpdateProgressService: Cleaning up');
+    logger.info("UpdateProgressService: Cleaning up");
     this.unsubscribeFunctions.forEach((unsub) => {
       try {
         unsub();
       } catch (error) {
-        logger.error('UpdateProgressService: Error unsubscribing', { error });
+        logger.error("UpdateProgressService: Error unsubscribing", { error });
       }
     });
     this.unsubscribeFunctions = [];
@@ -273,4 +302,3 @@ class UpdateProgressService {
 // Create and export a singleton instance
 const updateProgressService = new UpdateProgressService();
 export default updateProgressService;
-

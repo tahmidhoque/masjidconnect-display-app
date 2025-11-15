@@ -21,7 +21,7 @@ const ModernIslamicBackground: React.FC<ModernIslamicBackgroundProps> = ({
 
   // Get current alert to determine background color
   const currentAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert
+    (state: RootState) => state.emergency.currentAlert,
   );
 
   // Calculate background gradient based on alert state

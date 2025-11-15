@@ -109,10 +109,10 @@ const DisplayScreen: React.FC = memo(() => {
 
   // Get orientation from context (includes transition state)
   const { orientation, isChanging: isOrientationChanging } = useOrientation();
-  
+
   // Redux selectors
   const currentAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert
+    (state: RootState) => state.emergency.currentAlert,
   );
 
   // Local state with performance optimizations
@@ -147,20 +147,20 @@ const DisplayScreen: React.FC = memo(() => {
     timeouts.push(
       setTimeout(
         () => setComponentsLoaded((prev) => ({ ...prev, background: true })),
-        50
-      )
+        50,
+      ),
     );
     timeouts.push(
       setTimeout(
         () => setComponentsLoaded((prev) => ({ ...prev, layout: true })),
-        100
-      )
+        100,
+      ),
     );
     timeouts.push(
       setTimeout(
         () => setComponentsLoaded((prev) => ({ ...prev, content: true })),
-        150
-      )
+        150,
+      ),
     );
 
     return () => {
@@ -209,7 +209,7 @@ const DisplayScreen: React.FC = memo(() => {
       animationPhase,
       shouldDisableAnimations,
       isHighStrain,
-    ]
+    ],
   );
 
   // Memoize animation context to prevent unnecessary re-renders
@@ -219,13 +219,13 @@ const DisplayScreen: React.FC = memo(() => {
       isDisplayReady,
       getComponentAnimation,
     }),
-    [isAlertTransitioning, isDisplayReady, getComponentAnimation]
+    [isAlertTransitioning, isDisplayReady, getComponentAnimation],
   );
 
   // Mount and display readiness effect (optimized for 4K)
   useEffect(() => {
     logger.info(
-      "[DisplayScreen] Component mounted, starting readiness sequence"
+      "[DisplayScreen] Component mounted, starting readiness sequence",
     );
 
     if (isHighStrain) {
@@ -314,21 +314,21 @@ const DisplayScreen: React.FC = memo(() => {
           createTestAlert({
             type: "RED",
             duration: 10,
-          })
+          }),
         );
       } else if (event.key === "2") {
         dispatch(
           createTestAlert({
             type: "AMBER",
             duration: 8,
-          })
+          }),
         );
       } else if (event.key === "3") {
         dispatch(
           createTestAlert({
             type: "BLUE",
             duration: 6,
-          })
+          }),
         );
       } else if (event.key === "c") {
         dispatch(clearCurrentAlert());
@@ -383,20 +383,17 @@ const DisplayScreen: React.FC = memo(() => {
   // Memoize the display component with transition wrapper
   const DisplayComponent = useMemo(() => {
     logger.info(`DisplayScreen: Rendering ${orientation} layout`, {
-      isChanging: isOrientationChanging
+      isChanging: isOrientationChanging,
     });
-    
-    const layout = orientation === "LANDSCAPE" ? (
-      <ModernLandscapeDisplay />
-    ) : (
-      <ModernPortraitDisplay />
-    );
-    
-    return (
-      <OrientationTransition>
-        {layout}
-      </OrientationTransition>
-    );
+
+    const layout =
+      orientation === "LANDSCAPE" ? (
+        <ModernLandscapeDisplay />
+      ) : (
+        <ModernPortraitDisplay />
+      );
+
+    return <OrientationTransition>{layout}</OrientationTransition>;
   }, [orientation, isOrientationChanging]);
 
   // Wait for content to be available (progressive loading for 4K)
@@ -443,9 +440,10 @@ const DisplayScreen: React.FC = memo(() => {
             transform: isHighStrain ? "none" : "translateZ(0)",
             backfaceVisibility: isHighStrain ? "visible" : "hidden",
             // Smooth transition during orientation changes
-            transition: isOrientationChanging && !isHighStrain 
-              ? "all 0.3s ease-in-out" 
-              : "none",
+            transition:
+              isOrientationChanging && !isHighStrain
+                ? "all 0.3s ease-in-out"
+                : "none",
           }}
         >
           {rotationInfo.shouldRotate && !isHighStrain ? (
@@ -462,22 +460,23 @@ const DisplayScreen: React.FC = memo(() => {
                 // Ensure no overflow or positioning issues
                 overflow: "hidden",
                 // Smooth transition during orientation changes
-                transition: isOrientationChanging 
-                  ? "transform 0.3s ease-in-out" 
+                transition: isOrientationChanging
+                  ? "transform 0.3s ease-in-out"
                   : "none",
               }}
             >
               {DisplayComponent}
             </Box>
           ) : (
-            <Box 
-              sx={{ 
-                width: "100%", 
+            <Box
+              sx={{
+                width: "100%",
                 height: "100%",
                 // Smooth transition during orientation changes
-                transition: isOrientationChanging && !isHighStrain
-                  ? "all 0.3s ease-in-out"
-                  : "none",
+                transition:
+                  isOrientationChanging && !isHighStrain
+                    ? "all 0.3s ease-in-out"
+                    : "none",
               }}
             >
               {DisplayComponent}

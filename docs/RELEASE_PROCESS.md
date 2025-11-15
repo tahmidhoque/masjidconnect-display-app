@@ -111,6 +111,7 @@ npm run release:create 1.0.1
 ```
 
 This script:
+
 1. Validates version format
 2. Checks git working directory is clean
 3. Runs tests (unless `--skip-tests` flag is used)
@@ -188,6 +189,7 @@ npm run rpi:publish
 ```
 
 **Important Notes**:
+
 - The build script builds architectures **separately** (not together) for reliability
 - Each architecture build is validated before proceeding
 - Build artifacts are verified for size and integrity
@@ -216,6 +218,7 @@ npm run release:validate
 ```
 
 This checks:
+
 - ✅ Version format (semantic versioning)
 - ✅ Required artifacts exist (.deb files for both architectures)
 - ✅ Artifact integrity (file size, format)
@@ -227,6 +230,7 @@ This checks:
 ### Post-Build Validation
 
 GitHub Actions automatically validates:
+
 - Version format
 - Build artifacts exist and are valid
 - Checksums are generated
@@ -249,24 +253,27 @@ The `test-release.yml` workflow automatically tests releases:
 ### Manual Testing on Raspberry Pi
 
 1. **Download the release**:
+
    ```bash
    # For Raspberry Pi 4/5 (arm64)
    wget https://github.com/masjidSolutions/masjidconnect-display-app/releases/download/v1.0.1/masjidconnect-display-1.0.1-arm64.deb
-   
+
    # For Raspberry Pi 3 (armv7l)
    wget https://github.com/masjidSolutions/masjidconnect-display-app/releases/download/v1.0.1/masjidconnect-display-1.0.1-armv7l.deb
    ```
 
 2. **Verify checksum**:
+
    ```bash
    # Download checksum file
    wget https://github.com/masjidSolutions/masjidconnect-display-app/releases/download/v1.0.1/masjidconnect-display-1.0.1-arm64.deb.sha256
-   
+
    # Verify
    sha256sum -c masjidconnect-display-1.0.1-arm64.deb.sha256
    ```
 
 3. **Install**:
+
    ```bash
    sudo dpkg -i masjidconnect-display-1.0.1-arm64.deb
    ```
@@ -294,6 +301,7 @@ npm run release:rollback 1.0.1 --reason="Memory leak in update service"
 ```
 
 This provides instructions to:
+
 1. Mark release as pre-release on GitHub (hides from auto-updater)
 2. Add deprecation notice to release notes
 
@@ -310,6 +318,7 @@ npm run release:rollback 1.0.1 --create-patch --reason="Fixes memory leak"
 ```
 
 This will:
+
 1. Increment patch version (e.g., 1.0.1 → 1.0.2)
 2. Update package.json
 3. Update CHANGELOG.md with rollback notice
@@ -337,6 +346,7 @@ For immediate rollback:
 **Issue**: Build fails on GitHub Actions
 
 **Solutions**:
+
 - Check GitHub Actions logs for specific errors
 - Verify Node.js version compatibility (18+)
 - Ensure all dependencies are in package.json
@@ -346,6 +356,7 @@ For immediate rollback:
 **Issue**: Cross-compilation fails
 
 **Solutions**:
+
 - Use GitHub Actions (recommended - runs on Linux)
 - Build directly on Raspberry Pi
 - Use Docker for cross-compilation
@@ -354,6 +365,7 @@ For immediate rollback:
 **Issue**: .deb package doesn't install on RPI
 
 **Solutions**:
+
 - Verify architecture matches your RPI (armv7l for Pi 3, arm64 for Pi 4/5)
 - Check installation log: `cat /var/log/masjidconnect-install.log`
 - Fix dependencies: `sudo apt-get install -f`
@@ -365,6 +377,7 @@ For immediate rollback:
 **Issue**: Release not detected by electron-updater
 
 **Solutions**:
+
 - Verify release is not marked as "pre-release"
 - Check package.json `build.publish` configuration
 - Ensure GitHub token has correct permissions
@@ -373,6 +386,7 @@ For immediate rollback:
 **Issue**: Wrong version reported
 
 **Solutions**:
+
 - Verify `REACT_APP_VERSION` environment variable is set during build
 - Check `package.json` version matches release tag
 - Ensure version is properly embedded in build
@@ -382,6 +396,7 @@ For immediate rollback:
 **Issue**: Updates not downloading
 
 **Solutions**:
+
 - Check network connectivity on device
 - Verify GitHub releases API is accessible
 - Check electron-updater logs
@@ -390,6 +405,7 @@ For immediate rollback:
 **Issue**: Update fails to install
 
 **Solutions**:
+
 - Verify .deb file integrity (checksum)
 - Check disk space on device
 - Review installation logs
@@ -468,6 +484,6 @@ npm run rpi:publish
 ## Support
 
 For issues or questions:
+
 - Check GitHub Issues: https://github.com/masjidSolutions/masjidconnect-display-app/issues
 - Contact: support@masjidconnect.co.uk
-

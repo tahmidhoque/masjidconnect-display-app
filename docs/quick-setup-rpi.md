@@ -19,16 +19,19 @@ cd masjidconnect-display-app
 ### 2. Build and Install
 
 #### Option A: System-wide Installation (Recommended)
+
 ```bash
 sudo ./build-and-install-rpi.sh
 ```
 
 #### Option B: User Installation
+
 ```bash
 ./build-and-install-rpi.sh
 ```
 
 ### 3. Reboot
+
 ```bash
 sudo reboot
 ```
@@ -49,7 +52,9 @@ The app will start automatically after reboot.
 ## Build Options
 
 ### Memory Optimization
+
 The script automatically:
+
 - Sets Node.js memory limits based on available RAM
 - Disables source maps and ESLint during build
 - Uses optimized npm settings
@@ -58,12 +63,14 @@ The script automatically:
 ### Installation Modes
 
 **System-wide (sudo)**:
+
 - Installs to `/opt/masjidconnect-display/`
 - Creates systemd service
 - Available to all users
 - Starts automatically on boot
 
 **User installation**:
+
 - Installs to `~/.local/share/masjidconnect-display/`
 - User autostart only
 - No system-wide changes
@@ -73,6 +80,7 @@ The script automatically:
 ### Start/Stop Application
 
 **System-wide**:
+
 ```bash
 # Start manually
 sudo /opt/masjidconnect-display/masjidconnect-display
@@ -87,6 +95,7 @@ journalctl -u masjidconnect-display -f
 ```
 
 **User installation**:
+
 ```bash
 # Start manually
 ~/.local/share/masjidconnect-display/masjidconnect-display
@@ -98,17 +107,20 @@ journalctl -u masjidconnect-display -f
 ### Troubleshooting
 
 **Check if app is running**:
+
 ```bash
 ps aux | grep masjidconnect
 ```
 
 **View display**:
+
 ```bash
 export DISPLAY=:0
 xrandr  # Check display status
 ```
 
 **Free up memory** (if build fails):
+
 ```bash
 sudo systemctl stop masjidconnect-display
 free -h  # Check available memory
@@ -117,12 +129,14 @@ free -h  # Check available memory
 ## Performance Tips
 
 ### For Raspberry Pi 3:
+
 - Use 64-bit OS if possible
 - Enable swap file: `sudo dphys-swapfile setup`
 - Close unnecessary applications during build
 - Consider building overnight (can take 1-2 hours)
 
 ### For Raspberry Pi 4:
+
 - 2GB+ RAM recommended
 - 4GB+ RAM for comfortable development
 - Build typically takes 20-45 minutes
@@ -130,7 +144,9 @@ free -h  # Check available memory
 ## Configuration
 
 ### Display Settings
+
 Edit `/boot/config.txt`:
+
 ```bash
 # GPU memory for display apps
 gpu_mem=128
@@ -141,7 +157,9 @@ hdmi_mode=82  # 1080p 60Hz
 ```
 
 ### Kiosk Mode
+
 For full kiosk setup, also disable:
+
 ```bash
 # Disable screen blanking
 sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
@@ -158,10 +176,11 @@ echo "@unclutter -idle 0.5" >> ~/.config/lxsession/LXDE-pi/autostart
 ## Support
 
 If you encounter issues:
+
 1. Check available memory: `free -h`
 2. Verify Node.js version: `node -v` (needs 16+)
 3. Check build logs for specific errors
 4. Try building with swap enabled
 5. Consider using a more powerful Pi model
 
-For production deployments, consider using the pre-built packages instead of building on device. 
+For production deployments, consider using the pre-built packages instead of building on device.

@@ -31,17 +31,22 @@ Added validation to check if response is actually an object before using the `in
 ```typescript
 export function validateApiResponse<T>(response: any): ApiResponse<T> {
   // First check if response is a valid object (not string, not null, not array)
-  if (!response || typeof response !== 'object' || Array.isArray(response)) {
-    logger.error('Invalid API response: not an object', { response: typeof response });
-    return createErrorResponse('Invalid API response format');
+  if (!response || typeof response !== "object" || Array.isArray(response)) {
+    logger.error("Invalid API response: not an object", {
+      response: typeof response,
+    });
+    return createErrorResponse("Invalid API response format");
   }
 
   // Check if this is already a valid API response
-  if ('success' in response && ('data' in response || response.success === false)) {
+  if (
+    "success" in response &&
+    ("data" in response || response.success === false)
+  ) {
     // Process normally...
   }
 
-  return createErrorResponse<T>('Invalid API response format');
+  return createErrorResponse<T>("Invalid API response format");
 }
 ```
 
@@ -56,13 +61,19 @@ export function validateApiResponse<T>(response: any): ApiResponse<T> {
 Added check to detect if data is HTML:
 
 ```typescript
-export function normalizeApiResponse<T>(response: Partial<ApiResponse<T>>): ApiResponse<T> {
+export function normalizeApiResponse<T>(
+  response: Partial<ApiResponse<T>>,
+): ApiResponse<T> {
   // Check if data is an HTML string (common error case)
-  if (response.data && typeof response.data === 'string' && (response.data as string).trim().startsWith('<')) {
-    logger.error('Received HTML in API response data', {
+  if (
+    response.data &&
+    typeof response.data === "string" &&
+    (response.data as string).trim().startsWith("<")
+  ) {
+    logger.error("Received HTML in API response data", {
       preview: (response.data as string).substring(0, 200),
     });
-    return createErrorResponse('API returned HTML instead of JSON');
+    return createErrorResponse("API returned HTML instead of JSON");
   }
 
   // Process normally...
@@ -86,13 +97,18 @@ const response = await this.client.request<any, AxiosResponse<T>>({
 });
 
 // Check if response.data is HTML (common error response)
-if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
-  logger.error(`Received HTML response instead of JSON from ${normalizedEndpoint}`, {
-    status: response.status,
-    contentType: response.headers?.['content-type'],
-    preview: response.data.substring(0, 200),
-  });
-  throw new Error(`API returned HTML instead of JSON. This usually indicates a server error or incorrect URL.`);
+if (typeof response.data === "string" && response.data.trim().startsWith("<")) {
+  logger.error(
+    `Received HTML response instead of JSON from ${normalizedEndpoint}`,
+    {
+      status: response.status,
+      contentType: response.headers?.["content-type"],
+      preview: response.data.substring(0, 200),
+    },
+  );
+  throw new Error(
+    `API returned HTML instead of JSON. This usually indicates a server error or incorrect URL.`,
+  );
 }
 ```
 
@@ -122,7 +138,7 @@ Check `process.env.REACT_APP_API_URL` or the default URL:
 
 ```javascript
 // In src/api/masjidDisplayClient.ts
-const baseURL = process.env.REACT_APP_API_URL || 'https://api.masjid.app';
+const baseURL = process.env.REACT_APP_API_URL || "https://api.masjid.app";
 ```
 
 **Common issues:**
@@ -231,7 +247,7 @@ has been blocked by CORS policy
 In the browser console, enable verbose logging:
 
 ```javascript
-localStorage.setItem('debug', 'masjidconnect:*');
+localStorage.setItem("debug", "masjidconnect:*");
 ```
 
 Then reload the page. You'll see detailed logs including:
@@ -247,9 +263,9 @@ Then reload the page. You'll see detailed logs including:
 
 ```javascript
 // In browser console, test the error handling
-const htmlResponse = '<html><body>Error</body></html>';
+const htmlResponse = "<html><body>Error</body></html>";
 console.log(typeof htmlResponse); // "string"
-console.log('data' in htmlResponse); // TypeError (before fix)
+console.log("data" in htmlResponse); // TypeError (before fix)
 
 // After fix, the code checks typeof first, preventing the error
 ```
@@ -296,7 +312,6 @@ sudo dpkg -i masjidconnect-display-0.0.1-arm64.deb
 ## Related Files Changed
 
 1. **`src/utils/apiErrorHandler.ts`**
-
    - Enhanced `validateApiResponse` with object type checking
    - Added HTML detection in `normalizeApiResponse`
 

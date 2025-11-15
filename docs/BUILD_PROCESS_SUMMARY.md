@@ -8,13 +8,16 @@ The build and release process has been completely redesigned to fix installation
 
 ### 1. Separate Architecture Builds
 
-**Before**: 
+**Before**:
+
 ```bash
 electron-builder build --linux deb --armv7l --arm64
 ```
+
 This doesn't work reliably - electron-builder struggles with multiple architectures.
 
 **After**:
+
 ```bash
 # Build each architecture separately
 electron-builder --linux deb --armv7l
@@ -24,6 +27,7 @@ electron-builder --linux deb --arm64
 ### 2. New Build Script (`scripts/build-rpi.sh`)
 
 Created a comprehensive build script that:
+
 - ✅ Checks prerequisites (Node.js version, tools)
 - ✅ Cleans previous builds
 - ✅ Builds React app
@@ -35,6 +39,7 @@ Created a comprehensive build script that:
 ### 3. Fixed Package Configuration
 
 **Changes**:
+
 - Removed `tar.gz` targets (not needed for RPI)
 - Simplified `files` configuration (electron-builder handles node_modules)
 - Added `afterRemove` script for clean uninstall
@@ -44,6 +49,7 @@ Created a comprehensive build script that:
 ### 4. Improved After-Install Script
 
 **Fixes**:
+
 - Handles multiple possible file locations (asar vs unpacked)
 - Better font installation (searches multiple paths)
 - Icon path detection (handles missing icons gracefully)
@@ -52,6 +58,7 @@ Created a comprehensive build script that:
 ### 5. GitHub Actions Updates
 
 **Changes**:
+
 - Builds architectures in separate matrix jobs
 - Validates artifacts after each build
 - Ensures scripts are executable
@@ -91,6 +98,7 @@ bash scripts/verify-installation.sh
 ## File Structure
 
 After installation, the app is located at:
+
 ```
 /opt/masjidconnect-display/
 ├── masjidconnect-display          # Main executable
@@ -103,6 +111,7 @@ After installation, the app is located at:
 ## Verification
 
 The `scripts/verify-installation.sh` script checks:
+
 - ✅ Main executable exists and is executable
 - ✅ Required files present
 - ✅ Desktop entry created
@@ -122,13 +131,15 @@ The `scripts/verify-installation.sh` script checks:
 ### Installation Issues
 
 **Problem**: Package won't install
-**Solution**: 
+**Solution**:
+
 - Check architecture matches (armv7l for Pi 3, arm64 for Pi 4/5)
 - Fix dependencies: `sudo apt-get install -f`
 - Check log: `cat /var/log/masjidconnect-install.log`
 
 **Problem**: App doesn't start
 **Solution**:
+
 - Check permissions: `ls -l /opt/masjidconnect-display/masjidconnect-display`
 - Fix if needed: `sudo chmod +x /opt/masjidconnect-display/masjidconnect-display`
 - Check logs: `cat ~/.config/masjidconnect-display/logs/main.log`
@@ -149,4 +160,3 @@ The `scripts/verify-installation.sh` script checks:
 - ✅ Installation completes even if optional steps fail
 - ✅ Clear error messages and validation
 - ✅ Proper cleanup on uninstall
-

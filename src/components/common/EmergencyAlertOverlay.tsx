@@ -116,11 +116,11 @@ const alertAnimations = `
 const EmergencyAlertOverlay: React.FC = () => {
   const theme = useTheme();
   const currentAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert
+    (state: RootState) => state.emergency.currentAlert,
   );
   const hasActiveAlert = currentAlert !== null;
   const { fontSizes } = useResponsiveFontSize();
-  
+
   // Orientation handling
   const { orientation } = useOrientation();
   const rotationInfo = useRotationHandling(orientation);
@@ -256,7 +256,7 @@ const EmergencyAlertOverlay: React.FC = () => {
             position: "relative",
             background: `linear-gradient(to bottom, ${alpha(
               alertConfig.accentColor,
-              0.1
+              0.1,
             )}, transparent)`,
           }}
         >
@@ -271,7 +271,7 @@ const EmergencyAlertOverlay: React.FC = () => {
               letterSpacing: "0.08em",
               textShadow: `2px 2px 4px ${alpha(
                 theme.palette.common.black,
-                0.3
+                0.3,
               )}`,
               mb: 1,
             }}
@@ -292,7 +292,7 @@ const EmergencyAlertOverlay: React.FC = () => {
             justifyContent: "center",
             background: `linear-gradient(to bottom, transparent, ${alpha(
               alertConfig.accentColor,
-              0.05
+              0.05,
             )})`,
           }}
         >
@@ -308,7 +308,7 @@ const EmergencyAlertOverlay: React.FC = () => {
               fontWeight: 500,
               textShadow: `1px 1px 2px ${alpha(
                 theme.palette.common.black,
-                0.2
+                0.2,
               )}`,
             }}
           >
@@ -326,7 +326,7 @@ const EmergencyAlertOverlay: React.FC = () => {
             borderTop: `2px solid ${alpha(alertConfig.textColor, 0.15)}`,
             background: `linear-gradient(to top, ${alpha(
               alertConfig.accentColor,
-              0.1
+              0.1,
             )}, transparent)`,
           }}
         >
@@ -358,7 +358,7 @@ const EmergencyAlertOverlay: React.FC = () => {
                 letterSpacing: "0.05em",
                 textShadow: `1px 1px 2px ${alpha(
                   theme.palette.common.black,
-                  0.2
+                  0.2,
                 )}`,
               }}
             >

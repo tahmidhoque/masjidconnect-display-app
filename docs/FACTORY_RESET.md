@@ -1,9 +1,11 @@
 # Factory Reset Feature
 
 ## Overview
+
 The MasjidConnect Display App includes a factory reset feature that allows you to completely reset the display to its initial state, as if it has never been connected before.
 
 ## 🎹 Keyboard Shortcut
+
 **`Ctrl+Shift+R`** (Windows/Linux) or **`Cmd+Shift+R`** (Mac)
 
 This keyboard shortcut can be pressed at any time while the display app is running.
@@ -44,11 +46,13 @@ The factory reset confirmation modal is styled to match the app's branding:
 ## 🔧 Technical Details
 
 ### Components Involved
+
 - `FactoryResetModal.tsx` - The styled confirmation modal
 - `factoryResetService.ts` - Service handling the reset logic
 - `useFactoryReset.ts` - React hook for keyboard shortcuts and state management
 
 ### What Gets Cleared
+
 1. **localStorage** - All keys including credentials, cache, and preferences
 2. **sessionStorage** - Temporary session data
 3. **IndexedDB** - LocalForage databases used for offline storage
@@ -56,6 +60,7 @@ The factory reset confirmation modal is styled to match the app's branding:
 5. **Application state** - Redux store is reset via page reload
 
 ### Safety Features
+
 - **Confirmation required** - Cannot be triggered accidentally
 - **Clear warnings** - Modal explains exactly what will happen
 - **Keyboard controls** - Both mouse and keyboard interaction supported
@@ -64,6 +69,7 @@ The factory reset confirmation modal is styled to match the app's branding:
 ## 🚨 Use Cases
 
 ### When to Use Factory Reset
+
 - **Display not responding properly** - Clear corrupted data
 - **Moving to different location** - Unpair from old masjid account
 - **Testing/development** - Return to clean state
@@ -71,6 +77,7 @@ The factory reset confirmation modal is styled to match the app's branding:
 - **Before returning/selling device** - Remove all masjid-specific data
 
 ### When NOT to Use
+
 - **Minor display issues** - Try refreshing the page first
 - **Temporary network problems** - Wait for connection to restore
 - **Content not updating** - Check internet connection first
@@ -85,6 +92,7 @@ The factory reset confirmation modal is styled to match the app's branding:
 ## 📱 User Experience
 
 The factory reset feature is designed to be:
+
 - **Easy to access** via memorable keyboard shortcut
 - **Hard to trigger accidentally** with confirmation requirement
 - **Clear about consequences** with detailed warning messages
@@ -93,4 +101,4 @@ The factory reset feature is designed to be:
 
 ---
 
-*This feature ensures that displays can always be returned to a clean state when needed, while maintaining the security and branding standards of the MasjidConnect platform.* 
+_This feature ensures that displays can always be returned to a clean state when needed, while maintaining the security and branding standards of the MasjidConnect platform._

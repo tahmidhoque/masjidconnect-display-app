@@ -5,11 +5,11 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.0)'
+        description: "Version to release (e.g., 1.0.0)"
         required: false
         type: string
 
@@ -37,8 +37,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Get version from package.json
         id: package-version
@@ -46,7 +46,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
-          
+
           # Validate version format (semantic versioning)
           if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
             echo "❌ Invalid version format: $VERSION"
@@ -80,7 +80,7 @@ jobs:
           # Ensure after-install.sh is executable
           chmod +x after-install.sh || true
           chmod +x after-remove.sh || true
-          
+
           # Build for specific architecture
           if [ "${{ matrix.arch }}" = "armv7l" ]; then
             npx electron-builder --linux deb --armv7l --publish never
@@ -102,21 +102,21 @@ jobs:
             echo "❌ dist directory not found"
             exit 1
           fi
-          
+
           # Check for .deb file
           DEB_FILE=$(find dist -name "*.deb" -type f | head -1)
           if [ -z "$DEB_FILE" ]; then
             echo "❌ No .deb file found in dist directory"
             exit 1
           fi
-          
+
           # Validate .deb file size (should be > 0)
           DEB_SIZE=$(stat -f%z "$DEB_FILE" 2>/dev/null || stat -c%s "$DEB_FILE" 2>/dev/null)
           if [ "$DEB_SIZE" -eq 0 ]; then
             echo "❌ .deb file is empty"
             exit 1
           fi
-          
+
           echo "✅ Build artifacts validated"
           echo "   Found: $(basename "$DEB_FILE")"
           echo "   Size: $DEB_SIZE bytes"
@@ -193,7 +193,7 @@ jobs:
         id: release-notes
         run: |
           VERSION="${{ steps.get-version.outputs.VERSION }}"
-          
+
           # Try to get release notes from CHANGELOG.md if it exists
           if [ -f "CHANGELOG.md" ]; then
             echo "Found CHANGELOG.md, extracting release notes..."
@@ -214,7 +214,7 @@ jobs:
               CHANGELOG_CONTENT=$(cat changelog-section.md)
             fi
           fi
-          
+
           # Get commits since last tag as fallback
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -z "$PREVIOUS_TAG" ]; then
@@ -222,7 +222,7 @@ jobs:
           else
             COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD | head -20)
           fi
-          
+
           # Use CHANGELOG if available, otherwise use commits
           if [ -n "$CHANGELOG_CONTENT" ]; then
             CHANGES_SECTION="$CHANGELOG_CONTENT"
@@ -252,7 +252,7 @@ jobs:
 
           ### Checksums
           SHA256 checksums are provided for all artifacts to verify integrity.
-          
+
           ### Auto-Update
           The app will automatically check for updates hourly. Updates can also be triggered manually via the admin portal.
           EOF

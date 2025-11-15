@@ -1,297 +1,348 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <title>Blank Screen Debugger</title>
-  <style>
-    body {
-      font-family: 'Courier New', monospace;
-      max-width: 1000px;
-      margin: 20px auto;
-      padding: 20px;
-      background: #1a1a1a;
-      color: #0f0;
-    }
-    h1 { color: #0ff; }
-    h2 { color: #ff0; margin-top: 30px; }
-    .section {
-      background: #000;
-      border: 1px solid #0f0;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 5px;
-    }
-    .error { color: #f00; }
-    .success { color: #0f0; }
-    .warning { color: #ff0; }
-    pre {
-      background: #111;
-      padding: 10px;
-      overflow-x: auto;
-      border-left: 3px solid #0f0;
-    }
-    button {
-      background: #0f0;
-      color: #000;
-      border: none;
-      padding: 10px 20px;
-      margin: 5px;
-      cursor: pointer;
-      font-weight: bold;
-      border-radius: 3px;
-    }
-    button:hover {
-      background: #0ff;
-    }
-    .output {
-      background: #000;
-      border: 1px solid #0f0;
-      padding: 10px;
-      min-height: 50px;
-      margin-top: 10px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-  </style>
-</head>
-<body>
-  <h1>🔍 MasjidConnect Display - Blank Screen Debugger</h1>
-  <p>Use this tool to diagnose why you're seeing a blank screen</p>
-
-  <h2>📋 Quick Actions</h2>
-  <div class="section">
-    <button onclick="checkEnvironment()">Check Environment</button>
-    <button onclick="checkAPI()">Test API Connection</button>
-    <button onclick="checkStorage()">Check localStorage</button>
-    <button onclick="clearAndReload()">Clear & Reload</button>
-    <button onclick="forcePairing()">Force Pairing Mode</button>
-    <button onclick="collectDiagnostics()">Collect Full Diagnostics</button>
-  </div>
-
-  <h2>📊 Results</h2>
-  <div class="section">
-    <div id="output" class="output">Click buttons above to run diagnostics...</div>
-  </div>
-
-  <h2>💡 Common Fixes</h2>
-  <div class="section">
-    <h3>Fix 1: Force Pairing Mode</h3>
-    <p>Clears credentials and shows pairing screen</p>
-    <button onclick="forcePairing()">Apply Fix 1</button>
-
-    <h3>Fix 2: Clear All Data</h3>
-    <p>Nuclear option - clears everything</p>
-    <button onclick="clearAll()">Apply Fix 2</button>
-
-    <h3>Fix 3: Disable RPi Mode</h3>
-    <p>Disables performance optimizations</p>
-    <button onclick="disableRPiMode()">Apply Fix 3</button>
-  </div>
-
-  <script>
-    function log(message, type = 'info') {
-      const output = document.getElementById('output');
-      const timestamp = new Date().toLocaleTimeString();
-      const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'warning';
-      output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
-    }
-
-    function clearOutput() {
-      document.getElementById('output').innerHTML = '';
-    }
-
-    function checkEnvironment() {
-      clearOutput();
-      log('=== ENVIRONMENT CHECK ===', 'info');
-      log(`User Agent: ${navigator.userAgent}`, 'info');
-      log(`Platform: ${navigator.platform}`, 'info');
-      log(`Screen Resolution: ${screen.width}x${screen.height}`, 'info');
-      log(`Window Size: ${window.innerWidth}x${window.innerHeight}`, 'info');
-      log(`Language: ${navigator.language}`, 'info');
-      log(`Online: ${navigator.onLine}`, navigator.onLine ? 'success' : 'error');
-      
-      // Check if on RPi
-      const isRPi = navigator.userAgent.toLowerCase().includes('raspberry') || 
-                    navigator.platform.toLowerCase().includes('arm');
-      log(`Detected as RPi: ${isRPi}`, isRPi ? 'warning' : 'info');
-    }
-
-    function checkStorage() {
-      clearOutput();
-      log('=== LOCALSTORAGE CHECK ===', 'info');
-      
-      const apiKey = localStorage.getItem('masjid_api_key');
-      const screenId = localStorage.getItem('masjid_screen_id');
-      const isPaired = localStorage.getItem('isPaired');
-      
-      log(`API Key: ${apiKey ? '✓ Present (' + apiKey.substring(0, 10) + '...)' : '✗ Missing'}`, apiKey ? 'success' : 'error');
-      log(`Screen ID: ${screenId ? '✓ Present (' + screenId + ')' : '✗ Missing'}`, screenId ? 'success' : 'error');
-      log(`Is Paired: ${isPaired}`, 'info');
-      
-      log('\nAll localStorage keys:', 'info');
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        const value = localStorage.getItem(key);
-        log(`  ${key}: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`, 'info');
+  <head>
+    <title>Blank Screen Debugger</title>
+    <style>
+      body {
+        font-family: "Courier New", monospace;
+        max-width: 1000px;
+        margin: 20px auto;
+        padding: 20px;
+        background: #1a1a1a;
+        color: #0f0;
       }
-      
-      if (apiKey && screenId) {
-        log('\n✓ Credentials exist - should show Display Screen', 'success');
-      } else {
-        log('\n✗ No credentials - should show Pairing Screen', 'warning');
+      h1 {
+        color: #0ff;
       }
-    }
+      h2 {
+        color: #ff0;
+        margin-top: 30px;
+      }
+      .section {
+        background: #000;
+        border: 1px solid #0f0;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 5px;
+      }
+      .error {
+        color: #f00;
+      }
+      .success {
+        color: #0f0;
+      }
+      .warning {
+        color: #ff0;
+      }
+      pre {
+        background: #111;
+        padding: 10px;
+        overflow-x: auto;
+        border-left: 3px solid #0f0;
+      }
+      button {
+        background: #0f0;
+        color: #000;
+        border: none;
+        padding: 10px 20px;
+        margin: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        border-radius: 3px;
+      }
+      button:hover {
+        background: #0ff;
+      }
+      .output {
+        background: #000;
+        border: 1px solid #0f0;
+        padding: 10px;
+        min-height: 50px;
+        margin-top: 10px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 MasjidConnect Display - Blank Screen Debugger</h1>
+    <p>Use this tool to diagnose why you're seeing a blank screen</p>
 
-    async function checkAPI() {
-      clearOutput();
-      log('=== API CONNECTION CHECK ===', 'info');
-      
-      const apiUrl = 'https://portal.masjidconnect.co.uk/api';
-      log(`Testing connection to: ${apiUrl}`, 'info');
-      
-      try {
-        log('Testing /screen/heartbeat endpoint...', 'info');
-        const response = await fetch(`${apiUrl}/screen/heartbeat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('masjid_api_key') || 'test'}`,
-            'X-Screen-ID': localStorage.getItem('masjid_screen_id') || 'test'
+    <h2>📋 Quick Actions</h2>
+    <div class="section">
+      <button onclick="checkEnvironment()">Check Environment</button>
+      <button onclick="checkAPI()">Test API Connection</button>
+      <button onclick="checkStorage()">Check localStorage</button>
+      <button onclick="clearAndReload()">Clear & Reload</button>
+      <button onclick="forcePairing()">Force Pairing Mode</button>
+      <button onclick="collectDiagnostics()">Collect Full Diagnostics</button>
+    </div>
+
+    <h2>📊 Results</h2>
+    <div class="section">
+      <div id="output" class="output">
+        Click buttons above to run diagnostics...
+      </div>
+    </div>
+
+    <h2>💡 Common Fixes</h2>
+    <div class="section">
+      <h3>Fix 1: Force Pairing Mode</h3>
+      <p>Clears credentials and shows pairing screen</p>
+      <button onclick="forcePairing()">Apply Fix 1</button>
+
+      <h3>Fix 2: Clear All Data</h3>
+      <p>Nuclear option - clears everything</p>
+      <button onclick="clearAll()">Apply Fix 2</button>
+
+      <h3>Fix 3: Disable RPi Mode</h3>
+      <p>Disables performance optimizations</p>
+      <button onclick="disableRPiMode()">Apply Fix 3</button>
+    </div>
+
+    <script>
+      function log(message, type = "info") {
+        const output = document.getElementById("output");
+        const timestamp = new Date().toLocaleTimeString();
+        const className =
+          type === "error"
+            ? "error"
+            : type === "success"
+              ? "success"
+              : "warning";
+        output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+      }
+
+      function clearOutput() {
+        document.getElementById("output").innerHTML = "";
+      }
+
+      function checkEnvironment() {
+        clearOutput();
+        log("=== ENVIRONMENT CHECK ===", "info");
+        log(`User Agent: ${navigator.userAgent}`, "info");
+        log(`Platform: ${navigator.platform}`, "info");
+        log(`Screen Resolution: ${screen.width}x${screen.height}`, "info");
+        log(`Window Size: ${window.innerWidth}x${window.innerHeight}`, "info");
+        log(`Language: ${navigator.language}`, "info");
+        log(
+          `Online: ${navigator.onLine}`,
+          navigator.onLine ? "success" : "error",
+        );
+
+        // Check if on RPi
+        const isRPi =
+          navigator.userAgent.toLowerCase().includes("raspberry") ||
+          navigator.platform.toLowerCase().includes("arm");
+        log(`Detected as RPi: ${isRPi}`, isRPi ? "warning" : "info");
+      }
+
+      function checkStorage() {
+        clearOutput();
+        log("=== LOCALSTORAGE CHECK ===", "info");
+
+        const apiKey = localStorage.getItem("masjid_api_key");
+        const screenId = localStorage.getItem("masjid_screen_id");
+        const isPaired = localStorage.getItem("isPaired");
+
+        log(
+          `API Key: ${apiKey ? "✓ Present (" + apiKey.substring(0, 10) + "...)" : "✗ Missing"}`,
+          apiKey ? "success" : "error",
+        );
+        log(
+          `Screen ID: ${screenId ? "✓ Present (" + screenId + ")" : "✗ Missing"}`,
+          screenId ? "success" : "error",
+        );
+        log(`Is Paired: ${isPaired}`, "info");
+
+        log("\nAll localStorage keys:", "info");
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          const value = localStorage.getItem(key);
+          log(
+            `  ${key}: ${value.substring(0, 50)}${value.length > 50 ? "..." : ""}`,
+            "info",
+          );
+        }
+
+        if (apiKey && screenId) {
+          log("\n✓ Credentials exist - should show Display Screen", "success");
+        } else {
+          log("\n✗ No credentials - should show Pairing Screen", "warning");
+        }
+      }
+
+      async function checkAPI() {
+        clearOutput();
+        log("=== API CONNECTION CHECK ===", "info");
+
+        const apiUrl = "https://portal.masjidconnect.co.uk/api";
+        log(`Testing connection to: ${apiUrl}`, "info");
+
+        try {
+          log("Testing /screen/heartbeat endpoint...", "info");
+          const response = await fetch(`${apiUrl}/screen/heartbeat`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("masjid_api_key") || "test"}`,
+              "X-Screen-ID": localStorage.getItem("masjid_screen_id") || "test",
+            },
+            body: JSON.stringify({}),
+          });
+
+          log(
+            `Response Status: ${response.status}`,
+            response.ok ? "success" : "warning",
+          );
+          log(`Response Status Text: ${response.statusText}`, "info");
+
+          const contentType = response.headers.get("content-type");
+          log(`Content-Type: ${contentType}`, "info");
+
+          if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            log(`Response Data: ${JSON.stringify(data, null, 2)}`, "success");
+          } else {
+            const text = await response.text();
+            log(`Response (non-JSON): ${text.substring(0, 200)}`, "warning");
+          }
+
+          if (response.status === 200) {
+            log("\n✓ API is reachable and working!", "success");
+          } else if (response.status === 401) {
+            log(
+              "\n⚠ API is reachable but authentication failed (expected if not paired)",
+              "warning",
+            );
+          } else {
+            log(
+              `\n✗ API returned unexpected status: ${response.status}`,
+              "error",
+            );
+          }
+        } catch (error) {
+          log(`✗ API Connection Failed: ${error.message}`, "error");
+          log(`This means the API is not reachable from this device`, "error");
+          log(`Check: Network connection, DNS, firewall`, "error");
+        }
+      }
+
+      function forcePairing() {
+        if (
+          confirm(
+            "This will clear credentials and force the pairing screen. Continue?",
+          )
+        ) {
+          clearOutput();
+          log("Clearing credentials...", "info");
+          localStorage.removeItem("masjid_api_key");
+          localStorage.removeItem("masjid_screen_id");
+          localStorage.removeItem("isPaired");
+          log("✓ Credentials cleared", "success");
+          log("Reloading in 2 seconds...", "info");
+          setTimeout(() => location.reload(), 2000);
+        }
+      }
+
+      function clearAll() {
+        if (confirm("This will delete ALL app data. Continue?")) {
+          clearOutput();
+          log("Clearing all localStorage...", "info");
+          localStorage.clear();
+          log("Clearing all sessionStorage...", "info");
+          sessionStorage.clear();
+          log("✓ All data cleared", "success");
+          log("Reloading in 2 seconds...", "info");
+          setTimeout(() => location.reload(), 2000);
+        }
+      }
+
+      function disableRPiMode() {
+        clearOutput();
+        log("Disabling RPi Performance Mode...", "info");
+        localStorage.setItem(
+          "rpi_config_override",
+          JSON.stringify({
+            disableAnimations: false,
+            disableGPUOptimizer: false,
+            disableMemoryManager: false,
+          }),
+        );
+        log("✓ RPi mode disabled", "success");
+        log("Reloading in 2 seconds...", "info");
+        setTimeout(() => location.reload(), 2000);
+      }
+
+      function clearAndReload() {
+        if (confirm("Clear cache and reload?")) {
+          clearOutput();
+          log("Clearing cache...", "info");
+
+          // Clear Redux persist
+          localStorage.removeItem("persist:root");
+
+          // Clear service worker cache
+          if (
+            "serviceWorker" in navigator &&
+            navigator.serviceWorker.controller
+          ) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+              registrations.forEach((registration) =>
+                registration.unregister(),
+              );
+            });
+          }
+
+          if ("caches" in window) {
+            caches.keys().then((names) => {
+              names.forEach((name) => caches.delete(name));
+            });
+          }
+
+          log("✓ Cache cleared", "success");
+          log("Reloading...", "info");
+          setTimeout(() => location.reload(true), 1000);
+        }
+      }
+
+      function collectDiagnostics() {
+        clearOutput();
+        log("=== FULL DIAGNOSTICS ===", "info");
+
+        const diagnostics = {
+          timestamp: new Date().toISOString(),
+          environment: {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            screenRes: `${screen.width}x${screen.height}`,
+            windowSize: `${window.innerWidth}x${window.innerHeight}`,
+            language: navigator.language,
+            online: navigator.onLine,
+            cookiesEnabled: navigator.cookieEnabled,
           },
-          body: JSON.stringify({})
-        });
-        
-        log(`Response Status: ${response.status}`, response.ok ? 'success' : 'warning');
-        log(`Response Status Text: ${response.statusText}`, 'info');
-        
-        const contentType = response.headers.get('content-type');
-        log(`Content-Type: ${contentType}`, 'info');
-        
-        if (contentType && contentType.includes('application/json')) {
-          const data = await response.json();
-          log(`Response Data: ${JSON.stringify(data, null, 2)}`, 'success');
-        } else {
-          const text = await response.text();
-          log(`Response (non-JSON): ${text.substring(0, 200)}`, 'warning');
-        }
-        
-        if (response.status === 200) {
-          log('\n✓ API is reachable and working!', 'success');
-        } else if (response.status === 401) {
-          log('\n⚠ API is reachable but authentication failed (expected if not paired)', 'warning');
-        } else {
-          log(`\n✗ API returned unexpected status: ${response.status}`, 'error');
-        }
-        
-      } catch (error) {
-        log(`✗ API Connection Failed: ${error.message}`, 'error');
-        log(`This means the API is not reachable from this device`, 'error');
-        log(`Check: Network connection, DNS, firewall`, 'error');
+          storage: {
+            hasApiKey: !!localStorage.getItem("masjid_api_key"),
+            hasScreenId: !!localStorage.getItem("masjid_screen_id"),
+            isPaired: localStorage.getItem("isPaired"),
+            allKeys: Object.keys(localStorage),
+          },
+          dom: {
+            hasRoot: !!document.querySelector("#root"),
+            rootContent:
+              document.querySelector("#root")?.innerHTML?.length || 0,
+            hasReactComponents: !!document.querySelector('[class*="MuiBox"]'),
+          },
+        };
+
+        log(JSON.stringify(diagnostics, null, 2), "info");
+        log("\n=== COPY THE ABOVE AND SEND TO SUPPORT ===", "warning");
       }
-    }
 
-    function forcePairing() {
-      if (confirm('This will clear credentials and force the pairing screen. Continue?')) {
-        clearOutput();
-        log('Clearing credentials...', 'info');
-        localStorage.removeItem('masjid_api_key');
-        localStorage.removeItem('masjid_screen_id');
-        localStorage.removeItem('isPaired');
-        log('✓ Credentials cleared', 'success');
-        log('Reloading in 2 seconds...', 'info');
-        setTimeout(() => location.reload(), 2000);
-      }
-    }
-
-    function clearAll() {
-      if (confirm('This will delete ALL app data. Continue?')) {
-        clearOutput();
-        log('Clearing all localStorage...', 'info');
-        localStorage.clear();
-        log('Clearing all sessionStorage...', 'info');
-        sessionStorage.clear();
-        log('✓ All data cleared', 'success');
-        log('Reloading in 2 seconds...', 'info');
-        setTimeout(() => location.reload(), 2000);
-      }
-    }
-
-    function disableRPiMode() {
-      clearOutput();
-      log('Disabling RPi Performance Mode...', 'info');
-      localStorage.setItem('rpi_config_override', JSON.stringify({
-        disableAnimations: false,
-        disableGPUOptimizer: false,
-        disableMemoryManager: false
-      }));
-      log('✓ RPi mode disabled', 'success');
-      log('Reloading in 2 seconds...', 'info');
-      setTimeout(() => location.reload(), 2000);
-    }
-
-    function clearAndReload() {
-      if (confirm('Clear cache and reload?')) {
-        clearOutput();
-        log('Clearing cache...', 'info');
-        
-        // Clear Redux persist
-        localStorage.removeItem('persist:root');
-        
-        // Clear service worker cache
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.getRegistrations().then(registrations => {
-            registrations.forEach(registration => registration.unregister());
-          });
-        }
-        
-        if ('caches' in window) {
-          caches.keys().then(names => {
-            names.forEach(name => caches.delete(name));
-          });
-        }
-        
-        log('✓ Cache cleared', 'success');
-        log('Reloading...', 'info');
-        setTimeout(() => location.reload(true), 1000);
-      }
-    }
-
-    function collectDiagnostics() {
-      clearOutput();
-      log('=== FULL DIAGNOSTICS ===', 'info');
-      
-      const diagnostics = {
-        timestamp: new Date().toISOString(),
-        environment: {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-          screenRes: `${screen.width}x${screen.height}`,
-          windowSize: `${window.innerWidth}x${window.innerHeight}`,
-          language: navigator.language,
-          online: navigator.onLine,
-          cookiesEnabled: navigator.cookieEnabled
-        },
-        storage: {
-          hasApiKey: !!localStorage.getItem('masjid_api_key'),
-          hasScreenId: !!localStorage.getItem('masjid_screen_id'),
-          isPaired: localStorage.getItem('isPaired'),
-          allKeys: Object.keys(localStorage)
-        },
-        dom: {
-          hasRoot: !!document.querySelector('#root'),
-          rootContent: document.querySelector('#root')?.innerHTML?.length || 0,
-          hasReactComponents: !!document.querySelector('[class*="MuiBox"]'),
-        }
-      };
-      
-      log(JSON.stringify(diagnostics, null, 2), 'info');
-      log('\n=== COPY THE ABOVE AND SEND TO SUPPORT ===', 'warning');
-    }
-
-    // Auto-run environment check on load
-    window.addEventListener('load', () => {
-      setTimeout(checkEnvironment, 500);
-    });
-  </script>
-</body>
+      // Auto-run environment check on load
+      window.addEventListener("load", () => {
+        setTimeout(checkEnvironment, 500);
+      });
+    </script>
+  </body>
 </html>
-

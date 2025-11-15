@@ -2,13 +2,13 @@
 // allows you to do things like:
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
-import '@testing-library/jest-dom';
-import 'jest-canvas-mock';
+import "@testing-library/jest-dom";
+import "jest-canvas-mock";
 
 // Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: jest.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -40,7 +40,7 @@ global.ResizeObserver = class ResizeObserver {
 } as any;
 
 // Mock navigator.onLine
-Object.defineProperty(navigator, 'onLine', {
+Object.defineProperty(navigator, "onLine", {
   writable: true,
   value: true,
 });
@@ -72,4 +72,3 @@ global.localStorage = localStorageMock as any;
 // Suppress console errors in tests (optional - comment out if you want to see them)
 // global.console.error = jest.fn();
 // global.console.warn = jest.fn();
-

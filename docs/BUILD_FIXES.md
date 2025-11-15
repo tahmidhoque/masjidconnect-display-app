@@ -7,17 +7,21 @@ This document describes the fixes applied to resolve Raspberry Pi installation i
 ## Key Problems Identified
 
 ### 1. Multiple Architecture Build Issue
+
 **Problem**: Building for both `armv7l` and `arm64` in a single electron-builder command doesn't work reliably.
 
-**Solution**: 
+**Solution**:
+
 - Build each architecture separately
 - Created `scripts/build-rpi.sh` that builds architectures sequentially
 - Each build is validated before proceeding
 
 ### 2. Build Script Configuration
+
 **Problem**: Original scripts used incorrect electron-builder syntax and didn't validate builds.
 
 **Solution**:
+
 - Created robust `build-rpi.sh` script with:
   - Prerequisite checking
   - Build validation
@@ -26,18 +30,22 @@ This document describes the fixes applied to resolve Raspberry Pi installation i
   - Clear progress output
 
 ### 3. Deb Package Configuration
+
 **Problem**: electron-builder deb configuration needed optimization for RPI.
 
 **Solution**:
+
 - Removed `tar.gz` targets (not needed for RPI)
 - Added `afterRemove` script for clean uninstall
 - Added `fpm` options for better deb package handling
 - Simplified `files` configuration (electron-builder handles node_modules automatically)
 
 ### 4. File Structure Issues
+
 **Problem**: Package structure might not match what electron-builder creates.
 
 **Solution**:
+
 - Simplified `extraResources` configuration
 - Ensured `asarUnpack` includes necessary modules (electron-store, electron-log)
 - Fixed file paths in after-install script
@@ -45,22 +53,26 @@ This document describes the fixes applied to resolve Raspberry Pi installation i
 ## Build Process Changes
 
 ### Before (Broken)
+
 ```json
 "rpi:build": "npm run build:fix-paths && node scripts/prepare-rpi-build.js && electron-builder build --linux deb --armv7l --arm64 --publish never"
 ```
 
 **Issues**:
+
 - Tries to build both architectures at once
 - No validation
 - No error handling
 - Doesn't verify artifacts
 
 ### After (Fixed)
+
 ```json
 "rpi:build": "bash scripts/build-rpi.sh all never"
 ```
 
 **Improvements**:
+
 - Builds architectures separately
 - Validates each build
 - Verifies artifact size and existence
@@ -103,6 +115,7 @@ bash scripts/verify-installation.sh
 ```
 
 This checks:
+
 - Main executable exists and is executable
 - Required files are present
 - Desktop entry created
@@ -113,7 +126,8 @@ This checks:
 
 ### Issue: Package installs but app doesn't run
 
-**Fix**: 
+**Fix**:
+
 - After-install script now properly sets executable permissions
 - Checks for file existence before operations
 - Handles permission errors gracefully
@@ -121,6 +135,7 @@ This checks:
 ### Issue: Missing dependencies
 
 **Fix**:
+
 - All required dependencies listed in `deb.depends`
 - After-install script doesn't fail if optional operations fail
 - Package can be installed even if fonts can't be installed
@@ -128,6 +143,7 @@ This checks:
 ### Issue: Wrong installation path
 
 **Fix**:
+
 - Consistent `productName` (no spaces)
 - Proper `executableName` configuration
 - Correct paths in after-install script
@@ -168,6 +184,7 @@ bash scripts/verify-installation.sh
 ## GitHub Actions Integration
 
 The workflow now:
+
 1. Builds each architecture in separate matrix jobs
 2. Validates artifacts after build
 3. Ensures scripts are executable
@@ -227,10 +244,10 @@ cat ~/.config/masjidconnect-display/logs/main.log
 ## Summary
 
 The build process has been completely redesigned to:
+
 - ✅ Build architectures separately for reliability
 - ✅ Validate builds at every step
 - ✅ Provide clear error messages
 - ✅ Handle RPI-specific requirements
 - ✅ Ensure proper file permissions
 - ✅ Support clean installation and uninstallation
-

@@ -84,7 +84,7 @@ In the console, run:
 
 ```javascript
 // Enable all debug logs
-localStorage.setItem('debug', '*');
+localStorage.setItem("debug", "*");
 location.reload();
 
 // Check current state
@@ -92,8 +92,8 @@ console.log({
   isInitializing: window.location.href,
   localStorage: Object.keys(localStorage),
   credentials: {
-    apiKey: localStorage.getItem('masjid_api_key'),
-    screenId: localStorage.getItem('masjid_screen_id'),
+    apiKey: localStorage.getItem("masjid_api_key"),
+    screenId: localStorage.getItem("masjid_screen_id"),
   },
 });
 ```
@@ -127,9 +127,9 @@ Status: 200 OK (or 401 if not paired)
 window.__REDUX_DEVTOOLS_EXTENSION__?.();
 
 // Or manually check:
-console.log('Auth state:', {
-  hasApiKey: !!localStorage.getItem('masjid_api_key'),
-  hasScreenId: !!localStorage.getItem('masjid_screen_id'),
+console.log("Auth state:", {
+  hasApiKey: !!localStorage.getItem("masjid_api_key"),
+  hasScreenId: !!localStorage.getItem("masjid_screen_id"),
 });
 ```
 
@@ -149,9 +149,9 @@ This forces the app to show the pairing screen.
 
 ```javascript
 // In console:
-localStorage.removeItem('masjid_api_key');
-localStorage.removeItem('masjid_screen_id');
-localStorage.removeItem('isPaired');
+localStorage.removeItem("masjid_api_key");
+localStorage.removeItem("masjid_screen_id");
+localStorage.removeItem("isPaired");
 location.reload();
 ```
 
@@ -159,7 +159,7 @@ location.reload();
 
 ```javascript
 // In console:
-console.log('API URL:', localStorage.getItem('REACT_APP_API_URL'));
+console.log("API URL:", localStorage.getItem("REACT_APP_API_URL"));
 
 // Should show:
 // null (uses default: portal.masjidconnect.co.uk/api)
@@ -169,7 +169,7 @@ console.log('API URL:', localStorage.getItem('REACT_APP_API_URL'));
 
 ```javascript
 // Test if error screen works:
-throw new Error('Test error');
+throw new Error("Test error");
 ```
 
 If error screen shows, React is working fine.
@@ -179,12 +179,12 @@ If error screen shows, React is working fine.
 ```javascript
 // In console:
 localStorage.setItem(
-  'rpi_config_override',
+  "rpi_config_override",
   JSON.stringify({
     disableAnimations: false,
     disableGPUOptimizer: false,
     disableMemoryManager: false,
-  })
+  }),
 );
 location.reload();
 ```
@@ -195,7 +195,7 @@ location.reload();
 
 ```javascript
 // In console:
-document.querySelector('#root').innerHTML.length > 100;
+document.querySelector("#root").innerHTML.length > 100;
 // Should return: true
 ```
 
@@ -294,7 +294,7 @@ location.reload();
 
 ```javascript
 // Clear persisted Redux state:
-localStorage.removeItem('persist:root');
+localStorage.removeItem("persist:root");
 location.reload();
 ```
 
@@ -349,18 +349,18 @@ console.log(
       screenRes: `${screen.width}x${screen.height}`,
 
       // App State
-      hasApiKey: !!localStorage.getItem('masjid_api_key'),
-      hasScreenId: !!localStorage.getItem('masjid_screen_id'),
+      hasApiKey: !!localStorage.getItem("masjid_api_key"),
+      hasScreenId: !!localStorage.getItem("masjid_screen_id"),
 
       // DOM
-      hasRootContent: document.querySelector('#root').innerHTML.length,
+      hasRootContent: document.querySelector("#root").innerHTML.length,
 
       // Console Errors (check manually)
-      errors: 'Check console for red errors',
+      errors: "Check console for red errors",
     },
     null,
-    2
-  )
+    2,
+  ),
 );
 ```
 

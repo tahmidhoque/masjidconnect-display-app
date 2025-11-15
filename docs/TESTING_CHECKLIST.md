@@ -192,9 +192,9 @@ This is hard to test directly, but the failsafe should trigger if:
 ```javascript
 // In browser console:
 console.log({
-  screenId: localStorage.getItem('masjid_screen_id'),
-  apiKey: localStorage.getItem('masjid_api_key'),
-  isPaired: localStorage.getItem('isPaired'),
+  screenId: localStorage.getItem("masjid_screen_id"),
+  apiKey: localStorage.getItem("masjid_api_key"),
+  isPaired: localStorage.getItem("isPaired"),
 });
 ```
 
@@ -285,6 +285,6 @@ If any test fails, please capture:
 - [ ] Test Case 4: Network Recovery - **PASSED** ☑️
 - [ ] Test Case 5: Failsafe Timeout - **VERIFIED** ☑️
 
-**Tester**: ******\_\_\_******  
-**Date**: ******\_\_\_******  
-**Notes**: ******\_\_\_******
+**Tester**: **\*\***\_\_\_**\*\***  
+**Date**: **\*\***\_\_\_**\*\***  
+**Notes**: **\*\***\_\_\_**\*\***

@@ -97,133 +97,164 @@ const NetworkAwareComponent: React.FC = () => {
 ## Error Categories & When to Use
 
 ### Network Errors (NET_xxx)
+
 Use when dealing with connectivity issues:
 
 ```typescript
 // Internet connectivity
-dispatch(reportError({
-  code: ErrorCode.NET_OFFLINE,
-  message: 'Device is offline',
-  severity: ErrorSeverity.MEDIUM,
-  source: 'NetworkService'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.NET_OFFLINE,
+    message: "Device is offline",
+    severity: ErrorSeverity.MEDIUM,
+    source: "NetworkService",
+  }),
+);
 
 // CORS issues
-dispatch(reportError({
-  code: ErrorCode.NET_CORS_BLOCKED,
-  message: 'CORS policy blocking API access',
-  severity: ErrorSeverity.HIGH,
-  source: 'ApiClient'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.NET_CORS_BLOCKED,
+    message: "CORS policy blocking API access",
+    severity: ErrorSeverity.HIGH,
+    source: "ApiClient",
+  }),
+);
 
 // Connection timeouts
-dispatch(reportError({
-  code: ErrorCode.NET_TIMEOUT,
-  message: 'Request timed out after 30 seconds',
-  severity: ErrorSeverity.LOW,
-  source: 'ApiClient',
-  metadata: { timeout: 30000, endpoint: '/api/prayer-times' }
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.NET_TIMEOUT,
+    message: "Request timed out after 30 seconds",
+    severity: ErrorSeverity.LOW,
+    source: "ApiClient",
+    metadata: { timeout: 30000, endpoint: "/api/prayer-times" },
+  }),
+);
 ```
 
 ### Authentication Errors (AUTH_xxx)
+
 Use for authentication and pairing issues:
 
 ```typescript
 // Invalid credentials
-dispatch(reportError({
-  code: ErrorCode.AUTH_INVALID_TOKEN,
-  message: 'Authentication token is invalid',
-  severity: ErrorSeverity.HIGH,
-  source: 'AuthService'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.AUTH_INVALID_TOKEN,
+    message: "Authentication token is invalid",
+    severity: ErrorSeverity.HIGH,
+    source: "AuthService",
+  }),
+);
 
 // Pairing required
-dispatch(reportError({
-  code: ErrorCode.AUTH_SCREEN_NOT_PAIRED,
-  message: 'Screen not paired with masjid account',
-  severity: ErrorSeverity.CRITICAL,
-  source: 'AuthGuard'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.AUTH_SCREEN_NOT_PAIRED,
+    message: "Screen not paired with masjid account",
+    severity: ErrorSeverity.CRITICAL,
+    source: "AuthGuard",
+  }),
+);
 ```
 
 ### Data Errors (DATA_xxx)
+
 Use for data loading and caching issues:
 
 ```typescript
 // Missing prayer times
-dispatch(reportError({
-  code: ErrorCode.DATA_PRAYER_TIMES_MISSING,
-  message: 'Prayer times data not available',
-  severity: ErrorSeverity.MEDIUM,
-  source: 'PrayerTimesService'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.DATA_PRAYER_TIMES_MISSING,
+    message: "Prayer times data not available",
+    severity: ErrorSeverity.MEDIUM,
+    source: "PrayerTimesService",
+  }),
+);
 
 // Cache corruption
-dispatch(reportError({
-  code: ErrorCode.DATA_CACHE_CORRUPTED,
-  message: 'Local cache integrity check failed',
-  severity: ErrorSeverity.MEDIUM,
-  source: 'StorageService',
-  metadata: { cacheSize: 1024000, corruptedKeys: ['prayer-times', 'content'] }
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.DATA_CACHE_CORRUPTED,
+    message: "Local cache integrity check failed",
+    severity: ErrorSeverity.MEDIUM,
+    source: "StorageService",
+    metadata: {
+      cacheSize: 1024000,
+      corruptedKeys: ["prayer-times", "content"],
+    },
+  }),
+);
 ```
 
 ### System Errors (SYS_xxx)
+
 Use for system resource issues:
 
 ```typescript
 // Memory issues
-dispatch(reportError({
-  code: ErrorCode.SYS_MEMORY_EXCEEDED,
-  message: 'Memory usage above threshold',
-  severity: ErrorSeverity.HIGH,
-  source: 'SystemMonitor',
-  metadata: { 
-    memoryUsage: performance.memory?.usedJSHeapSize,
-    threshold: 1000000000 
-  }
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.SYS_MEMORY_EXCEEDED,
+    message: "Memory usage above threshold",
+    severity: ErrorSeverity.HIGH,
+    source: "SystemMonitor",
+    metadata: {
+      memoryUsage: performance.memory?.usedJSHeapSize,
+      threshold: 1000000000,
+    },
+  }),
+);
 
 // Storage full
-dispatch(reportError({
-  code: ErrorCode.SYS_STORAGE_FULL,
-  message: 'Device storage is full',
-  severity: ErrorSeverity.CRITICAL,
-  source: 'StorageService'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.SYS_STORAGE_FULL,
+    message: "Device storage is full",
+    severity: ErrorSeverity.CRITICAL,
+    source: "StorageService",
+  }),
+);
 ```
 
 ## Error Recovery
 
 ### Automatic Recovery
+
 Some errors trigger automatic recovery:
 
 ```typescript
-import { startRecovery, completeRecovery } from '../store/slices/errorSlice';
+import { startRecovery, completeRecovery } from "../store/slices/errorSlice";
 
 const handleRecovery = async () => {
   dispatch(startRecovery());
-  
+
   try {
     // Attempt recovery actions
     await refreshData();
     await clearCache();
-    
-    dispatch(completeRecovery({ 
-      success: true, 
-      message: 'Recovery completed successfully' 
-    }));
+
+    dispatch(
+      completeRecovery({
+        success: true,
+        message: "Recovery completed successfully",
+      }),
+    );
   } catch (error) {
-    dispatch(completeRecovery({ 
-      success: false, 
-      message: 'Recovery failed: ' + error.message 
-    }));
+    dispatch(
+      completeRecovery({
+        success: false,
+        message: "Recovery failed: " + error.message,
+      }),
+    );
   }
 };
 ```
 
 ### Error Boundaries
+
 Catch React component errors:
 
 ```typescript
@@ -243,7 +274,7 @@ class ComponentErrorBoundary extends React.Component {
       }
     }));
   }
-  
+
   render() {
     if (this.state.hasError) {
       return <ErrorFallback onRetry={this.handleRetry} />;
@@ -256,34 +287,41 @@ class ComponentErrorBoundary extends React.Component {
 ## Best Practices
 
 ### 1. Use Appropriate Severity Levels
+
 - **CRITICAL**: App can't function (unpaired device, storage full)
 - **HIGH**: Major features broken (auth failed, API down)
 - **MEDIUM**: Some features affected (missing data, slow network)
 - **LOW**: Minor issues (timeouts, rate limiting)
 
 ### 2. Provide Useful Metadata
+
 ```typescript
-dispatch(reportError({
-  code: ErrorCode.DATA_SYNC_FAILED,
-  message: 'Failed to sync prayer times',
-  severity: ErrorSeverity.MEDIUM,
-  source: 'DataSyncService',
-  metadata: {
-    endpoint: '/api/prayer-times',
-    lastSuccessfulSync: '2025-01-18T10:00:00Z',
-    retryCount: 3,
-    errorDetails: error.response?.data
-  }
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.DATA_SYNC_FAILED,
+    message: "Failed to sync prayer times",
+    severity: ErrorSeverity.MEDIUM,
+    source: "DataSyncService",
+    metadata: {
+      endpoint: "/api/prayer-times",
+      lastSuccessfulSync: "2025-01-18T10:00:00Z",
+      retryCount: 3,
+      errorDetails: error.response?.data,
+    },
+  }),
+);
 ```
 
 ### 3. Rate Limiting
+
 The system automatically rate limits similar errors:
+
 - Same error code within 30 seconds is suppressed
 - After 5 identical errors, further reports are blocked
 - Use different metadata to bypass rate limiting when needed
 
 ### 4. Recovery Actions
+
 Provide clear recovery instructions:
 
 ```typescript
@@ -291,7 +329,7 @@ Provide clear recovery instructions:
 code: ErrorCode.AUTH_TOKEN_EXPIRED,
 recoveryAction: 'Re-pair device'
 
-// Bad: Generic recovery action  
+// Bad: Generic recovery action
 code: ErrorCode.AUTH_TOKEN_EXPIRED,
 recoveryAction: 'Try again'
 ```
@@ -299,10 +337,11 @@ recoveryAction: 'Try again'
 ## UI Components
 
 ### System Status Indicator
+
 Shows overall system health:
 
 ```typescript
-<SystemStatusIndicator 
+<SystemStatusIndicator
   position="bottom-right"
   autoHide={true}  // Only show when there are issues
   compact={true}   // Small indicator that can be expanded
@@ -310,10 +349,11 @@ Shows overall system health:
 ```
 
 ### Graceful Error Overlay
+
 Shows user-friendly error messages:
 
 ```typescript
-<GracefulErrorOverlay 
+<GracefulErrorOverlay
   position="center"
   autoHide={true}     // Auto-hide low severity errors
   maxWidth={600}      // Maximum overlay width
@@ -323,37 +363,43 @@ Shows user-friendly error messages:
 ## Testing Errors
 
 ### Manual Testing
+
 ```typescript
 // Test network error
-dispatch(reportError({
-  code: ErrorCode.NET_OFFLINE,
-  message: 'Test offline error',
-  severity: ErrorSeverity.MEDIUM,
-  source: 'TestComponent'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.NET_OFFLINE,
+    message: "Test offline error",
+    severity: ErrorSeverity.MEDIUM,
+    source: "TestComponent",
+  }),
+);
 
 // Test critical error
-dispatch(reportError({
-  code: ErrorCode.AUTH_SCREEN_NOT_PAIRED,
-  message: 'Test pairing error',
-  severity: ErrorSeverity.CRITICAL,
-  source: 'TestComponent'
-}));
+dispatch(
+  reportError({
+    code: ErrorCode.AUTH_SCREEN_NOT_PAIRED,
+    message: "Test pairing error",
+    severity: ErrorSeverity.CRITICAL,
+    source: "TestComponent",
+  }),
+);
 ```
 
 ### Error Simulation
+
 ```typescript
 // Simulate network issues
 networkStatusService.updateStatus({
   isOnline: false,
-  isApiReachable: false
+  isApiReachable: false,
 });
 
 // Simulate recovery
 setTimeout(() => {
   networkStatusService.updateStatus({
     isOnline: true,
-    isApiReachable: true
+    isApiReachable: true,
   });
 }, 5000);
 ```
@@ -361,6 +407,7 @@ setTimeout(() => {
 ## Monitoring & Debugging
 
 ### Console Logging
+
 All errors are automatically logged with structured data:
 
 ```javascript
@@ -371,28 +418,30 @@ All errors are automatically logged with structured data:
 ```
 
 ### Error State Inspection
+
 ```typescript
 // Get current error state
 const state = store.getState();
-console.log('Active errors:', state.errors.activeErrors);
-console.log('System health:', state.errors.systemHealth);
-console.log('Network status:', state.errors.networkStatus);
+console.log("Active errors:", state.errors.activeErrors);
+console.log("System health:", state.errors.systemHealth);
+console.log("Network status:", state.errors.networkStatus);
 ```
 
 ### Error Analytics
+
 Access error history and patterns:
 
 ```typescript
 // Get error counts
-const errorCounts = useSelector(state => state.errors.errorCounts);
+const errorCounts = useSelector((state) => state.errors.errorCounts);
 
 // Get recovery attempts
-const recoveryAttempts = useSelector(state => state.errors.recoveryAttempts);
+const recoveryAttempts = useSelector((state) => state.errors.recoveryAttempts);
 
 // Check if recovery in progress
-const isRecovering = useSelector(state => state.errors.isRecovering);
+const isRecovering = useSelector((state) => state.errors.isRecovering);
 ```
 
 ---
 
-For more details, see the [Error Codes Documentation](./ERROR_CODES.md). 
+For more details, see the [Error Codes Documentation](./ERROR_CODES.md).

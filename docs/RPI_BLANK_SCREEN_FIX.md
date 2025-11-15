@@ -50,7 +50,7 @@ rpiGPUOptimizer.initialize();
 if (!config.disableGPUOptimizer) {
   rpiGPUOptimizer.initialize();
 } else {
-  logger.info('⚠️ GPU optimizer disabled by RPi config');
+  logger.info("⚠️ GPU optimizer disabled by RPi config");
 }
 ```
 
@@ -65,7 +65,7 @@ rpiMemoryManager.startMonitoring();
 if (!config.disableMemoryManager) {
   initializeMemoryManagement();
 } else {
-  logger.info('⚠️ Memory management disabled by RPi config');
+  logger.info("⚠️ Memory management disabled by RPi config");
 }
 ```
 
@@ -81,8 +81,8 @@ Automatically injects performance CSS:
 }
 
 /* Remove blur/backdrop effects */
-*[class*='blur'],
-*[class*='glassmorphic'] {
+*[class*="blur"],
+*[class*="glassmorphic"] {
   backdrop-filter: none !important;
   filter: none !important;
 }
@@ -181,12 +181,12 @@ Expected console output on RPi:
 ```javascript
 // In browser console:
 localStorage.setItem(
-  'rpi_config_override',
+  "rpi_config_override",
   JSON.stringify({
     disableAnimations: true,
     disableGPUOptimizer: true,
     disableMemoryManager: true,
-  })
+  }),
 );
 
 // Reload page
@@ -205,8 +205,8 @@ location.reload();
 
 ```javascript
 // Check if performance CSS was applied
-const style = document.getElementById('rpi-performance-css');
-console.log(style ? 'Performance CSS active' : 'No performance CSS');
+const style = document.getElementById("rpi-performance-css");
+console.log(style ? "Performance CSS active" : "No performance CSS");
 ```
 
 ## Installation & Testing
@@ -327,8 +327,8 @@ If you still see a blank screen:
 
    ```javascript
    // In console:
-   localStorage.getItem('masjid_api_key');
-   localStorage.getItem('masjid_screen_id');
+   localStorage.getItem("masjid_api_key");
+   localStorage.getItem("masjid_screen_id");
    // Should return your credentials
    ```
 
@@ -346,12 +346,12 @@ If the new configuration causes issues (unlikely), you can revert:
 ```javascript
 // In browser console:
 localStorage.setItem(
-  'rpi_config_override',
+  "rpi_config_override",
   JSON.stringify({
     disableAnimations: false,
     disableGPUOptimizer: false,
     disableMemoryManager: false,
-  })
+  }),
 );
 location.reload();
 ```
@@ -374,7 +374,7 @@ If RPi still struggles, try these additional settings:
 
 ```javascript
 localStorage.setItem(
-  'rpi_config_override',
+  "rpi_config_override",
   JSON.stringify({
     disableAnimations: true,
     disableGPUOptimizer: true,
@@ -383,7 +383,7 @@ localStorage.setItem(
     heartbeatInterval: 120000, // 2 minutes
     contentRefreshInterval: 600000, // 10 minutes
     maxConcurrentRequests: 1, // Only 1 request at a time
-  })
+  }),
 );
 location.reload();
 ```
@@ -393,7 +393,7 @@ location.reload();
 ```javascript
 // More aggressive optimization for RPi 3
 localStorage.setItem(
-  'rpi_config_override',
+  "rpi_config_override",
   JSON.stringify({
     disableAnimations: true,
     disableGPUOptimizer: true,
@@ -401,14 +401,13 @@ localStorage.setItem(
     simplifiedUI: true,
     lazyLoadImages: true,
     maxCacheSize: 25, // Reduce cache to 25MB
-  })
+  }),
 );
 ```
 
 ## Related Files Changed
 
 1. **`src/utils/rpiConfig.ts`** (NEW)
-
    - RPi detection logic
    - Performance configuration
    - CSS injection for performance

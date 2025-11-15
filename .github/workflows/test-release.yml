@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to test (e.g., 1.0.0)'
+        description: "Version to test (e.g., 1.0.0)"
         required: false
         type: string
 
@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Get version
         id: get-version
@@ -49,12 +49,12 @@ jobs:
         run: |
           VERSION="${{ steps.get-version.outputs.VERSION }}"
           mkdir -p test-artifacts
-          
+
           # Download arm64 artifact (for testing)
           echo "Downloading arm64 artifact..."
           curl -L -o "test-artifacts/masjidconnect-display-${VERSION}-arm64.deb" \
             "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/masjidconnect-display-${VERSION}-arm64.deb" || echo "Artifact not found (may not be released yet)"
-          
+
           # Download armv7l artifact
           echo "Downloading armv7l artifact..."
           curl -L -o "test-artifacts/masjidconnect-display-${VERSION}-armv7l.deb" \
@@ -63,7 +63,7 @@ jobs:
       - name: Validate .deb files
         run: |
           echo "Validating downloaded .deb files..."
-          
+
           for deb_file in test-artifacts/*.deb; do
             if [ -f "$deb_file" ]; then
               echo "Checking $deb_file..."
@@ -88,11 +88,11 @@ jobs:
       - name: Test package metadata
         run: |
           echo "Testing package metadata..."
-          
+
           # Install dpkg-dev tools for dpkg-deb
           sudo apt-get update -qq
           sudo apt-get install -y dpkg-dev
-          
+
           for deb_file in test-artifacts/*.deb; do
             if [ -f "$deb_file" ]; then
               echo "Extracting metadata from $deb_file..."
@@ -121,7 +121,7 @@ jobs:
         run: |
           echo "Validating checksums..."
           VERSION="${{ steps.get-version.outputs.VERSION }}"
-          
+
           for deb_file in test-artifacts/*.deb; do
             if [ -f "$deb_file" ]; then
               BASENAME=$(basename "$deb_file")
@@ -153,11 +153,11 @@ jobs:
         run: |
           echo "Testing electron-updater release detection..."
           VERSION="${{ steps.get-version.outputs.VERSION }}"
-          
+
           # Check if release exists on GitHub
           RELEASE_URL="https://api.github.com/repos/${{ github.repository }}/releases/tags/v${VERSION}"
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$RELEASE_URL")
-          
+
           if [ "$RESPONSE" = "200" ]; then
             echo "✅ Release found on GitHub"
             
@@ -195,4 +195,3 @@ jobs:
           echo "2. Verify app starts correctly" >> $GITHUB_STEP_SUMMARY
           echo "3. Test update detection and download" >> $GITHUB_STEP_SUMMARY
           echo "4. Monitor version reporting in heartbeat" >> $GITHUB_STEP_SUMMARY
-

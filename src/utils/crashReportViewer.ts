@@ -1,24 +1,23 @@
-import { crashLogger } from './crashLogger';
-import logger from './logger';
+import { crashLogger } from "./crashLogger";
+import logger from "./logger";
 
 /**
  * Browser console interface for viewing crash reports
  * Use in browser console: window.MasjidConnectDebug.showCrashes()
  */
 class CrashReportViewer {
-  
   public showCrashes(): void {
     const report = crashLogger.generateCrashReport();
-    console.log('\n🔍 MASJIDCONNECT CRASH REPORT\n' + '='.repeat(50));
+    console.log("\n🔍 MASJIDCONNECT CRASH REPORT\n" + "=".repeat(50));
     console.log(report);
-    console.log('='.repeat(50));
+    console.log("=".repeat(50));
   }
 
   public showRecentCrashes(count: number = 5): void {
     const crashes = crashLogger.getCrashes();
     const storedCrashes = crashLogger.getCrashesFromStorage();
     const allCrashes = [...storedCrashes, ...crashes];
-    
+
     console.log(`\n📊 Last ${count} crashes:`);
     allCrashes.slice(-count).forEach((crash, index) => {
       console.log(`\n${index + 1}. [${crash.timestamp}] ${crash.type}`);
@@ -31,80 +30,102 @@ class CrashReportViewer {
 
   public clearCrashes(): void {
     crashLogger.clearCrashes();
-    console.log('✅ All crash logs cleared');
+    console.log("✅ All crash logs cleared");
   }
 
   public downloadCrashReport(): void {
     const report = crashLogger.generateCrashReport();
-    const blob = new Blob([report], { type: 'text/plain' });
+    const blob = new Blob([report], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
+
+    const a = document.createElement("a");
     a.href = url;
     a.download = `masjidconnect-crash-report-${new Date().toISOString().slice(0, 19)}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    console.log('📥 Crash report downloaded');
+
+    console.log("📥 Crash report downloaded");
   }
 
   public showSystemInfo(): void {
-    console.log('\n🖥️ SYSTEM INFORMATION\n' + '-'.repeat(30));
-    console.log('User Agent:', navigator.userAgent);
-    console.log('Platform:', navigator.platform);
-    console.log('Language:', navigator.language);
-    console.log('Online:', navigator.onLine);
-    console.log('URL:', window.location.href);
-    
-    if ('memory' in (performance as any)) {
+    console.log("\n🖥️ SYSTEM INFORMATION\n" + "-".repeat(30));
+    console.log("User Agent:", navigator.userAgent);
+    console.log("Platform:", navigator.platform);
+    console.log("Language:", navigator.language);
+    console.log("Online:", navigator.onLine);
+    console.log("URL:", window.location.href);
+
+    if ("memory" in (performance as any)) {
       const memory = (performance as any).memory;
-      console.log('\n💾 MEMORY USAGE:');
-      console.log(`Used: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB`);
-      console.log(`Total: ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB`);
-      console.log(`Limit: ${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)} MB`);
+      console.log("\n💾 MEMORY USAGE:");
+      console.log(
+        `Used: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
+      );
+      console.log(
+        `Total: ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
+      );
+      console.log(
+        `Limit: ${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)} MB`,
+      );
     }
-    
-    console.log('\n🕰️ TIMING:');
-    console.log('Page Load Time:', performance.timing.loadEventEnd - performance.timing.navigationStart, 'ms');
-    console.log('DOM Ready Time:', performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart, 'ms');
+
+    console.log("\n🕰️ TIMING:");
+    console.log(
+      "Page Load Time:",
+      performance.timing.loadEventEnd - performance.timing.navigationStart,
+      "ms",
+    );
+    console.log(
+      "DOM Ready Time:",
+      performance.timing.domContentLoadedEventEnd -
+        performance.timing.navigationStart,
+      "ms",
+    );
   }
 
   public testCrash(): void {
-    console.log('🧪 Testing crash logging...');
-    
+    console.log("🧪 Testing crash logging...");
+
     // Test JavaScript error
     crashLogger.logCrash({
-      type: 'javascript_error',
-      error: 'Test error for debugging',
-      additionalInfo: { source: 'manual_test', timestamp: new Date().toISOString() }
+      type: "javascript_error",
+      error: "Test error for debugging",
+      additionalInfo: {
+        source: "manual_test",
+        timestamp: new Date().toISOString(),
+      },
     });
-    
-    console.log('✅ Test crash logged. Check with showCrashes()');
+
+    console.log("✅ Test crash logged. Check with showCrashes()");
   }
 
   public monitorPerformance(duration: number = 60000): void {
-    console.log(`🔍 Starting performance monitoring for ${duration / 1000} seconds...`);
-    
+    console.log(
+      `🔍 Starting performance monitoring for ${duration / 1000} seconds...`,
+    );
+
     const startTime = Date.now();
     const interval = setInterval(() => {
-      if ('memory' in (performance as any)) {
+      if ("memory" in (performance as any)) {
         const memory = (performance as any).memory;
         const memoryUsageMB = memory.usedJSHeapSize / 1024 / 1024;
         const memoryLimitMB = memory.jsHeapSizeLimit / 1024 / 1024;
-        const usagePercent = (memoryUsageMB / memoryLimitMB * 100).toFixed(1);
-        
-        console.log(`📊 Memory: ${memoryUsageMB.toFixed(1)}MB (${usagePercent}%)`);
-        
+        const usagePercent = ((memoryUsageMB / memoryLimitMB) * 100).toFixed(1);
+
+        console.log(
+          `📊 Memory: ${memoryUsageMB.toFixed(1)}MB (${usagePercent}%)`,
+        );
+
         if (memoryUsageMB > memoryLimitMB * 0.8) {
-          console.warn('⚠️ High memory usage detected!');
+          console.warn("⚠️ High memory usage detected!");
         }
       }
-      
+
       if (Date.now() - startTime >= duration) {
         clearInterval(interval);
-        console.log('✅ Performance monitoring completed');
+        console.log("✅ Performance monitoring completed");
       }
     }, 5000); // Check every 5 seconds
   }
@@ -140,18 +161,20 @@ const crashReportViewer = new CrashReportViewer();
 // Attach to window for console access
 (window as any).MasjidConnectDebug = {
   showCrashes: () => crashReportViewer.showCrashes(),
-  showRecentCrashes: (count?: number) => crashReportViewer.showRecentCrashes(count),
+  showRecentCrashes: (count?: number) =>
+    crashReportViewer.showRecentCrashes(count),
   clearCrashes: () => crashReportViewer.clearCrashes(),
   downloadCrashReport: () => crashReportViewer.downloadCrashReport(),
   showSystemInfo: () => crashReportViewer.showSystemInfo(),
   testCrash: () => crashReportViewer.testCrash(),
-  monitorPerformance: (duration?: number) => crashReportViewer.monitorPerformance(duration),
-  help: () => crashReportViewer.help()
+  monitorPerformance: (duration?: number) =>
+    crashReportViewer.monitorPerformance(duration),
+  help: () => crashReportViewer.help(),
 };
 
 // Log availability in development
-if (process.env.NODE_ENV === 'development') {
-  logger.info('🔧 Debug console available: window.MasjidConnectDebug.help()');
+if (process.env.NODE_ENV === "development") {
+  logger.info("🔧 Debug console available: window.MasjidConnectDebug.help()");
 }
 
-export default crashReportViewer; 
+export default crashReportViewer;

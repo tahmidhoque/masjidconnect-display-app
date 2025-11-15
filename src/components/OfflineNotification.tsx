@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Snackbar, Alert, AlertTitle } from '@mui/material';
-import CloudDoneIcon from '@mui/icons-material/CloudDone';
-import CloudOffIcon from '@mui/icons-material/CloudOff';
-import { formatDistanceToNow } from 'date-fns';
+import React, { useState, useEffect } from "react";
+import { Box, Typography, Snackbar, Alert, AlertTitle } from "@mui/material";
+import CloudDoneIcon from "@mui/icons-material/CloudDone";
+import CloudOffIcon from "@mui/icons-material/CloudOff";
+import { formatDistanceToNow } from "date-fns";
 
 interface OfflineNotificationProps {
   position?: {
-    vertical: 'top' | 'bottom';
-    horizontal: 'left' | 'center' | 'right';
+    vertical: "top" | "bottom";
+    horizontal: "left" | "center" | "right";
   };
   showNotification?: boolean;
 }
 
 const OfflineNotification: React.FC<OfflineNotificationProps> = ({
-  position = { vertical: 'top', horizontal: 'right' },
-  showNotification = true
+  position = { vertical: "top", horizontal: "right" },
+  showNotification = true,
 }) => {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -27,20 +27,20 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
       setLastSyncTime(new Date());
       setSnackbarOpen(true);
       setTimeout(() => setSnackbarOpen(false), 3000);
-      console.log('[OfflineIndicator] Connection restored');
+      console.log("[OfflineIndicator] Connection restored");
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      console.log('[OfflineIndicator] Connection lost');
+      console.log("[OfflineIndicator] Connection lost");
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
@@ -52,13 +52,13 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
   // Show success snackbar when coming back online
   if (isOnline && snackbarOpen) {
     return (
-      <Snackbar 
-        open={snackbarOpen} 
-        autoHideDuration={3000} 
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert severity="success" sx={{ width: '100%' }}>
+        <Alert severity="success" sx={{ width: "100%" }}>
           <AlertTitle>Connection Restored</AlertTitle>
           You are back online.
         </Alert>
@@ -75,15 +75,15 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
   return (
     <Box
       sx={{
-        position: 'fixed',
+        position: "fixed",
         top: 16,
         right: 16,
-        backgroundColor: isOnline ? 'success.main' : 'error.main',
-        color: 'white',
+        backgroundColor: isOnline ? "success.main" : "error.main",
+        color: "white",
         padding: 2,
         borderRadius: 2,
-        display: 'flex',
-        alignItems: 'center',
+        display: "flex",
+        alignItems: "center",
         gap: 1,
         zIndex: 9999,
         boxShadow: 3,
@@ -93,7 +93,9 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
         <>
           <CloudDoneIcon />
           <Typography variant="body2">
-            Online{lastSyncTime && ` • Synced ${formatDistanceToNow(lastSyncTime, { addSuffix: true })}`}
+            Online
+            {lastSyncTime &&
+              ` • Synced ${formatDistanceToNow(lastSyncTime, { addSuffix: true })}`}
           </Typography>
         </>
       ) : (
@@ -108,4 +110,4 @@ const OfflineNotification: React.FC<OfflineNotificationProps> = ({
   );
 };
 
-export default OfflineNotification; 
+export default OfflineNotification;

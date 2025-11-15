@@ -7,18 +7,21 @@ This document outlines the comprehensive refactoring of the MasjidConnect Displa
 ## Refactoring Goals Achieved
 
 ### ✅ Better State Management
+
 - **Centralized State**: All application state is now managed in a single Redux store
 - **Predictable Updates**: State changes follow a unidirectional data flow with actions and reducers
 - **Time-Travel Debugging**: Redux DevTools integration for debugging and monitoring
 - **Immutable Updates**: Automatic immutability with Immer integration
 
 ### ✅ Improved Render Performance
+
 - **Selective Re-renders**: Components only re-render when specific state slices change
 - **Memoized Selectors**: Efficient state selection prevents unnecessary calculations
 - **Optimized Context Usage**: Eliminated multiple context re-renders
 - **Redux Persist**: State persistence without performance impact
 
 ### ✅ Enhanced Error Handling
+
 - **Async Error Management**: Centralized error handling for async operations
 - **Loading States**: Granular loading states for better UX
 - **Offline Resilience**: Robust offline state management and recovery
@@ -43,9 +46,11 @@ src/store/
 ### State Slices
 
 #### 1. Auth Slice (`authSlice.ts`)
+
 **Replaces**: `AuthContext.tsx`
 
 **Features**:
+
 - Authentication state management
 - Pairing process handling
 - Credential storage and validation
@@ -53,15 +58,18 @@ src/store/
 - Async thunks for API operations
 
 **Key Improvements**:
+
 - **Multiple credential format support** for backward compatibility
 - **Automatic localStorage synchronization** across different storage keys
 - **Robust error handling** with detailed error states
 - **Async operations** properly managed with loading states
 
 #### 2. Content Slice (`contentSlice.ts`)
+
 **Replaces**: `ContentContext.tsx`
 
 **Features**:
+
 - Screen content management
 - Prayer times synchronization
 - Schedule data normalization
@@ -69,15 +77,18 @@ src/store/
 - Masjid information extraction
 
 **Key Improvements**:
+
 - **Parallel data fetching** for improved performance
 - **Rate limiting** to prevent excessive API calls
 - **Data normalization** for consistent schedule formats
 - **Granular loading states** for different content types
 
 #### 3. UI Slice (`uiSlice.ts`)
+
 **Replaces**: Multiple UI-related contexts
 
 **Features**:
+
 - Orientation management
 - Offline status tracking
 - Loading screen coordination
@@ -86,15 +97,18 @@ src/store/
 - Kiosk mode settings
 
 **Key Improvements**:
+
 - **Non-persistent UI state** (not saved to storage)
 - **Performance monitoring** with render count tracking
 - **Comprehensive notification system** with automatic cleanup
 - **Offline duration tracking** for better UX
 
 #### 4. Emergency Slice (`emergencySlice.ts`)
+
 **Replaces**: `EmergencyAlertContext.tsx`
 
 **Features**:
+
 - Emergency alert management
 - SSE connection status
 - Alert history tracking
@@ -102,6 +116,7 @@ src/store/
 - Automatic reconnection logic
 
 **Key Improvements**:
+
 - **Connection resilience** with exponential backoff
 - **Alert history** for debugging and monitoring
 - **Statistics tracking** for performance insights
@@ -110,9 +125,11 @@ src/store/
 ### Redux Middleware
 
 #### Emergency Middleware (`emergencyMiddleware.ts`)
+
 **Purpose**: Handles Server-Sent Events (SSE) integration with Redux
 
 **Features**:
+
 - **Automatic SSE connection** management
 - **Reconnection logic** with exponential backoff
 - **Authentication state integration**
@@ -120,6 +137,7 @@ src/store/
 - **Connection lifecycle management**
 
 **Benefits**:
+
 - **Centralized SSE logic** instead of scattered across components
 - **Automatic cleanup** on logout or service disable
 - **Network resilience** with smart reconnection
@@ -128,17 +146,19 @@ src/store/
 ### Persistence Strategy
 
 #### Redux Persist Configuration
+
 ```typescript
 const persistConfig = {
-  key: 'masjidconnect-root',
+  key: "masjidconnect-root",
   version: 1,
   storage,
-  blacklist: ['ui'],           // Don't persist UI state
-  whitelist: ['auth', 'content', 'emergency'] // Persist critical data
+  blacklist: ["ui"], // Don't persist UI state
+  whitelist: ["auth", "content", "emergency"], // Persist critical data
 };
 ```
 
 **Benefits**:
+
 - **Selective persistence** - only critical data is saved
 - **Version management** for state migrations
 - **Offline resilience** - app works without network
@@ -147,6 +167,7 @@ const persistConfig = {
 ## Best Practices Implemented
 
 ### 1. Modern Redux Toolkit Patterns
+
 - ✅ `configureStore` with sensible defaults
 - ✅ `createSlice` for reduced boilerplate
 - ✅ `createAsyncThunk` for async operations
@@ -154,24 +175,28 @@ const persistConfig = {
 - ✅ Redux DevTools integration
 
 ### 2. TypeScript Integration
+
 - ✅ Typed hooks (`useAppDispatch`, `useAppSelector`)
 - ✅ Strong typing for all state slices
 - ✅ PayloadAction types for actions
 - ✅ Inferred types from store configuration
 
 ### 3. Performance Optimization
+
 - ✅ Memoized selectors for computed values
 - ✅ Selective component re-renders
 - ✅ Efficient async thunk design
 - ✅ Proper cleanup in middleware
 
 ### 4. Error Handling
+
 - ✅ Centralized error states
 - ✅ Loading states for UX feedback
 - ✅ Error boundaries integration
 - ✅ Graceful degradation patterns
 
 ### 5. Offline Capability
+
 - ✅ State persistence across app restarts
 - ✅ Offline status tracking
 - ✅ Network reconnection handling
@@ -192,6 +217,7 @@ The refactoring follows a **gradual migration approach**:
 The Redux implementation maintains compatibility with the existing system flows:
 
 ### First Time Opening (No Prior Linking)
+
 1. **Loading page**: Redux manages loading states and initialization
 2. **Pairing code fetch**: `authSlice` handles pairing code requests
 3. **QR code display**: Proper countdown and expiration handling
@@ -200,11 +226,13 @@ The Redux implementation maintains compatibility with the existing system flows:
 6. **Display transition**: Coordinated through UI state management
 
 ### Previously Paired Device
+
 1. **Storage initialization**: Automatic credential loading from localStorage
 2. **Background data fetch**: Efficient content updates
 3. **Direct display**: Smooth transition to main display
 
 ### Emergency Alerts (SSE)
+
 1. **Automatic connection**: Middleware manages SSE lifecycle
 2. **Alert display**: Real-time updates through Redux state
 3. **Connection resilience**: Automatic reconnection on network issues
@@ -213,24 +241,28 @@ The Redux implementation maintains compatibility with the existing system flows:
 ## Technical Benefits
 
 ### 1. Performance Improvements
+
 - **Reduced Re-renders**: Only components using changed state re-render
 - **Optimized Selectors**: Memoized calculations prevent duplicate work
 - **Efficient Updates**: Batch updates through Redux batching
 - **Memory Management**: Proper cleanup and garbage collection
 
 ### 2. Developer Experience
+
 - **Time-Travel Debugging**: Redux DevTools for state inspection
 - **Predictable Testing**: Pure functions for easy unit testing
 - **Type Safety**: Comprehensive TypeScript integration
 - **Code Organization**: Clear separation of concerns
 
 ### 3. Maintainability
+
 - **Single Source of Truth**: All state in one location
 - **Action-Based Changes**: Clear audit trail of state changes
 - **Modular Architecture**: Easy to add/remove features
 - **Standard Patterns**: Well-established Redux patterns
 
 ### 4. Reliability
+
 - **Error Boundaries**: Graceful error handling
 - **State Validation**: TypeScript prevents invalid states
 - **Async Safety**: Proper handling of async operations
@@ -241,21 +273,25 @@ The Redux implementation maintains compatibility with the existing system flows:
 The Redux foundation enables several future improvements:
 
 ### 1. RTK Query Integration
+
 - Replace manual data fetching with RTK Query
 - Automatic caching and invalidation
 - Optimistic updates for better UX
 
 ### 2. Enhanced Offline Support
+
 - Background sync capabilities
 - Conflict resolution for offline changes
 - Progressive web app features
 
 ### 3. Advanced Monitoring
+
 - Performance metrics collection
 - Error tracking and analytics
 - User interaction analytics
 
 ### 4. Real-time Features
+
 - WebSocket integration through middleware
 - Live content updates
 - Multi-device synchronization
@@ -274,6 +310,7 @@ The implementation follows Redux Toolkit best practices and provides a solid fou
 ## Files Modified/Created
 
 ### New Files
+
 - `src/store/index.ts` - Main store configuration
 - `src/store/hooks.ts` - Typed Redux hooks
 - `src/store/slices/authSlice.ts` - Authentication state management
@@ -283,10 +320,12 @@ The implementation follows Redux Toolkit best practices and provides a solid fou
 - `src/store/middleware/emergencyMiddleware.ts` - SSE middleware
 
 ### Modified Files
+
 - `src/index.tsx` - Added Redux Provider and PersistGate
 - `package.json` - Added Redux Toolkit and related dependencies
 
 ### Next Steps
+
 1. Gradually migrate components to use Redux hooks instead of contexts
 2. Remove old context files once migration is complete
 3. Add comprehensive tests for Redux logic

@@ -32,6 +32,7 @@ All API endpoints should follow a consistent response format:
 ```
 
 #### Fields Explanation:
+
 - `success`: Boolean indicating if the request was successful
 - `data`: The actual response data (null for error responses)
 - `error`: Error message (null for successful responses)
@@ -60,6 +61,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Support date range parameters
 
 **Example Response:**
+
 ```json
 {
   "success": true,
@@ -99,6 +101,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Include timestamp of calculation
 
 **Example Response:**
+
 ```json
 {
   "success": true,
@@ -137,6 +140,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Include version information
 
 **Example Response:**
+
 ```json
 {
   "success": true,
@@ -145,15 +149,23 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
       "id": "screen-123",
       "name": "Main Prayer Hall",
       "orientation": "LANDSCAPE",
-      "contentConfig": { /* configuration */ }
+      "contentConfig": {
+        /* configuration */
+      }
     },
     "masjid": {
       "name": "Masjid Al-Noor",
       "timezone": "America/New_York"
     },
-    "schedule": { /* schedule data */ },
-    "prayerTimes": { /* prayer times data */ },
-    "contentOverrides": [ /* overrides */ ],
+    "schedule": {
+      /* schedule data */
+    },
+    "prayerTimes": {
+      /* prayer times data */
+    },
+    "contentOverrides": [
+      /* overrides */
+    ],
     "lastUpdated": "2023-05-01T12:00:00Z"
   },
   "timestamp": "2023-05-01T12:00:00Z",
@@ -173,6 +185,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Include date range information
 
 **Example Response:**
+
 ```json
 {
   "success": true,
@@ -209,6 +222,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Support tracking of screen connectivity
 
 **Request Body:**
+
 ```json
 {
   "screenId": "screen-123",
@@ -222,6 +236,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -243,6 +258,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Allow clients to determine what needs updating
 
 **Example Response:**
+
 ```json
 {
   "success": true,
@@ -265,25 +281,29 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 - Reduce number of requests needed after reconnection
 
 **Request Body:**
+
 ```json
 {
-  "resources": [
-    "prayerTimes",
-    "events",
-    "content"
-  ],
+  "resources": ["prayerTimes", "events", "content"],
   "sinceTimestamp": "2023-05-01T08:00:00Z"
 }
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
   "data": {
-    "prayerTimes": { /* prayer times data */ },
-    "events": { /* events data */ },
-    "content": { /* content data */ }
+    "prayerTimes": {
+      /* prayer times data */
+    },
+    "events": {
+      /* events data */
+    },
+    "content": {
+      /* content data */
+    }
   },
   "timestamp": "2023-05-01T13:15:00Z"
 }
@@ -294,6 +314,7 @@ Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
 ### 1. HTTP Status Codes
 
 Use appropriate HTTP status codes:
+
 - `200 OK`: Successful response
 - `304 Not Modified`: When content hasn't changed (with If-Modified-Since/ETag)
 - `400 Bad Request`: Client error
@@ -304,18 +325,21 @@ Use appropriate HTTP status codes:
 ### 2. Versioning
 
 Include API version information:
+
 - In URL: `/api/v1/prayer-times`
 - Or in header: `Accept: application/vnd.masjidconnect.v1+json`
 
 ### 3. Compression
 
 Enable compression to reduce payload size:
+
 - Support gzip/brotli compression
 - Set appropriate `Content-Encoding` headers
 
 ### 4. CORS Headers
 
 Ensure proper CORS headers for cross-origin requests:
+
 ```
 Access-Control-Allow-Origin: *
 Access-Control-Allow-Methods: GET, POST, OPTIONS
@@ -326,22 +350,26 @@ Access-Control-Max-Age: 86400
 ## Client-Server Interaction Patterns
 
 ### 1. Initial Data Load
+
 1. Client requests all required data
 2. Server responds with full data sets
 3. Client caches all data in IndexedDB
 
 ### 2. Regular Updates
+
 1. Client periodically requests updates with If-Modified-Since
 2. Server returns 304 if no changes, or full/partial data if changed
 3. Client updates cache with new data
 
 ### 3. Offline Mode
+
 1. Client detects network disconnection
 2. Data requests are served from local cache
 3. UI indicates offline status with the subtle indicator
 4. Calculations (like current prayer status) happen locally
 
 ### 4. Reconnection
+
 1. Client detects network restoration
 2. Requests `/api/sync` to identify outdated resources
 3. Fetches only the resources that have changed
@@ -364,4 +392,4 @@ Access-Control-Max-Age: 86400
 
 ## Conclusion
 
-By following these guidelines, the backend API will integrate seamlessly with the enhanced offline capabilities in the MasjidConnect Display App, providing users with a reliable experience even in unstable network conditions. 
+By following these guidelines, the backend API will integrate seamlessly with the enhanced offline capabilities in the MasjidConnect Display App, providing users with a reliable experience even in unstable network conditions.
