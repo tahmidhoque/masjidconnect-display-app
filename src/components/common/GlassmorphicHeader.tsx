@@ -47,6 +47,7 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
         p: getSizeRem(isPortrait ? 1 : 1.5),
         pb: getSizeRem(isPortrait ? 1.5 : 1.5),
         width: '100%',
+        minWidth: 0, // Prevent flex overflow
         color: '#fff',
         backdropFilter: 'blur(8px)',
         backgroundColor: alpha(theme.palette.primary.dark, 0.3),
@@ -56,7 +57,14 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
         borderLeft: `1px solid ${alpha('#ffffff', 0.5)}`,
       }}
     >
-      <Box>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0, // Prevent flex overflow
+          overflow: 'hidden',
+          pr: getSizeRem(1),
+        }}
+      >
         <Typography 
           variant="h4" 
           sx={{ 
@@ -70,18 +78,33 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
             fontFamily: "'Poppins', sans-serif",
             letterSpacing: '0.5px',
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
           {masjidName}
         </Typography>
         
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: getSizeRem(1) }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: getSizeRem(1),
+            overflow: 'hidden',
+            flexWrap: 'wrap',
+          }}
+        >
           <Typography 
             sx={{ 
               fontSize: fontSizes.body1,
               color: '#fff',
               opacity: 0.9,
               fontFamily: "'Poppins', sans-serif",
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
             }}
           >
             {format(currentDate, 'EEEE, MMMM d, yyyy')}
@@ -92,6 +115,10 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
               fontSize: fontSizes.body1,
               color: alpha(theme.palette.warning.main, 0.9),
               fontFamily: "'Poppins', sans-serif",
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
             }}
           >
             • {hijriDate}
@@ -107,6 +134,10 @@ const GlassmorphicHeader: React.FC<GlassmorphicHeaderProps> = ({
           fontFamily: "'Poppins', sans-serif",
           color: '#fff',
           textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+          flexShrink: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
         {format(currentTime, 'HH:mm')}

@@ -47,11 +47,13 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
         alignItems: "center",
         p: getSizeRem(isPortrait ? 0.8 : 1),
         width: "100%",
+        minWidth: 0, // Prevent flex overflow
+        boxSizing: "border-box", // Include border in width calculation
         background: `linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)`,
-        borderRadius: isPortrait ? "8px 8px 0 0" : "8px",
+        borderRadius: "8px",
         border: `1px solid rgba(255,255,255,0.1)`,
-        borderBottom: isPortrait ? "none" : `1px solid rgba(255,255,255,0.1)`,
         position: "relative",
+        overflow: "visible", // Allow borders to be visible
 
         // Modern accent line
         "&::before": {
@@ -73,6 +75,9 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
           display: "flex", 
           alignItems: "center", 
           gap: getSizeRem(1),
+          minWidth: 0,
+          overflow: "hidden",
+          maxWidth: "100%",
         }}
       >
         <Typography
@@ -81,6 +86,10 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
             color: "rgba(255,255,255,0.7)",
             fontFamily: "'Poppins', sans-serif",
             fontWeight: 500,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           Powered by
@@ -95,6 +104,8 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
               height: getSizeRem(isPortrait ? 1.5 : 2),
               width: "auto",
               filter: "brightness(1.2)",
+              flexShrink: 0,
+              maxHeight: "100%",
             }}
           />
         ) : (
@@ -107,6 +118,9 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               fontFamily: "'Poppins', sans-serif",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             MasjidConnect

@@ -66,11 +66,14 @@ const ModernPortraitDisplay: React.FC = () => {
             flexDirection: "column",
             flex: "nowrap",
             height: "100%",
+            width: "100%",
+            minWidth: 0, // Prevent flex overflow
             position: "relative",
             gap: getSizeRem(1),
             zIndex: 2,
             px: getSizeRem(1),
             py: getSizeRem(1),
+            overflow: "hidden", // Prevent content from clipping
           }}
         >
           {/* Header with staggered animation */}
@@ -98,6 +101,8 @@ const ModernPortraitDisplay: React.FC = () => {
               flexGrow: 1,
               gap: getSizeRem(1.5),
               overflow: "hidden",
+              minWidth: 0, // Prevent flex overflow
+              minHeight: 0, // Important for proper flex behavior
             }}
           >
             {/* Prayer Times Section with staggered animation */}

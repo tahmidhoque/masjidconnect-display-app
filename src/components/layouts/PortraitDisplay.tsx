@@ -222,6 +222,7 @@ const PortraitDisplay: React.FC = () => {
         sx={{
           height: "100%",
           width: "100%",
+          minWidth: 0, // Prevent flex overflow
           position: "relative",
           zIndex: 10,
           display: "flex",
@@ -229,6 +230,7 @@ const PortraitDisplay: React.FC = () => {
           gap: 1.5,
           px: 1.5,
           py: 1.5, // Consistent top and bottom padding
+          overflow: "hidden", // Prevent content from clipping
         }}
       >
         {/* Glassmorphic Header */}
@@ -248,6 +250,8 @@ const PortraitDisplay: React.FC = () => {
             flexDirection: "column",
             overflow: "hidden",
             gap: 1.5, // Add consistent gap between prayer card and content
+            minWidth: 0, // Prevent flex overflow
+            minHeight: 0, // Important for proper flex behavior
           }}
         >
           {/* Combined Prayer Card (Countdown + Times) - with 50% of available space */}

@@ -37,12 +37,14 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
         alignItems: "center",
         p: getSizeRem(isPortrait ? 1 : 1.2),
         width: "100%",
+        minWidth: 0, // Prevent flex overflow
+        boxSizing: "border-box", // Include border in width calculation
         background: `linear-gradient(90deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%)`,
-        borderRadius: isPortrait ? "0 0 8px 8px" : "8px",
+        borderRadius: "8px",
         border: `1px solid rgba(255,255,255,0.2)`,
-        borderTop: isPortrait ? "none" : `1px solid rgba(255,255,255,0.2)`,
         boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
         position: "relative",
+        overflow: "visible", // Allow borders to be visible
 
         // Modern accent line
         "&::before": {
@@ -59,7 +61,14 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
       }}
     >
       {/* Left Section - Masjid Info */}
-      <Box>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0, // Prevent flex overflow
+          overflow: "hidden",
+          pr: getSizeRem(1),
+        }}
+      >
         <Typography
           variant="h4"
           sx={{
@@ -72,6 +81,9 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
             mb: 0.5,
             fontFamily: "'Poppins', sans-serif",
             letterSpacing: "0.5px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {masjidName}
@@ -83,6 +95,7 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
             alignItems: "center",
             gap: getSizeRem(1),
             flexWrap: "wrap",
+            overflow: "hidden",
           }}
         >
           <Typography
@@ -91,6 +104,10 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
               color: "rgba(255,255,255,0.9)",
               fontFamily: "'Poppins', sans-serif",
               fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
             }}
           >
             {format(currentDate, "EEEE, MMMM d, yyyy")}
@@ -102,6 +119,7 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
               height: "4px",
               borderRadius: "50%",
               backgroundColor: theme.palette.warning.main,
+              flexShrink: 0,
             }}
           />
 
@@ -111,6 +129,10 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
               color: theme.palette.warning.light,
               fontFamily: "'Poppins', sans-serif",
               fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
             }}
           >
             {hijriDate}
@@ -119,7 +141,14 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
       </Box>
 
       {/* Right Section - Current Time */}
-      <Box sx={{ textAlign: "right" }}>
+      <Box
+        sx={{
+          textAlign: "right",
+          flexShrink: 0,
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
         <Typography
           sx={{
             fontSize: fontSizes.h1,
@@ -128,6 +157,9 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
             fontFamily: "'Poppins', sans-serif",
             letterSpacing: "1px",
             textShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {format(currentTime, "HH:mm")}
@@ -140,6 +172,9 @@ const ModernHeader: React.FC<ModernHeaderProps> = ({
             fontFamily: "'Poppins', sans-serif",
             fontWeight: 500,
             mt: -0.5,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {format(currentTime, "ss")} seconds
