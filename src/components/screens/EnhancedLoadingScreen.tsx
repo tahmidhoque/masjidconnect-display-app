@@ -473,7 +473,12 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               width: "100vh",
               height: "100vw",
               transform: "translate(-50%, -50%) rotate(90deg)",
-              transformOrigin: "center",
+              transformOrigin: "center center",
+              // Ensure no overflow or positioning issues
+              overflow: "hidden",
+              // GPU optimizations for RPi
+              willChange: isHighStrain ? "auto" : "transform",
+              backfaceVisibility: "hidden",
             }}
           >
             <LoadingContent />

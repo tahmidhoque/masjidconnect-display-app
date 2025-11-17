@@ -446,8 +446,8 @@ const DisplayScreen: React.FC = memo(() => {
                 : "none",
           }}
         >
-          {rotationInfo.shouldRotate && !isHighStrain ? (
-            // Only apply rotation if not high strain (4K displays usually don't need rotation)
+          {rotationInfo.shouldRotate ? (
+            // Apply rotation for portrait orientation
             <Box
               sx={{
                 position: "absolute",
@@ -459,8 +459,11 @@ const DisplayScreen: React.FC = memo(() => {
                 transform: "translate(-50%, -50%) rotate(90deg)",
                 // Ensure no overflow or positioning issues
                 overflow: "hidden",
+                // GPU optimizations for RPi
+                willChange: isHighStrain ? "auto" : "transform",
+                backfaceVisibility: "hidden",
                 // Smooth transition during orientation changes
-                transition: isOrientationChanging
+                transition: isOrientationChanging && !isHighStrain
                   ? "transform 0.3s ease-in-out"
                   : "none",
               }}
