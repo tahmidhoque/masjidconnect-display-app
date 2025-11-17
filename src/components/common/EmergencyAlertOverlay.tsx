@@ -374,15 +374,22 @@ const EmergencyAlertOverlay: React.FC = () => {
     <>
       {shouldRotate ? (
         <Box
+          className="rotation-container no-acceleration"
           sx={{
             position: "fixed",
             top: "50%",
             left: "50%",
             width: "100vh",
             height: "100vw",
+            // Rotation transform - inline styles have higher specificity than CSS classes
+            // The .no-acceleration and .rotation-container classes ensure this isn't overridden
             transform: "translate(-50%, -50%) rotate(90deg)",
-            transformOrigin: "center",
+            transformOrigin: "center center",
             zIndex: 110,
+            overflow: "hidden",
+            // GPU optimizations for RPi
+            willChange: "transform",
+            backfaceVisibility: "hidden",
           }}
         >
           <AlertContent />

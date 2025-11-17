@@ -279,14 +279,21 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
           {shouldRotate ? (
             // Portrait orientation with rotation transform
             <Box
+              className="rotation-container no-acceleration"
               sx={{
                 position: "absolute",
                 top: "50%",
                 left: "50%",
                 width: windowHeight,
                 height: windowWidth,
+                // Rotation transform - inline styles have higher specificity than CSS classes
+                // The .no-acceleration and .rotation-container classes ensure this isn't overridden
                 transform: "translate(-50%, -50%) rotate(90deg)",
-                transformOrigin: "center",
+                transformOrigin: "center center",
+                overflow: "hidden",
+                // GPU optimizations for RPi
+                willChange: "transform",
+                backfaceVisibility: "hidden",
               }}
             >
               <LoadingContent />
