@@ -7,6 +7,7 @@ import React, {
   memo,
 } from "react";
 import { Box, Typography, Fade, CircularProgress, Paper } from "@mui/material";
+import { Image as ImageIcon } from "@mui/icons-material";
 import { useAppSelector, selectCarouselData } from "../../store/hooks";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import IslamicPatternBackground from "./IslamicPatternBackground";
@@ -200,6 +201,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
 
   // Preload next content item to avoid flashing
   const [nextItemIndex, setNextItemIndex] = useState<number | null>(null);
+
+  // Image loading states
+  const [imageLoading, setImageLoading] = useState<{ [key: string]: boolean }>({});
+  const [imageError, setImageError] = useState<{ [key: string]: boolean }>({});
 
   // Auto-scroll refs and state
   const contentContainerRef = useRef<HTMLDivElement | null>(null);
@@ -456,29 +461,124 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
       });
 
       // Map schedule items to content items
+      // Handle both formats: wrapped (contentItem) and flattened (direct properties)
       const scheduleItems = schedule.items
         .map((item: any, index: number) => {
-          if (!item.contentItem) {
-            logger.debug(
-              `ContentCarousel: Item ${index} missing contentItem property`,
-              { item },
-            );
-            return null;
+          // Handle Events V2 from schedule items (with event property)
+          if (item.eventId && item.event) {
+            const event = item.event;
+            logger.debug(`ContentCarousel: Processing event from schedule item`, {
+              eventId: event.id,
+              title: event.title,
+            });
+
+            return {
+              id: item.id || `schedule-event-${index}`,
+              order: item.order || index,
+              contentItem: {
+                id: event.id || `event-${index}`,
+                title: event.title || "Event",
+                content: event.content || {
+                  description: event.description || null,
+                  shortDescription: event.shortDescription || null,
+                  startAt: event.startAt || event.content?.startAt || null,
+                  endAt: event.endAt || event.content?.endAt || null,
+                  venue: event.venue || event.content?.venue || null,
+                  location: event.venue || event.content?.location || null,
+                  bannerUrl:
+                    event.displayThumbnail ||
+                    event.bannerImageUrl ||
+                    event.content?.bannerUrl ||
+                    event.content?.imageUrl ||
+                    null,
+                  imageUrl:
+                    event.displayThumbnail ||
+                    event.bannerImageUrl ||
+                    event.content?.imageUrl ||
+                    event.content?.bannerUrl ||
+                    null,
+                },
+                type: "EVENT",
+                duration: event.displayDuration || event.duration || 20,
+              },
+              startDate: event.startAt || event.content?.startAt || null,
+              endDate: event.endAt || event.content?.endAt || null,
+              location: event.venue || event.content?.venue || event.content?.location || null,
+            };
           }
 
-          const contentItem = item.contentItem;
+          // Handle flattened format (items with direct properties like id, title, type, content, duration)
+          // This format is used by /api/screens/content/route.ts
+          if (item.type && (item.title || item.content)) {
+            logger.debug(`ContentCarousel: Processing flattened schedule item`, {
+              id: item.id,
+              type: item.type,
+              title: item.title,
+            });
 
-          return {
-            id: item.id || `schedule-item-${index}`,
-            order: item.order || index,
-            contentItem: {
-              id: contentItem.id || `content-${index}`,
-              title: contentItem.title || "No Title",
-              content: contentItem.content || "No Content",
-              type: contentItem.type || "CUSTOM",
-              duration: contentItem.duration || 30,
+            // Handle events in flattened format
+            if (item.type === "EVENT") {
+              const eventContent = item.content || {};
+              return {
+                id: item.id || `schedule-event-${index}`,
+                order: item.order !== undefined ? item.order : index,
+                contentItem: {
+                  id: item.id || `event-${index}`,
+                  title: item.title || "Event",
+                  content: eventContent,
+                  type: "EVENT",
+                  duration: typeof item.duration === "number" ? item.duration : 20,
+                },
+                startDate: eventContent.startAt || eventContent.startDate || null,
+                endDate: eventContent.endAt || eventContent.endDate || null,
+                location: eventContent.venue || eventContent.location || null,
+              };
+            }
+
+            // Handle other content types in flattened format
+            return {
+              id: item.id || `schedule-item-${index}`,
+              order: item.order !== undefined ? item.order : index,
+              contentItem: {
+                id: item.id || `content-${index}`,
+                title: item.title || "No Title",
+                content: item.content || "No Content",
+                type: item.type || "CUSTOM",
+                duration: typeof item.duration === "number" ? item.duration : 30,
+              },
+            };
+          }
+
+          // Handle wrapped format (items with contentItem property)
+          if (item.contentItem) {
+            const contentItem = item.contentItem;
+
+            return {
+              id: item.id || `schedule-item-${index}`,
+              order: item.order !== undefined ? item.order : index,
+              contentItem: {
+                id: contentItem.id || `content-${index}`,
+                title: contentItem.title || "No Title",
+                content: contentItem.content || "No Content",
+                type: contentItem.type || "CUSTOM",
+                duration: typeof contentItem.duration === "number" ? contentItem.duration : 30,
+              },
+            };
+          }
+
+          // Log items that don't match any expected format
+          logger.debug(
+            `ContentCarousel: Item ${index} doesn't match expected formats`,
+            { 
+              item,
+              hasType: !!item.type,
+              hasTitle: !!item.title,
+              hasContentItem: !!item.contentItem,
+              hasEvent: !!item.event,
+              hasEventId: !!item.eventId,
             },
-          };
+          );
+          return null;
         })
         .filter(Boolean);
 
@@ -837,6 +937,119 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     };
   }, [showContent]);
 
+  // Helper function to extract image URL from content
+  const getImageUrl = useCallback((content: any): string | null => {
+    if (!content) return null;
+
+    // Check if content is an object with image properties
+    if (typeof content === "object") {
+      return (
+        content.imageUrl ||
+        content.bannerUrl ||
+        content.image ||
+        content.bannerImageUrl ||
+        content.displayThumbnail ||
+        null
+      );
+    }
+
+    return null;
+  }, []);
+
+  // Helper function to check if content has an image
+  const hasImage = useCallback((content: any): boolean => {
+    return !!getImageUrl(content);
+  }, [getImageUrl]);
+
+  // Render image content
+  const renderImageContent = useCallback(
+    (imageUrl: string, title: string, itemId: string) => {
+      const isLoading = imageLoading[itemId] !== false;
+      const hasError = imageError[itemId] === true;
+
+      return (
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+          }}
+        >
+          {isLoading && !hasError && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "rgba(0, 0, 0, 0.3)",
+              }}
+            >
+              <CircularProgress size={48} />
+            </Box>
+          )}
+
+          {hasError ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 2,
+                p: 3,
+              }}
+            >
+              <ImageIcon sx={{ fontSize: 64, color: "rgba(255,255,255,0.5)" }} />
+              <Typography
+                sx={{
+                  fontSize: fontSizes.h5,
+                  color: "rgba(255,255,255,0.7)",
+                  textAlign: "center",
+                }}
+              >
+                Image failed to load
+              </Typography>
+            </Box>
+          ) : (
+            <Box
+              component="img"
+              src={imageUrl}
+              alt={title}
+              onLoad={() => {
+                setImageLoading((prev) => ({ ...prev, [itemId]: false }));
+                setImageError((prev) => ({ ...prev, [itemId]: false }));
+              }}
+              onError={() => {
+                setImageLoading((prev) => ({ ...prev, [itemId]: false }));
+                setImageError((prev) => ({ ...prev, [itemId]: true }));
+              }}
+              sx={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                width: "auto",
+                height: "auto",
+                objectFit: "contain",
+                borderRadius: 1,
+                opacity: isLoading ? 0 : 1,
+                transition: "opacity 0.3s ease-in-out",
+              }}
+            />
+          )}
+        </Box>
+      );
+    },
+    [imageLoading, imageError, fontSizes],
+  );
+
   // Render formatted content with proper Arabic and English styling
   const renderFormattedContent = useCallback(
     (content: string, fontSize: string) => {
@@ -1069,6 +1282,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     let titleToShow = currentItem.contentItem.title || typeConfig.title;
     let titleGradient = typeConfig.titleColor;
 
+    // Check if content has an image (for ANNOUNCEMENT, CUSTOM, or EVENT types)
+    const contentData = currentItem.contentItem.content;
+    const imageUrl = getImageUrl(contentData);
+    const hasImageContent = !!imageUrl && (contentType === "ANNOUNCEMENT" || contentType === "CUSTOM" || contentType === "EVENT");
+
     // Get content
     let contentToShow: string;
 
@@ -1092,20 +1310,29 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               ? currentItem.contentItem.content
               : "No announcement text";
         }
+        // If there's an image, we'll render it instead of text
         break;
 
       case "EVENT":
-        // Format event content with date/time
-        const description =
-          typeof currentItem.contentItem.content === "string"
-            ? currentItem.contentItem.content
-            : currentItem.contentItem.content?.description ||
-              "No event description";
+        // Format event content with date/time - handle Events V2 structure
+        const eventContent = currentItem.contentItem.content;
+        let description = "";
+        
+        if (typeof eventContent === "string") {
+          description = eventContent;
+        } else if (eventContent && typeof eventContent === "object") {
+          description = eventContent.description || eventContent.shortDescription || "No event description";
+        } else {
+          description = "No event description";
+        }
 
         let eventDetails = "";
-        if (currentItem.startDate) {
+        const startDateStr = currentItem.startDate || eventContent?.startAt || eventContent?.startDate;
+        const location = currentItem.location || eventContent?.venue || eventContent?.location;
+
+        if (startDateStr) {
           try {
-            const startDate = new Date(currentItem.startDate);
+            const startDate = new Date(startDateStr);
             const formattedDate = startDate.toLocaleDateString(undefined, {
               weekday: "long",
               month: "long",
@@ -1117,11 +1344,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
             });
             eventDetails = `${formattedDate} at ${formattedTime}`;
 
-            if (currentItem.location) {
-              eventDetails += `\nLocation: ${currentItem.location}`;
+            if (location) {
+              eventDetails += `\nLocation: ${location}`;
             }
           } catch (e) {
-            console.error("Error formatting event date:", e);
+            logger.error("Error formatting event date:", { error: e instanceof Error ? e.message : String(e) });
           }
         }
 
@@ -1155,7 +1382,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         break;
 
       default:
-        // Default handling for other content types
+        // Default handling for other content types (including CUSTOM)
         if (typeof currentItem.contentItem.content === "string") {
           contentToShow = currentItem.contentItem.content;
         } else if (
@@ -1181,15 +1408,68 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
             }
           } catch (e) {
             contentToShow = "Error displaying content";
-            console.error("Error formatting content object:", e);
+            logger.error("Error formatting content object:", { error: e instanceof Error ? e.message : String(e) });
           }
         } else {
           contentToShow = "No content available";
         }
     }
 
-    const fontSize = getDynamicFontSize(String(contentToShow), contentType);
 
+    const fontSize = getDynamicFontSize(String(contentToShow), contentType);
+    const itemId = currentItem.contentItem.id;
+
+    // Initialize image loading state for this item if not already set
+    if (hasImageContent && imageLoading[itemId] === undefined) {
+      // Set initial loading state synchronously
+      setImageLoading((prev) => ({ ...prev, [itemId]: true }));
+    }
+
+    // Render image content if available
+    if (hasImageContent && imageUrl) {
+      return (
+        <ModernContentCard variant={variant || "landscape"}>
+          {/* Static Header - Always Visible */}
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: "1px solid rgba(255,255,255,0.1)",
+              textAlign: "center",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: fontSizes.h3,
+                fontWeight: 600,
+                color: "rgba(255, 193, 7, 1)",
+                fontFamily: "'Poppins', sans-serif",
+              }}
+            >
+              {titleToShow}
+            </Typography>
+          </Box>
+
+          {/* Image Content Area */}
+          <Fade in={!isChangingItem} timeout={{ enter: 800, exit: 400 }}>
+            <Box
+              ref={contentContainerRef}
+              sx={{
+                flex: 1,
+                overflow: "hidden",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                p: 2,
+              }}
+            >
+              {renderImageContent(imageUrl, titleToShow, itemId)}
+            </Box>
+          </Fade>
+        </ModernContentCard>
+      );
+    }
+
+    // Render text content (existing logic)
     return (
       <ModernContentCard variant={variant || "landscape"}>
         {/* Static Header - Always Visible */}
@@ -1264,6 +1544,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     renderFormattedContent,
     isChangingItem,
     needsAutoScroll,
+    getImageUrl,
+    imageLoading,
+    imageError,
+    renderImageContent,
   ]);
 
   // Render prayer announcement

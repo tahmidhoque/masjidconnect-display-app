@@ -116,6 +116,64 @@ const normalizeScheduleData = (schedule: any): Schedule => {
     if (normalizedSchedule.items.length > 0) {
       normalizedSchedule.items = normalizedSchedule.items.map(
         (item: any, index: number) => {
+          // Handle Events V2 from schedule items (with eventId and event properties)
+          if (item.eventId && item.event) {
+            const event = item.event;
+            return {
+              id: item.id || `item-${index}`,
+              order: typeof item.order === "number" ? item.order : index,
+              eventId: item.eventId,
+              event: event,
+              // Also include flattened format for compatibility
+              type: "EVENT",
+              title: event.title || item.title || "Event",
+              duration: event.displayDuration || item.duration || 20,
+              content: {
+                description: event.description || null,
+                shortDescription: event.shortDescription || null,
+                startAt: event.startAt?.toISOString?.() || event.startAt || null,
+                endAt: event.endAt?.toISOString?.() || event.endAt || null,
+                venue: event.venue || null,
+                location: event.venue || null,
+                bannerUrl:
+                  event.displayThumbnail ||
+                  event.bannerImageUrl ||
+                  event.thumbnailImageUrl ||
+                  null,
+                imageUrl:
+                  event.displayThumbnail ||
+                  event.bannerImageUrl ||
+                  event.thumbnailImageUrl ||
+                  null,
+              },
+              contentItem: {
+                id: event.id || `${item.id}-event`,
+                type: "EVENT",
+                title: event.title || "Event",
+                content: {
+                  description: event.description || null,
+                  shortDescription: event.shortDescription || null,
+                  startAt: event.startAt?.toISOString?.() || event.startAt || null,
+                  endAt: event.endAt?.toISOString?.() || event.endAt || null,
+                  venue: event.venue || null,
+                  location: event.venue || null,
+                  bannerUrl:
+                    event.displayThumbnail ||
+                    event.bannerImageUrl ||
+                    event.thumbnailImageUrl ||
+                    null,
+                  imageUrl:
+                    event.displayThumbnail ||
+                    event.bannerImageUrl ||
+                    event.thumbnailImageUrl ||
+                    null,
+                },
+                duration: event.displayDuration || 20,
+              },
+            };
+          }
+
+          // Handle wrapped format (items with contentItem property)
           if (item.contentItem && typeof item.contentItem === "object") {
             return {
               id: item.id || `item-${index}`,
@@ -130,21 +188,33 @@ const normalizeScheduleData = (schedule: any): Schedule => {
                     ? item.contentItem.duration
                     : 30,
               },
-            };
-          } else {
-            return {
-              id: item.id || `item-${index}`,
-              order: typeof item.order === "number" ? item.order : index,
-              contentItem: {
-                id: `${item.id || index}-content`,
-                type: item.type || "CUSTOM",
-                title: item.title || "No Title",
-                content: item.content || {},
-                duration:
-                  typeof item.duration === "number" ? item.duration : 30,
-              },
+              // Also include flattened format for compatibility
+              type: item.contentItem.type || "CUSTOM",
+              title: item.contentItem.title || "No Title",
+              content: item.contentItem.content || {},
+              duration:
+                typeof item.contentItem.duration === "number"
+                  ? item.contentItem.duration
+                  : 30,
             };
           }
+
+          // Handle flattened format (items with direct properties)
+          return {
+            id: item.id || `item-${index}`,
+            order: typeof item.order === "number" ? item.order : index,
+            type: item.type || "CUSTOM",
+            title: item.title || "No Title",
+            content: item.content || {},
+            duration: typeof item.duration === "number" ? item.duration : 30,
+            contentItem: {
+              id: `${item.id || index}-content`,
+              type: item.type || "CUSTOM",
+              title: item.title || "No Title",
+              content: item.content || {},
+              duration: typeof item.duration === "number" ? item.duration : 30,
+            },
+          };
         },
       );
     }
