@@ -47,17 +47,27 @@ export const emergencyMiddleware: Middleware = (api: any) => {
     );
 
     // Listen for alert changes from the service
-    emergencyAlertService.addListener((alert) => {
+    console.log("[EmergencyMiddleware] Registering listener with emergencyAlertService");
+    const unregisterListener = emergencyAlertService.addListener((alert) => {
+      console.log("[EmergencyMiddleware] Alert callback invoked", {
+        hasAlert: !!alert,
+        alertId: alert?.id,
+        alertTitle: alert?.title,
+      });
       if (alert) {
         logger.debug("[EmergencyMiddleware] Alert received from service:", {
           id: alert.id,
           title: alert.title,
         });
+        console.log("[EmergencyMiddleware] Dispatching setCurrentAlert with alert:", alert);
       } else {
         logger.debug("[EmergencyMiddleware] Alert cleared from service");
+        console.log("[EmergencyMiddleware] Dispatching setCurrentAlert with null");
       }
       api.dispatch(setCurrentAlert(alert));
+      console.log("[EmergencyMiddleware] setCurrentAlert dispatched");
     });
+    console.log("[EmergencyMiddleware] Listener registered, unregister function:", typeof unregisterListener);
 
     // Monitor connection status (we'll implement this in the service if needed)
     // For now, we'll manage connection status through the middleware
@@ -176,7 +186,10 @@ export const emergencyMiddleware: Middleware = (api: any) => {
               unifiedSSEService.cleanup();
             }
             // Always cleanup individual services to ensure handlers are re-registered
+            // BUT: Re-register listeners after cleanup since cleanup clears them
             emergencyAlertService.cleanup();
+            // Re-register listeners after cleanup
+            setupEmergencyListeners();
             remoteControlService.cleanup();
             import("../../services/orientationEventService")
               .then(({ default: orientationEventService }) => {

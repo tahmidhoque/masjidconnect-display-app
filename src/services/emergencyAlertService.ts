@@ -132,20 +132,22 @@ class EmergencyAlertService {
       event.data,
     );
 
-    // CRITICAL: Verify unified SSE connection is ready before processing events
+    // Note: We no longer require SSE connection to be ready for emergency alerts
+    // Emergency alerts are critical and should be processed even if connection status is uncertain
+    // The connection check was too strict and could block legitimate alerts
     const connectionStatus = unifiedSSEService.getConnectionStatus();
     if (!connectionStatus.connected) {
       logger.warn(
-        "EmergencyAlertService: Ignoring alert - unified SSE connection not ready",
+        "EmergencyAlertService: SSE connection not ready, but processing alert anyway (critical)",
         {
           readyState: connectionStatus.readyState,
           connected: connectionStatus.connected,
         },
       );
       console.warn(
-        "🚨 EmergencyAlertService: Alert blocked - unified SSE connection not ready",
+        "🚨 EmergencyAlertService: SSE connection not ready, but processing alert anyway (critical)",
       );
-      return;
+      // Continue processing - don't return early
     }
 
     try {
@@ -156,6 +158,15 @@ class EmergencyAlertService {
         alertData = JSON.parse(event.data) as EmergencyAlert;
       } else {
         alertData = event.data as EmergencyAlert;
+      }
+
+      // Handle action field - if action is "clear" or "hide", clear the alert instead of showing it
+      if (alertData.action === "clear" || alertData.action === "hide") {
+        console.log(
+          "🚨 EmergencyAlertService: Alert has action='clear' or 'hide', clearing current alert",
+        );
+        this.clearCurrentAlert();
+        return;
       }
 
       // Validate required fields
@@ -215,8 +226,10 @@ class EmergencyAlertService {
       }
 
       console.log("🚨 EmergencyAlertService: Parsed alert data:", alertData);
+      console.log("🚨 EmergencyAlertService: Setting current alert and notifying listeners");
       // Display the alert
       this.setCurrentAlert(alertData);
+      console.log("🚨 EmergencyAlertService: Alert set, listeners should be notified");
     } catch (error) {
       console.error(
         "🚨 EmergencyAlertService: Error parsing alert data:",
@@ -231,13 +244,17 @@ class EmergencyAlertService {
    * Handle an update to an existing alert
    */
   private handleUpdateEvent = (event: MessageEvent): void => {
-    // CRITICAL: Verify unified SSE connection is ready before processing events
+    // Note: Emergency alerts are critical - process even if connection status is uncertain
     const connectionStatus = unifiedSSEService.getConnectionStatus();
     if (!connectionStatus.connected) {
       logger.warn(
-        "EmergencyAlertService: Ignoring update - unified SSE connection not ready",
+        "EmergencyAlertService: SSE connection not ready, but processing update anyway (critical)",
+        {
+          readyState: connectionStatus.readyState,
+          connected: connectionStatus.connected,
+        },
       );
-      return;
+      // Continue processing - don't return early
     }
 
     try {
@@ -276,13 +293,17 @@ class EmergencyAlertService {
       event.data,
     );
 
-    // CRITICAL: Verify unified SSE connection is ready before processing events
+    // Note: Emergency alerts are critical - process even if connection status is uncertain
     const connectionStatus = unifiedSSEService.getConnectionStatus();
     if (!connectionStatus.connected) {
       logger.warn(
-        "EmergencyAlertService: Ignoring cancel - unified SSE connection not ready",
+        "EmergencyAlertService: SSE connection not ready, but processing cancel anyway (critical)",
+        {
+          readyState: connectionStatus.readyState,
+          connected: connectionStatus.connected,
+        },
       );
-      return;
+      // Continue processing - don't return early
     }
 
     try {
@@ -446,10 +467,17 @@ class EmergencyAlertService {
    * Notify all listeners of the current alert state
    */
   private notifyListeners(): void {
+    console.log(`🚨 EmergencyAlertService: Notifying ${this.listeners.size} listener(s)`, {
+      hasAlert: !!this.currentAlert,
+      alertId: this.currentAlert?.id,
+      alertTitle: this.currentAlert?.title,
+    });
     this.listeners.forEach((listener) => {
       try {
         listener(this.currentAlert);
+        console.log("🚨 EmergencyAlertService: Listener notified successfully");
       } catch (error) {
+        console.error("🚨 EmergencyAlertService: Error notifying listener", error);
         logger.error("EmergencyAlertService: Error notifying listener", {
           error,
         });
@@ -504,6 +532,9 @@ class EmergencyAlertService {
    */
   public cleanup(): void {
     logger.info("EmergencyAlertService: Cleaning up");
+    console.log("🚨 EmergencyAlertService: Cleanup called", {
+      listenersBeforeCleanup: this.listeners.size,
+    });
 
     // Unregister all event handlers
     this.unregisterHandlers.forEach((unregister) => unregister());
@@ -517,9 +548,17 @@ class EmergencyAlertService {
       this.expirationTimer = null;
     }
 
-    this.listeners.clear();
+    // IMPORTANT: Don't clear listeners here - they're managed by the middleware
+    // Clearing them would break the Redux store updates
+    // The middleware will re-register listeners if needed after cleanup
+    // this.listeners.clear(); // REMOVED - listeners are managed externally
+    
     this.currentAlert = null;
     this.isInitializing = false;
+    
+    console.log("🚨 EmergencyAlertService: Cleanup complete", {
+      listenersAfterCleanup: this.listeners.size,
+    });
   }
 
   /**

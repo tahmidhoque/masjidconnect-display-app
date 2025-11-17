@@ -28,11 +28,14 @@ class UnifiedSSEService {
   private eventSource: EventSource | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private baseReconnectDelay = 5000; // 5 seconds
+  private maxReconnectAttempts = Infinity; // Unlimited attempts for emergency alerts
+  private baseReconnectDelay = 1000; // 1 second base delay for exponential backoff
+  private maxReconnectDelay = 30000; // 30 seconds maximum delay
   private connectionUrl: string | null = null;
   private baseURL: string | null = null;
   private isInitializing = false;
+  private consecutiveFailures = 0; // Track consecutive failures for fallback logic
+  private readonly MAX_CONSECUTIVE_FAILURES = 5; // Fallback to polling after 5 consecutive failures
 
   // Event handlers registered by different services
   private eventHandlers: Map<string, Set<EventHandler>> = new Map();
@@ -597,6 +600,7 @@ class UnifiedSSEService {
    */
   private handleConnectionOpen = (): void => {
     this.reconnectAttempts = 0;
+    this.consecutiveFailures = 0; // Reset consecutive failures on successful connection
     const readyState = this.eventSource?.readyState;
     const readyStateText =
       readyState === EventSource.OPEN
@@ -694,21 +698,34 @@ class UnifiedSSEService {
       clearTimeout(this.reconnectTimeout);
     }
 
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger.warn("UnifiedSSEService: Maximum reconnect attempts reached");
-      return;
-    }
+    // Track consecutive failures for fallback logic
+    this.consecutiveFailures++;
 
-    const delay =
-      Math.min(
-        this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-        60000, // Max 1 minute
-      ) *
-      (0.8 + Math.random() * 0.4); // Add 20% jitter
+    // Note: Unlimited reconnection attempts for emergency alerts
+    // Exponential backoff ensures we don't overwhelm the server
+
+    // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, 16s, 30s (max)
+    const delay = Math.min(
+      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+      this.maxReconnectDelay,
+    );
 
     logger.info(
-      `UnifiedSSEService: Scheduling reconnect in ${delay / 1000}s (attempt ${this.reconnectAttempts + 1})`,
+      `UnifiedSSEService: Scheduling reconnect in ${delay / 1000}s (attempt ${this.reconnectAttempts + 1}, consecutive failures: ${this.consecutiveFailures})`,
     );
+
+    // If we've had too many consecutive failures, log a warning about fallback
+    if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
+      logger.warn(
+        `UnifiedSSEService: ${this.consecutiveFailures} consecutive failures - consider fallback to heartbeat polling for emergency alerts`,
+        {
+          consecutiveFailures: this.consecutiveFailures,
+          maxFailures: this.MAX_CONSECUTIVE_FAILURES,
+        },
+      );
+      // Note: Fallback to heartbeat polling would be implemented in emergencyAlertService
+      // For now, we continue trying to reconnect (unlimited attempts)
+    }
 
     this.reconnectTimeout = setTimeout(() => {
       if (this.eventSource) {

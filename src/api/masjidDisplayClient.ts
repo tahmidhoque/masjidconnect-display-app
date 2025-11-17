@@ -903,11 +903,16 @@ class MasjidDisplayClient {
       // Remove any leading slash to ensure consistent handling with baseURL
       const endpoint = "api/screen/heartbeat".replace(/^\//, "");
 
-      const payload = {
+      const payload: any = {
         screenId: this.credentials!.screenId,
         status: status.status,
         deviceInfo: status.metrics,
       };
+
+      // Include command acknowledgements if present in the request
+      if ((status as any).commandAcknowledgements) {
+        payload.commandAcknowledgements = (status as any).commandAcknowledgements;
+      }
 
       // Log detailed information about the request
       logger.debug("Preparing heartbeat request", {

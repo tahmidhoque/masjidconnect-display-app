@@ -13,6 +13,7 @@ import storageService from "./storageService";
 import localforage from "localforage";
 import { analyticsService } from "./analyticsService";
 import unifiedSSEService from "./unifiedSSEService";
+import type { RemoteCommand as ApiRemoteCommand } from "../api/models";
 
 // Event Types for SSE Remote Control
 const REMOTE_COMMAND_TYPES = {
@@ -94,6 +95,8 @@ class RemoteControlService {
 
   /**
    * Register event handlers with the unified SSE service
+   * NOTE: Remote commands are now delivered via heartbeat, not SSE
+   * This method is kept for backward compatibility but no longer registers remote command handlers
    */
   private registerEventHandlers(): void {
     // Clean up any existing handlers first
@@ -111,135 +114,128 @@ class RemoteControlService {
     this.unregisterHandlers.forEach((unregister) => unregister());
     this.unregisterHandlers = [];
 
-    // Register handler for each command type
-    Object.values(REMOTE_COMMAND_TYPES).forEach((commandType) => {
-      const unregister = unifiedSSEService.addEventListener(
-        commandType,
-        (event: MessageEvent) => {
-          console.log(
-            `🎮🎮🎮 RemoteControlService: ${commandType} event received via unified SSE!`,
-            {
-              eventType: event.type,
-              data: event.data,
-              timestamp: new Date().toISOString(),
-            },
-          );
-          logger.info(`RemoteControlService: ${commandType} event received`, {
-            type: event.type,
-            data: event.data,
-          });
-          try {
-            this.handleRemoteCommand(event);
-          } catch (error) {
-            console.error(
-              `🎮 RemoteControlService: Error in ${commandType} handler:`,
-              error,
-            );
-            logger.error(
-              `RemoteControlService: Error handling ${commandType} event`,
-              { error },
-            );
-          }
-        },
-      );
-      this.unregisterHandlers.push(unregister);
-    });
-
-    // Also listen for generic 'remote_command' events
-    const unregisterRemoteCommand = unifiedSSEService.addEventListener(
-      "remote_command",
-      (event: MessageEvent) => {
-        console.log(
-          "🎮 RemoteControlService: remote_command event received:",
-          event.data,
-        );
-        this.handleRemoteCommand(event);
-      },
+    // NOTE: Remote commands are no longer delivered via SSE
+    // They are now delivered via heartbeat polling
+    // Emergency alerts are still handled by emergencyAlertService via SSE
+    logger.info(
+      "RemoteControlService: Remote commands are now delivered via heartbeat, not SSE",
     );
-    this.unregisterHandlers.push(unregisterRemoteCommand);
-
-    const unregisterRemoteCommandAlt = unifiedSSEService.addEventListener(
-      "remoteCommand",
-      (event: MessageEvent) => {
-        console.log(
-          "🎮 RemoteControlService: remoteCommand event received:",
-          event.data,
-        );
-        this.handleRemoteCommand(event);
-      },
+    console.log(
+      "🎮 RemoteControlService: Remote commands are now delivered via heartbeat, not SSE",
     );
-    this.unregisterHandlers.push(unregisterRemoteCommandAlt);
-
-    // Listen to default 'message' event for commands without specific type
-    const unregisterMessage = unifiedSSEService.addEventListener(
-      "message",
-      (event: MessageEvent) => {
-        const messageEvent = event as MessageEvent;
-        const eventType = (messageEvent as any).type || "message";
-
-        console.log(
-          `🎮🎮🎮 RemoteControlService: MESSAGE event received via unified SSE!`,
-          {
-            eventType,
-            data: messageEvent.data,
-            originalType: messageEvent.type,
-          },
-        );
-
-        logger.info("RemoteControlService: Message event received", {
-          eventType,
-          data: messageEvent.data,
-          originalType: messageEvent.type,
-        });
-
-        // Try to parse and handle as remote command
-        try {
-          const data =
-            typeof messageEvent.data === "string"
-              ? JSON.parse(messageEvent.data)
-              : messageEvent.data;
-
-          console.log("🎮 RemoteControlService: Parsed message data:", data);
-
-          // Check if this is a remote command
-          if (data && (data.type || data.commandType)) {
-            logger.info(
-              "RemoteControlService: Message event contains command, handling",
-              {
-                commandType: data.type || data.commandType,
-              },
-            );
-            console.log(
-              "🎮 RemoteControlService: Message event contains command, handling:",
-              data.type || data.commandType,
-            );
-            this.handleRemoteCommand(messageEvent);
-          }
-        } catch (error) {
-          // Not JSON or not a command, ignore
-          logger.debug(
-            "RemoteControlService: Message event is not a remote command",
-            { error },
-          );
-        }
-      },
-    );
-    this.unregisterHandlers.push(unregisterMessage);
 
     logger.info(
-      "RemoteControlService: All event handlers registered with unified SSE service",
+      "RemoteControlService: No SSE event handlers registered (commands via heartbeat)",
       {
         totalHandlers: this.unregisterHandlers.length,
-        commandTypes: Object.values(REMOTE_COMMAND_TYPES),
       },
     );
     console.log(
-      `🎮 RemoteControlService: All event handlers registered successfully (${this.unregisterHandlers.length} handlers)`,
+      `🎮 RemoteControlService: Event handler registration complete (${this.unregisterHandlers.length} handlers - none for remote commands)`,
     );
   }
 
   /**
-   * Handle a remote command event
+   * Handle a remote command from heartbeat (new approach)
+   * Commands are delivered via heartbeat polling instead of SSE
+   */
+  public async handleCommandFromHeartbeat(
+    command: ApiRemoteCommand,
+  ): Promise<void> {
+    logger.info("RemoteControlService: Processing command from heartbeat", {
+      commandId: command.commandId,
+      type: command.type,
+    });
+
+    // Don't process commands when offline
+    if (!navigator.onLine) {
+      logger.warn("RemoteControlService: Ignoring command - device is offline");
+      return;
+    }
+
+    // Validate command
+    if (!command || !command.type || !command.commandId) {
+      logger.warn("RemoteControlService: Invalid command format", {
+        command,
+        hasType: !!command?.type,
+        hasCommandId: !!command?.commandId,
+      });
+      return;
+    }
+
+    // Check for duplicate command IDs
+    if (this.processedCommandIds.has(command.commandId)) {
+      logger.warn(
+        "RemoteControlService: Duplicate command detected, skipping",
+        {
+          commandId: command.commandId,
+          type: command.type,
+        },
+      );
+      return;
+    }
+
+    // Check cooldown to prevent command spam
+    const now = Date.now();
+    const lastTime = this.lastCommandTimestamp[command.type] || 0;
+
+    if (now - lastTime < this.commandCooldownMs) {
+      logger.warn("RemoteControlService: Command throttled", {
+        type: command.type,
+        cooldown: this.commandCooldownMs,
+        commandId: command.commandId,
+      });
+
+      // Queue command instead of dropping it
+      this.commandQueue.push(command as RemoteCommand);
+
+      // Dispatch throttled event for UI feedback
+      window.dispatchEvent(
+        new CustomEvent("remote:command-throttled", {
+          detail: {
+            type: command.type,
+            commandId: command.commandId,
+            queued: true,
+          },
+        }),
+      );
+
+      // Process queue after cooldown period
+      setTimeout(
+        () => {
+          this.processCommandQueue();
+        },
+        this.commandCooldownMs - (now - lastTime),
+      );
+
+      return;
+    }
+
+    // Mark command as processed BEFORE execution
+    this.processedCommandIds.add(command.commandId);
+
+    // Schedule cleanup of command ID after 5 seconds
+    const cleanupTimer = setTimeout(() => {
+      this.processedCommandIds.delete(command.commandId);
+      this.commandIdCleanupTimers.delete(command.commandId);
+    }, 5000);
+    this.commandIdCleanupTimers.set(command.commandId, cleanupTimer);
+
+    this.lastCommandTimestamp[command.type] = now;
+
+    // Execute command (convert to internal RemoteCommand format)
+    const internalCommand = command as RemoteCommand;
+    await this.executeCommand(internalCommand);
+
+    // Notify listeners
+    this.notifyListeners(internalCommand);
+
+    // Process any queued commands
+    this.processCommandQueue();
+  }
+
+  /**
+   * Handle a remote command event from SSE (legacy - kept for emergency alerts)
    */
   private handleRemoteCommand = (event: MessageEvent): void => {
     console.log("🎮 RemoteControlService: handleRemoteCommand called!", {

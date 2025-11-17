@@ -5,6 +5,8 @@ import storageService from "./storageService";
 import logger, { getLastError } from "../utils/logger";
 import { isLowPowerDevice } from "../utils/performanceUtils";
 import unifiedSSEService from "./unifiedSSEService";
+import remoteControlService from "./remoteControlService";
+import type { RemoteCommand } from "../api/models";
 
 class DataSyncService {
   private syncIntervals: Record<string, number | null> = {
@@ -14,6 +16,14 @@ class DataSyncService {
     schedule: null,
     heartbeat: null,
   };
+  
+  // Store command acknowledgements to send in next heartbeat
+  private pendingCommandAcknowledgements: Array<{
+    queueId: string;
+    commandId: string;
+    success: boolean;
+    timestamp: string;
+  }> = [];
 
   private lastSyncTime: Record<string, number> = {
     content: 0,
@@ -678,6 +688,79 @@ class DataSyncService {
     }
   }
 
+  /**
+   * Adjust heartbeat interval dynamically based on server response
+   * @param interval - New interval in milliseconds
+   */
+  private adjustHeartbeatInterval(interval: number): void {
+    // Ensure minimum interval of 1 second
+    const minInterval = 1000;
+    const adjustedInterval = Math.max(interval, minInterval);
+
+    // Get current interval
+    const currentInterval = this.syncIntervals.heartbeat
+      ? POLLING_INTERVALS.HEARTBEAT
+      : null;
+
+    // Only adjust if interval has changed significantly (more than 10% difference)
+    if (
+      currentInterval &&
+      Math.abs(adjustedInterval - currentInterval) / currentInterval < 0.1
+    ) {
+      logger.debug("Heartbeat interval unchanged, skipping adjustment", {
+        currentInterval,
+        requestedInterval: interval,
+        adjustedInterval,
+      });
+      return;
+    }
+
+    logger.info("Adjusting heartbeat interval", {
+      oldInterval: currentInterval,
+      newInterval: adjustedInterval,
+      requestedInterval: interval,
+    });
+
+    // Stop current heartbeat
+    this.stopHeartbeat();
+
+    // Start with new interval
+    this.syncIntervals.heartbeat = window.setInterval(() => {
+      this.sendHeartbeat();
+    }, adjustedInterval);
+
+    logger.info("Heartbeat interval adjusted successfully", {
+      newInterval: adjustedInterval,
+    });
+  }
+
+  /**
+   * Store command acknowledgements to send in next heartbeat
+   */
+  private storeCommandAcknowledgements(
+    queueIds: string[],
+    commands: Array<{ commandId: string; _queueId?: string }>,
+  ): void {
+    const now = new Date().toISOString();
+    
+    for (const queueId of queueIds) {
+      const command = commands.find((cmd) => cmd._queueId === queueId);
+      if (command) {
+        this.pendingCommandAcknowledgements.push({
+          queueId,
+          commandId: command.commandId,
+          success: true, // Assume success if we got here
+          timestamp: now,
+        });
+      }
+    }
+
+    logger.info("Stored command acknowledgements for next heartbeat", {
+      count: this.pendingCommandAcknowledgements.length,
+      queueIds,
+    });
+  }
+
   private async sendHeartbeat(): Promise<void> {
     if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) {
       logger.debug("Skipping heartbeat - offline or not authenticated");
@@ -735,7 +818,7 @@ class DataSyncService {
       const lastError = getLastError() || "";
 
       // Prepare heartbeat request according to the API guide
-      const heartbeatRequest = {
+      const heartbeatRequest: any = {
         status: navigator.onLine ? ("ONLINE" as const) : ("OFFLINE" as const),
         metrics: {
           uptime: uptime,
@@ -743,6 +826,16 @@ class DataSyncService {
           lastError: lastError,
         },
       };
+
+      // Include command acknowledgements if any are pending
+      if (this.pendingCommandAcknowledgements.length > 0) {
+        heartbeatRequest.commandAcknowledgements = [...this.pendingCommandAcknowledgements];
+        logger.info("Including command acknowledgements in heartbeat", {
+          count: this.pendingCommandAcknowledgements.length,
+        });
+        // Clear after including in request
+        this.pendingCommandAcknowledgements = [];
+      }
 
       // Send heartbeat to server
       logger.debug("Calling masjidDisplayClient.sendHeartbeat", {
@@ -766,57 +859,173 @@ class DataSyncService {
         this.lastSyncTime.heartbeat = now;
         logger.debug("Heartbeat sent successfully");
 
-        // Check if backend has pending SSE events queued
-        const hasPendingEvents = response.data?.hasPendingEvents === true;
-        logger.info("Checking for pending SSE events", {
-          hasPendingEvents,
-          responseData: response.data,
+        // Extract pending commands and heartbeat interval from response
+        // ApiResponse wraps the data in response.data
+        const heartbeatData = response.data;
+        
+        // Debug: Log the full response structure
+        logger.debug("Heartbeat response structure", {
+          hasResponseData: !!response.data,
+          responseDataType: typeof response.data,
+          responseDataKeys: response.data ? Object.keys(response.data) : [],
+          fullResponseData: JSON.stringify(response.data).substring(0, 500),
         });
+        
+        // Try multiple paths to extract pendingCommands
+        // Backend returns: { success: true, data: { pendingCommands: [...] } }
+        let pendingCommands: any[] = [];
+        
+        if (heartbeatData) {
+          // First try: direct access (if backend puts it at top level of data)
+          if (Array.isArray(heartbeatData.pendingCommands)) {
+            pendingCommands = heartbeatData.pendingCommands;
+          }
+          // Second try: nested in data.data (if double-wrapped)
+          else if (heartbeatData.data && Array.isArray(heartbeatData.data.pendingCommands)) {
+            pendingCommands = heartbeatData.data.pendingCommands;
+          }
+          // Third try: check if it's a HeartbeatResponse with nested structure
+          else if (heartbeatData.data && typeof heartbeatData.data === 'object') {
+            const nestedData = heartbeatData.data as any;
+            if (Array.isArray(nestedData.pendingCommands)) {
+              pendingCommands = nestedData.pendingCommands;
+            }
+          }
+        }
+        
+        // Ensure it's an array
+        if (!Array.isArray(pendingCommands)) {
+          pendingCommands = [];
+        }
+        
+        const nextHeartbeatInterval = 
+          heartbeatData?.nextHeartbeatInterval || 
+          heartbeatData?.data?.nextHeartbeatInterval;
+        
+        // Backward compatibility: check for hasPendingEvents flag
+        const hasPendingEvents = 
+          heartbeatData?.hasPendingEvents === true || 
+          heartbeatData?.data?.hasPendingEvents === true;
 
-        if (hasPendingEvents) {
-          // Log connection state before reconnection
-          const connectionStatusBefore = unifiedSSEService.getConnectionStatus();
+        logger.info("Processing heartbeat response", {
+          pendingCommandsCount: pendingCommands.length,
+          nextHeartbeatInterval,
+          hasPendingEvents,
+          pendingCommands: pendingCommands.length > 0 ? pendingCommands.map(c => ({ id: c.commandId, type: c.type, queueId: c._queueId })) : [],
+          extractionPath: heartbeatData?.pendingCommands ? 'direct' : heartbeatData?.data?.pendingCommands ? 'nested' : 'none',
+        });
+        
+        // Also log to console for immediate debugging
+        if (pendingCommands.length > 0) {
+          console.log(`[DataSync] Found ${pendingCommands.length} pending command(s) to process:`, 
+            pendingCommands.map(c => ({ type: c.type, commandId: c.commandId, queueId: c._queueId }))
+          );
+        } else {
+          console.log('[DataSync] No pending commands found in heartbeat response');
+        }
+
+        // Process pending commands from heartbeat (new approach)
+        const processedQueueIds: string[] = [];
+        if (pendingCommands.length > 0) {
           logger.info(
-            "Heartbeat response indicates pending SSE events - triggering reconnection",
-            {
-              hasPendingEvents,
-              responseData: response.data,
-              connectionStatusBefore,
-            },
+            `Processing ${pendingCommands.length} pending command(s) from heartbeat`,
           );
           
-          // Trigger SSE reconnection to process queued events
-          try {
-            unifiedSSEService.reconnect();
-            logger.info("SSE reconnection triggered successfully", {
-              connectionStatusBefore,
-            });
-            
-            // Verify reconnection after a delay
-            setTimeout(() => {
-              const connectionStatusAfter = unifiedSSEService.getConnectionStatus();
-              logger.info("SSE reconnection status check", {
-                connectionStatusBefore,
-                connectionStatusAfter,
-                reconnected: connectionStatusAfter.connected,
+          // Check app start time to identify stale commands (sent before restart)
+          const appStartTime = this.startTime;
+          
+          for (const command of pendingCommands) {
+            try {
+              // Check if command is stale (sent before app started)
+              const commandTimestamp = command.timestamp 
+                ? new Date(command.timestamp).getTime() 
+                : null;
+              
+              const isStale = commandTimestamp && commandTimestamp < appStartTime;
+              
+              if (isStale) {
+                logger.warn("Skipping stale command (sent before app restart)", {
+                  commandId: command.commandId,
+                  type: command.type,
+                  queueId: command._queueId,
+                  commandTimestamp: command.timestamp,
+                  appStartTime: new Date(appStartTime).toISOString(),
+                });
+                
+                // Mark stale commands as delivered to prevent them from reappearing
+                if (command._queueId) {
+                  processedQueueIds.push(command._queueId);
+                  logger.info("Stale command marked for acknowledgement", {
+                    commandId: command.commandId,
+                    queueId: command._queueId,
+                  });
+                }
+                continue;
+              }
+              
+              logger.info("Processing command from heartbeat", {
+                commandId: command.commandId,
+                type: command.type,
+                queueId: command._queueId,
+                commandTimestamp: command.timestamp,
               });
               
-              if (connectionStatusAfter.connected) {
-                logger.info("SSE reconnection verified - connection is now open");
-              } else {
-                logger.warn("SSE reconnection may have failed - connection not open", {
-                  readyState: connectionStatusAfter.readyState,
+              // Process command using remoteControlService
+              await remoteControlService.handleCommandFromHeartbeat(command);
+              
+              // Mark command as processed (will be acknowledged in next heartbeat)
+              if (command._queueId) {
+                processedQueueIds.push(command._queueId);
+                logger.info("Command queued for acknowledgement", {
+                  commandId: command.commandId,
+                  queueId: command._queueId,
                 });
               }
-            }, 2000); // Check after 2 seconds
-          } catch (error) {
-            logger.error("Error triggering SSE reconnection", {
-              error,
-              connectionStatusBefore,
-            });
+              
+              logger.info("Command processed successfully", {
+                commandId: command.commandId,
+                queueId: command._queueId,
+              });
+            } catch (error) {
+              logger.error("Error processing command from heartbeat", {
+                error,
+                commandId: command.commandId,
+                type: command.type,
+                queueId: command._queueId,
+              });
+              // Still mark as delivered even on error to prevent infinite retries
+              if (command._queueId) {
+                processedQueueIds.push(command._queueId);
+              }
+            }
           }
+        }
+
+        // Store processed queue IDs to send acknowledgements in next heartbeat
+        if (processedQueueIds.length > 0) {
+          this.storeCommandAcknowledgements(processedQueueIds, pendingCommands);
+        }
+
+        // Handle dynamic heartbeat interval adjustment
+        if (nextHeartbeatInterval && nextHeartbeatInterval > 0) {
+          this.adjustHeartbeatInterval(nextHeartbeatInterval);
         } else {
-          logger.debug("No pending events detected in heartbeat response");
+          // Reset to default interval if no commands pending
+          this.adjustHeartbeatInterval(POLLING_INTERVALS.HEARTBEAT);
+        }
+
+        // Backward compatibility: If hasPendingEvents is true but no commands,
+        // it might be for emergency alerts - trigger SSE reconnection
+        if (hasPendingEvents && pendingCommands.length === 0) {
+          logger.info(
+            "Heartbeat indicates pending events (likely emergency alerts) - triggering SSE reconnection",
+          );
+          try {
+            unifiedSSEService.reconnect();
+            logger.info("SSE reconnection triggered for emergency alerts");
+          } catch (error) {
+            logger.error("Error triggering SSE reconnection", { error });
+          }
         }
       } else {
         // Implement backoff if heartbeat fails

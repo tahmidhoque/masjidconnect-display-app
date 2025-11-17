@@ -109,9 +109,40 @@ export interface HeartbeatRequest {
   };
 }
 
+// Remote Command interface (shared with remoteControlService)
+export interface RemoteCommand {
+  id?: string; // Backward compatibility
+  commandId: string; // Unique command identifier
+  type:
+    | "RESTART_APP"
+    | "RELOAD_CONTENT"
+    | "CLEAR_CACHE"
+    | "FORCE_UPDATE"
+    | "UPDATE_SETTINGS"
+    | "FACTORY_RESET"
+    | "CAPTURE_SCREENSHOT";
+  payload?: {
+    countdown?: number;
+    settings?: any;
+    [key: string]: any;
+  };
+  timestamp: string;
+  _queueId?: string; // Internal: queue ID for marking as delivered
+}
+
 export interface HeartbeatResponse {
   success: boolean;
-  hasPendingEvents?: boolean; // Indicates queued SSE events are available on backend
+  hasPendingEvents?: boolean; // Backward compatibility: indicates queued SSE events are available on backend
+  pendingCommands?: RemoteCommand[]; // New: actual pending commands to process
+  nextHeartbeatInterval?: number; // New: server-controlled heartbeat interval in milliseconds
+  data?: {
+    acknowledged?: boolean;
+    serverTime?: string;
+    hasPendingEvents?: boolean;
+    pendingCommands?: RemoteCommand[];
+    nextHeartbeatInterval?: number;
+    [key: string]: any; // Allow other data fields
+  };
 }
 
 // New Analytics Types for Enhanced Heartbeat System
@@ -457,5 +488,5 @@ export interface EmergencyAlert {
     remaining: number; // Remaining time in milliseconds (calculated by server)
     autoCloseAt: string; // ISO date string when alert should auto-close
   };
-  action?: "show" | "hide" | "update"; // Action to perform with this alert
+  action?: "show" | "hide" | "update" | "clear"; // Action to perform with this alert
 }
