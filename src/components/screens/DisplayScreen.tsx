@@ -8,7 +8,7 @@ import React, {
   createContext,
   useContext,
 } from "react";
-import { Box, Fade } from "@mui/material";
+import { Box, Fade, useTheme } from "@mui/material";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { refreshAllContent } from "../../store/slices/contentSlice";
@@ -100,6 +100,7 @@ const FADE_DURATION = isHighStrainDevice() ? 200 : 400;
 // Memoized DisplayScreen component
 const DisplayScreen: React.FC = memo(() => {
   const dispatch = useDispatch<AppDispatch>();
+  const theme = useTheme();
 
   // Get performance profile
   const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
@@ -435,6 +436,8 @@ const DisplayScreen: React.FC = memo(() => {
             position: "fixed",
             top: 0,
             left: 0,
+            // Set background to prevent dark blocks showing through
+            backgroundColor: theme.palette.primary.dark,
             // 4K optimizations
             willChange: isHighStrain ? "auto" : "transform",
             transform: isHighStrain ? "none" : "translateZ(0)",
@@ -453,7 +456,9 @@ const DisplayScreen: React.FC = memo(() => {
                 position: "absolute",
                 top: "50%",
                 left: "50%",
-                width: "100vh", // Swap dimensions for rotation
+                // Swap dimensions for rotation: use viewport height for width,
+                // viewport width for height to ensure proper coverage after rotation
+                width: "100vh",
                 height: "100vw",
                 transformOrigin: "center center",
                 transform: "translate(-50%, -50%) rotate(90deg)",

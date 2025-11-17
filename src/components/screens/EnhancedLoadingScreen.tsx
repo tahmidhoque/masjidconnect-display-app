@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, memo } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 import useRotationHandling from "../../hooks/useRotationHandling";
 import { useAppSelector } from "../../store/hooks";
@@ -40,7 +40,7 @@ interface EnhancedLoadingScreenProps {
   orientation?: "LANDSCAPE" | "PORTRAIT"; // Optional prop for override, but defaults to Redux value
 }
 
-const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
+const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = memo(({
   currentPhase,
   progress,
   statusMessage,
@@ -52,7 +52,11 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
   const masjidName = useAppSelector((state) => state.content.masjidName);
   // Read orientation from Redux store, with prop override if provided
   const reduxOrientation = useAppSelector((state) => state.ui.orientation);
-  const orientation = orientationProp || reduxOrientation || "LANDSCAPE";
+  // Memoize orientation to prevent unnecessary re-renders
+  const orientation = useMemo(
+    () => orientationProp || reduxOrientation || "LANDSCAPE",
+    [orientationProp, reduxOrientation],
+  );
 
   // Get performance profile for optimizations
   const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
@@ -61,7 +65,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
     !performanceProfile.recommendations.enableAnimations;
 
   // Component state
-  const [isFullyVisible, setIsFullyVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [displayProgress, setDisplayProgress] = useState(0);
 
@@ -75,49 +78,13 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
   const shouldRotate = rotationInfo.shouldRotate;
 
   // Progressive loading for 4K displays
+  // Load all elements immediately to prevent dark block flash
   const [elementsLoaded, setElementsLoaded] = useState({
-    logo: !isHighStrain, // Load immediately if not high strain
-    spinner: !isHighStrain,
-    progress: !isHighStrain,
-    status: !isHighStrain,
+    logo: true, // Always load immediately to prevent flash
+    spinner: true, // Always load immediately to prevent flash
+    progress: true, // Always load immediately to prevent flash
+    status: true, // Always load immediately to prevent flash
   });
-
-  // Progressive loading effect for 4K displays
-  useEffect(() => {
-    if (!isHighStrain) return;
-
-    // Load elements progressively with delays for 4K displays
-    const timeouts: NodeJS.Timeout[] = [];
-
-    timeouts.push(
-      setTimeout(
-        () => setElementsLoaded((prev) => ({ ...prev, logo: true })),
-        100,
-      ),
-    );
-    timeouts.push(
-      setTimeout(
-        () => setElementsLoaded((prev) => ({ ...prev, spinner: true })),
-        300,
-      ),
-    );
-    timeouts.push(
-      setTimeout(
-        () => setElementsLoaded((prev) => ({ ...prev, progress: true })),
-        500,
-      ),
-    );
-    timeouts.push(
-      setTimeout(
-        () => setElementsLoaded((prev) => ({ ...prev, status: true })),
-        700,
-      ),
-    );
-
-    return () => {
-      timeouts.forEach((timeout) => clearTimeout(timeout));
-    };
-  }, [isHighStrain]);
 
   // Smooth progress animation (disabled for 4K)
   useEffect(() => {
@@ -161,18 +128,6 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
       }
     };
   }, [progress, shouldDisableAnimations]);
-
-  // Immediate visibility for other components (faster for 4K)
-  useEffect(() => {
-    if (isHighStrain) {
-      // Immediate visibility for 4K displays
-      setIsFullyVisible(true);
-    } else {
-      // Small delay for non-4K displays
-      const timer = setTimeout(() => setIsFullyVisible(true), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isHighStrain]);
 
   // Only exit when actually transitioning to display
   useEffect(() => {
@@ -248,7 +203,10 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
         height: "100%",
         position: "relative",
         overflow: "hidden",
+        // Ensure background renders immediately to prevent dark block flash
         background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
+        // Fallback background color in case gradient doesn't render immediately
+        backgroundColor: theme.palette.primary.dark,
         // 4K optimizations
         willChange: isHighStrain ? "auto" : "transform",
         transform: isHighStrain ? "none" : "translateZ(0)",
@@ -455,6 +413,8 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
           top: 0,
           left: 0,
           zIndex: 1000,
+          // Set background to prevent dark blocks showing through
+          backgroundColor: theme.palette.primary.dark,
           opacity: isExiting ? 0 : 1,
           transform:
             isExiting && !shouldDisableAnimations ? "scale(0.98)" : "scale(1)",
@@ -464,33 +424,53 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = ({
               : "none",
         }}
       >
-        {shouldRotate ? (
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: "100vh",
-              height: "100vw",
-              transform: "translate(-50%, -50%) rotate(90deg)",
-              transformOrigin: "center center",
-              // Ensure no overflow or positioning issues
-              overflow: "hidden",
-              // GPU optimizations for RPi
-              willChange: isHighStrain ? "auto" : "transform",
-              backfaceVisibility: "hidden",
-            }}
-          >
-            <LoadingContent />
-          </Box>
-        ) : (
-          <Box sx={{ width: "100%", height: "100%" }}>
-            <LoadingContent />
-          </Box>
-        )}
+        {/* Always render both containers to prevent flash - hide the inactive one */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            // Use max dimensions to ensure full coverage after rotation
+            width: "max(100vh, 100vw)",
+            height: "max(100vh, 100vw)",
+            transform: shouldRotate
+              ? "translate(-50%, -50%) rotate(90deg)"
+              : "none",
+            transformOrigin: "center center",
+            // Hide if not rotating, show if rotating
+            opacity: shouldRotate ? 1 : 0,
+            pointerEvents: shouldRotate ? "auto" : "none",
+            // Ensure no overflow or positioning issues
+            overflow: "hidden",
+            // GPU optimizations for RPi
+            willChange: isHighStrain ? "auto" : "transform",
+            backfaceVisibility: "hidden",
+            // Ensure it covers the viewport
+            minWidth: "100vh",
+            minHeight: "100vw",
+          }}
+        >
+          <LoadingContent />
+        </Box>
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            // Hide if rotating, show if not rotating
+            opacity: shouldRotate ? 0 : 1,
+            pointerEvents: shouldRotate ? "none" : "auto",
+            position: "absolute",
+            top: 0,
+            left: 0,
+          }}
+        >
+          <LoadingContent />
+        </Box>
       </Box>
     </>
   );
-};
+});
+
+EnhancedLoadingScreen.displayName = "EnhancedLoadingScreen";
 
 export default EnhancedLoadingScreen;

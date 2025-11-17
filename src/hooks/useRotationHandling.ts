@@ -38,14 +38,24 @@ export function useRotationHandling(desiredOrientation: Orientation) {
           ? "PORTRAIT"
           : "LANDSCAPE";
 
-        if (newOrientation !== physicalOrientation) {
-          setPhysicalOrientation(newOrientation);
-        }
+        // Use functional update to avoid dependency on physicalOrientation
+        setPhysicalOrientation((current) => {
+          if (newOrientation !== current) {
+            return newOrientation;
+          }
+          return current;
+        });
       }, 150); // 150ms debounce
     };
 
-    // Initial check
-    handleResize();
+    // Initial check - only set if different to avoid initial re-render
+    const initialIsPortrait = window.innerHeight > window.innerWidth;
+    const initialOrientation: Orientation = initialIsPortrait
+      ? "PORTRAIT"
+      : "LANDSCAPE";
+    if (initialOrientation !== physicalOrientation) {
+      setPhysicalOrientation(initialOrientation);
+    }
 
     // Listen for resize events
     window.addEventListener("resize", handleResize);
@@ -57,7 +67,9 @@ export function useRotationHandling(desiredOrientation: Orientation) {
         clearTimeout(resizeTimer);
       }
     };
-  }, [physicalOrientation]);
+    // Remove physicalOrientation from dependencies to prevent re-attaching listener
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     shouldRotate,
