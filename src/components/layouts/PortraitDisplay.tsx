@@ -1,11 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import { Box, Typography, Button } from "@mui/material";
+import { Box } from "@mui/material";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { setPrayerAnnouncement } from "../../store/slices/contentSlice";
 import { usePrayerTimes } from "../../hooks/usePrayerTimes";
 import useCurrentTime from "../../hooks/useCurrentTime";
-import { format } from "date-fns";
 import logoGold from "../../assets/logos/logo-notext-gold.svg";
 import ContentCarousel from "../common/ContentCarousel";
 import IslamicPatternBackgroundDark from "../common/IslamicPatternBackgroundDark";
@@ -48,15 +47,10 @@ const PortraitDisplay: React.FC = () => {
   };
   const { currentDate, hijriDate, nextPrayer } = usePrayerTimes();
 
-  const { fontSizes, screenSize, getSizeRem } = useResponsiveFontSize();
+  const { getSizeRem } = useResponsiveFontSize();
   // Use centralized time management to prevent timer conflicts
   const currentTime = useCurrentTime();
   const announcementActiveRef = useRef(false);
-
-  // Log masjid name for debugging
-  useEffect(() => {
-    console.log("PortraitDisplay: Masjid name =", masjidName);
-  }, [masjidName]);
 
   // Track prayer announcements for debugging
   useEffect(() => {
@@ -162,7 +156,8 @@ const PortraitDisplay: React.FC = () => {
   };
 
   // Function to manually trigger prayer announcement for testing
-  const showDebugAnnouncement = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _showDebugAnnouncement = () => {
     logger.info("Debug button clicked - manually showing prayer announcement");
 
     if (announcementActiveRef.current) {
@@ -227,9 +222,9 @@ const PortraitDisplay: React.FC = () => {
           zIndex: 10,
           display: "flex",
           flexDirection: "column",
-          gap: 1.5,
-          px: 1.5,
-          py: 1.5, // Consistent top and bottom padding
+          gap: getSizeRem(1.5),
+          px: getSizeRem(1.5),
+          py: getSizeRem(1.5), // Consistent top and bottom padding
           overflow: "hidden", // Prevent content from clipping
         }}
       >
@@ -239,7 +234,7 @@ const PortraitDisplay: React.FC = () => {
           currentDate={currentDate ? new Date(currentDate) : new Date()}
           hijriDate={hijriDate || ""}
           currentTime={currentTime}
-          orientation="landscape"
+          orientation="portrait"
         />
 
         {/* Content Layout Container with proper spacing */}
@@ -249,7 +244,7 @@ const PortraitDisplay: React.FC = () => {
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            gap: 1.5, // Add consistent gap between prayer card and content
+            gap: getSizeRem(1.5), // Add consistent gap between prayer card and content
             minWidth: 0, // Prevent flex overflow
             minHeight: 0, // Important for proper flex behavior
           }}
@@ -278,7 +273,7 @@ const PortraitDisplay: React.FC = () => {
               minHeight: 0, // Important for proper flex behavior
             }}
           >
-            <ContentCarousel variant="landscape" />
+            <ContentCarousel variant="portrait" />
           </Box>
         </Box>
 
