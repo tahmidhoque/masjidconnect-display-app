@@ -31,6 +31,21 @@
   will-change: auto;
 }
 
+/* Exception: Rotation containers must preserve their transform for proper screen rotation */
+/* This rule ensures rotation containers are excluded from transform overrides */
+/* Higher specificity ensures this rule takes precedence over the general MuiBox-root rule */
+.low-power-device .MuiBox-root.rotation-container,
+.low-power-device .MuiBox-root.rotation-container.no-acceleration,
+.low-power-device .rotation-container,
+.low-power-device .rotation-container.no-acceleration {
+  /* Do not override transform - let inline styles take precedence */
+  /* The inline transform from sx prop will have higher specificity than CSS classes */
+  /* Only set properties that don't conflict with the rotation transform */
+  will-change: transform;
+  backfaceVisibility: hidden;
+  /* Explicitly do not set transform here - let inline styles handle it */
+}
+
 /* Disable expensive background effects on low-power devices */
 .low-power-device .glassmorphic-background,
 .low-power-device [class*="gradient"],
@@ -50,9 +65,10 @@
 }
 
 /* Disable complex transforms and 3D effects */
-.low-power-device [class*="rotate"],
-.low-power-device [class*="scale"],
-.low-power-device [class*="3d"] {
+/* Exception: Rotation containers need their transforms for screen rotation */
+.low-power-device [class*="rotate"]:not(.rotation-container),
+.low-power-device [class*="scale"]:not(.rotation-container),
+.low-power-device [class*="3d"]:not(.rotation-container) {
   transform: none !important;
 }
 

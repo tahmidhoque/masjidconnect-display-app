@@ -426,6 +426,7 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = memo(({
       >
         {/* Always render both containers to prevent flash - hide the inactive one */}
         <Box
+          className={shouldRotate ? "rotation-container no-acceleration" : ""}
           sx={{
             position: "absolute",
             top: "50%",

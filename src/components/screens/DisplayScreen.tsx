@@ -452,6 +452,7 @@ const DisplayScreen: React.FC = memo(() => {
           {rotationInfo.shouldRotate ? (
             // Apply rotation for portrait orientation
             <Box
+              className="rotation-container no-acceleration"
               sx={{
                 position: "absolute",
                 top: "50%",
@@ -461,6 +462,8 @@ const DisplayScreen: React.FC = memo(() => {
                 width: "100vh",
                 height: "100vw",
                 transformOrigin: "center center",
+                // Rotation transform - inline styles have higher specificity than CSS classes
+                // The .no-acceleration and .rotation-container classes ensure this isn't overridden
                 transform: "translate(-50%, -50%) rotate(90deg)",
                 // Ensure no overflow or positioning issues
                 overflow: "hidden",

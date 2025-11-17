@@ -1,6 +1,6 @@
 {
   "name": "masjidconnect-display-app",
-  "version": "0.0.2-beta.6",
+  "version": "0.0.2-beta.7",
   "private": true,
   "main": "electron/main.js",
   "description": "MasjidConnect Display App - Digital signage solution for mosques",
