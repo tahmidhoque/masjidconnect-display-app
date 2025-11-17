@@ -15,6 +15,31 @@ const logHistory: LogEntry[] = [];
 const MAX_LOG_HISTORY = 100;
 
 /**
+ * Check if we're in production mode
+ */
+const isProduction = (): boolean => {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.NODE_ENV === "test"
+  );
+};
+
+/**
+ * Check if a log level should be output in the current environment
+ * Production: only errors and critical warnings
+ * Development: all levels
+ */
+const shouldLog = (level: LogLevel): boolean => {
+  if (!isProduction()) {
+    // Development: log everything
+    return true;
+  }
+
+  // Production: only log errors and warnings
+  return level === "error" || level === "warn";
+};
+
+/**
  * Structured logging function
  * @param level Log level
  * @param message Log message
@@ -39,10 +64,17 @@ export function log(
     logEntry.screenId = screenId;
   }
 
-  // Store in history (limited to last 100 entries)
+  // Always store in history (for debugging purposes, even in production)
+  // But limit history size more aggressively in production
+  const maxHistory = isProduction() ? 50 : MAX_LOG_HISTORY;
   logHistory.push(logEntry);
-  if (logHistory.length > MAX_LOG_HISTORY) {
+  if (logHistory.length > maxHistory) {
     logHistory.shift();
+  }
+
+  // Only output to console if log level is appropriate for environment
+  if (!shouldLog(level)) {
+    return;
   }
 
   // Output to console with appropriate styling

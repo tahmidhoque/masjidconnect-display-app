@@ -187,28 +187,14 @@ export class SystemMetricsCollector {
 
   /**
    * Measure network latency
+   * Note: We use heartbeat for connectivity checks instead of a separate ping endpoint
+   * This method returns a default value since latency is tracked via heartbeat responses
    */
   async measureNetworkLatency(): Promise<number> {
-    try {
-      const start = performance.now();
-
-      // Use the same API base URL for consistency
-      const { getApiBaseUrl } = require("./adminUrlUtils");
-      const baseUrl = getApiBaseUrl();
-      const response = await fetch(`${baseUrl}/api/ping`, {
-        method: "HEAD",
-        cache: "no-cache",
-      });
-
-      if (response.ok) {
-        return performance.now() - start;
-      }
-
-      return -1; // Indicate network error
-    } catch (error) {
-      logger.debug("Network latency measurement failed", { error });
-      return -1;
-    }
+    // Heartbeat already handles connectivity checks, so we don't need a separate ping
+    // Return a default value to indicate latency measurement is handled elsewhere
+    // Negative value indicates we're not actively measuring here
+    return -1;
   }
 
   /**

@@ -759,11 +759,6 @@ class DataSyncService {
         hasPendingEvents: response.data?.hasPendingEvents,
         error: response.error,
       });
-      console.log("💓 Heartbeat response:", {
-        success: response.success,
-        data: response.data,
-        hasPendingEvents: response.data?.hasPendingEvents,
-      });
 
       if (response.success) {
         // Only update the successful time on success
@@ -777,30 +772,48 @@ class DataSyncService {
           hasPendingEvents,
           responseData: response.data,
         });
-        console.log(
-          `💓 Checking pending events flag: ${hasPendingEvents}`,
-          response.data,
-        );
 
         if (hasPendingEvents) {
+          // Log connection state before reconnection
+          const connectionStatusBefore = unifiedSSEService.getConnectionStatus();
           logger.info(
             "Heartbeat response indicates pending SSE events - triggering reconnection",
             {
               hasPendingEvents,
               responseData: response.data,
+              connectionStatusBefore,
             },
           );
-          console.log(
-            "🔗 Heartbeat detected pending events - reconnecting SSE to process queued events",
-          );
+          
           // Trigger SSE reconnection to process queued events
           try {
             unifiedSSEService.reconnect();
-            logger.info("SSE reconnection triggered successfully");
-            console.log("✅ SSE reconnection triggered");
+            logger.info("SSE reconnection triggered successfully", {
+              connectionStatusBefore,
+            });
+            
+            // Verify reconnection after a delay
+            setTimeout(() => {
+              const connectionStatusAfter = unifiedSSEService.getConnectionStatus();
+              logger.info("SSE reconnection status check", {
+                connectionStatusBefore,
+                connectionStatusAfter,
+                reconnected: connectionStatusAfter.connected,
+              });
+              
+              if (connectionStatusAfter.connected) {
+                logger.info("SSE reconnection verified - connection is now open");
+              } else {
+                logger.warn("SSE reconnection may have failed - connection not open", {
+                  readyState: connectionStatusAfter.readyState,
+                });
+              }
+            }, 2000); // Check after 2 seconds
           } catch (error) {
-            logger.error("Error triggering SSE reconnection", { error });
-            console.error("❌ Error triggering SSE reconnection:", error);
+            logger.error("Error triggering SSE reconnection", {
+              error,
+              connectionStatusBefore,
+            });
           }
         } else {
           logger.debug("No pending events detected in heartbeat response");
@@ -887,8 +900,7 @@ class DataSyncService {
       // Track sync attempt
       this.lastSyncAttempts.schedule = Date.now();
 
-      logger.info("dataSyncService: Syncing schedule data", { forceRefresh });
-      console.log("DEBUG dataSyncService: Syncing schedule data", {
+      logger.debug("dataSyncService: Syncing schedule data", {
         forceRefresh,
         online: navigator.onLine,
         authenticated: isAuthenticated,
@@ -913,9 +925,9 @@ class DataSyncService {
       }
 
       // Fetch screen content which includes schedule
-      console.log("DEBUG dataSyncService: Calling getScreenContent");
+      logger.debug("dataSyncService: Calling getScreenContent");
       const response = await masjidDisplayClient.getScreenContent(forceRefresh);
-      console.log("DEBUG dataSyncService: getScreenContent response", {
+      logger.debug("dataSyncService: getScreenContent response", {
         success: response.success,
         hasData: !!response.data,
         status: response?.status,
@@ -923,16 +935,15 @@ class DataSyncService {
       });
 
       if (response.success && response.data) {
-        console.log(
-          "DEBUG dataSyncService: Response data keys:",
-          Object.keys(response.data),
-        );
+        logger.debug("dataSyncService: Response data keys", {
+          keys: Object.keys(response.data),
+        });
 
         // Check for schedule in response - could be directly in data or in a nested structure
         const schedule = response.data.schedule;
         const nestedData = (response.data as any).data;
 
-        console.log("DEBUG dataSyncService: Schedule structure check:", {
+        logger.debug("dataSyncService: Schedule structure check", {
           hasScheduleDirectly: !!schedule,
           hasNestedData: !!nestedData,
           nestedDataHasSchedule: nestedData ? !!nestedData.schedule : false,
@@ -943,7 +954,7 @@ class DataSyncService {
           const scheduleData = schedule || nestedData.schedule;
 
           // Log the structure of the schedule data we found
-          console.log("DEBUG dataSyncService: Schedule data found:", {
+          logger.debug("dataSyncService: Schedule data found", {
             type: typeof scheduleData,
             isObject: typeof scheduleData === "object",
             hasItems: !!scheduleData.items,
@@ -954,7 +965,7 @@ class DataSyncService {
           // If we have items, check the first one to understand its structure
           if (scheduleData.items && scheduleData.items.length > 0) {
             const firstItem = scheduleData.items[0];
-            console.log("DEBUG dataSyncService: First schedule item:", {
+            logger.debug("dataSyncService: First schedule item", {
               keys: Object.keys(firstItem),
               hasContentItem: "contentItem" in firstItem,
               hasType: "type" in firstItem,
@@ -965,23 +976,14 @@ class DataSyncService {
           // Save schedule data to storage
           await storageService.saveSchedule(scheduleData);
           logger.info("dataSyncService: Schedule data saved successfully");
-          console.log(
-            "DEBUG dataSyncService: Schedule data saved successfully",
-          );
 
           // Update last sync time
           this.lastSyncTime.schedule = Date.now();
         } else {
           logger.warn("dataSyncService: No schedule data found in response");
-          console.log(
-            "DEBUG dataSyncService: No schedule data found in response",
-          );
         }
       } else {
         logger.error("dataSyncService: Failed to fetch schedule data", {
-          error: response.error,
-        });
-        console.log("DEBUG dataSyncService: Failed to fetch schedule data", {
           error: response.error,
         });
 
@@ -991,7 +993,6 @@ class DataSyncService {
         this.backoffStatus.schedule.nextTry = now + 60000; // Try again in 1 minute
       }
     } catch (error) {
-      console.error("Error in syncSchedule:", error);
       logger.error("dataSyncService: Error syncing schedule data", { error });
 
       // Set backoff for errors
