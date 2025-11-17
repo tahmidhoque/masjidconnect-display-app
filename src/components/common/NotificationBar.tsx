@@ -233,15 +233,31 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       });
     };
 
-    const handleForceUpdate = () => {
-      addNotification({
-        type: "info",
-        title: "Checking for Updates",
-        message: "Downloading update if available...",
-        icon: <SystemUpdateIcon />,
-        progress: 0,
-        autoHide: 5000,
-      });
+    const handleForceUpdate = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const action = detail?.action || "checking";
+      const version = detail?.version;
+
+      if (action === "installing") {
+        addNotification({
+          type: "success",
+          title: "Installing Update",
+          message: version
+            ? `Installing update ${version} now...`
+            : "Installing update now...",
+          icon: <SystemUpdateIcon />,
+          autoHide: 0, // Don't auto-hide during installation
+        });
+      } else {
+        addNotification({
+          type: "info",
+          title: "Checking for Updates",
+          message: "Checking for updates and will auto-install when ready...",
+          icon: <SystemUpdateIcon />,
+          progress: 0,
+          autoHide: 5000,
+        });
+      }
     };
 
     window.addEventListener(

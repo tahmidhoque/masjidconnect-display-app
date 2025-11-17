@@ -529,7 +529,8 @@ class RemoteControlService {
 
   /**
    * Force Update Handler
-   * Checks for updates immediately and downloads if available
+   * Checks for updates immediately, downloads if available, and automatically installs
+   * If update is already downloaded, installs immediately without re-checking
    */
   private async handleForceUpdate(
     command: RemoteCommand,
@@ -561,12 +562,130 @@ class RemoteControlService {
         };
       }
 
-      // Trigger update check via IPC to main process
       try {
+        // First, check if update is already downloaded
+        const updateState = await window.electron!.ipcRenderer!.invoke(
+          "get-update-state",
+        );
+
+        logger.info("RemoteControlService: Current update state", {
+          status: updateState?.status,
+          version: updateState?.version,
+        });
+
+        // If update is already downloaded, install immediately
+        if (updateState?.status === "downloaded") {
+          logger.info(
+            "RemoteControlService: Update already downloaded, installing immediately",
+            { version: updateState.version },
+          );
+
+          // Dispatch event for UI feedback
+          window.dispatchEvent(
+            new CustomEvent("remote:force-update", {
+              detail: {
+                commandId: command.commandId,
+                action: "installing",
+                version: updateState.version,
+              },
+            }),
+          );
+
+          // Install update immediately
+          const installResult =
+            await window.electron!.updater!.installUpdate();
+
+          if (!installResult.success) {
+            return {
+              commandId: command.commandId,
+              success: false,
+              error:
+                installResult.error || "Failed to install downloaded update",
+              timestamp: new Date().toISOString(),
+            };
+          }
+
+          return {
+            commandId: command.commandId,
+            success: true,
+            message: `Installing update ${updateState.version} immediately`,
+            timestamp: new Date().toISOString(),
+          };
+        }
+
+        // Update not downloaded yet - trigger check and set up auto-install listener
+        logger.info(
+          "RemoteControlService: Update not downloaded, checking for updates",
+        );
+
+        // Set up one-time listener for update-downloaded event
+        let installListener: (() => void) | null = null;
+        let timeoutId: NodeJS.Timeout | null = null;
+
+        const cleanup = () => {
+          if (installListener) {
+            installListener();
+            installListener = null;
+          }
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+        };
+
+        // Set up listener to auto-install when download completes
+        installListener = window.electron!.updater!.onUpdateDownloaded(
+          async (info: { version: string }) => {
+            logger.info(
+              "RemoteControlService: Update downloaded, auto-installing",
+              { version: info.version },
+            );
+
+            cleanup();
+
+            // Dispatch event for UI feedback
+            window.dispatchEvent(
+              new CustomEvent("remote:force-update", {
+                detail: {
+                  commandId: command.commandId,
+                  action: "installing",
+                  version: info.version,
+                },
+              }),
+            );
+
+            // Install immediately
+            try {
+              const installResult =
+                await window.electron!.updater!.installUpdate();
+              if (!installResult.success) {
+                logger.error(
+                  "RemoteControlService: Auto-install failed",
+                  { error: installResult.error },
+                );
+              }
+            } catch (installError: any) {
+              logger.error("RemoteControlService: Error during auto-install", {
+                error: installError,
+              });
+            }
+          },
+        );
+
+        // Set timeout to clean up listener after 10 minutes (safety measure)
+        timeoutId = setTimeout(() => {
+          logger.warn(
+            "RemoteControlService: Auto-install listener timeout, cleaning up",
+          );
+          cleanup();
+        }, 10 * 60 * 1000);
+
+        // Trigger update check
         const result =
           await window.electron!.ipcRenderer!.invoke("check-for-updates");
 
         if (!result.success) {
+          cleanup();
           return {
             commandId: command.commandId,
             success: false,
@@ -575,18 +694,14 @@ class RemoteControlService {
           };
         }
 
-        // Update check started successfully
-        // Actual update progress will be reported via heartbeat
-        logger.info(
-          "RemoteControlService: Update check initiated successfully",
-          { commandId: command.commandId },
-        );
-
         // Dispatch custom event for UI to show update notification
         try {
           window.dispatchEvent(
             new CustomEvent("remote:force-update", {
-              detail: { commandId: command.commandId },
+              detail: {
+                commandId: command.commandId,
+                action: "checking",
+              },
             }),
           );
         } catch (eventError) {
@@ -600,15 +715,15 @@ class RemoteControlService {
           commandId: command.commandId,
           success: true,
           message:
-            "Update check initiated. Progress will be reported via heartbeat.",
+            "Update check initiated. Will auto-install when download completes.",
           timestamp: new Date().toISOString(),
         };
       } catch (ipcError: any) {
-        logger.error("RemoteControlService: IPC error checking for updates", {
+        logger.error("RemoteControlService: IPC error in force update", {
           error: ipcError,
         });
         throw new Error(
-          `Update check failed: ${ipcError.message || "Unknown error"}`,
+          `Force update failed: ${ipcError.message || "Unknown error"}`,
         );
       }
     } catch (error: any) {
