@@ -38,6 +38,8 @@ class DataSyncService {
   private isInitialized: boolean = false;
   private lastHeartbeatTime: number = 0;
   private readonly MIN_HEARTBEAT_INTERVAL: number = 30000; // 30 seconds minimum between heartbeats
+  // Track previous authentication state to detect auth restoration
+  private lastAuthState: boolean = false;
 
   // Track backoff status for APIs
   private backoffStatus: Record<
@@ -81,6 +83,8 @@ class DataSyncService {
     } else {
       this.MIN_SYNC_INTERVAL = baseIntervals;
     }
+    // Initialize lastAuthState
+    this.lastAuthState = masjidDisplayClient.isAuthenticated();
   }
 
   // Helper method to check if a sync should be throttled
@@ -762,13 +766,30 @@ class DataSyncService {
   }
 
   private async sendHeartbeat(): Promise<void> {
-    if (!navigator.onLine || !masjidDisplayClient.isAuthenticated()) {
-      logger.debug("Skipping heartbeat - offline or not authenticated");
+    // Only skip if offline - allow heartbeat attempts even when not authenticated to enable recovery
+    if (!navigator.onLine) {
+      logger.debug("Skipping heartbeat - offline");
       return;
     }
 
     // Record time for tracking
     const now = Date.now();
+    
+    // Check current authentication state
+    const currentAuthState = masjidDisplayClient.isAuthenticated();
+    
+    // Detect auth restoration: transition from false to true
+    if (!this.lastAuthState && currentAuthState) {
+      logger.info("Authentication restored - clearing backoff and triggering immediate heartbeat retry");
+      // Clear backoff to allow immediate retry
+      this.backoffStatus.heartbeat.inBackoff = false;
+      this.backoffStatus.heartbeat.nextTry = 0;
+      // Reset lastHeartbeatTime to bypass MIN_HEARTBEAT_INTERVAL check
+      this.lastHeartbeatTime = 0;
+    }
+    
+    // Update lastAuthState
+    this.lastAuthState = currentAuthState;
 
     // Apply throttling for heartbeat - should check BEFORE updating lastSyncAttempts
     const lastAttempt = this.lastSyncAttempts.heartbeat || 0;
@@ -1067,26 +1088,59 @@ class DataSyncService {
           }
         }
       } else {
-        // Implement backoff if heartbeat fails
+        // Check if error is auth-related
+        const errorMessage = response.error || "";
+        const isAuthError = 
+          errorMessage.toLowerCase().includes("not authenticated") ||
+          errorMessage.toLowerCase().includes("authentication") ||
+          errorMessage.toLowerCase().includes("unauthorized") ||
+          errorMessage.toLowerCase().includes("forbidden");
+        
+        if (isAuthError) {
+          // For auth errors, don't enter backoff - we want to retry when auth is restored
+          // The auth restoration detection will handle immediate retry
+          logger.warn("Heartbeat failed due to authentication error - will retry when auth is restored", {
+            error: response.error,
+          });
+        } else {
+          // For network/server errors, use normal backoff logic
+          this.backoffStatus.heartbeat.inBackoff = true;
+          this.backoffStatus.heartbeat.nextTry = now + 60 * 1000; // Wait 1 minute before next try
+          logger.warn("Heartbeat failed (non-auth error), entering backoff mode", {
+            error: response.error,
+            backoffUntil: new Date(
+              this.backoffStatus.heartbeat.nextTry,
+            ).toISOString(),
+          });
+        }
+      }
+    } catch (error: any) {
+      // Check if error is auth-related
+      const errorMessage = error?.message || error?.toString() || "";
+      const isAuthError = 
+        errorMessage.toLowerCase().includes("not authenticated") ||
+        errorMessage.toLowerCase().includes("authentication") ||
+        errorMessage.toLowerCase().includes("unauthorized") ||
+        errorMessage.toLowerCase().includes("forbidden") ||
+        error?.response?.status === 401 ||
+        error?.response?.status === 403;
+      
+      if (isAuthError) {
+        // For auth errors, don't enter backoff - we want to retry when auth is restored
+        logger.error("Error sending heartbeat (auth error) - will retry when auth is restored", {
+          error: errorMessage,
+        });
+      } else {
+        // For network/server errors, use normal backoff logic
         this.backoffStatus.heartbeat.inBackoff = true;
         this.backoffStatus.heartbeat.nextTry = now + 60 * 1000; // Wait 1 minute before next try
-        logger.warn("Heartbeat failed, entering backoff mode", {
-          error: response.error,
+        logger.error("Error sending heartbeat (non-auth error), entering backoff mode", {
+          error: errorMessage,
           backoffUntil: new Date(
             this.backoffStatus.heartbeat.nextTry,
           ).toISOString(),
         });
       }
-    } catch (error) {
-      // Implement backoff on error
-      this.backoffStatus.heartbeat.inBackoff = true;
-      this.backoffStatus.heartbeat.nextTry = now + 60 * 1000; // Wait 1 minute before next try
-      logger.error("Error sending heartbeat, entering backoff mode", {
-        error,
-        backoffUntil: new Date(
-          this.backoffStatus.heartbeat.nextTry,
-        ).toISOString(),
-      });
     }
   }
 

@@ -342,6 +342,7 @@ class NetworkStatusService {
 
   /**
    * Test API connectivity
+   * Returns true if API is reachable (even if auth fails), false only for network/server issues
    */
   private async testAPIConnectivity(): Promise<boolean> {
     try {
@@ -354,8 +355,57 @@ class NetworkStatusService {
         },
       });
 
-      return response.success;
-    } catch {
+      // If heartbeat succeeds, API is definitely reachable
+      if (response.success) {
+        return true;
+      }
+
+      // If heartbeat fails, check if it's an auth error or network error
+      const errorMessage = response.error || "";
+      const isAuthError = 
+        errorMessage.toLowerCase().includes("not authenticated") ||
+        errorMessage.toLowerCase().includes("authentication") ||
+        errorMessage.toLowerCase().includes("unauthorized") ||
+        errorMessage.toLowerCase().includes("forbidden");
+
+      // If it's an auth error, the API is reachable (server responded, just not authenticated)
+      if (isAuthError) {
+        return true;
+      }
+
+      // For other errors (network, timeout, server down), API is unreachable
+      return false;
+    } catch (error: any) {
+      // Check if error is auth-related
+      const errorMessage = error?.message || error?.toString() || "";
+      const isAuthError = 
+        errorMessage.toLowerCase().includes("not authenticated") ||
+        errorMessage.toLowerCase().includes("authentication") ||
+        errorMessage.toLowerCase().includes("unauthorized") ||
+        errorMessage.toLowerCase().includes("forbidden") ||
+        error?.response?.status === 401 ||
+        error?.response?.status === 403;
+
+      // If it's an auth error, the API is reachable (server responded, just not authenticated)
+      if (isAuthError) {
+        return true;
+      }
+
+      // For network errors (timeout, connection refused, DNS error, etc.), API is unreachable
+      const isNetworkError = 
+        errorMessage.toLowerCase().includes("timeout") ||
+        errorMessage.toLowerCase().includes("network") ||
+        errorMessage.toLowerCase().includes("connection") ||
+        errorMessage.toLowerCase().includes("dns") ||
+        errorMessage.toLowerCase().includes("failed to fetch") ||
+        errorMessage.toLowerCase().includes("networkerror");
+
+      // If it's a network error, API is unreachable
+      if (isNetworkError) {
+        return false;
+      }
+
+      // For unknown errors, assume unreachable to be safe
       return false;
     }
   }

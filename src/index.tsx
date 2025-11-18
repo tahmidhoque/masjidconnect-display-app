@@ -10,6 +10,7 @@ import reportWebVitals from "./reportWebVitals";
 import { store, persistor } from "./store";
 import { optimizeAppPerformance } from "./utils/performanceUtils";
 import LoadingScreen from "./components/screens/LoadingScreen";
+import logger from "./utils/logger";
 
 // Import performance CSS
 import "./styles/minimal-hardware-acceleration.css";
@@ -26,15 +27,97 @@ const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
 );
 
+// CRITICAL FIX: Error boundary component for PersistGate failures
+const PersistErrorFallback: React.FC<{ error: Error; resetError: () => void }> = ({
+  error,
+  resetError,
+}) => {
+  React.useEffect(() => {
+    logger.error("[PersistGate] Redux persist failed to rehydrate", {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    // Attempt to recover by purging corrupted state
+    const attemptRecovery = async () => {
+      try {
+        logger.warn("[PersistGate] Attempting to purge corrupted state and reload");
+        await persistor.purge();
+        logger.info("[PersistGate] Corrupted state purged, reloading app");
+        window.location.reload();
+      } catch (recoveryError) {
+        logger.error("[PersistGate] Recovery failed", { error: recoveryError });
+        // If recovery fails, still try to continue
+        resetError();
+      }
+    };
+
+    // Auto-recover after a short delay
+    const recoveryTimer = setTimeout(attemptRecovery, 2000);
+    return () => clearTimeout(recoveryTimer);
+  }, [error, resetError]);
+
+  return (
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #0A2647 0%, #144272 50%, #2A9D8F 100%)",
+        color: "white",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      <div style={{ textAlign: "center", padding: "2rem" }}>
+        <h1>Loading...</h1>
+        <p>Recovering from storage error...</p>
+      </div>
+    </div>
+  );
+};
+
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
+      <PersistGate
+        loading={null}
+        persistor={persistor}
+        onBeforeLift={() => {
+          logger.info("[PersistGate] Redux state rehydrated successfully");
+        }}
+      >
         <App />
       </PersistGate>
     </Provider>
   </React.StrictMode>,
 );
+
+// CRITICAL FIX: Global error handler for persist errors
+window.addEventListener("error", (event) => {
+  if (event.error?.message?.includes("persist") || event.error?.message?.includes("localStorage")) {
+    logger.error("[GlobalError] Persist-related error detected", {
+      error: event.error?.message,
+      stack: event.error?.stack,
+    });
+  }
+});
+
+// CRITICAL FIX: Handle unhandled promise rejections from persist
+window.addEventListener("unhandledrejection", (event) => {
+  if (
+    event.reason?.message?.includes("persist") ||
+    event.reason?.message?.includes("localStorage")
+  ) {
+    logger.error("[GlobalError] Persist-related promise rejection", {
+      error: event.reason?.message,
+      stack: event.reason?.stack,
+    });
+    // Prevent default browser error handling
+    event.preventDefault();
+  }
+});
 
 // Check if we are NOT running in Electron before registering the service worker
 // Service workers don't work well with file:// protocol

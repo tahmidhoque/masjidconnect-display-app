@@ -45,6 +45,7 @@ export default function useInitializationFlow() {
   const stageTransitionTimer = useRef<NodeJS.Timeout | null>(null);
   const contentFetchTimer = useRef<NodeJS.Timeout | null>(null);
   const pairingPollTimer = useRef<NodeJS.Timeout | null>(null);
+  const initializationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Debounced stage transition to prevent rapid changes
   const setStageDebounced = useCallback(
@@ -250,6 +251,35 @@ export default function useInitializationFlow() {
     initializationStarted.current = true;
     logger.info("[InitFlow] === Starting App Initialization ===");
 
+    // CRITICAL FIX: Set initialization timeout (max 15 seconds)
+    const INITIALIZATION_TIMEOUT = 15000;
+    initializationTimeout.current = setTimeout(() => {
+      logger.error(
+        "[InitFlow] 🚨 INITIALIZATION TIMEOUT - Forcing recovery after 15 seconds",
+      );
+
+      // Force initialization to complete
+      dispatch(setInitializing(false));
+
+      // If not authenticated, force pairing mode
+      if (!isAuthenticated) {
+        logger.warn("[InitFlow] Not authenticated after timeout, forcing pairing");
+        startPairingProcess();
+      } else {
+        // If authenticated but no content, try to fetch content
+        if (!hasMinimumData()) {
+          logger.warn(
+            "[InitFlow] Authenticated but no content after timeout, attempting content fetch",
+          );
+          fetchContent();
+        } else {
+          logger.info(
+            "[InitFlow] Initialization timeout but app appears ready",
+          );
+        }
+      }
+    }, INITIALIZATION_TIMEOUT);
+
     const initializeApp = async () => {
       // Stage 1: Check credentials
       setStageDebounced("checking", "Checking credentials...");
@@ -272,6 +302,12 @@ export default function useInitializationFlow() {
 
         const action: any = await dispatch(initializeFromStorage());
 
+        // CRITICAL FIX: Clear timeout on successful initialization
+        if (initializationTimeout.current) {
+          clearTimeout(initializationTimeout.current);
+          initializationTimeout.current = null;
+        }
+
         if (action.payload?.credentials) {
           logger.info("[InitFlow] Authentication successful from storage");
           setStageDebounced("welcome", "Welcome back!", 500);
@@ -286,6 +322,38 @@ export default function useInitializationFlow() {
         }
       } catch (error) {
         logger.error("[InitFlow] Initialization error:", { error });
+
+        // CRITICAL FIX: Clear timeout on error and attempt recovery
+        if (initializationTimeout.current) {
+          clearTimeout(initializationTimeout.current);
+          initializationTimeout.current = null;
+        }
+
+        // Attempt to recover by clearing potentially corrupted state
+        try {
+          logger.warn(
+            "[InitFlow] Attempting recovery by clearing potentially corrupted state",
+          );
+          // Clear only non-critical localStorage items
+          const criticalKeys = [
+            "masjid_api_key",
+            "masjid_screen_id",
+            "apiKey",
+            "screenId",
+            "masjidconnect_credentials",
+            "masjidconnect-root",
+          ];
+          const allKeys = Object.keys(localStorage);
+          allKeys.forEach((key) => {
+            if (!criticalKeys.includes(key)) {
+              localStorage.removeItem(key);
+            }
+          });
+          logger.info("[InitFlow] Cleared non-critical localStorage items");
+        } catch (recoveryError) {
+          logger.error("[InitFlow] Recovery attempt failed", { error: recoveryError });
+        }
+
         startPairingProcess();
       }
     };
@@ -297,6 +365,8 @@ export default function useInitializationFlow() {
     startPairingProcess,
     checkCredentialsPersistence,
     setStageDebounced,
+    isAuthenticated,
+    hasMinimumData,
   ]);
 
   // Handle pairing code availability
@@ -351,6 +421,9 @@ export default function useInitializationFlow() {
       }
       if (pairingPollTimer.current) {
         clearTimeout(pairingPollTimer.current);
+      }
+      if (initializationTimeout.current) {
+        clearTimeout(initializationTimeout.current);
       }
 
       // Stop polling

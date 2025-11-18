@@ -23,8 +23,10 @@ import "./utils/clearHijriCache";
 import useKioskMode from "./hooks/useKioskMode";
 import useInitializationFlow from "./hooks/useInitializationFlow";
 import useFactoryReset from "./hooks/useFactoryReset";
-import useLoadingStateManager from "./hooks/useLoadingStateManager";
-import { setOffline } from "./store/slices/uiSlice";
+import useLoadingStateManager, {
+  type AppPhase,
+} from "./hooks/useLoadingStateManager";
+import { setOffline, setInitializing } from "./store/slices/uiSlice";
 import offlineStorage from "./services/offlineStorageService";
 import {
   ComponentPreloader,
@@ -182,29 +184,45 @@ const AppRoutes: React.FC = () => {
     logger.info("[App] Loading screen transition completed");
   }, []);
 
+  // CRITICAL FIX: Validate currentPhase to prevent undefined/invalid states
+  const validPhases: AppPhase[] = [
+    "initializing",
+    "checking",
+    "pairing",
+    "loading-content",
+    "preparing",
+    "ready",
+    "displaying",
+  ];
+  const safePhase: AppPhase = validPhases.includes(currentPhase)
+    ? currentPhase
+    : "initializing";
+
   logger.info("[App] Current app state:", {
-    currentPhase,
+    currentPhase: safePhase,
+    originalPhase: currentPhase,
     shouldShowLoadingScreen,
     shouldShowDisplay,
     isTransitioning,
     progress,
   });
 
-  // Always show loading screen for these phases to prevent gaps
+  // CRITICAL FIX: Always show loading screen for these phases to prevent gaps
   const shouldForceLoadingScreen =
-    currentPhase === "initializing" ||
-    currentPhase === "checking" ||
-    currentPhase === "loading-content" ||
-    currentPhase === "preparing" ||
-    currentPhase === "ready";
+    safePhase === "initializing" ||
+    safePhase === "checking" ||
+    safePhase === "loading-content" ||
+    safePhase === "preparing" ||
+    safePhase === "ready";
 
+  // CRITICAL FIX: Ensure we always render something - never return null
   // Show enhanced loading screen when needed
   if (shouldShowLoadingScreen || shouldForceLoadingScreen) {
     return (
       <EnhancedLoadingScreen
-        currentPhase={currentPhase}
+        currentPhase={safePhase}
         progress={progress}
-        statusMessage={statusMessage}
+        statusMessage={statusMessage || "Loading..."}
         isTransitioning={isTransitioning}
         onTransitionComplete={handleLoadingComplete}
       />
@@ -212,7 +230,7 @@ const AppRoutes: React.FC = () => {
   }
 
   // Show appropriate screen based on phase - be more specific about when to show each
-  if (currentPhase === "pairing") {
+  if (safePhase === "pairing") {
     return (
       <Suspense
         fallback={
@@ -229,7 +247,7 @@ const AppRoutes: React.FC = () => {
     );
   }
 
-  if (currentPhase === "displaying" && shouldShowDisplay) {
+  if (safePhase === "displaying" && shouldShowDisplay) {
     return (
       <Suspense
         fallback={
@@ -246,14 +264,22 @@ const AppRoutes: React.FC = () => {
     );
   }
 
-  // Fallback to loading screen instead of error screen to prevent white flash
+  // CRITICAL FIX: Enhanced fallback with logging - ensure something always renders
   logger.warn(
-    `[App] Unexpected state, showing loading screen as fallback: ${currentPhase}`,
+    `[App] ⚠️ Unexpected state detected, showing loading screen as fallback`,
+    {
+      currentPhase: safePhase,
+      originalPhase: currentPhase,
+      shouldShowLoadingScreen,
+      shouldShowDisplay,
+      isTransitioning,
+      progress,
+    },
   );
   return (
     <EnhancedLoadingScreen
-      currentPhase={currentPhase}
-      progress={progress}
+      currentPhase={safePhase}
+      progress={progress || 0}
       statusMessage={statusMessage || "Loading..."}
       isTransitioning={isTransitioning}
       onTransitionComplete={handleLoadingComplete}
@@ -362,6 +388,75 @@ const App: React.FC = () => {
       if (window.gc) {
         window.gc(); // Force garbage collection if available
       }
+    };
+  }, []);
+
+  // CRITICAL FIX: Startup health check to detect and recover from stuck states
+  useEffect(() => {
+    const HEALTH_CHECK_DELAY = 3000; // 3 seconds
+    const STUCK_PHASE_TIMEOUT = 15000; // 15 seconds max for initialization
+
+    const healthCheckTimer = setTimeout(() => {
+      // Import store dynamically to avoid circular dependencies
+      import("./store").then(({ store }) => {
+        const state = store.getState();
+        const isInitializing = state.ui?.isInitializing ?? false;
+        const initializationStage = state.ui?.initializationStage ?? "unknown";
+
+        logger.info("[App] Startup health check", {
+          isInitializing,
+          initializationStage,
+          timestamp: Date.now(),
+        });
+
+        // If still initializing after 3 seconds, log diagnostic info
+        if (isInitializing && initializationStage === "checking") {
+          logger.warn(
+            "[App] ⚠️ Still in checking phase after 3 seconds - may be stuck",
+            {
+              isInitializing,
+              initializationStage,
+              authState: {
+                isAuthenticated: state.auth?.isAuthenticated ?? false,
+                isPairing: state.auth?.isPairing ?? false,
+                hasPairingCode: !!state.auth?.pairingCode,
+              },
+              contentState: {
+                isLoading: state.content?.isLoading ?? false,
+                hasScreenContent: !!state.content?.screenContent,
+                hasPrayerTimes: !!state.content?.prayerTimes,
+              },
+            },
+          );
+        }
+      });
+    }, HEALTH_CHECK_DELAY);
+
+    // Set up a failsafe timeout to force recovery if stuck
+    const failsafeTimer = setTimeout(() => {
+      import("./store").then(({ store }) => {
+        const state = store.getState();
+        const isInitializing = state.ui?.isInitializing ?? false;
+
+        if (isInitializing) {
+          logger.error(
+            "[App] 🚨 FAILSAFE: App stuck in initialization after 15 seconds - forcing recovery",
+            {
+              isInitializing,
+              initializationStage: state.ui?.initializationStage ?? "unknown",
+            },
+          );
+
+          // Force initialization to complete by dispatching actions
+          // This will trigger the initialization flow to proceed
+          store.dispatch(setInitializing(false));
+        }
+      });
+    }, STUCK_PHASE_TIMEOUT);
+
+    return () => {
+      clearTimeout(healthCheckTimer);
+      clearTimeout(failsafeTimer);
     };
   }, []);
 
