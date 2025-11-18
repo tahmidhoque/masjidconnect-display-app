@@ -168,7 +168,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       addNotification({
         type: "info",
         title: "Reloading Content",
-        message: "Refreshing content...",
+        message: "Refreshing...",
         icon: <CachedIcon />,
         autoHide: 3000,
       });
@@ -178,7 +178,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       addNotification({
         type: "success",
         title: "Settings Updated",
-        message: "Settings updated",
+        message: "Updated",
         icon: <SettingsIcon />,
         autoHide: 3000,
       });
@@ -188,7 +188,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       addNotification({
         type: "success",
         title: "Screenshot Captured",
-        message: "Screenshot sent",
+        message: "Sent",
         icon: <CameraAltIcon />,
         autoHide: 3000,
       });
@@ -198,7 +198,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       addNotification({
         type: "warning",
         title: "Command Queued",
-        message: "Command queued",
+        message: "Queued",
         icon: <WarningIcon />,
         autoHide: 3000,
       });
@@ -225,9 +225,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       addNotification({
         type: success ? "success" : "error",
         title: success ? "Command Completed" : "Command Failed",
-        message: success
-          ? "Command executed successfully"
-          : "Command failed to execute",
+        message: success ? "Completed" : "Failed",
         icon: <CheckCircleIcon />,
         autoHide: 3000,
       });
@@ -242,9 +240,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
         addNotification({
           type: "success",
           title: "Installing Update",
-          message: version
-            ? `Installing update ${version} now...`
-            : "Installing update now...",
+          message: version ? `Installing ${version}...` : "Installing...",
           icon: <SystemUpdateIcon />,
           autoHide: 0, // Don't auto-hide during installation
         });
@@ -252,7 +248,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
         addNotification({
           type: "info",
           title: "Checking for Updates",
-          message: "Checking for updates and will auto-install when ready...",
+          message: "Checking for updates...",
           icon: <SystemUpdateIcon />,
           progress: 0,
           autoHide: 5000,
@@ -326,7 +322,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
         addNotification({
           type: "info",
           title: "Update Available",
-          message: `Update ${updateState.latestVersion} available`,
+          message: `Update ${updateState.latestVersion}`,
           icon: <SystemUpdateIcon />,
           autoHide: 5000,
           key: "update-available",
@@ -341,7 +337,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       addNotification({
         type: "info",
         title: "Downloading Update",
-        message: `Downloading ${updateState.downloadProgress.toFixed(0)}%`,
+        message: `${updateState.downloadProgress.toFixed(0)}%`,
         icon: <DownloadIcon />,
         autoHide: 0,
         key: "update-downloading",
@@ -352,7 +348,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
         addNotification({
           type: "success",
           title: "Update Ready",
-          message: `Update ${updateState.latestVersion} ready`,
+          message: `Ready: ${updateState.latestVersion}`,
           icon: <SystemUpdateIcon />,
           autoHide: 5000,
           key: "update-ready",
@@ -392,8 +388,8 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
             countdownType === "restart" ? "Restarting App" : "Factory Reset",
           message:
             countdownType === "restart"
-              ? `Restarting in ${countdownSeconds}s`
-              : `Resetting in ${countdownSeconds}s`,
+              ? `${countdownSeconds}s`
+              : `${countdownSeconds}s`,
           icon:
             countdownType === "restart" ? (
               <RestartAltIcon />

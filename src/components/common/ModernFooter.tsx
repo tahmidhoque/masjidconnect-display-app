@@ -1,7 +1,10 @@
 import React from "react";
 import { Box, Typography, useTheme, Fade } from "@mui/material";
+import WifiOffIcon from "@mui/icons-material/WifiOff";
+import SignalWifiStatusbarConnectedNoInternet4Icon from "@mui/icons-material/SignalWifiStatusbarConnectedNoInternet4";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import { useNotifications } from "../../contexts/NotificationContext";
+import { useConnectionStatus } from "../../hooks/useConnectionStatus";
 
 interface ModernFooterProps {
   logoSrc?: string;
@@ -21,6 +24,7 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
   const theme = useTheme();
   const { fontSizes, getSizeRem } = useResponsiveFontSize();
   const { getCurrentNotification, removeNotification } = useNotifications();
+  const connectionStatus = useConnectionStatus();
 
   const isPortrait = orientation === "portrait";
   const currentNotification = getCurrentNotification();
@@ -69,6 +73,80 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
         },
       }}
     >
+      {/* Connection status indicator - left side */}
+      {!connectionStatus.hasConnection && (
+        <Fade in={true} timeout={300}>
+          <Box
+            sx={{
+              position: "absolute",
+              left: getSizeRem(0.75),
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: getSizeRem(0.4),
+              px: getSizeRem(0.5),
+              py: getSizeRem(0.25),
+              background: `linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)`,
+              borderRadius: "12px",
+              border: `1px solid rgba(255,255,255,0.08)`,
+              maxWidth: isPortrait ? "45%" : "180px",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: "2px",
+                background:
+                  connectionStatus.severity === "error"
+                    ? theme.palette.error.main
+                    : theme.palette.warning.main,
+                borderRadius: "12px 0 0 12px",
+                opacity: 0.7,
+              },
+            }}
+          >
+            {/* Icon */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                color:
+                  connectionStatus.severity === "error"
+                    ? theme.palette.error.main
+                    : theme.palette.warning.main,
+                "& svg": {
+                  fontSize: "0.75rem",
+                },
+              }}
+            >
+              {connectionStatus.status === "no-internet" ? (
+                <WifiOffIcon />
+              ) : (
+                <SignalWifiStatusbarConnectedNoInternet4Icon />
+              )}
+            </Box>
+
+            {/* Text */}
+            <Typography
+              sx={{
+                fontSize: fontSizes.caption,
+                color: "rgba(255,255,255,0.85)",
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                lineHeight: 1.1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {connectionStatus.message}
+            </Typography>
+          </Box>
+        </Fade>
+      )}
+
       {/* Powered by section - always centered */}
       <Box
         sx={{
@@ -139,13 +217,13 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
               transform: "translateY(-50%)",
               display: "flex",
               alignItems: "center",
-              gap: getSizeRem(0.5),
-              px: getSizeRem(0.75),
-              py: getSizeRem(0.3),
+              gap: getSizeRem(0.4),
+              px: getSizeRem(0.6),
+              py: getSizeRem(0.25),
               background: `linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)`,
               borderRadius: "12px",
               border: `1px solid rgba(255,255,255,0.08)`,
-              maxWidth: isPortrait ? "50%" : "240px",
+              maxWidth: isPortrait ? "45%" : "220px",
               "&::before": {
                 content: '""',
                 position: "absolute",
@@ -167,7 +245,7 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
                   alignItems: "center",
                   color: getNotificationColor(currentNotification.type),
                   "& svg": {
-                    fontSize: "0.875rem",
+                    fontSize: "0.75rem",
                   },
                 }}
               >
@@ -182,7 +260,7 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
                 color: "rgba(255,255,255,0.85)",
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 500,
-                lineHeight: 1.2,
+                lineHeight: 1.1,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
