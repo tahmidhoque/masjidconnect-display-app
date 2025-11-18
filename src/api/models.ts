@@ -133,12 +133,14 @@ export interface RemoteCommand {
 export interface HeartbeatResponse {
   success: boolean;
   hasPendingEvents?: boolean; // Backward compatibility: indicates queued SSE events are available on backend
+  hasPendingEmergencyAlerts?: boolean; // Indicates pending emergency alerts (EMERGENCY_ALERT, EMERGENCY_UPDATE, EMERGENCY_CANCEL) queued on backend
   pendingCommands?: RemoteCommand[]; // New: actual pending commands to process
   nextHeartbeatInterval?: number; // New: server-controlled heartbeat interval in milliseconds
   data?: {
     acknowledged?: boolean;
     serverTime?: string;
     hasPendingEvents?: boolean;
+    hasPendingEmergencyAlerts?: boolean;
     pendingCommands?: RemoteCommand[];
     nextHeartbeatInterval?: number;
     [key: string]: any; // Allow other data fields

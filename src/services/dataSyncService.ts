@@ -6,7 +6,7 @@ import logger, { getLastError } from "../utils/logger";
 import { isLowPowerDevice } from "../utils/performanceUtils";
 import unifiedSSEService from "./unifiedSSEService";
 import remoteControlService from "./remoteControlService";
-import type { RemoteCommand } from "../api/models";
+import type { RemoteCommand, HeartbeatResponse } from "../api/models";
 
 class DataSyncService {
   private syncIntervals: Record<string, number | null> = {
@@ -861,7 +861,7 @@ class DataSyncService {
 
         // Extract pending commands and heartbeat interval from response
         // ApiResponse wraps the data in response.data
-        const heartbeatData = response.data;
+        const heartbeatData = response.data as HeartbeatResponse | null | undefined;
         
         // Debug: Log the full response structure
         logger.debug("Heartbeat response structure", {
@@ -907,10 +907,16 @@ class DataSyncService {
           heartbeatData?.hasPendingEvents === true || 
           heartbeatData?.data?.hasPendingEvents === true;
 
+        // Extract hasPendingEmergencyAlerts flag (indicates pending emergency alerts via SSE)
+        const hasPendingEmergencyAlerts = 
+          heartbeatData?.hasPendingEmergencyAlerts === true || 
+          heartbeatData?.data?.hasPendingEmergencyAlerts === true;
+
         logger.info("Processing heartbeat response", {
           pendingCommandsCount: pendingCommands.length,
           nextHeartbeatInterval,
           hasPendingEvents,
+          hasPendingEmergencyAlerts,
           pendingCommands: pendingCommands.length > 0 ? pendingCommands.map(c => ({ id: c.commandId, type: c.type, queueId: c._queueId })) : [],
           extractionPath: heartbeatData?.pendingCommands ? 'direct' : heartbeatData?.data?.pendingCommands ? 'nested' : 'none',
         });
@@ -1014,15 +1020,48 @@ class DataSyncService {
           this.adjustHeartbeatInterval(POLLING_INTERVALS.HEARTBEAT);
         }
 
-        // Backward compatibility: If hasPendingEvents is true but no commands,
-        // it might be for emergency alerts - trigger SSE reconnection
-        if (hasPendingEvents && pendingCommands.length === 0) {
+        // CRITICAL: If hasPendingEmergencyAlerts is true, check SSE connection health
+        // and force reconnect if connection is stale or not healthy
+        if (hasPendingEmergencyAlerts) {
+          const isHealthy = unifiedSSEService.isConnectionHealthy();
           logger.info(
-            "Heartbeat indicates pending events (likely emergency alerts) - triggering SSE reconnection",
+            "Heartbeat indicates pending emergency alerts - checking SSE connection health",
+            {
+              hasPendingEmergencyAlerts,
+              isHealthy,
+            },
+          );
+
+          if (!isHealthy) {
+            logger.warn(
+              "SSE connection is not healthy - forcing reconnection for emergency alerts",
+              {
+                hasPendingEmergencyAlerts,
+                isHealthy,
+              },
+            );
+            try {
+              unifiedSSEService.reconnect();
+              logger.info("SSE reconnection triggered for emergency alerts");
+            } catch (error) {
+              logger.error("Error triggering SSE reconnection", { error });
+            }
+          } else {
+            logger.debug(
+              "SSE connection is healthy - no reconnection needed for emergency alerts",
+            );
+          }
+        }
+
+        // Backward compatibility: If hasPendingEvents is true but no commands and no emergency alerts flag,
+        // it might be for other SSE events - trigger SSE reconnection
+        if (hasPendingEvents && pendingCommands.length === 0 && !hasPendingEmergencyAlerts) {
+          logger.info(
+            "Heartbeat indicates pending events (non-emergency) - triggering SSE reconnection",
           );
           try {
             unifiedSSEService.reconnect();
-            logger.info("SSE reconnection triggered for emergency alerts");
+            logger.info("SSE reconnection triggered for pending events");
           } catch (error) {
             logger.error("Error triggering SSE reconnection", { error });
           }

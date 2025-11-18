@@ -36,6 +36,8 @@ class UnifiedSSEService {
   private isInitializing = false;
   private consecutiveFailures = 0; // Track consecutive failures for fallback logic
   private readonly MAX_CONSECUTIVE_FAILURES = 5; // Fallback to polling after 5 consecutive failures
+  private lastEventReceived: number | null = null; // Track last SSE event received timestamp (any event indicates connection is alive)
+  private readonly HEARTBEAT_TIMEOUT_MS = 30000; // 30 seconds - connection considered stale if no events received
 
   // Event handlers registered by different services
   private eventHandlers: Map<string, Set<EventHandler>> = new Map();
@@ -360,6 +362,10 @@ class UnifiedSSEService {
     // IMPORTANT: This only fires for events that don't have a specific event type
     // If the server sends "event: RESTART_APP", EventSource will fire a 'RESTART_APP' event, not 'message'
     eventSource.addEventListener("message", (event: MessageEvent) => {
+      // Track that we received an event (indicates connection is alive)
+      // Note: SSE heartbeat comments aren't exposed by EventSource, but any event indicates connection health
+      this.lastEventReceived = Date.now();
+
       logger.debug("UnifiedSSEService: Generic message event received (no specific type)", {
         type: event.type,
         data: event.data,
@@ -471,6 +477,9 @@ class UnifiedSSEService {
         try {
           // Create a wrapper that dispatches to our handler
           const wrapper = (event: MessageEvent) => {
+            // Track that we received an event (indicates connection is alive)
+            this.lastEventReceived = Date.now();
+            
             logger.debug(`UnifiedSSEService: Processing ${eventType} event`, {
               eventType,
               data: event.data,
@@ -542,6 +551,9 @@ class UnifiedSSEService {
         try {
           // Create a wrapper that logs and dispatches
           const wrapper = (event: MessageEvent) => {
+            // Track that we received an event (indicates connection is alive)
+            this.lastEventReceived = Date.now();
+            
             logger.debug(`UnifiedSSEService: Event received for ${eventType}`, {
               type: event.type,
               data: event.data,
@@ -601,6 +613,7 @@ class UnifiedSSEService {
   private handleConnectionOpen = (): void => {
     this.reconnectAttempts = 0;
     this.consecutiveFailures = 0; // Reset consecutive failures on successful connection
+    this.lastEventReceived = Date.now(); // Track connection open time as last event
     const readyState = this.eventSource?.readyState;
     const readyStateText =
       readyState === EventSource.OPEN
@@ -740,6 +753,41 @@ class UnifiedSSEService {
   }
 
   /**
+   * Check if SSE connection is healthy
+   * Connection is healthy if it's open AND has received events recently (<30 seconds)
+   */
+  public isConnectionHealthy(): boolean {
+    const isOpen =
+      this.eventSource !== null &&
+      this.eventSource.readyState === EventSource.OPEN;
+
+    if (!isOpen) {
+      return false;
+    }
+
+    // If we've never received an event, connection might be stale
+    if (this.lastEventReceived === null) {
+      return false;
+    }
+
+    // Check if last event was received within timeout window
+    const timeSinceLastEvent = Date.now() - this.lastEventReceived;
+    const isRecent = timeSinceLastEvent < this.HEARTBEAT_TIMEOUT_MS;
+
+    logger.debug("UnifiedSSEService: Connection health check", {
+      isOpen,
+      lastEventReceived: this.lastEventReceived
+        ? new Date(this.lastEventReceived).toISOString()
+        : null,
+      timeSinceLastEvent: `${Math.round(timeSinceLastEvent / 1000)}s`,
+      isRecent,
+      isHealthy: isOpen && isRecent,
+    });
+
+    return isOpen && isRecent;
+  }
+
+  /**
    * Get connection status
    */
   public getConnectionStatus(): ConnectionStatus {
@@ -809,6 +857,7 @@ class UnifiedSSEService {
     this.connectionStatusListeners.clear();
     this.reconnectAttempts = 0;
     this.isInitializing = false;
+    this.lastEventReceived = null;
   }
 }
 
