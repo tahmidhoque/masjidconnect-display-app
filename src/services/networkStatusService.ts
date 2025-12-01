@@ -362,7 +362,7 @@ class NetworkStatusService {
 
       // If heartbeat fails, check if it's an auth error or network error
       const errorMessage = response.error || "";
-      const isAuthError = 
+      const isAuthError =
         errorMessage.toLowerCase().includes("not authenticated") ||
         errorMessage.toLowerCase().includes("authentication") ||
         errorMessage.toLowerCase().includes("unauthorized") ||
@@ -378,7 +378,7 @@ class NetworkStatusService {
     } catch (error: any) {
       // Check if error is auth-related
       const errorMessage = error?.message || error?.toString() || "";
-      const isAuthError = 
+      const isAuthError =
         errorMessage.toLowerCase().includes("not authenticated") ||
         errorMessage.toLowerCase().includes("authentication") ||
         errorMessage.toLowerCase().includes("unauthorized") ||
@@ -392,7 +392,7 @@ class NetworkStatusService {
       }
 
       // For network errors (timeout, connection refused, DNS error, etc.), API is unreachable
-      const isNetworkError = 
+      const isNetworkError =
         errorMessage.toLowerCase().includes("timeout") ||
         errorMessage.toLowerCase().includes("network") ||
         errorMessage.toLowerCase().includes("connection") ||

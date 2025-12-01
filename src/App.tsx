@@ -26,7 +26,7 @@ import useFactoryReset from "./hooks/useFactoryReset";
 import useLoadingStateManager, {
   type AppPhase,
 } from "./hooks/useLoadingStateManager";
-import { setOffline, setInitializing } from "./store/slices/uiSlice";
+import { setOffline } from "./store/slices/uiSlice";
 import offlineStorage from "./services/offlineStorageService";
 import {
   ComponentPreloader,
@@ -391,74 +391,9 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // CRITICAL FIX: Startup health check to detect and recover from stuck states
-  useEffect(() => {
-    const HEALTH_CHECK_DELAY = 3000; // 3 seconds
-    const STUCK_PHASE_TIMEOUT = 15000; // 15 seconds max for initialization
-
-    const healthCheckTimer = setTimeout(() => {
-      // Import store dynamically to avoid circular dependencies
-      import("./store").then(({ store }) => {
-        const state = store.getState();
-        const isInitializing = state.ui?.isInitializing ?? false;
-        const initializationStage = state.ui?.initializationStage ?? "unknown";
-
-        logger.info("[App] Startup health check", {
-          isInitializing,
-          initializationStage,
-          timestamp: Date.now(),
-        });
-
-        // If still initializing after 3 seconds, log diagnostic info
-        if (isInitializing && initializationStage === "checking") {
-          logger.warn(
-            "[App] ⚠️ Still in checking phase after 3 seconds - may be stuck",
-            {
-              isInitializing,
-              initializationStage,
-              authState: {
-                isAuthenticated: state.auth?.isAuthenticated ?? false,
-                isPairing: state.auth?.isPairing ?? false,
-                hasPairingCode: !!state.auth?.pairingCode,
-              },
-              contentState: {
-                isLoading: state.content?.isLoading ?? false,
-                hasScreenContent: !!state.content?.screenContent,
-                hasPrayerTimes: !!state.content?.prayerTimes,
-              },
-            },
-          );
-        }
-      });
-    }, HEALTH_CHECK_DELAY);
-
-    // Set up a failsafe timeout to force recovery if stuck
-    const failsafeTimer = setTimeout(() => {
-      import("./store").then(({ store }) => {
-        const state = store.getState();
-        const isInitializing = state.ui?.isInitializing ?? false;
-
-        if (isInitializing) {
-          logger.error(
-            "[App] 🚨 FAILSAFE: App stuck in initialization after 15 seconds - forcing recovery",
-            {
-              isInitializing,
-              initializationStage: state.ui?.initializationStage ?? "unknown",
-            },
-          );
-
-          // Force initialization to complete by dispatching actions
-          // This will trigger the initialization flow to proceed
-          store.dispatch(setInitializing(false));
-        }
-      });
-    }, STUCK_PHASE_TIMEOUT);
-
-    return () => {
-      clearTimeout(healthCheckTimer);
-      clearTimeout(failsafeTimer);
-    };
-  }, []);
+  // NOTE: Startup health check and failsafe timeout mechanisms have been consolidated
+  // into useLoadingStateManager to avoid duplicate timeout logic and race conditions.
+  // The loading state manager now handles all failsafe recovery for stuck phases.
 
   return (
     <ThemeProvider theme={theme}>

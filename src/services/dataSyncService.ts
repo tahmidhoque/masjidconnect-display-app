@@ -16,7 +16,7 @@ class DataSyncService {
     schedule: null,
     heartbeat: null,
   };
-  
+
   // Store command acknowledgements to send in next heartbeat
   private pendingCommandAcknowledgements: Array<{
     queueId: string;
@@ -746,7 +746,7 @@ class DataSyncService {
     commands: Array<{ commandId: string; _queueId?: string }>,
   ): void {
     const now = new Date().toISOString();
-    
+
     for (const queueId of queueIds) {
       const command = commands.find((cmd) => cmd._queueId === queueId);
       if (command) {
@@ -774,20 +774,22 @@ class DataSyncService {
 
     // Record time for tracking
     const now = Date.now();
-    
+
     // Check current authentication state
     const currentAuthState = masjidDisplayClient.isAuthenticated();
-    
+
     // Detect auth restoration: transition from false to true
     if (!this.lastAuthState && currentAuthState) {
-      logger.info("Authentication restored - clearing backoff and triggering immediate heartbeat retry");
+      logger.info(
+        "Authentication restored - clearing backoff and triggering immediate heartbeat retry",
+      );
       // Clear backoff to allow immediate retry
       this.backoffStatus.heartbeat.inBackoff = false;
       this.backoffStatus.heartbeat.nextTry = 0;
       // Reset lastHeartbeatTime to bypass MIN_HEARTBEAT_INTERVAL check
       this.lastHeartbeatTime = 0;
     }
-    
+
     // Update lastAuthState
     this.lastAuthState = currentAuthState;
 
@@ -850,7 +852,9 @@ class DataSyncService {
 
       // Include command acknowledgements if any are pending
       if (this.pendingCommandAcknowledgements.length > 0) {
-        heartbeatRequest.commandAcknowledgements = [...this.pendingCommandAcknowledgements];
+        heartbeatRequest.commandAcknowledgements = [
+          ...this.pendingCommandAcknowledgements,
+        ];
         logger.info("Including command acknowledgements in heartbeat", {
           count: this.pendingCommandAcknowledgements.length,
         });
@@ -882,8 +886,11 @@ class DataSyncService {
 
         // Extract pending commands and heartbeat interval from response
         // ApiResponse wraps the data in response.data
-        const heartbeatData = response.data as HeartbeatResponse | null | undefined;
-        
+        const heartbeatData = response.data as
+          | HeartbeatResponse
+          | null
+          | undefined;
+
         // Debug: Log the full response structure
         logger.debug("Heartbeat response structure", {
           hasResponseData: !!response.data,
@@ -891,46 +898,52 @@ class DataSyncService {
           responseDataKeys: response.data ? Object.keys(response.data) : [],
           fullResponseData: JSON.stringify(response.data).substring(0, 500),
         });
-        
+
         // Try multiple paths to extract pendingCommands
         // Backend returns: { success: true, data: { pendingCommands: [...] } }
         let pendingCommands: any[] = [];
-        
+
         if (heartbeatData) {
           // First try: direct access (if backend puts it at top level of data)
           if (Array.isArray(heartbeatData.pendingCommands)) {
             pendingCommands = heartbeatData.pendingCommands;
           }
           // Second try: nested in data.data (if double-wrapped)
-          else if (heartbeatData.data && Array.isArray(heartbeatData.data.pendingCommands)) {
+          else if (
+            heartbeatData.data &&
+            Array.isArray(heartbeatData.data.pendingCommands)
+          ) {
             pendingCommands = heartbeatData.data.pendingCommands;
           }
           // Third try: check if it's a HeartbeatResponse with nested structure
-          else if (heartbeatData.data && typeof heartbeatData.data === 'object') {
+          else if (
+            heartbeatData.data &&
+            typeof heartbeatData.data === "object"
+          ) {
             const nestedData = heartbeatData.data as any;
             if (Array.isArray(nestedData.pendingCommands)) {
               pendingCommands = nestedData.pendingCommands;
             }
           }
         }
-        
+
         // Ensure it's an array
         if (!Array.isArray(pendingCommands)) {
           pendingCommands = [];
         }
-        
-        const nextHeartbeatInterval = 
-          heartbeatData?.nextHeartbeatInterval || 
+
+        const nextHeartbeatInterval =
+          heartbeatData?.nextHeartbeatInterval ||
           heartbeatData?.data?.nextHeartbeatInterval;
-        
+
         // Backward compatibility: check for hasPendingEvents flag
-        const hasPendingEvents = 
-          heartbeatData?.hasPendingEvents === true || 
+        const hasPendingEvents =
+          heartbeatData?.hasPendingEvents === true ||
           heartbeatData?.data?.hasPendingEvents === true;
 
         // Extract hasPendingEmergencyAlerts flag (indicates pending emergency alerts via SSE)
-        const hasPendingEmergencyAlerts = 
-          heartbeatData?.hasPendingEmergencyAlerts === true || 
+        const hasPendingEmergencyAlerts =
+          heartbeatData?.hasPendingEmergencyAlerts === true ||
           heartbeatData?.data?.hasPendingEmergencyAlerts === true;
 
         logger.info("Processing heartbeat response", {
@@ -938,17 +951,35 @@ class DataSyncService {
           nextHeartbeatInterval,
           hasPendingEvents,
           hasPendingEmergencyAlerts,
-          pendingCommands: pendingCommands.length > 0 ? pendingCommands.map(c => ({ id: c.commandId, type: c.type, queueId: c._queueId })) : [],
-          extractionPath: heartbeatData?.pendingCommands ? 'direct' : heartbeatData?.data?.pendingCommands ? 'nested' : 'none',
+          pendingCommands:
+            pendingCommands.length > 0
+              ? pendingCommands.map((c) => ({
+                  id: c.commandId,
+                  type: c.type,
+                  queueId: c._queueId,
+                }))
+              : [],
+          extractionPath: heartbeatData?.pendingCommands
+            ? "direct"
+            : heartbeatData?.data?.pendingCommands
+              ? "nested"
+              : "none",
         });
-        
+
         // Also log to console for immediate debugging
         if (pendingCommands.length > 0) {
-          console.log(`[DataSync] Found ${pendingCommands.length} pending command(s) to process:`, 
-            pendingCommands.map(c => ({ type: c.type, commandId: c.commandId, queueId: c._queueId }))
+          console.log(
+            `[DataSync] Found ${pendingCommands.length} pending command(s) to process:`,
+            pendingCommands.map((c) => ({
+              type: c.type,
+              commandId: c.commandId,
+              queueId: c._queueId,
+            })),
           );
         } else {
-          console.log('[DataSync] No pending commands found in heartbeat response');
+          console.log(
+            "[DataSync] No pending commands found in heartbeat response",
+          );
         }
 
         // Process pending commands from heartbeat (new approach)
@@ -957,28 +988,32 @@ class DataSyncService {
           logger.info(
             `Processing ${pendingCommands.length} pending command(s) from heartbeat`,
           );
-          
+
           // Check app start time to identify stale commands (sent before restart)
           const appStartTime = this.startTime;
-          
+
           for (const command of pendingCommands) {
             try {
               // Check if command is stale (sent before app started)
-              const commandTimestamp = command.timestamp 
-                ? new Date(command.timestamp).getTime() 
+              const commandTimestamp = command.timestamp
+                ? new Date(command.timestamp).getTime()
                 : null;
-              
-              const isStale = commandTimestamp && commandTimestamp < appStartTime;
-              
+
+              const isStale =
+                commandTimestamp && commandTimestamp < appStartTime;
+
               if (isStale) {
-                logger.warn("Skipping stale command (sent before app restart)", {
-                  commandId: command.commandId,
-                  type: command.type,
-                  queueId: command._queueId,
-                  commandTimestamp: command.timestamp,
-                  appStartTime: new Date(appStartTime).toISOString(),
-                });
-                
+                logger.warn(
+                  "Skipping stale command (sent before app restart)",
+                  {
+                    commandId: command.commandId,
+                    type: command.type,
+                    queueId: command._queueId,
+                    commandTimestamp: command.timestamp,
+                    appStartTime: new Date(appStartTime).toISOString(),
+                  },
+                );
+
                 // Mark stale commands as delivered to prevent them from reappearing
                 if (command._queueId) {
                   processedQueueIds.push(command._queueId);
@@ -989,17 +1024,17 @@ class DataSyncService {
                 }
                 continue;
               }
-              
+
               logger.info("Processing command from heartbeat", {
                 commandId: command.commandId,
                 type: command.type,
                 queueId: command._queueId,
                 commandTimestamp: command.timestamp,
               });
-              
+
               // Process command using remoteControlService
               await remoteControlService.handleCommandFromHeartbeat(command);
-              
+
               // Mark command as processed (will be acknowledged in next heartbeat)
               if (command._queueId) {
                 processedQueueIds.push(command._queueId);
@@ -1008,7 +1043,7 @@ class DataSyncService {
                   queueId: command._queueId,
                 });
               }
-              
+
               logger.info("Command processed successfully", {
                 commandId: command.commandId,
                 queueId: command._queueId,
@@ -1076,7 +1111,11 @@ class DataSyncService {
 
         // Backward compatibility: If hasPendingEvents is true but no commands and no emergency alerts flag,
         // it might be for other SSE events - trigger SSE reconnection
-        if (hasPendingEvents && pendingCommands.length === 0 && !hasPendingEmergencyAlerts) {
+        if (
+          hasPendingEvents &&
+          pendingCommands.length === 0 &&
+          !hasPendingEmergencyAlerts
+        ) {
           logger.info(
             "Heartbeat indicates pending events (non-emergency) - triggering SSE reconnection",
           );
@@ -1090,56 +1129,68 @@ class DataSyncService {
       } else {
         // Check if error is auth-related
         const errorMessage = response.error || "";
-        const isAuthError = 
+        const isAuthError =
           errorMessage.toLowerCase().includes("not authenticated") ||
           errorMessage.toLowerCase().includes("authentication") ||
           errorMessage.toLowerCase().includes("unauthorized") ||
           errorMessage.toLowerCase().includes("forbidden");
-        
+
         if (isAuthError) {
           // For auth errors, don't enter backoff - we want to retry when auth is restored
           // The auth restoration detection will handle immediate retry
-          logger.warn("Heartbeat failed due to authentication error - will retry when auth is restored", {
-            error: response.error,
-          });
+          logger.warn(
+            "Heartbeat failed due to authentication error - will retry when auth is restored",
+            {
+              error: response.error,
+            },
+          );
         } else {
           // For network/server errors, use normal backoff logic
           this.backoffStatus.heartbeat.inBackoff = true;
           this.backoffStatus.heartbeat.nextTry = now + 60 * 1000; // Wait 1 minute before next try
-          logger.warn("Heartbeat failed (non-auth error), entering backoff mode", {
-            error: response.error,
-            backoffUntil: new Date(
-              this.backoffStatus.heartbeat.nextTry,
-            ).toISOString(),
-          });
+          logger.warn(
+            "Heartbeat failed (non-auth error), entering backoff mode",
+            {
+              error: response.error,
+              backoffUntil: new Date(
+                this.backoffStatus.heartbeat.nextTry,
+              ).toISOString(),
+            },
+          );
         }
       }
     } catch (error: any) {
       // Check if error is auth-related
       const errorMessage = error?.message || error?.toString() || "";
-      const isAuthError = 
+      const isAuthError =
         errorMessage.toLowerCase().includes("not authenticated") ||
         errorMessage.toLowerCase().includes("authentication") ||
         errorMessage.toLowerCase().includes("unauthorized") ||
         errorMessage.toLowerCase().includes("forbidden") ||
         error?.response?.status === 401 ||
         error?.response?.status === 403;
-      
+
       if (isAuthError) {
         // For auth errors, don't enter backoff - we want to retry when auth is restored
-        logger.error("Error sending heartbeat (auth error) - will retry when auth is restored", {
-          error: errorMessage,
-        });
+        logger.error(
+          "Error sending heartbeat (auth error) - will retry when auth is restored",
+          {
+            error: errorMessage,
+          },
+        );
       } else {
         // For network/server errors, use normal backoff logic
         this.backoffStatus.heartbeat.inBackoff = true;
         this.backoffStatus.heartbeat.nextTry = now + 60 * 1000; // Wait 1 minute before next try
-        logger.error("Error sending heartbeat (non-auth error), entering backoff mode", {
-          error: errorMessage,
-          backoffUntil: new Date(
-            this.backoffStatus.heartbeat.nextTry,
-          ).toISOString(),
-        });
+        logger.error(
+          "Error sending heartbeat (non-auth error), entering backoff mode",
+          {
+            error: errorMessage,
+            backoffUntil: new Date(
+              this.backoffStatus.heartbeat.nextTry,
+            ).toISOString(),
+          },
+        );
       }
     }
   }

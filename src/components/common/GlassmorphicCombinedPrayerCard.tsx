@@ -337,15 +337,15 @@ const GlassmorphicCombinedPrayerCard: React.FC<
   const hasJumuahData = useMemo(() => {
     return Boolean(
       isJumuahToday &&
-        (jumuahDisplayTime ||
-          jumuahKhutbahTime ||
-          (prayerTimes &&
-            (prayerTimes.jummahKhutbah ||
-              prayerTimes.jummahJamaat ||
-              (prayerTimes.data &&
-                prayerTimes.data[0] &&
-                (prayerTimes.data[0].jummahKhutbah ||
-                  prayerTimes.data[0].jummahJamaat))))),
+      (jumuahDisplayTime ||
+        jumuahKhutbahTime ||
+        (prayerTimes &&
+          (prayerTimes.jummahKhutbah ||
+            prayerTimes.jummahJamaat ||
+            (prayerTimes.data &&
+              prayerTimes.data[0] &&
+              (prayerTimes.data[0].jummahKhutbah ||
+                prayerTimes.data[0].jummahJamaat))))),
     );
   }, [isJumuahToday, jumuahDisplayTime, jumuahKhutbahTime, prayerTimes]);
 

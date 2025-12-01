@@ -471,9 +471,10 @@ const DisplayScreen: React.FC = memo(() => {
                 willChange: isHighStrain ? "auto" : "transform",
                 backfaceVisibility: "hidden",
                 // Smooth transition during orientation changes
-                transition: isOrientationChanging && !isHighStrain
-                  ? "transform 0.3s ease-in-out"
-                  : "none",
+                transition:
+                  isOrientationChanging && !isHighStrain
+                    ? "transform 0.3s ease-in-out"
+                    : "none",
               }}
             >
               {DisplayComponent}

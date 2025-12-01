@@ -217,7 +217,9 @@ class StorageService {
       testRequest.onsuccess = (event) => {
         const target = event.target as IDBOpenDBRequest | null;
         if (!target?.result) {
-          logger.error("Database verification failed: No result from IndexedDB");
+          logger.error(
+            "Database verification failed: No result from IndexedDB",
+          );
           return;
         }
         const db = target.result;
@@ -238,7 +240,8 @@ class StorageService {
 
       testRequest.onerror = (event) => {
         const target = event.target as IDBOpenDBRequest | null;
-        const error = target?.error || testRequest.error || "Unknown database error";
+        const error =
+          target?.error || testRequest.error || "Unknown database error";
         logger.error("Error verifying database:", {
           error: error instanceof Error ? error.message : String(error),
         });
@@ -283,13 +286,11 @@ class StorageService {
       if (fallbackValue !== null) {
         logger.info(`Retrieved ${key} from fallback storage`);
         // Sync back to primary for next time
-        this.primaryStorage
-          .set(key, fallbackValue)
-          .catch((err) =>
-            logger.error(`Error syncing ${key} back to primary storage`, {
-              error: err,
-            }),
-          );
+        this.primaryStorage.set(key, fallbackValue).catch((err) =>
+          logger.error(`Error syncing ${key} back to primary storage`, {
+            error: err,
+          }),
+        );
         return fallbackValue;
       }
 

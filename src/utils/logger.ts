@@ -19,8 +19,7 @@ const MAX_LOG_HISTORY = 100;
  */
 const isProduction = (): boolean => {
   return (
-    process.env.NODE_ENV === "production" ||
-    process.env.NODE_ENV === "test"
+    process.env.NODE_ENV === "production" || process.env.NODE_ENV === "test"
   );
 };
 

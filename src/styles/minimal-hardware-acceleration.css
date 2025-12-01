@@ -42,7 +42,7 @@
   /* The inline transform from sx prop will have higher specificity than CSS classes */
   /* Only set properties that don't conflict with the rotation transform */
   will-change: transform;
-  backfaceVisibility: hidden;
+  backfacevisibility: hidden;
   /* Explicitly do not set transform here - let inline styles handle it */
 }
 

@@ -11,7 +11,7 @@ export const getApiBaseUrl = (): string => {
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
-  
+
   // Fallback: localhost in development, production URL otherwise
   return process.env.NODE_ENV === "development"
     ? "http://localhost:3000"

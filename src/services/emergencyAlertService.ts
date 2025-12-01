@@ -226,10 +226,14 @@ class EmergencyAlertService {
       }
 
       console.log("🚨 EmergencyAlertService: Parsed alert data:", alertData);
-      console.log("🚨 EmergencyAlertService: Setting current alert and notifying listeners");
+      console.log(
+        "🚨 EmergencyAlertService: Setting current alert and notifying listeners",
+      );
       // Display the alert
       this.setCurrentAlert(alertData);
-      console.log("🚨 EmergencyAlertService: Alert set, listeners should be notified");
+      console.log(
+        "🚨 EmergencyAlertService: Alert set, listeners should be notified",
+      );
     } catch (error) {
       console.error(
         "🚨 EmergencyAlertService: Error parsing alert data:",
@@ -467,17 +471,23 @@ class EmergencyAlertService {
    * Notify all listeners of the current alert state
    */
   private notifyListeners(): void {
-    console.log(`🚨 EmergencyAlertService: Notifying ${this.listeners.size} listener(s)`, {
-      hasAlert: !!this.currentAlert,
-      alertId: this.currentAlert?.id,
-      alertTitle: this.currentAlert?.title,
-    });
+    console.log(
+      `🚨 EmergencyAlertService: Notifying ${this.listeners.size} listener(s)`,
+      {
+        hasAlert: !!this.currentAlert,
+        alertId: this.currentAlert?.id,
+        alertTitle: this.currentAlert?.title,
+      },
+    );
     this.listeners.forEach((listener) => {
       try {
         listener(this.currentAlert);
         console.log("🚨 EmergencyAlertService: Listener notified successfully");
       } catch (error) {
-        console.error("🚨 EmergencyAlertService: Error notifying listener", error);
+        console.error(
+          "🚨 EmergencyAlertService: Error notifying listener",
+          error,
+        );
         logger.error("EmergencyAlertService: Error notifying listener", {
           error,
         });
@@ -552,10 +562,10 @@ class EmergencyAlertService {
     // Clearing them would break the Redux store updates
     // The middleware will re-register listeners if needed after cleanup
     // this.listeners.clear(); // REMOVED - listeners are managed externally
-    
+
     this.currentAlert = null;
     this.isInitializing = false;
-    
+
     console.log("🚨 EmergencyAlertService: Cleanup complete", {
       listenersAfterCleanup: this.listeners.size,
     });

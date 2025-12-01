@@ -131,7 +131,8 @@ const normalizeScheduleData = (schedule: any): Schedule => {
               content: {
                 description: event.description || null,
                 shortDescription: event.shortDescription || null,
-                startAt: event.startAt?.toISOString?.() || event.startAt || null,
+                startAt:
+                  event.startAt?.toISOString?.() || event.startAt || null,
                 endAt: event.endAt?.toISOString?.() || event.endAt || null,
                 venue: event.venue || null,
                 location: event.venue || null,
@@ -153,7 +154,8 @@ const normalizeScheduleData = (schedule: any): Schedule => {
                 content: {
                   description: event.description || null,
                   shortDescription: event.shortDescription || null,
-                  startAt: event.startAt?.toISOString?.() || event.startAt || null,
+                  startAt:
+                    event.startAt?.toISOString?.() || event.startAt || null,
                   endAt: event.endAt?.toISOString?.() || event.endAt || null,
                   venue: event.venue || null,
                   location: event.venue || null,

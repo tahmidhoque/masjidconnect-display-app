@@ -47,7 +47,9 @@ export const emergencyMiddleware: Middleware = (api: any) => {
     );
 
     // Listen for alert changes from the service
-    console.log("[EmergencyMiddleware] Registering listener with emergencyAlertService");
+    console.log(
+      "[EmergencyMiddleware] Registering listener with emergencyAlertService",
+    );
     const unregisterListener = emergencyAlertService.addListener((alert) => {
       console.log("[EmergencyMiddleware] Alert callback invoked", {
         hasAlert: !!alert,
@@ -59,15 +61,23 @@ export const emergencyMiddleware: Middleware = (api: any) => {
           id: alert.id,
           title: alert.title,
         });
-        console.log("[EmergencyMiddleware] Dispatching setCurrentAlert with alert:", alert);
+        console.log(
+          "[EmergencyMiddleware] Dispatching setCurrentAlert with alert:",
+          alert,
+        );
       } else {
         logger.debug("[EmergencyMiddleware] Alert cleared from service");
-        console.log("[EmergencyMiddleware] Dispatching setCurrentAlert with null");
+        console.log(
+          "[EmergencyMiddleware] Dispatching setCurrentAlert with null",
+        );
       }
       api.dispatch(setCurrentAlert(alert));
       console.log("[EmergencyMiddleware] setCurrentAlert dispatched");
     });
-    console.log("[EmergencyMiddleware] Listener registered, unregister function:", typeof unregisterListener);
+    console.log(
+      "[EmergencyMiddleware] Listener registered, unregister function:",
+      typeof unregisterListener,
+    );
 
     // Monitor connection status (we'll implement this in the service if needed)
     // For now, we'll manage connection status through the middleware

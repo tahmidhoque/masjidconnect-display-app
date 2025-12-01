@@ -203,7 +203,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   const [nextItemIndex, setNextItemIndex] = useState<number | null>(null);
 
   // Image loading states
-  const [imageLoading, setImageLoading] = useState<{ [key: string]: boolean }>({});
+  const [imageLoading, setImageLoading] = useState<{ [key: string]: boolean }>(
+    {},
+  );
   const [imageError, setImageError] = useState<{ [key: string]: boolean }>({});
 
   // Auto-scroll refs and state
@@ -467,10 +469,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           // Handle Events V2 from schedule items (with event property)
           if (item.eventId && item.event) {
             const event = item.event;
-            logger.debug(`ContentCarousel: Processing event from schedule item`, {
-              eventId: event.id,
-              title: event.title,
-            });
+            logger.debug(
+              `ContentCarousel: Processing event from schedule item`,
+              {
+                eventId: event.id,
+                title: event.title,
+              },
+            );
 
             return {
               id: item.id || `schedule-event-${index}`,
@@ -503,18 +508,25 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               },
               startDate: event.startAt || event.content?.startAt || null,
               endDate: event.endAt || event.content?.endAt || null,
-              location: event.venue || event.content?.venue || event.content?.location || null,
+              location:
+                event.venue ||
+                event.content?.venue ||
+                event.content?.location ||
+                null,
             };
           }
 
           // Handle flattened format (items with direct properties like id, title, type, content, duration)
           // This format is used by /api/screens/content/route.ts
           if (item.type && (item.title || item.content)) {
-            logger.debug(`ContentCarousel: Processing flattened schedule item`, {
-              id: item.id,
-              type: item.type,
-              title: item.title,
-            });
+            logger.debug(
+              `ContentCarousel: Processing flattened schedule item`,
+              {
+                id: item.id,
+                type: item.type,
+                title: item.title,
+              },
+            );
 
             // Handle events in flattened format
             if (item.type === "EVENT") {
@@ -527,9 +539,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                   title: item.title || "Event",
                   content: eventContent,
                   type: "EVENT",
-                  duration: typeof item.duration === "number" ? item.duration : 20,
+                  duration:
+                    typeof item.duration === "number" ? item.duration : 20,
                 },
-                startDate: eventContent.startAt || eventContent.startDate || null,
+                startDate:
+                  eventContent.startAt || eventContent.startDate || null,
                 endDate: eventContent.endAt || eventContent.endDate || null,
                 location: eventContent.venue || eventContent.location || null,
               };
@@ -544,7 +558,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 title: item.title || "No Title",
                 content: item.content || "No Content",
                 type: item.type || "CUSTOM",
-                duration: typeof item.duration === "number" ? item.duration : 30,
+                duration:
+                  typeof item.duration === "number" ? item.duration : 30,
               },
             };
           }
@@ -561,7 +576,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 title: contentItem.title || "No Title",
                 content: contentItem.content || "No Content",
                 type: contentItem.type || "CUSTOM",
-                duration: typeof contentItem.duration === "number" ? contentItem.duration : 30,
+                duration:
+                  typeof contentItem.duration === "number"
+                    ? contentItem.duration
+                    : 30,
               },
             };
           }
@@ -569,7 +587,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
           // Log items that don't match any expected format
           logger.debug(
             `ContentCarousel: Item ${index} doesn't match expected formats`,
-            { 
+            {
               item,
               hasType: !!item.type,
               hasTitle: !!item.title,
@@ -957,9 +975,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
   }, []);
 
   // Helper function to check if content has an image
-  const hasImage = useCallback((content: any): boolean => {
-    return !!getImageUrl(content);
-  }, [getImageUrl]);
+  const hasImage = useCallback(
+    (content: any): boolean => {
+      return !!getImageUrl(content);
+    },
+    [getImageUrl],
+  );
 
   // Render image content
   const renderImageContent = useCallback(
@@ -1008,7 +1029,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 p: 3,
               }}
             >
-              <ImageIcon sx={{ fontSize: 64, color: "rgba(255,255,255,0.5)" }} />
+              <ImageIcon
+                sx={{ fontSize: 64, color: "rgba(255,255,255,0.5)" }}
+              />
               <Typography
                 sx={{
                   fontSize: fontSizes.h5,
@@ -1285,7 +1308,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     // Check if content has an image (for ANNOUNCEMENT, CUSTOM, or EVENT types)
     const contentData = currentItem.contentItem.content;
     const imageUrl = getImageUrl(contentData);
-    const hasImageContent = !!imageUrl && (contentType === "ANNOUNCEMENT" || contentType === "CUSTOM" || contentType === "EVENT");
+    const hasImageContent =
+      !!imageUrl &&
+      (contentType === "ANNOUNCEMENT" ||
+        contentType === "CUSTOM" ||
+        contentType === "EVENT");
 
     // Get content
     let contentToShow: string;
@@ -1317,18 +1344,25 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
         // Format event content with date/time - handle Events V2 structure
         const eventContent = currentItem.contentItem.content;
         let description = "";
-        
+
         if (typeof eventContent === "string") {
           description = eventContent;
         } else if (eventContent && typeof eventContent === "object") {
-          description = eventContent.description || eventContent.shortDescription || "No event description";
+          description =
+            eventContent.description ||
+            eventContent.shortDescription ||
+            "No event description";
         } else {
           description = "No event description";
         }
 
         let eventDetails = "";
-        const startDateStr = currentItem.startDate || eventContent?.startAt || eventContent?.startDate;
-        const location = currentItem.location || eventContent?.venue || eventContent?.location;
+        const startDateStr =
+          currentItem.startDate ||
+          eventContent?.startAt ||
+          eventContent?.startDate;
+        const location =
+          currentItem.location || eventContent?.venue || eventContent?.location;
 
         if (startDateStr) {
           try {
@@ -1348,7 +1382,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               eventDetails += `\nLocation: ${location}`;
             }
           } catch (e) {
-            logger.error("Error formatting event date:", { error: e instanceof Error ? e.message : String(e) });
+            logger.error("Error formatting event date:", {
+              error: e instanceof Error ? e.message : String(e),
+            });
           }
         }
 
@@ -1408,13 +1444,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
             }
           } catch (e) {
             contentToShow = "Error displaying content";
-            logger.error("Error formatting content object:", { error: e instanceof Error ? e.message : String(e) });
+            logger.error("Error formatting content object:", {
+              error: e instanceof Error ? e.message : String(e),
+            });
           }
         } else {
           contentToShow = "No content available";
         }
     }
-
 
     const fontSize = getDynamicFontSize(String(contentToShow), contentType);
     const itemId = currentItem.contentItem.id;

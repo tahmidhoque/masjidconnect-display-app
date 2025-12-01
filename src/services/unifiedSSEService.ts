@@ -37,7 +37,9 @@ class UnifiedSSEService {
   private consecutiveFailures = 0; // Track consecutive failures for fallback logic
   private readonly MAX_CONSECUTIVE_FAILURES = 5; // Fallback to polling after 5 consecutive failures
   private lastEventReceived: number | null = null; // Track last SSE event received timestamp (any event indicates connection is alive)
+  private connectionEstablishedAt: number | null = null; // Track when connection was established for grace period
   private readonly HEARTBEAT_TIMEOUT_MS = 30000; // 30 seconds - connection considered stale if no events received
+  private readonly CONNECTION_GRACE_PERIOD_MS = 60000; // 60 seconds - grace period for new connections before requiring events
 
   // Event handlers registered by different services
   private eventHandlers: Map<string, Set<EventHandler>> = new Map();
@@ -119,15 +121,20 @@ class UnifiedSSEService {
       reconnectAttempts: this.reconnectAttempts,
       connectionUrl: this.connectionUrl,
     };
-    
-    logger.info("UnifiedSSEService: Explicit reconnection requested (pending events detected)", previousState);
+
+    logger.info(
+      "UnifiedSSEService: Explicit reconnection requested (pending events detected)",
+      previousState,
+    );
 
     // Determine baseURL if not already stored
     let baseURL = this.baseURL;
     if (!baseURL) {
       baseURL = getApiBaseUrl();
       this.baseURL = baseURL;
-      logger.info("UnifiedSSEService: Determined baseURL for reconnect", { baseURL });
+      logger.info("UnifiedSSEService: Determined baseURL for reconnect", {
+        baseURL,
+      });
     }
 
     // CRITICAL: Force close existing connection regardless of state
@@ -136,13 +143,19 @@ class UnifiedSSEService {
       const oldReadyState = this.eventSource.readyState;
       try {
         this.eventSource.close();
-        logger.info("UnifiedSSEService: Force-closed existing connection for reconnect", {
-          oldReadyState,
-        });
+        logger.info(
+          "UnifiedSSEService: Force-closed existing connection for reconnect",
+          {
+            oldReadyState,
+          },
+        );
       } catch (error) {
-        logger.warn("UnifiedSSEService: Error closing existing connection during reconnect", {
-          error,
-        });
+        logger.warn(
+          "UnifiedSSEService: Error closing existing connection during reconnect",
+          {
+            error,
+          },
+        );
       }
       this.eventSource = null;
     }
@@ -160,10 +173,13 @@ class UnifiedSSEService {
     const clearedListenerCount = this.attachedListeners.size;
     const clearedHandlerTypes = Array.from(this.attachedListeners.keys());
     this.attachedListeners.clear();
-    logger.info("UnifiedSSEService: Cleared attached listeners for reconnection", {
-      clearedListenerCount,
-      clearedHandlerTypes,
-    });
+    logger.info(
+      "UnifiedSSEService: Cleared attached listeners for reconnection",
+      {
+        clearedListenerCount,
+        clearedHandlerTypes,
+      },
+    );
 
     // Reset reconnection attempt counter for fresh start
     this.reconnectAttempts = 0;
@@ -173,8 +189,10 @@ class UnifiedSSEService {
     this.isInitializing = false;
 
     // Establish new connection with retry logic
-    logger.info("UnifiedSSEService: Establishing new SSE connection", { baseURL });
-    
+    logger.info("UnifiedSSEService: Establishing new SSE connection", {
+      baseURL,
+    });
+
     // Attempt initial connection
     this.attemptReconnect(baseURL, 0);
   }
@@ -202,10 +220,13 @@ class UnifiedSSEService {
       setTimeout(() => {
         const status = this.getConnectionStatus();
         if (!status.connected && attemptNumber < maxRetries) {
-          logger.warn("UnifiedSSEService: Reconnection attempt failed, scheduling retry", {
-            attemptNumber: attemptNumber + 1,
-            status,
-          });
+          logger.warn(
+            "UnifiedSSEService: Reconnection attempt failed, scheduling retry",
+            {
+              attemptNumber: attemptNumber + 1,
+              status,
+            },
+          );
 
           // Schedule retry
           setTimeout(() => {
@@ -217,10 +238,13 @@ class UnifiedSSEService {
             status,
           });
         } else {
-          logger.error("UnifiedSSEService: Reconnection failed after all retries", {
-            attemptNumber: attemptNumber + 1,
-            status,
-          });
+          logger.error(
+            "UnifiedSSEService: Reconnection failed after all retries",
+            {
+              attemptNumber: attemptNumber + 1,
+              status,
+            },
+          );
         }
       }, 1000); // Check after 1 second
     } catch (error) {
@@ -235,10 +259,13 @@ class UnifiedSSEService {
           this.attemptReconnect(baseURL, attemptNumber + 1);
         }, retryDelay);
       } else {
-        logger.error("UnifiedSSEService: Reconnection failed after all retries", {
-          error,
-          maxRetries: maxRetries + 1,
-        });
+        logger.error(
+          "UnifiedSSEService: Reconnection failed after all retries",
+          {
+            error,
+            maxRetries: maxRetries + 1,
+          },
+        );
       }
     }
   }
@@ -337,11 +364,14 @@ class UnifiedSSEService {
       this.attachRegisteredHandlers(eventSource);
 
       // Log that setup is complete
-      logger.info("UnifiedSSEService: EventSource created and listeners attached", {
-        connectionUrl: this.connectionUrl,
-        readyState: eventSource.readyState,
-        registeredEventTypes: Array.from(this.eventHandlers.keys()),
-      });
+      logger.info(
+        "UnifiedSSEService: EventSource created and listeners attached",
+        {
+          connectionUrl: this.connectionUrl,
+          readyState: eventSource.readyState,
+          registeredEventTypes: Array.from(this.eventHandlers.keys()),
+        },
+      );
     } catch (error) {
       logger.error("UnifiedSSEService: Error connecting to SSE", {
         error,
@@ -366,10 +396,13 @@ class UnifiedSSEService {
       // Note: SSE heartbeat comments aren't exposed by EventSource, but any event indicates connection health
       this.lastEventReceived = Date.now();
 
-      logger.debug("UnifiedSSEService: Generic message event received (no specific type)", {
-        type: event.type,
-        data: event.data,
-      });
+      logger.debug(
+        "UnifiedSSEService: Generic message event received (no specific type)",
+        {
+          type: event.type,
+          data: event.data,
+        },
+      );
 
       // Try to extract event type from data to check if we have specific handlers
       let extractedEventType: string | null = null;
@@ -479,7 +512,7 @@ class UnifiedSSEService {
           const wrapper = (event: MessageEvent) => {
             // Track that we received an event (indicates connection is alive)
             this.lastEventReceived = Date.now();
-            
+
             logger.debug(`UnifiedSSEService: Processing ${eventType} event`, {
               eventType,
               data: event.data,
@@ -553,7 +586,7 @@ class UnifiedSSEService {
           const wrapper = (event: MessageEvent) => {
             // Track that we received an event (indicates connection is alive)
             this.lastEventReceived = Date.now();
-            
+
             logger.debug(`UnifiedSSEService: Event received for ${eventType}`, {
               type: event.type,
               data: event.data,
@@ -613,6 +646,7 @@ class UnifiedSSEService {
   private handleConnectionOpen = (): void => {
     this.reconnectAttempts = 0;
     this.consecutiveFailures = 0; // Reset consecutive failures on successful connection
+    this.connectionEstablishedAt = Date.now(); // Track when connection was established for grace period
     this.lastEventReceived = Date.now(); // Track connection open time as last event
     const readyState = this.eventSource?.readyState;
     const readyStateText =
@@ -638,7 +672,9 @@ class UnifiedSSEService {
     // CRITICAL: Attach all registered handlers now that connection is open
     // This ensures events are processed and trigger notifications
     if (this.eventSource) {
-      logger.debug("UnifiedSSEService: Connection opened, attaching registered handlers");
+      logger.debug(
+        "UnifiedSSEService: Connection opened, attaching registered handlers",
+      );
       const handlerCount = Array.from(this.eventHandlers.values()).reduce(
         (sum, handlers) => sum + handlers.size,
         0,
@@ -646,19 +682,22 @@ class UnifiedSSEService {
       logger.debug(
         `UnifiedSSEService: Attaching ${handlerCount} handler(s) for ${this.eventHandlers.size} event type(s)`,
       );
-      
+
       this.attachRegisteredHandlers(this.eventSource);
-      
+
       // Verify handlers were attached
       const attachedCount = Array.from(this.attachedListeners.values()).reduce(
         (sum, handlers) => sum + handlers.size,
         0,
       );
-      
-      logger.info("UnifiedSSEService: Handlers attached after connection open", {
-        attachedCount,
-        eventTypes: Array.from(this.eventHandlers.keys()),
-      });
+
+      logger.info(
+        "UnifiedSSEService: Handlers attached after connection open",
+        {
+          attachedCount,
+          eventTypes: Array.from(this.eventHandlers.keys()),
+        },
+      );
     }
 
     // Reset initialization flag now that connection is established
@@ -754,7 +793,9 @@ class UnifiedSSEService {
 
   /**
    * Check if SSE connection is healthy
-   * Connection is healthy if it's open AND has received events recently (<30 seconds)
+   * Connection is healthy if:
+   * 1. It's open AND within the grace period (first 60 seconds after connection), OR
+   * 2. It's open AND has received events recently (<30 seconds)
    */
   public isConnectionHealthy(): boolean {
     const isOpen =
@@ -765,13 +806,38 @@ class UnifiedSSEService {
       return false;
     }
 
-    // If we've never received an event, connection might be stale
+    const now = Date.now();
+
+    // Check if we're within the grace period (first 60 seconds after connection established)
+    // During this period, we consider the connection healthy even without events
+    const isWithinGracePeriod = this.isWithinGracePeriod();
+
+    if (isWithinGracePeriod) {
+      logger.debug(
+        "UnifiedSSEService: Connection healthy (within grace period)",
+        {
+          isOpen,
+          connectionEstablishedAt: this.connectionEstablishedAt
+            ? new Date(this.connectionEstablishedAt).toISOString()
+            : null,
+          timeSinceConnection: this.connectionEstablishedAt
+            ? `${Math.round((now - this.connectionEstablishedAt) / 1000)}s`
+            : "N/A",
+          gracePeriodRemaining: this.connectionEstablishedAt
+            ? `${Math.round((this.CONNECTION_GRACE_PERIOD_MS - (now - this.connectionEstablishedAt)) / 1000)}s`
+            : "N/A",
+        },
+      );
+      return true;
+    }
+
+    // Outside grace period - check if we've received events recently
     if (this.lastEventReceived === null) {
       return false;
     }
 
     // Check if last event was received within timeout window
-    const timeSinceLastEvent = Date.now() - this.lastEventReceived;
+    const timeSinceLastEvent = now - this.lastEventReceived;
     const isRecent = timeSinceLastEvent < this.HEARTBEAT_TIMEOUT_MS;
 
     logger.debug("UnifiedSSEService: Connection health check", {
@@ -785,6 +851,31 @@ class UnifiedSSEService {
     });
 
     return isOpen && isRecent;
+  }
+
+  /**
+   * Check if connection is within the initial grace period
+   * Returns true if connection was established less than 60 seconds ago
+   */
+  public isWithinGracePeriod(): boolean {
+    if (this.connectionEstablishedAt === null) {
+      return false;
+    }
+    const timeSinceConnection = Date.now() - this.connectionEstablishedAt;
+    return timeSinceConnection < this.CONNECTION_GRACE_PERIOD_MS;
+  }
+
+  /**
+   * Get the time remaining in the grace period (in milliseconds)
+   * Returns 0 if not within grace period
+   */
+  public getGracePeriodRemaining(): number {
+    if (this.connectionEstablishedAt === null) {
+      return 0;
+    }
+    const timeSinceConnection = Date.now() - this.connectionEstablishedAt;
+    const remaining = this.CONNECTION_GRACE_PERIOD_MS - timeSinceConnection;
+    return Math.max(0, remaining);
   }
 
   /**
@@ -858,6 +949,7 @@ class UnifiedSSEService {
     this.reconnectAttempts = 0;
     this.isInitializing = false;
     this.lastEventReceived = null;
+    this.connectionEstablishedAt = null;
   }
 }
 

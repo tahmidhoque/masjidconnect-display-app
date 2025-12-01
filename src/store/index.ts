@@ -53,13 +53,17 @@ const stateValidationTransform = createTransform(
       // If state slice is corrupted or invalid, return the slice as-is
       // The reducer will handle undefined/null values properly
       if (!outboundState || typeof outboundState !== "object") {
-        logger.warn("[ReduxPersist] Invalid slice structure detected, will use default");
+        logger.warn(
+          "[ReduxPersist] Invalid slice structure detected, will use default",
+        );
         return outboundState; // Return as-is, reducer will handle it
       }
 
       // Validate that it's a proper object
       if (Array.isArray(outboundState)) {
-        logger.warn("[ReduxPersist] Slice is array instead of object, will use default");
+        logger.warn(
+          "[ReduxPersist] Slice is array instead of object, will use default",
+        );
         return outboundState; // Return as-is, reducer will handle it
       }
 
@@ -71,7 +75,7 @@ const stateValidationTransform = createTransform(
     }
   },
   // Define which reducers this transform gets called for
-  { whitelist: ["auth", "content", "emergency"] }
+  { whitelist: ["auth", "content", "emergency"] },
 );
 
 // Persist config - we want to persist most of the state for offline capability

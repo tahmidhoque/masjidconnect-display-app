@@ -1,10 +1,14 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Typography, useTheme, Fade } from "@mui/material";
 import WifiOffIcon from "@mui/icons-material/WifiOff";
 import SignalWifiStatusbarConnectedNoInternet4Icon from "@mui/icons-material/SignalWifiStatusbarConnectedNoInternet4";
 import useResponsiveFontSize from "../../hooks/useResponsiveFontSize";
 import { useNotifications } from "../../contexts/NotificationContext";
 import { useConnectionStatus } from "../../hooks/useConnectionStatus";
+
+// Delay before showing connection status indicator after component mounts
+// This prevents flash of disconnection warning during initial render
+const CONNECTION_STATUS_DISPLAY_DELAY_MS = 5000;
 
 interface ModernFooterProps {
   logoSrc?: string;
@@ -25,6 +29,19 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
   const { fontSizes, getSizeRem } = useResponsiveFontSize();
   const { getCurrentNotification, removeNotification } = useNotifications();
   const connectionStatus = useConnectionStatus();
+
+  // State to track if we should show connection status indicator
+  // Start as false to prevent flash during initial load
+  const [canShowConnectionStatus, setCanShowConnectionStatus] = useState(false);
+
+  // Delay showing connection status indicator to prevent flash on startup
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCanShowConnectionStatus(true);
+    }, CONNECTION_STATUS_DISPLAY_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const isPortrait = orientation === "portrait";
   const currentNotification = getCurrentNotification();
@@ -74,7 +91,8 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
       }}
     >
       {/* Connection status indicator - left side */}
-      {!connectionStatus.hasConnection && (
+      {/* Only show after startup delay to prevent flash of disconnection warning */}
+      {canShowConnectionStatus && !connectionStatus.hasConnection && (
         <Fade in={true} timeout={300}>
           <Box
             sx={{

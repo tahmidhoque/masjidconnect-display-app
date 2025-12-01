@@ -40,437 +40,444 @@ interface EnhancedLoadingScreenProps {
   orientation?: "LANDSCAPE" | "PORTRAIT"; // Optional prop for override, but defaults to Redux value
 }
 
-const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = memo(({
-  currentPhase,
-  progress,
-  statusMessage,
-  isTransitioning,
-  onTransitionComplete,
-  orientation: orientationProp,
-}) => {
-  const theme = useTheme();
-  const masjidName = useAppSelector((state) => state.content.masjidName);
-  // Read orientation from Redux store, with prop override if provided
-  const reduxOrientation = useAppSelector((state) => state.ui.orientation);
-  // Memoize orientation to prevent unnecessary re-renders
-  const orientation = useMemo(
-    () => orientationProp || reduxOrientation || "LANDSCAPE",
-    [orientationProp, reduxOrientation],
-  );
+const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = memo(
+  ({
+    currentPhase,
+    progress,
+    statusMessage,
+    isTransitioning,
+    onTransitionComplete,
+    orientation: orientationProp,
+  }) => {
+    const theme = useTheme();
+    const masjidName = useAppSelector((state) => state.content.masjidName);
+    // Read orientation from Redux store, with prop override if provided
+    const reduxOrientation = useAppSelector((state) => state.ui.orientation);
+    // Memoize orientation to prevent unnecessary re-renders
+    const orientation = useMemo(
+      () => orientationProp || reduxOrientation || "LANDSCAPE",
+      [orientationProp, reduxOrientation],
+    );
 
-  // Get performance profile for optimizations
-  const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
-  const isHighStrain = isHighStrainDevice();
-  const shouldDisableAnimations =
-    !performanceProfile.recommendations.enableAnimations;
+    // Get performance profile for optimizations
+    const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
+    const isHighStrain = isHighStrainDevice();
+    const shouldDisableAnimations =
+      !performanceProfile.recommendations.enableAnimations;
 
-  // Component state
-  const [isExiting, setIsExiting] = useState(false);
-  const [displayProgress, setDisplayProgress] = useState(0);
+    // Component state
+    const [isExiting, setIsExiting] = useState(false);
+    const [displayProgress, setDisplayProgress] = useState(0);
 
-  // Refs for smooth progress updates
-  const progressAnimationRef = useRef<number>();
-  const targetProgressRef = useRef(progress);
-  const exitTimerRef = useRef<NodeJS.Timeout>();
+    // Refs for smooth progress updates
+    const progressAnimationRef = useRef<number>();
+    const targetProgressRef = useRef(progress);
+    const exitTimerRef = useRef<NodeJS.Timeout>();
 
-  // Rotation handling
-  const rotationInfo = useRotationHandling(orientation);
-  const shouldRotate = rotationInfo.shouldRotate;
+    // Rotation handling
+    const rotationInfo = useRotationHandling(orientation);
+    const shouldRotate = rotationInfo.shouldRotate;
 
-  // Progressive loading for 4K displays
-  // Load all elements immediately to prevent dark block flash
-  const [elementsLoaded, setElementsLoaded] = useState({
-    logo: true, // Always load immediately to prevent flash
-    spinner: true, // Always load immediately to prevent flash
-    progress: true, // Always load immediately to prevent flash
-    status: true, // Always load immediately to prevent flash
-  });
+    // Progressive loading for 4K displays
+    // Load all elements immediately to prevent dark block flash
+    const [elementsLoaded, setElementsLoaded] = useState({
+      logo: true, // Always load immediately to prevent flash
+      spinner: true, // Always load immediately to prevent flash
+      progress: true, // Always load immediately to prevent flash
+      status: true, // Always load immediately to prevent flash
+    });
 
-  // Smooth progress animation (disabled for 4K)
-  useEffect(() => {
-    if (shouldDisableAnimations) {
-      // Immediate update for 4K displays
-      setDisplayProgress(progress);
-      return;
-    }
+    // Smooth progress animation (disabled for 4K)
+    useEffect(() => {
+      if (shouldDisableAnimations) {
+        // Immediate update for 4K displays
+        setDisplayProgress(progress);
+        return;
+      }
 
-    targetProgressRef.current = progress;
+      targetProgressRef.current = progress;
 
-    const animateProgress = () => {
-      setDisplayProgress((current) => {
-        const target = targetProgressRef.current;
-        const difference = target - current;
+      const animateProgress = () => {
+        setDisplayProgress((current) => {
+          const target = targetProgressRef.current;
+          const difference = target - current;
 
-        if (Math.abs(difference) < 0.1) {
-          return target;
-        }
+          if (Math.abs(difference) < 0.1) {
+            return target;
+          }
 
-        const step = difference * 0.08;
-        const newProgress = current + step;
+          const step = difference * 0.08;
+          const newProgress = current + step;
 
-        if (Math.abs(target - newProgress) > 0.1) {
-          progressAnimationRef.current = requestAnimationFrame(animateProgress);
-        }
+          if (Math.abs(target - newProgress) > 0.1) {
+            progressAnimationRef.current =
+              requestAnimationFrame(animateProgress);
+          }
 
-        return newProgress;
-      });
-    };
+          return newProgress;
+        });
+      };
 
-    if (progressAnimationRef.current) {
-      cancelAnimationFrame(progressAnimationRef.current);
-    }
-
-    progressAnimationRef.current = requestAnimationFrame(animateProgress);
-
-    return () => {
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
       }
-    };
-  }, [progress, shouldDisableAnimations]);
 
-  // Only exit when actually transitioning to display
-  useEffect(() => {
-    if (currentPhase === "displaying") {
-      setIsExiting(true);
-
-      const exitDuration = isHighStrain ? 300 : TRANSITION_OUT_DURATION; // Faster exit for 4K
-      exitTimerRef.current = setTimeout(() => {
-        onTransitionComplete?.();
-      }, exitDuration);
+      progressAnimationRef.current = requestAnimationFrame(animateProgress);
 
       return () => {
-        if (exitTimerRef.current) {
-          clearTimeout(exitTimerRef.current);
+        if (progressAnimationRef.current) {
+          cancelAnimationFrame(progressAnimationRef.current);
         }
       };
-    }
-  }, [currentPhase, onTransitionComplete, isHighStrain]);
+    }, [progress, shouldDisableAnimations]);
 
-  // Enhanced status message with context
-  const enhancedStatusMessage = useMemo(() => {
-    if (currentPhase === "loading-content" && masjidName) {
-      return `Loading ${masjidName} content...`;
-    }
-    return statusMessage;
-  }, [currentPhase, statusMessage, masjidName]);
+    // Only exit when actually transitioning to display
+    useEffect(() => {
+      if (currentPhase === "displaying") {
+        setIsExiting(true);
 
-  // Progress bar color based on phase
-  const getProgressColor = (phase: AppPhase) => {
-    switch (phase) {
-      case "initializing":
-        return theme.palette.grey[400];
-      case "checking":
-        return theme.palette.info.main;
-      case "pairing":
-        return theme.palette.warning.main;
-      case "loading-content":
-        return theme.palette.primary.main;
-      case "preparing":
-        return theme.palette.primary.light;
-      case "ready":
-        return theme.palette.success.main;
-      case "displaying":
-        return theme.palette.success.light;
-      default:
-        return theme.palette.primary.main;
-    }
-  };
+        const exitDuration = isHighStrain ? 300 : TRANSITION_OUT_DURATION; // Faster exit for 4K
+        exitTimerRef.current = setTimeout(() => {
+          onTransitionComplete?.();
+        }, exitDuration);
 
-  // Spinner style based on phase (simplified for 4K)
-  const getSpinnerStyle = (phase: AppPhase) => {
-    const baseSize = isHighStrain ? 24 : 28; // Smaller for 4K
-    const borderWidth = isHighStrain ? 2 : 3; // Thinner for 4K
+        return () => {
+          if (exitTimerRef.current) {
+            clearTimeout(exitTimerRef.current);
+          }
+        };
+      }
+    }, [currentPhase, onTransitionComplete, isHighStrain]);
 
-    const baseStyle = {
-      width: baseSize,
-      height: baseSize,
-      border: `${borderWidth}px solid rgba(255, 255, 255, 0.25)`,
-      borderTopColor: getProgressColor(phase),
-      borderRadius: "50%",
-      animation: shouldDisableAnimations ? "none" : "spin 2s linear infinite",
-      opacity: 0.8,
+    // Enhanced status message with context
+    const enhancedStatusMessage = useMemo(() => {
+      if (currentPhase === "loading-content" && masjidName) {
+        return `Loading ${masjidName} content...`;
+      }
+      return statusMessage;
+    }, [currentPhase, statusMessage, masjidName]);
+
+    // Progress bar color based on phase
+    const getProgressColor = (phase: AppPhase) => {
+      switch (phase) {
+        case "initializing":
+          return theme.palette.grey[400];
+        case "checking":
+          return theme.palette.info.main;
+        case "pairing":
+          return theme.palette.warning.main;
+        case "loading-content":
+          return theme.palette.primary.main;
+        case "preparing":
+          return theme.palette.primary.light;
+        case "ready":
+          return theme.palette.success.main;
+        case "displaying":
+          return theme.palette.success.light;
+        default:
+          return theme.palette.primary.main;
+      }
     };
 
-    return baseStyle;
-  };
+    // Spinner style based on phase (simplified for 4K)
+    const getSpinnerStyle = (phase: AppPhase) => {
+      const baseSize = isHighStrain ? 24 : 28; // Smaller for 4K
+      const borderWidth = isHighStrain ? 2 : 3; // Thinner for 4K
 
-  // Loading content component
-  const LoadingContent = () => (
-    <Box
-      sx={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-        // Ensure background renders immediately to prevent dark block flash
-        background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
-        // Fallback background color in case gradient doesn't render immediately
-        backgroundColor: theme.palette.primary.dark,
-        // 4K optimizations
-        willChange: isHighStrain ? "auto" : "transform",
-        transform: isHighStrain ? "none" : "translateZ(0)",
-      }}
-    >
+      const baseStyle = {
+        width: baseSize,
+        height: baseSize,
+        border: `${borderWidth}px solid rgba(255, 255, 255, 0.25)`,
+        borderTopColor: getProgressColor(phase),
+        borderRadius: "50%",
+        animation: shouldDisableAnimations ? "none" : "spin 2s linear infinite",
+        opacity: 0.8,
+      };
+
+      return baseStyle;
+    };
+
+    // Loading content component
+    const LoadingContent = () => (
       <Box
         sx={{
           width: "100%",
           height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
           position: "relative",
-          zIndex: 2,
-          px: 4,
-          py: 6,
+          overflow: "hidden",
+          // Ensure background renders immediately to prevent dark block flash
+          background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
+          // Fallback background color in case gradient doesn't render immediately
+          backgroundColor: theme.palette.primary.dark,
+          // 4K optimizations
+          willChange: isHighStrain ? "auto" : "transform",
+          transform: isHighStrain ? "none" : "translateZ(0)",
         }}
       >
-        {/* OPTIMIZED: Logo with progressive loading for 4K */}
-        {elementsLoaded.logo && (
-          <Box
-            sx={{
-              marginBottom: "32px",
-              height: "80px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: 1,
-              transition: shouldDisableAnimations
-                ? "none"
-                : "opacity 0.3s ease-in-out",
-            }}
-          >
-            <img
-              src={logoGold}
-              alt="MasjidConnect"
-              style={{
-                width: isHighStrain ? "100px" : "130px", // Smaller for 4K
-                height: "auto",
-                maxHeight: "80px",
-                filter: isHighStrain
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            position: "relative",
+            zIndex: 2,
+            px: 4,
+            py: 6,
+          }}
+        >
+          {/* OPTIMIZED: Logo with progressive loading for 4K */}
+          {elementsLoaded.logo && (
+            <Box
+              sx={{
+                marginBottom: "32px",
+                height: "80px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 1,
+                transition: shouldDisableAnimations
                   ? "none"
-                  : "drop-shadow(0 8px 16px rgba(0,0,0,0.3))", // Remove shadow for 4K
-                display: "block",
-                imageRendering: isHighStrain ? "pixelated" : "auto", // Optimize for 4K
+                  : "opacity 0.3s ease-in-out",
               }}
-            />
-          </Box>
-        )}
+            >
+              <img
+                src={logoGold}
+                alt="MasjidConnect"
+                style={{
+                  width: isHighStrain ? "100px" : "130px", // Smaller for 4K
+                  height: "auto",
+                  maxHeight: "80px",
+                  filter: isHighStrain
+                    ? "none"
+                    : "drop-shadow(0 8px 16px rgba(0,0,0,0.3))", // Remove shadow for 4K
+                  display: "block",
+                  imageRendering: isHighStrain ? "pixelated" : "auto", // Optimize for 4K
+                }}
+              />
+            </Box>
+          )}
 
-        {/* OPTIMIZED: Spinner with progressive loading */}
-        {elementsLoaded.spinner && (
-          <Box
-            sx={{
-              mb: 4,
-              height: "32px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: 1,
-              transition: shouldDisableAnimations
-                ? "none"
-                : "opacity 0.3s ease-in-out",
-            }}
-          >
+          {/* OPTIMIZED: Spinner with progressive loading */}
+          {elementsLoaded.spinner && (
             <Box
               sx={{
-                ...getSpinnerStyle(currentPhase),
-              }}
-            />
-          </Box>
-        )}
-
-        {/* OPTIMIZED: Progress bar with progressive loading */}
-        {elementsLoaded.progress && (
-          <Box
-            sx={{
-              width: "100%",
-              maxWidth: isHighStrain ? "300px" : "380px", // Smaller for 4K
-              mb: 3,
-              height: "40px",
-              opacity: 1,
-              transition: shouldDisableAnimations
-                ? "none"
-                : "opacity 0.3s ease-in-out",
-            }}
-          >
-            <Box
-              sx={{
-                width: "100%",
-                height: isHighStrain ? 3 : 5, // Thinner for 4K
-                borderRadius: 3,
-                backgroundColor: "rgba(255, 255, 255, 0.2)",
-                overflow: "hidden",
-                position: "relative",
+                mb: 4,
+                height: "32px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 1,
+                transition: shouldDisableAnimations
+                  ? "none"
+                  : "opacity 0.3s ease-in-out",
               }}
             >
               <Box
                 sx={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  height: "100%",
-                  width: `${Math.max(0, Math.min(100, displayProgress))}%`,
-                  backgroundColor: getProgressColor(currentPhase),
-                  borderRadius: 3,
-                  transition: shouldDisableAnimations
-                    ? "none"
-                    : "width 0.3s ease-out",
-                  transformOrigin: "left",
+                  ...getSpinnerStyle(currentPhase),
                 }}
               />
             </Box>
-            <Typography
-              variant="caption"
-              sx={{
-                display: "block",
-                textAlign: "right",
-                mt: 1,
-                color: "rgba(255, 255, 255, 0.75)",
-                fontWeight: 500,
-                fontSize: isHighStrain ? "0.7rem" : "0.8rem", // Smaller for 4K
-                height: "20px",
-                lineHeight: "20px",
-              }}
-            >
-              {Math.round(displayProgress)}%
-            </Typography>
-          </Box>
-        )}
+          )}
 
-        {/* OPTIMIZED: Status message with progressive loading */}
-        {elementsLoaded.status && (
-          <Box
-            sx={{
-              textAlign: "center",
-              maxWidth: "85%",
-              minHeight: "80px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              opacity: 1,
-              transition: shouldDisableAnimations
-                ? "none"
-                : "opacity 0.3s ease-in-out",
-            }}
-          >
-            <Typography
-              variant="h6"
+          {/* OPTIMIZED: Progress bar with progressive loading */}
+          {elementsLoaded.progress && (
+            <Box
               sx={{
-                color: "#fff",
-                textAlign: "center",
-                fontWeight: 500,
-                letterSpacing: "0.02em",
-                fontSize: isHighStrain ? "1.2rem" : "1.4rem", // Smaller for 4K
-                textShadow: isHighStrain ? "none" : "0 2px 8px rgba(0,0,0,0.5)", // Remove shadow for 4K
-                mb: 0.5,
+                width: "100%",
+                maxWidth: isHighStrain ? "300px" : "380px", // Smaller for 4K
+                mb: 3,
+                height: "40px",
+                opacity: 1,
+                transition: shouldDisableAnimations
+                  ? "none"
+                  : "opacity 0.3s ease-in-out",
               }}
             >
-              {enhancedStatusMessage}
-            </Typography>
+              <Box
+                sx={{
+                  width: "100%",
+                  height: isHighStrain ? 3 : 5, // Thinner for 4K
+                  borderRadius: 3,
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    height: "100%",
+                    width: `${Math.max(0, Math.min(100, displayProgress))}%`,
+                    backgroundColor: getProgressColor(currentPhase),
+                    borderRadius: 3,
+                    transition: shouldDisableAnimations
+                      ? "none"
+                      : "width 0.3s ease-out",
+                    transformOrigin: "left",
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  textAlign: "right",
+                  mt: 1,
+                  color: "rgba(255, 255, 255, 0.75)",
+                  fontWeight: 500,
+                  fontSize: isHighStrain ? "0.7rem" : "0.8rem", // Smaller for 4K
+                  height: "20px",
+                  lineHeight: "20px",
+                }}
+              >
+                {Math.round(displayProgress)}%
+              </Typography>
+            </Box>
+          )}
 
-            <Typography
-              variant="body2"
+          {/* OPTIMIZED: Status message with progressive loading */}
+          {elementsLoaded.status && (
+            <Box
               sx={{
-                color: "rgba(255, 255, 255, 0.65)",
                 textAlign: "center",
-                fontWeight: 400,
-                fontSize: isHighStrain ? "0.75rem" : "0.85rem", // Smaller for 4K
-                textTransform: "capitalize",
+                maxWidth: "85%",
+                minHeight: "80px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                opacity: 1,
+                transition: shouldDisableAnimations
+                  ? "none"
+                  : "opacity 0.3s ease-in-out",
               }}
             >
-              {currentPhase.replace("-", " ")}
-              {isTransitioning && " • transitioning"}
-            </Typography>
-          </Box>
-        )}
+              <Typography
+                variant="h6"
+                sx={{
+                  color: "#fff",
+                  textAlign: "center",
+                  fontWeight: 500,
+                  letterSpacing: "0.02em",
+                  fontSize: isHighStrain ? "1.2rem" : "1.4rem", // Smaller for 4K
+                  textShadow: isHighStrain
+                    ? "none"
+                    : "0 2px 8px rgba(0,0,0,0.5)", // Remove shadow for 4K
+                  mb: 0.5,
+                }}
+              >
+                {enhancedStatusMessage}
+              </Typography>
+
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "rgba(255, 255, 255, 0.65)",
+                  textAlign: "center",
+                  fontWeight: 400,
+                  fontSize: isHighStrain ? "0.75rem" : "0.85rem", // Smaller for 4K
+                  textTransform: "capitalize",
+                }}
+              >
+                {currentPhase.replace("-", " ")}
+                {isTransitioning && " • transitioning"}
+              </Typography>
+            </Box>
+          )}
+        </Box>
       </Box>
-    </Box>
-  );
+    );
 
-  return (
-    <>
-      {/* Spinner keyframes - conditional for 4K */}
-      {!shouldDisableAnimations && (
-        <style>
-          {`
+    return (
+      <>
+        {/* Spinner keyframes - conditional for 4K */}
+        {!shouldDisableAnimations && (
+          <style>
+            {`
             @keyframes spin {
               to {
                 transform: rotate(360deg);
               }
             }
           `}
-        </style>
-      )}
+          </style>
+        )}
 
-      <Box
-        sx={{
-          width: "100vw",
-          height: "100vh",
-          overflow: "hidden",
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: 1000,
-          // Set background to prevent dark blocks showing through
-          backgroundColor: theme.palette.primary.dark,
-          opacity: isExiting ? 0 : 1,
-          transform:
-            isExiting && !shouldDisableAnimations ? "scale(0.98)" : "scale(1)",
-          transition:
-            isExiting && !shouldDisableAnimations
-              ? `opacity ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`
-              : "none",
-        }}
-      >
-        {/* Always render both containers to prevent flash - hide the inactive one */}
         <Box
-          className={shouldRotate ? "rotation-container no-acceleration" : ""}
           sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            // Use max dimensions to ensure full coverage after rotation
-            width: "max(100vh, 100vw)",
-            height: "max(100vh, 100vw)",
-            transform: shouldRotate
-              ? "translate(-50%, -50%) rotate(90deg)"
-              : "none",
-            transformOrigin: "center center",
-            // Hide if not rotating, show if rotating
-            opacity: shouldRotate ? 1 : 0,
-            pointerEvents: shouldRotate ? "auto" : "none",
-            // Ensure no overflow or positioning issues
+            width: "100vw",
+            height: "100vh",
             overflow: "hidden",
-            // GPU optimizations for RPi
-            willChange: isHighStrain ? "auto" : "transform",
-            backfaceVisibility: "hidden",
-            // Ensure it covers the viewport
-            minWidth: "100vh",
-            minHeight: "100vw",
-          }}
-        >
-          <LoadingContent />
-        </Box>
-        <Box
-          sx={{
-            width: "100%",
-            height: "100%",
-            // Hide if rotating, show if not rotating
-            opacity: shouldRotate ? 0 : 1,
-            pointerEvents: shouldRotate ? "none" : "auto",
-            position: "absolute",
+            position: "fixed",
             top: 0,
             left: 0,
+            zIndex: 1000,
+            // Set background to prevent dark blocks showing through
+            backgroundColor: theme.palette.primary.dark,
+            opacity: isExiting ? 0 : 1,
+            transform:
+              isExiting && !shouldDisableAnimations
+                ? "scale(0.98)"
+                : "scale(1)",
+            transition:
+              isExiting && !shouldDisableAnimations
+                ? `opacity ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${isHighStrain ? 300 : TRANSITION_OUT_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`
+                : "none",
           }}
         >
-          <LoadingContent />
+          {/* Always render both containers to prevent flash - hide the inactive one */}
+          <Box
+            className={shouldRotate ? "rotation-container no-acceleration" : ""}
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              // Use max dimensions to ensure full coverage after rotation
+              width: "max(100vh, 100vw)",
+              height: "max(100vh, 100vw)",
+              transform: shouldRotate
+                ? "translate(-50%, -50%) rotate(90deg)"
+                : "none",
+              transformOrigin: "center center",
+              // Hide if not rotating, show if rotating
+              opacity: shouldRotate ? 1 : 0,
+              pointerEvents: shouldRotate ? "auto" : "none",
+              // Ensure no overflow or positioning issues
+              overflow: "hidden",
+              // GPU optimizations for RPi
+              willChange: isHighStrain ? "auto" : "transform",
+              backfaceVisibility: "hidden",
+              // Ensure it covers the viewport
+              minWidth: "100vh",
+              minHeight: "100vw",
+            }}
+          >
+            <LoadingContent />
+          </Box>
+          <Box
+            sx={{
+              width: "100%",
+              height: "100%",
+              // Hide if rotating, show if not rotating
+              opacity: shouldRotate ? 0 : 1,
+              pointerEvents: shouldRotate ? "none" : "auto",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          >
+            <LoadingContent />
+          </Box>
         </Box>
-      </Box>
-    </>
-  );
-});
+      </>
+    );
+  },
+);
 
 EnhancedLoadingScreen.displayName = "EnhancedLoadingScreen";
 

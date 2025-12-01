@@ -263,7 +263,9 @@ export default function useInitializationFlow() {
 
       // If not authenticated, force pairing mode
       if (!isAuthenticated) {
-        logger.warn("[InitFlow] Not authenticated after timeout, forcing pairing");
+        logger.warn(
+          "[InitFlow] Not authenticated after timeout, forcing pairing",
+        );
         startPairingProcess();
       } else {
         // If authenticated but no content, try to fetch content
@@ -351,7 +353,9 @@ export default function useInitializationFlow() {
           });
           logger.info("[InitFlow] Cleared non-critical localStorage items");
         } catch (recoveryError) {
-          logger.error("[InitFlow] Recovery attempt failed", { error: recoveryError });
+          logger.error("[InitFlow] Recovery attempt failed", {
+            error: recoveryError,
+          });
         }
 
         startPairingProcess();

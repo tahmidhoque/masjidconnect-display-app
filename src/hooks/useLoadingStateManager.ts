@@ -106,27 +106,35 @@ export default function useLoadingStateManager(
   );
 
   // CRITICAL FIX: Validate phase to ensure it's always valid
-  const validatePhase = useCallback((phase: AppPhase | undefined | null): AppPhase => {
-    const validPhases: AppPhase[] = [
-      "initializing",
-      "checking",
-      "pairing",
-      "loading-content",
-      "preparing",
-      "ready",
-      "displaying",
-    ];
-    if (phase && validPhases.includes(phase)) {
-      return phase;
-    }
-    logger.warn("[LoadingStateManager] Invalid phase detected, resetting to initializing", {
-      invalidPhase: phase,
-    });
-    return "initializing";
-  }, []);
+  const validatePhase = useCallback(
+    (phase: AppPhase | undefined | null): AppPhase => {
+      const validPhases: AppPhase[] = [
+        "initializing",
+        "checking",
+        "pairing",
+        "loading-content",
+        "preparing",
+        "ready",
+        "displaying",
+      ];
+      if (phase && validPhases.includes(phase)) {
+        return phase;
+      }
+      logger.warn(
+        "[LoadingStateManager] Invalid phase detected, resetting to initializing",
+        {
+          invalidPhase: phase,
+        },
+      );
+      return "initializing";
+    },
+    [],
+  );
 
   // Internal state - ensure phase is always valid
-  const [currentPhase, setCurrentPhase] = useState<AppPhase>(() => validatePhase("initializing"));
+  const [currentPhase, setCurrentPhase] = useState<AppPhase>(() =>
+    validatePhase("initializing"),
+  );
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldShowLoadingScreen, setShouldShowLoadingScreen] = useState(true);
   const [shouldShowDisplay, setShouldShowDisplay] = useState(false);
@@ -325,15 +333,21 @@ export default function useLoadingStateManager(
     // CRITICAL FIX: Validate current phase first
     const validatedCurrentPhase = validatePhase(currentPhase);
     if (validatedCurrentPhase !== currentPhase) {
-      logger.warn("[LoadingStateManager] Current phase was invalid, correcting", {
-        invalid: currentPhase,
-        corrected: validatedCurrentPhase,
-      });
+      logger.warn(
+        "[LoadingStateManager] Current phase was invalid, correcting",
+        {
+          invalid: currentPhase,
+          corrected: validatedCurrentPhase,
+        },
+      );
       setCurrentPhase(validatedCurrentPhase);
     }
 
     // Check for forced phase first
-    if (forcePhaseRef.current && forcePhaseRef.current !== validatedCurrentPhase) {
+    if (
+      forcePhaseRef.current &&
+      forcePhaseRef.current !== validatedCurrentPhase
+    ) {
       const forcedPhase = validatePhase(forcePhaseRef.current);
       forcePhaseRef.current = null;
       transitionToPhaseDebounced(forcedPhase, true);
@@ -433,14 +447,17 @@ export default function useLoadingStateManager(
   ]);
 
   // CRITICAL FIX: Enhanced failsafe timeout to prevent infinite loading
+  // Timeouts increased for RPi compatibility - slower hardware needs more time
   useEffect(() => {
     // Clear any existing failsafe
     if (failsafeTimer.current) {
       clearTimeout(failsafeTimer.current);
     }
 
-    // CRITICAL FIX: Reduced timeout from 10s to 5s for faster recovery
-    const FAILSAFE_TIMEOUT = 5000; // 5 seconds max
+    // Increased timeouts for RPi stability - slower hardware needs more time
+    // High-strain (4K) displays get slightly shorter timeouts since they have optimisations
+    const FAILSAFE_TIMEOUT = isHighStrain ? 10000 : 15000; // 10-15 seconds max
+    const STUCK_PHASE_TIMEOUT = isHighStrain ? 20000 : 30000; // 20-30 seconds for stuck phases
 
     // If we're in a loading phase and have content and authentication, set a failsafe
     const loadingPhases: AppPhase[] = ["loading-content", "preparing", "ready"];
@@ -454,6 +471,7 @@ export default function useLoadingStateManager(
         timeout: FAILSAFE_TIMEOUT,
         isAuthenticated,
         hasContent: hasMinimumContent(),
+        isHighStrain,
       });
 
       failsafeTimer.current = setTimeout(() => {
@@ -476,14 +494,13 @@ export default function useLoadingStateManager(
       }, FAILSAFE_TIMEOUT);
     }
 
-    // CRITICAL FIX: Also set failsafe for stuck initializing/checking phases
+    // Also set failsafe for stuck initializing/checking phases
     const stuckPhases: AppPhase[] = ["initializing", "checking"];
     if (stuckPhases.includes(currentPhase)) {
-      const STUCK_PHASE_TIMEOUT = 10000; // 10 seconds for stuck phases
-
       logger.info("[LoadingStateManager] Setting stuck phase failsafe", {
         currentPhase,
         timeout: STUCK_PHASE_TIMEOUT,
+        isHighStrain,
       });
 
       failsafeTimer.current = setTimeout(() => {
@@ -509,7 +526,7 @@ export default function useLoadingStateManager(
         clearTimeout(failsafeTimer.current);
       }
     };
-  }, [currentPhase, isAuthenticated, hasMinimumContent]);
+  }, [currentPhase, isAuthenticated, hasMinimumContent, isHighStrain]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -533,7 +550,8 @@ export default function useLoadingStateManager(
   const safeCurrentPhase = validatePhase(currentPhase);
 
   // Calculate derived loading state - be more conservative about when to hide loading
-  const isLoading = safeCurrentPhase !== "displaying" && safeCurrentPhase !== "pairing";
+  const isLoading =
+    safeCurrentPhase !== "displaying" && safeCurrentPhase !== "pairing";
   const actualShouldShowLoading =
     shouldShowLoadingScreen && safeCurrentPhase !== "displaying";
   const actualShouldShowDisplay =

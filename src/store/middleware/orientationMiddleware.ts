@@ -66,7 +66,7 @@ export const orientationMiddleware: Middleware = (api: any) => {
           // Set screen ID in the service
           orientationEventService.setScreenId(screenId);
 
-            const baseURL = getApiBaseUrl();
+          const baseURL = getApiBaseUrl();
 
           logger.info(
             "[OrientationMiddleware] Authentication successful with credentials, initializing orientation service",
@@ -120,7 +120,7 @@ export const orientationMiddleware: Middleware = (api: any) => {
             if (stillAuthenticated && screenIdNow) {
               orientationEventService.setScreenId(screenIdNow);
 
-            const baseURL = getApiBaseUrl();
+              const baseURL = getApiBaseUrl();
 
               logger.info(
                 "[OrientationMiddleware] Screen ID now available, initializing orientation service",
@@ -204,7 +204,7 @@ export const orientationMiddleware: Middleware = (api: any) => {
                 );
                 orientationEventService.setScreenId(screenId);
 
-            const baseURL = getApiBaseUrl();
+                const baseURL = getApiBaseUrl();
 
                 orientationEventService.initialize(baseURL);
               }, 2000);
@@ -243,7 +243,7 @@ export const orientationMiddleware: Middleware = (api: any) => {
             },
           );
           orientationEventService.setScreenId(screenId);
-            const baseURL = getApiBaseUrl();
+          const baseURL = getApiBaseUrl();
           orientationEventService.initialize(baseURL);
         }
       }

@@ -564,9 +564,8 @@ class RemoteControlService {
 
       try {
         // First, check if update is already downloaded
-        const updateState = await window.electron!.ipcRenderer!.invoke(
-          "get-update-state",
-        );
+        const updateState =
+          await window.electron!.ipcRenderer!.invoke("get-update-state");
 
         logger.info("RemoteControlService: Current update state", {
           status: updateState?.status,
@@ -592,8 +591,7 @@ class RemoteControlService {
           );
 
           // Install update immediately
-          const installResult =
-            await window.electron!.updater!.installUpdate();
+          const installResult = await window.electron!.updater!.installUpdate();
 
           if (!installResult.success) {
             return {
@@ -659,10 +657,9 @@ class RemoteControlService {
               const installResult =
                 await window.electron!.updater!.installUpdate();
               if (!installResult.success) {
-                logger.error(
-                  "RemoteControlService: Auto-install failed",
-                  { error: installResult.error },
-                );
+                logger.error("RemoteControlService: Auto-install failed", {
+                  error: installResult.error,
+                });
               }
             } catch (installError: any) {
               logger.error("RemoteControlService: Error during auto-install", {
@@ -673,12 +670,15 @@ class RemoteControlService {
         );
 
         // Set timeout to clean up listener after 10 minutes (safety measure)
-        timeoutId = setTimeout(() => {
-          logger.warn(
-            "RemoteControlService: Auto-install listener timeout, cleaning up",
-          );
-          cleanup();
-        }, 10 * 60 * 1000);
+        timeoutId = setTimeout(
+          () => {
+            logger.warn(
+              "RemoteControlService: Auto-install listener timeout, cleaning up",
+            );
+            cleanup();
+          },
+          10 * 60 * 1000,
+        );
 
         // Trigger update check
         const result =
@@ -898,9 +898,8 @@ class RemoteControlService {
 
       // Cleanup other SSE services
       try {
-        const { default: emergencyAlertService } = await import(
-          "./emergencyAlertService"
-        );
+        const { default: emergencyAlertService } =
+          await import("./emergencyAlertService");
         emergencyAlertService.cleanup();
         logger.info("RemoteControlService: Cleaned up emergency alert service");
       } catch (error) {
@@ -911,9 +910,8 @@ class RemoteControlService {
       }
 
       try {
-        const { default: orientationEventService } = await import(
-          "./orientationEventService"
-        );
+        const { default: orientationEventService } =
+          await import("./orientationEventService");
         orientationEventService.cleanup();
         logger.info(
           "RemoteControlService: Cleaned up orientation event service",

@@ -911,7 +911,9 @@ class MasjidDisplayClient {
 
       // Include command acknowledgements if present in the request
       if ((status as any).commandAcknowledgements) {
-        payload.commandAcknowledgements = (status as any).commandAcknowledgements;
+        payload.commandAcknowledgements = (
+          status as any
+        ).commandAcknowledgements;
       }
 
       // Log detailed information about the request

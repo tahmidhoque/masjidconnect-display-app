@@ -28,10 +28,10 @@ const root = ReactDOM.createRoot(
 );
 
 // CRITICAL FIX: Error boundary component for PersistGate failures
-const PersistErrorFallback: React.FC<{ error: Error; resetError: () => void }> = ({
-  error,
-  resetError,
-}) => {
+const PersistErrorFallback: React.FC<{
+  error: Error;
+  resetError: () => void;
+}> = ({ error, resetError }) => {
   React.useEffect(() => {
     logger.error("[PersistGate] Redux persist failed to rehydrate", {
       error: error.message,
@@ -41,7 +41,9 @@ const PersistErrorFallback: React.FC<{ error: Error; resetError: () => void }> =
     // Attempt to recover by purging corrupted state
     const attemptRecovery = async () => {
       try {
-        logger.warn("[PersistGate] Attempting to purge corrupted state and reload");
+        logger.warn(
+          "[PersistGate] Attempting to purge corrupted state and reload",
+        );
         await persistor.purge();
         logger.info("[PersistGate] Corrupted state purged, reloading app");
         window.location.reload();
@@ -65,7 +67,8 @@ const PersistErrorFallback: React.FC<{ error: Error; resetError: () => void }> =
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #0A2647 0%, #144272 50%, #2A9D8F 100%)",
+        background:
+          "linear-gradient(135deg, #0A2647 0%, #144272 50%, #2A9D8F 100%)",
         color: "white",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -96,7 +99,10 @@ root.render(
 
 // CRITICAL FIX: Global error handler for persist errors
 window.addEventListener("error", (event) => {
-  if (event.error?.message?.includes("persist") || event.error?.message?.includes("localStorage")) {
+  if (
+    event.error?.message?.includes("persist") ||
+    event.error?.message?.includes("localStorage")
+  ) {
     logger.error("[GlobalError] Persist-related error detected", {
       error: event.error?.message,
       stack: event.error?.stack,
