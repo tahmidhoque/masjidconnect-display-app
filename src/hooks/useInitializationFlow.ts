@@ -12,9 +12,18 @@ import {
   setInitializationStage,
   setLoadingMessage,
 } from "../store/slices/uiSlice";
+import {
+  checkWiFiAvailability,
+  checkInternetConnectivity,
+  selectIsWiFiAvailable,
+  selectIsWiFiChecked,
+  selectConnectionStatus,
+} from "../store/slices/wifiSlice";
 import logger from "../utils/logger";
 
 export type InitStage =
+  | "wifi-check"
+  | "wifi-setup"
   | "checking"
   | "welcome"
   | "pairing"
@@ -36,6 +45,11 @@ export default function useInitializationFlow() {
   const { isLoading, screenContent, prayerTimes } = useSelector(
     (state: RootState) => state.content,
   );
+
+  // WiFi state
+  const isWiFiAvailable = useSelector(selectIsWiFiAvailable);
+  const isWiFiChecked = useSelector(selectIsWiFiChecked);
+  const wifiConnectionStatus = useSelector(selectConnectionStatus);
 
   const stage = initializationStage as InitStage;
 
@@ -244,6 +258,27 @@ export default function useInitializationFlow() {
     pairingPollTimer.current = setTimeout(poll, 3000);
   }, [pairingCode, dispatch, fetchContent]);
 
+  // Check internet connectivity
+  const checkConnectivity = useCallback(async (): Promise<boolean> => {
+    logger.info("[InitFlow] Checking internet connectivity...");
+
+    // First, try navigator.onLine as a quick check
+    if (!navigator.onLine) {
+      logger.warn("[InitFlow] Navigator reports offline");
+      return false;
+    }
+
+    // Dispatch the async thunk to check actual internet connectivity
+    try {
+      const result = await dispatch(checkInternetConnectivity()).unwrap();
+      logger.info(`[InitFlow] Internet connectivity check: ${result ? "online" : "offline"}`);
+      return result;
+    } catch (error) {
+      logger.error("[InitFlow] Error checking connectivity:", { error });
+      return false;
+    }
+  }, [dispatch]);
+
   // Main initialization effect
   useEffect(() => {
     if (initializationStarted.current) return;
@@ -283,6 +318,39 @@ export default function useInitializationFlow() {
     }, INITIALIZATION_TIMEOUT);
 
     const initializeApp = async () => {
+      // Stage 0: Check WiFi and internet connectivity first
+      setStageDebounced("wifi-check", "Checking network connection...");
+
+      // Check if WiFi management is available (Raspberry Pi with NetworkManager)
+      await dispatch(checkWiFiAvailability());
+
+      // Check internet connectivity
+      const hasInternet = await checkConnectivity();
+
+      if (!hasInternet) {
+        logger.warn("[InitFlow] No internet connectivity detected");
+
+        // If we're on a system with WiFi management, show the WiFi setup screen
+        // Otherwise, just proceed and let the app handle offline state
+        const wifiAvailableResult = await dispatch(checkWiFiAvailability()).unwrap();
+
+        if (wifiAvailableResult) {
+          logger.info("[InitFlow] WiFi management available, showing setup screen");
+          setStageDebounced("wifi-setup", "WiFi setup required");
+          dispatch(setInitializing(false));
+
+          // Clear the initialization timeout since we're waiting for user input
+          if (initializationTimeout.current) {
+            clearTimeout(initializationTimeout.current);
+            initializationTimeout.current = null;
+          }
+          return; // Exit and wait for WiFi connection
+        } else {
+          logger.info("[InitFlow] No WiFi management, proceeding in offline mode");
+          // Continue with normal flow - the app will work with cached content
+        }
+      }
+
       // Stage 1: Check credentials
       setStageDebounced("checking", "Checking credentials...");
 
@@ -368,9 +436,63 @@ export default function useInitializationFlow() {
     fetchContent,
     startPairingProcess,
     checkCredentialsPersistence,
+    checkConnectivity,
     setStageDebounced,
     isAuthenticated,
     hasMinimumData,
+  ]);
+
+  // Handle WiFi connection success - resume initialization
+  useEffect(() => {
+    if (stage === "wifi-setup" && wifiConnectionStatus === "connected") {
+      logger.info("[InitFlow] WiFi connected, resuming initialization");
+
+      // Reset initialization state to allow re-initialization
+      initializationStarted.current = false;
+
+      // Brief delay then restart initialization
+      setTimeout(() => {
+        setStageDebounced("checking", "Connection established! Checking credentials...");
+        dispatch(setInitializing(true));
+
+        // Re-run the credential check flow
+        const resumeInitialization = async () => {
+          const hasStoredCredentials = checkCredentialsPersistence();
+
+          if (hasStoredCredentials) {
+            localStorage.removeItem("pairingCode");
+            localStorage.removeItem("pairingCodeExpiresAt");
+            localStorage.removeItem("lastPairingCodeRequestTime");
+          }
+
+          try {
+            const action: any = await dispatch(initializeFromStorage());
+
+            if (action.payload?.credentials) {
+              logger.info("[InitFlow] Authentication successful after WiFi connect");
+              setStageDebounced("welcome", "Welcome back!", 500);
+              setTimeout(() => fetchContent(), 1200);
+            } else {
+              logger.info("[InitFlow] No credentials after WiFi, starting pairing");
+              startPairingProcess();
+            }
+          } catch (error) {
+            logger.error("[InitFlow] Error after WiFi connect:", { error });
+            startPairingProcess();
+          }
+        };
+
+        resumeInitialization();
+      }, 500);
+    }
+  }, [
+    stage,
+    wifiConnectionStatus,
+    dispatch,
+    setStageDebounced,
+    checkCredentialsPersistence,
+    fetchContent,
+    startPairingProcess,
   ]);
 
   // Handle pairing code availability
@@ -435,5 +557,13 @@ export default function useInitializationFlow() {
     };
   }, []);
 
-  return { stage };
+  // Determine if we need WiFi setup
+  const needsWiFiSetup = stage === "wifi-setup";
+
+  return {
+    stage,
+    needsWiFiSetup,
+    isWiFiAvailable,
+    isWiFiChecked,
+  };
 }

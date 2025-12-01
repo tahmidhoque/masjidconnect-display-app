@@ -180,4 +180,45 @@ contextBridge.exposeInMainWorld('electron', {
     // Get all keys in store
     keys: () => store.keys(),
   },
+
+  // WiFi configuration API (for Raspberry Pi with NetworkManager)
+  wifi: {
+    /**
+     * Check if WiFi configuration is available on this system
+     * @returns {Promise<{available: boolean}>}
+     */
+    isAvailable: () => ipcRenderer.invoke('wifi-is-available'),
+
+    /**
+     * Scan for available WiFi networks
+     * @returns {Promise<{success: boolean, networks?: Array, error?: string}>}
+     */
+    scan: () => ipcRenderer.invoke('wifi-scan'),
+
+    /**
+     * Connect to a WiFi network
+     * @param {string} ssid - The network SSID
+     * @param {string} password - The network password (optional for open networks)
+     * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+     */
+    connect: (ssid, password) => ipcRenderer.invoke('wifi-connect', { ssid, password }),
+
+    /**
+     * Get current WiFi connection status
+     * @returns {Promise<{success: boolean, status?: object, error?: string}>}
+     */
+    getStatus: () => ipcRenderer.invoke('wifi-status'),
+
+    /**
+     * Get currently connected network info
+     * @returns {Promise<{success: boolean, network?: object, error?: string}>}
+     */
+    getCurrentNetwork: () => ipcRenderer.invoke('wifi-current'),
+
+    /**
+     * Disconnect from current WiFi network
+     * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+     */
+    disconnect: () => ipcRenderer.invoke('wifi-disconnect'),
+  },
 });

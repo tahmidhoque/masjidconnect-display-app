@@ -8,6 +8,12 @@ import {
   ErrorCode,
   ErrorSeverity,
 } from "../store/slices/errorSlice";
+import {
+  setShowReconnectOverlay,
+  setConnectionStatus,
+  recordDisconnect,
+  resetReconnectAttempts,
+} from "../store/slices/wifiSlice";
 
 export interface NetworkStatusUpdate {
   isOnline: boolean;
@@ -15,6 +21,8 @@ export interface NetworkStatusUpdate {
   connectionType: "wifi" | "cellular" | "ethernet" | "unknown";
   latency: number | null;
   lastConnected: string | null;
+  lastDisconnected: string | null;
+  offlineDuration: number | null;
   effectiveType?: string;
   downlink?: number;
   rtt?: number;
@@ -39,11 +47,17 @@ class NetworkStatusService {
   private lastErrorReportTime: number = 0;
   private errorReportCooldown: number = 30000; // 30 seconds between error reports
 
+  // Reconnection tracking
+  private lastDisconnectTime: number | null = null;
+  private reconnectOverlayTimer: NodeJS.Timeout | null = null;
+  private wasOnline: boolean = true;
+
   // Configuration
   private readonly CHECK_INTERVAL = 30000; // 30 seconds
   private readonly FAST_CHECK_INTERVAL = 5000; // 5 seconds when offline
   private readonly LATENCY_TIMEOUT = 5000; // 5 seconds for latency test
   private readonly MAX_CONSECUTIVE_FAILURES = 3;
+  private readonly RECONNECT_OVERLAY_DELAY = 30000; // Show overlay after 30 seconds offline
 
   constructor() {
     this.currentStatus = {
@@ -52,6 +66,8 @@ class NetworkStatusService {
       connectionType: "unknown",
       latency: null,
       lastConnected: navigator.onLine ? new Date().toISOString() : null,
+      lastDisconnected: null,
+      offlineDuration: null,
     };
   }
 
@@ -85,6 +101,11 @@ class NetworkStatusService {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+
+    if (this.reconnectOverlayTimer) {
+      clearTimeout(this.reconnectOverlayTimer);
+      this.reconnectOverlayTimer = null;
     }
 
     window.removeEventListener("online", this.handleOnlineEvent);
@@ -522,13 +543,16 @@ class NetworkStatusService {
   }
 
   /**
-   * Report network errors to the error system
+   * Report network errors to the error system and handle reconnection tracking
    */
   private reportNetworkErrors(
     previousStatus: NetworkStatusUpdate,
     currentStatus: NetworkStatusUpdate,
   ): void {
     const now = Date.now();
+
+    // Track disconnect/reconnect events for WiFi overlay
+    this.handleReconnectionTracking(previousStatus, currentStatus);
 
     // Check if we should report an error (respect cooldown)
     if (now - this.lastErrorReportTime < this.errorReportCooldown) {
@@ -591,6 +615,106 @@ class NetworkStatusService {
       );
       this.lastErrorReportTime = now;
     }
+  }
+
+  /**
+   * Handle reconnection tracking for WiFi overlay
+   */
+  private handleReconnectionTracking(
+    previousStatus: NetworkStatusUpdate,
+    currentStatus: NetworkStatusUpdate,
+  ): void {
+    const wasOnline = previousStatus.isOnline || previousStatus.isApiReachable;
+    const isOnline = currentStatus.isOnline || currentStatus.isApiReachable;
+
+    // Going offline
+    if (wasOnline && !isOnline) {
+      logger.info("[NetworkStatus] Connection lost, starting reconnect tracking");
+      this.lastDisconnectTime = Date.now();
+      this.wasOnline = false;
+
+      // Update WiFi slice
+      try {
+        store.dispatch(recordDisconnect());
+        store.dispatch(setConnectionStatus("disconnected"));
+      } catch (error) {
+        logger.error("[NetworkStatus] Failed to dispatch disconnect", { error });
+      }
+
+      // Start timer to show reconnect overlay after delay
+      if (this.reconnectOverlayTimer) {
+        clearTimeout(this.reconnectOverlayTimer);
+      }
+
+      this.reconnectOverlayTimer = setTimeout(() => {
+        // Only show overlay if still offline
+        if (!this.currentStatus.isOnline && !this.currentStatus.isApiReachable) {
+          logger.info("[NetworkStatus] Offline for 30s, showing reconnect overlay");
+          try {
+            store.dispatch(setShowReconnectOverlay(true));
+          } catch (error) {
+            logger.error("[NetworkStatus] Failed to show reconnect overlay", { error });
+          }
+        }
+      }, this.RECONNECT_OVERLAY_DELAY);
+
+      // Update status with disconnect time
+      this.currentStatus.lastDisconnected = new Date().toISOString();
+    }
+
+    // Coming back online
+    if (!this.wasOnline && isOnline) {
+      logger.info("[NetworkStatus] Connection restored");
+      this.wasOnline = true;
+
+      // Calculate offline duration
+      if (this.lastDisconnectTime) {
+        const offlineDuration = Date.now() - this.lastDisconnectTime;
+        this.currentStatus.offlineDuration = offlineDuration;
+        logger.info(`[NetworkStatus] Was offline for ${offlineDuration}ms`);
+      }
+
+      // Clear reconnect overlay timer
+      if (this.reconnectOverlayTimer) {
+        clearTimeout(this.reconnectOverlayTimer);
+        this.reconnectOverlayTimer = null;
+      }
+
+      // Reset last disconnect time
+      this.lastDisconnectTime = null;
+
+      // Update WiFi slice
+      try {
+        store.dispatch(setShowReconnectOverlay(false));
+        store.dispatch(setConnectionStatus("connected"));
+        store.dispatch(resetReconnectAttempts());
+      } catch (error) {
+        logger.error("[NetworkStatus] Failed to dispatch reconnect", { error });
+      }
+    }
+
+    // Update offline duration while offline
+    if (!isOnline && this.lastDisconnectTime) {
+      this.currentStatus.offlineDuration = Date.now() - this.lastDisconnectTime;
+    }
+  }
+
+  /**
+   * Get the time since last disconnect (in milliseconds)
+   */
+  public getOfflineDuration(): number | null {
+    if (this.lastDisconnectTime) {
+      return Date.now() - this.lastDisconnectTime;
+    }
+    return null;
+  }
+
+  /**
+   * Check if we've been offline long enough to show reconnect overlay
+   */
+  public shouldShowReconnectOverlay(): boolean {
+    const offlineDuration = this.getOfflineDuration();
+    return offlineDuration !== null && offlineDuration >= this.RECONNECT_OVERLAY_DELAY;
   }
 
   /**

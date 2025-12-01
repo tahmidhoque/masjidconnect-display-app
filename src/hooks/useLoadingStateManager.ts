@@ -9,6 +9,8 @@ import {
 
 export type AppPhase =
   | "initializing" // App is starting up
+  | "wifi-check" // Checking network connectivity
+  | "wifi-setup" // WiFi configuration required
   | "checking" // Checking credentials
   | "pairing" // Showing pairing screen
   | "loading-content" // Loading display content
@@ -110,6 +112,8 @@ export default function useLoadingStateManager(
     (phase: AppPhase | undefined | null): AppPhase => {
       const validPhases: AppPhase[] = [
         "initializing",
+        "wifi-check",
+        "wifi-setup",
         "checking",
         "pairing",
         "loading-content",
@@ -161,6 +165,10 @@ export default function useLoadingStateManager(
     switch (phase) {
       case "initializing":
         return 5;
+      case "wifi-check":
+        return 8;
+      case "wifi-setup":
+        return 10;
       case "checking":
         return 20;
       case "pairing":
@@ -183,6 +191,10 @@ export default function useLoadingStateManager(
     switch (phase) {
       case "initializing":
         return "Starting up...";
+      case "wifi-check":
+        return "Checking network connection...";
+      case "wifi-setup":
+        return "WiFi setup required";
       case "checking":
         return "Checking credentials...";
       case "pairing":
@@ -254,8 +266,16 @@ export default function useLoadingStateManager(
             setIsTransitioning(false);
 
             // Update display flags based on new phase
-            if (pendingPhase === "pairing") {
+            if (
+              pendingPhase === "pairing" ||
+              pendingPhase === "wifi-setup"
+            ) {
+              // Pairing and WiFi setup screens are handled separately
               setShouldShowLoadingScreen(false);
+              setShouldShowDisplay(false);
+            } else if (pendingPhase === "wifi-check") {
+              // Brief WiFi check phase - show loading
+              setShouldShowLoadingScreen(true);
               setShouldShowDisplay(false);
             } else if (pendingPhase === "preparing") {
               // Auto-transition from preparing to ready
@@ -360,10 +380,23 @@ export default function useLoadingStateManager(
     if (!isAuthenticated && !isPairing && !pairingCode) {
       // No authentication, not pairing
       if (isInitializing) {
-        targetPhase =
-          initializationStage === "checking" ? "checking" : "initializing";
+        // Handle WiFi check/setup stages
+        if (initializationStage === "wifi-check") {
+          targetPhase = "wifi-check";
+        } else if (initializationStage === "wifi-setup") {
+          targetPhase = "wifi-setup";
+        } else if (initializationStage === "checking") {
+          targetPhase = "checking";
+        } else {
+          targetPhase = "initializing";
+        }
       } else {
-        targetPhase = "checking";
+        // Not initializing - check for wifi-setup stage
+        if (initializationStage === "wifi-setup") {
+          targetPhase = "wifi-setup";
+        } else {
+          targetPhase = "checking";
+        }
       }
     } else if (!isAuthenticated && (isPairing || pairingCode)) {
       // In pairing mode
@@ -551,9 +584,13 @@ export default function useLoadingStateManager(
 
   // Calculate derived loading state - be more conservative about when to hide loading
   const isLoading =
-    safeCurrentPhase !== "displaying" && safeCurrentPhase !== "pairing";
+    safeCurrentPhase !== "displaying" &&
+    safeCurrentPhase !== "pairing" &&
+    safeCurrentPhase !== "wifi-setup";
   const actualShouldShowLoading =
-    shouldShowLoadingScreen && safeCurrentPhase !== "displaying";
+    shouldShowLoadingScreen &&
+    safeCurrentPhase !== "displaying" &&
+    safeCurrentPhase !== "wifi-setup";
   const actualShouldShowDisplay =
     shouldShowDisplay && safeCurrentPhase === "displaying";
 

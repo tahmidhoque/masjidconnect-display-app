@@ -20,6 +20,7 @@ import uiSlice from "./slices/uiSlice";
 import emergencySlice from "./slices/emergencySlice";
 import errorSlice from "./slices/errorSlice";
 import updateSlice from "./slices/updateSlice";
+import wifiSlice from "./slices/wifiSlice";
 
 // Import middleware
 import { emergencyMiddleware } from "./middleware/emergencyMiddleware";
@@ -35,6 +36,7 @@ const rootReducer = combineReducers({
   emergency: emergencySlice,
   errors: errorSlice,
   update: updateSlice,
+  wifi: wifiSlice,
 });
 
 // Types are defined below to avoid circular dependencies
@@ -84,8 +86,8 @@ const persistConfig = {
   version: 1,
   storage,
   // Blacklist UI state and error state that should not be persisted
-  // Also blacklist update state as it should be fresh on each app start
-  blacklist: ["ui", "errors", "update"],
+  // Also blacklist update state and wifi state as they should be fresh on each app start
+  blacklist: ["ui", "errors", "update", "wifi"],
   // Whitelist critical data that should be persisted
   whitelist: ["auth", "content", "emergency"],
   // CRITICAL FIX: Add transform to validate and sanitize state

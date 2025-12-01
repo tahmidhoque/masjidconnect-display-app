@@ -1,3 +1,33 @@
+/**
+ * WiFi network information returned from scanning
+ */
+interface WiFiNetwork {
+  ssid: string;
+  signal: number;
+  security: string;
+  inUse: boolean;
+}
+
+/**
+ * WiFi connection status from NetworkManager
+ */
+interface WiFiStatus {
+  state: string;
+  connectivity: string;
+  wifi: string;
+  wifiHw: string;
+}
+
+/**
+ * Currently connected network info
+ */
+interface CurrentNetwork {
+  ssid: string;
+  signal: number;
+  security: string;
+  connected: boolean;
+}
+
 interface Window {
   electron?: {
     app?: {
@@ -68,6 +98,37 @@ interface Window {
       has: (key: string) => boolean;
       clear: () => void;
       keys: () => string[];
+    };
+    wifi?: {
+      isAvailable: () => Promise<{ available: boolean }>;
+      scan: () => Promise<{
+        success: boolean;
+        networks?: WiFiNetwork[];
+        error?: string;
+      }>;
+      connect: (
+        ssid: string,
+        password?: string,
+      ) => Promise<{
+        success: boolean;
+        message?: string;
+        error?: string;
+      }>;
+      getStatus: () => Promise<{
+        success: boolean;
+        status?: WiFiStatus;
+        error?: string;
+      }>;
+      getCurrentNetwork: () => Promise<{
+        success: boolean;
+        network?: CurrentNetwork | null;
+        error?: string;
+      }>;
+      disconnect: () => Promise<{
+        success: boolean;
+        message?: string;
+        error?: string;
+      }>;
     };
   };
   process?: {

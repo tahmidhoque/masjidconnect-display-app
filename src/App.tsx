@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense, lazy, useCallback } from "react";
 import { Box, ThemeProvider, CssBaseline } from "@mui/material";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 import theme from "./theme/theme";
 import logger from "./utils/logger";
@@ -12,6 +12,8 @@ import UpdateNotification from "./components/common/UpdateNotification";
 import RemoteCommandNotification from "./components/common/RemoteCommandNotification";
 import FactoryResetModal from "./components/common/FactoryResetModal";
 import EnhancedLoadingScreen from "./components/screens/EnhancedLoadingScreen";
+import WiFiReconnectOverlay from "./components/common/WiFiReconnectOverlay";
+import { selectShowReconnectOverlay, selectCurrentNetwork } from "./store/slices/wifiSlice";
 import { OrientationProvider } from "./contexts/OrientationContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 // Clear cached Hijri data to ensure accurate calculation
@@ -49,6 +51,12 @@ const DisplayScreen = lazy(() =>
   ComponentPreloader.preload(
     "DisplayScreen",
     () => import("./components/screens/DisplayScreen"),
+  ),
+);
+const WiFiSetupScreen = lazy(() =>
+  ComponentPreloader.preload(
+    "WiFiSetupScreen",
+    () => import("./components/screens/WiFiSetupScreen"),
   ),
 );
 // ErrorScreen is loaded dynamically when needed
@@ -161,8 +169,8 @@ const useLocalStorageMonitor = () => {
 const AppRoutes: React.FC = () => {
   useKioskMode();
 
-  // Initialize the app flow (but don't use its stage directly)
-  useInitializationFlow();
+  // Initialize the app flow and get WiFi setup status
+  const { needsWiFiSetup } = useInitializationFlow();
 
   // Use the new unified loading state manager
   const {
@@ -184,9 +192,17 @@ const AppRoutes: React.FC = () => {
     logger.info("[App] Loading screen transition completed");
   }, []);
 
+  // Handle WiFi connection success
+  const handleWiFiConnected = useCallback(() => {
+    logger.info("[App] WiFi connected, continuing initialization");
+    // The initialization flow will automatically resume via the useEffect in useInitializationFlow
+  }, []);
+
   // CRITICAL FIX: Validate currentPhase to prevent undefined/invalid states
   const validPhases: AppPhase[] = [
     "initializing",
+    "wifi-check",
+    "wifi-setup",
     "checking",
     "pairing",
     "loading-content",
@@ -210,10 +226,29 @@ const AppRoutes: React.FC = () => {
   // CRITICAL FIX: Always show loading screen for these phases to prevent gaps
   const shouldForceLoadingScreen =
     safePhase === "initializing" ||
+    safePhase === "wifi-check" ||
     safePhase === "checking" ||
     safePhase === "loading-content" ||
     safePhase === "preparing" ||
     safePhase === "ready";
+
+  // Show WiFi setup screen when network configuration is needed
+  if (safePhase === "wifi-setup" || needsWiFiSetup) {
+    return (
+      <Suspense
+        fallback={
+          <EnhancedLoadingScreen
+            currentPhase="wifi-check"
+            progress={10}
+            statusMessage="Loading WiFi setup..."
+            isTransitioning={false}
+          />
+        }
+      >
+        <WiFiSetupScreen onConnected={handleWiFiConnected} />
+      </Suspense>
+    );
+  }
 
   // CRITICAL FIX: Ensure we always render something - never return null
   // Show enhanced loading screen when needed
@@ -294,6 +329,10 @@ const App: React.FC = () => {
   // Initialize factory reset functionality
   const { isModalOpen, closeModal, confirmReset, isResetting } =
     useFactoryReset();
+
+  // WiFi reconnect overlay state
+  const showReconnectOverlay = useSelector(selectShowReconnectOverlay);
+  const currentNetwork = useSelector(selectCurrentNetwork);
 
   // Setup network status listener and offline storage cleanup
   const dispatch = useDispatch();
@@ -436,6 +475,16 @@ const App: React.FC = () => {
               <AnalyticsErrorIntegration />
               <UpdateNotification />
               <RemoteCommandNotification />
+
+              {/* WiFi Reconnect Overlay - shown when connection drops after pairing */}
+              {showReconnectOverlay && (
+                <WiFiReconnectOverlay
+                  lastNetwork={currentNetwork?.ssid || null}
+                  onReconnected={() => {
+                    logger.info("[App] WiFi reconnected via overlay");
+                  }}
+                />
+              )}
 
               {/* Factory Reset Modal */}
               <FactoryResetModal

@@ -4,6 +4,7 @@ const url = require('url');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const fs = require('fs');
+const { exec } = require('child_process');
 
 // Configure logging
 // Reduce log verbosity in production to minimize disk writes
@@ -620,6 +621,305 @@ ipcMain.handle('restart-app', async () => {
   } catch (error) {
     log.error('Error restarting app:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// WiFi Configuration IPC Handlers (for Raspberry Pi with NetworkManager)
+// ============================================================================
+
+/**
+ * Execute a shell command and return a promise
+ * @param {string} command - The command to execute
+ * @returns {Promise<{stdout: string, stderr: string}>}
+ */
+function execCommand(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, { timeout: 30000 }, (error, stdout, stderr) => {
+      if (error) {
+        reject({ error, stdout, stderr });
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
+
+/**
+ * Parse nmcli wifi list output into structured data
+ * @param {string} output - Raw nmcli output
+ * @returns {Array} - Array of network objects
+ */
+function parseWifiList(output) {
+  const networks = [];
+  const lines = output.trim().split('\n');
+  
+  // Skip header line if present
+  const startIndex = lines[0] && lines[0].includes('IN-USE') ? 1 : 0;
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    
+    // Parse the line - format: IN-USE:BSSID:SSID:MODE:CHAN:RATE:SIGNAL:BARS:SECURITY
+    // Using -t flag gives us colon-separated values
+    const parts = line.split(':');
+    
+    if (parts.length >= 8) {
+      const inUse = parts[0] === '*';
+      const ssid = parts[2];
+      const signal = parseInt(parts[6], 10) || 0;
+      const security = parts[8] || 'Open';
+      
+      // Skip hidden networks (empty SSID)
+      if (!ssid || ssid === '--') continue;
+      
+      // Check if network already in list (avoid duplicates from multiple access points)
+      const existingIndex = networks.findIndex(n => n.ssid === ssid);
+      if (existingIndex >= 0) {
+        // Keep the one with stronger signal
+        if (signal > networks[existingIndex].signal) {
+          networks[existingIndex] = { ssid, signal, security, inUse };
+        }
+      } else {
+        networks.push({ ssid, signal, security, inUse });
+      }
+    }
+  }
+  
+  // Sort by signal strength (descending)
+  networks.sort((a, b) => b.signal - a.signal);
+  
+  return networks;
+}
+
+/**
+ * Check if NetworkManager is available on this system
+ * @returns {Promise<boolean>}
+ */
+async function isNetworkManagerAvailable() {
+  try {
+    await execCommand('which nmcli');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// WiFi scan handler - List available WiFi networks
+ipcMain.handle('wifi-scan', async () => {
+  log.info('[WiFi] Scanning for available networks...');
+  
+  try {
+    // Check if NetworkManager is available
+    const nmAvailable = await isNetworkManagerAvailable();
+    if (!nmAvailable) {
+      log.warn('[WiFi] NetworkManager (nmcli) not available on this system');
+      return { 
+        success: false, 
+        error: 'WiFi configuration is only available on Raspberry Pi with NetworkManager',
+        networks: [] 
+      };
+    }
+    
+    // Scan for networks with rescan
+    const { stdout } = await execCommand('nmcli -t -f IN-USE,BSSID,SSID,MODE,CHAN,RATE,SIGNAL,BARS,SECURITY device wifi list --rescan yes');
+    
+    const networks = parseWifiList(stdout);
+    log.info(`[WiFi] Found ${networks.length} networks`);
+    
+    return { success: true, networks };
+  } catch (error) {
+    log.error('[WiFi] Scan failed:', error);
+    return { 
+      success: false, 
+      error: error.error?.message || 'Failed to scan for WiFi networks',
+      networks: [] 
+    };
+  }
+});
+
+// WiFi connect handler - Connect to a WiFi network
+ipcMain.handle('wifi-connect', async (event, { ssid, password }) => {
+  log.info(`[WiFi] Attempting to connect to: ${ssid}`);
+  
+  if (!ssid) {
+    return { success: false, error: 'SSID is required' };
+  }
+  
+  try {
+    // Check if NetworkManager is available
+    const nmAvailable = await isNetworkManagerAvailable();
+    if (!nmAvailable) {
+      return { 
+        success: false, 
+        error: 'WiFi configuration is only available on Raspberry Pi with NetworkManager'
+      };
+    }
+    
+    // Build the connect command
+    // Escape special characters in SSID and password
+    const escapedSsid = ssid.replace(/'/g, "'\\''");
+    const escapedPassword = password ? password.replace(/'/g, "'\\''") : '';
+    
+    let command;
+    if (password) {
+      command = `nmcli device wifi connect '${escapedSsid}' password '${escapedPassword}'`;
+    } else {
+      command = `nmcli device wifi connect '${escapedSsid}'`;
+    }
+    
+    await execCommand(command);
+    
+    log.info(`[WiFi] Successfully connected to: ${ssid}`);
+    return { success: true, message: `Connected to ${ssid}` };
+  } catch (error) {
+    log.error(`[WiFi] Connection failed for ${ssid}:`, error);
+    
+    // Parse common error messages for user-friendly feedback
+    const stderr = error.stderr || '';
+    let userMessage = 'Failed to connect to network';
+    
+    if (stderr.includes('Secrets were required') || stderr.includes('password')) {
+      userMessage = 'Incorrect password. Please try again.';
+    } else if (stderr.includes('No network with SSID')) {
+      userMessage = 'Network not found. Please scan again.';
+    } else if (stderr.includes('Connection activation failed')) {
+      userMessage = 'Connection failed. Please check the password and try again.';
+    }
+    
+    return { success: false, error: userMessage };
+  }
+});
+
+// WiFi status handler - Get current connection status
+ipcMain.handle('wifi-status', async () => {
+  log.info('[WiFi] Checking connection status...');
+  
+  try {
+    // Check if NetworkManager is available
+    const nmAvailable = await isNetworkManagerAvailable();
+    if (!nmAvailable) {
+      return { 
+        success: true,
+        status: {
+          state: 'unknown',
+          connectivity: 'unknown',
+          wifi: 'unavailable',
+          wifiHw: 'unavailable'
+        }
+      };
+    }
+    
+    // Get general NetworkManager status
+    const { stdout } = await execCommand('nmcli -t general status');
+    const parts = stdout.trim().split(':');
+    
+    const status = {
+      state: parts[0] || 'unknown',        // connected, disconnected, connecting, etc.
+      connectivity: parts[1] || 'unknown', // full, limited, none, portal
+      wifi: parts[2] || 'unknown',         // enabled, disabled
+      wifiHw: parts[3] || 'unknown'        // enabled, disabled (hardware switch)
+    };
+    
+    log.info('[WiFi] Status:', status);
+    return { success: true, status };
+  } catch (error) {
+    log.error('[WiFi] Status check failed:', error);
+    return { 
+      success: false, 
+      error: error.error?.message || 'Failed to get WiFi status',
+      status: null 
+    };
+  }
+});
+
+// WiFi current network handler - Get currently connected network info
+ipcMain.handle('wifi-current', async () => {
+  log.info('[WiFi] Getting current network info...');
+  
+  try {
+    // Check if NetworkManager is available
+    const nmAvailable = await isNetworkManagerAvailable();
+    if (!nmAvailable) {
+      return { success: true, network: null };
+    }
+    
+    // Get active WiFi connection
+    const { stdout } = await execCommand('nmcli -t -f ACTIVE,SSID,SIGNAL,SECURITY dev wifi');
+    const lines = stdout.trim().split('\n');
+    
+    for (const line of lines) {
+      const parts = line.split(':');
+      if (parts[0] === 'yes' && parts[1]) {
+        const network = {
+          ssid: parts[1],
+          signal: parseInt(parts[2], 10) || 0,
+          security: parts[3] || 'Open',
+          connected: true
+        };
+        
+        log.info('[WiFi] Currently connected to:', network.ssid);
+        return { success: true, network };
+      }
+    }
+    
+    log.info('[WiFi] Not connected to any network');
+    return { success: true, network: null };
+  } catch (error) {
+    log.error('[WiFi] Failed to get current network:', error);
+    return { 
+      success: false, 
+      error: error.error?.message || 'Failed to get current network',
+      network: null 
+    };
+  }
+});
+
+// WiFi disconnect handler - Disconnect from current network
+ipcMain.handle('wifi-disconnect', async () => {
+  log.info('[WiFi] Disconnecting from current network...');
+  
+  try {
+    // Check if NetworkManager is available
+    const nmAvailable = await isNetworkManagerAvailable();
+    if (!nmAvailable) {
+      return { success: false, error: 'NetworkManager not available' };
+    }
+    
+    // Get the WiFi device name (usually wlan0)
+    const { stdout: deviceOutput } = await execCommand('nmcli -t -f DEVICE,TYPE dev');
+    const devices = deviceOutput.trim().split('\n');
+    let wifiDevice = 'wlan0';
+    
+    for (const device of devices) {
+      const [name, type] = device.split(':');
+      if (type === 'wifi') {
+        wifiDevice = name;
+        break;
+      }
+    }
+    
+    await execCommand(`nmcli device disconnect ${wifiDevice}`);
+    
+    log.info('[WiFi] Successfully disconnected');
+    return { success: true, message: 'Disconnected from WiFi' };
+  } catch (error) {
+    log.error('[WiFi] Disconnect failed:', error);
+    return { 
+      success: false, 
+      error: error.error?.message || 'Failed to disconnect from WiFi'
+    };
+  }
+});
+
+// Check if running on Raspberry Pi
+ipcMain.handle('wifi-is-available', async () => {
+  try {
+    const nmAvailable = await isNetworkManagerAvailable();
+    return { available: nmAvailable };
+  } catch {
+    return { available: false };
   }
 });
 
