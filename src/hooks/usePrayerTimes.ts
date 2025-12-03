@@ -827,11 +827,14 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         nextPrayer.isCurrent = false;
       } else {
         // Check if this prayer's time has already passed today
-        const prayerTime = dayjs().hour(0).minute(0).second(0).millisecond(0);
         const [prayerHours, prayerMinutes] = nextPrayer.time
           .split(":")
           .map(Number);
-        prayerTime.hour(prayerHours).minute(prayerMinutes);
+        const prayerTime = dayjs()
+          .hour(prayerHours)
+          .minute(prayerMinutes)
+          .second(0)
+          .millisecond(0);
 
         // If prayer time has passed today, it means we're counting down to tomorrow's occurrence
         // Need to be careful comparing dayjs objects

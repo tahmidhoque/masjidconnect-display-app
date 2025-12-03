@@ -91,11 +91,20 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
     try {
       const now = dayjs();
-      const prayerDayjs = parseTimeToday(prayerTime);
+      let prayerDayjs = parseTimeToday(prayerTime);
 
       if (!prayerDayjs) {
         logger.error(`[PrayerCountdown] Could not parse prayer time: ${prayerTime}`);
         return;
+      }
+
+      // If prayer time is in the past, it must be tomorrow's prayer
+      // (parent component already determined this is the next prayer)
+      if (now.isAfter(prayerDayjs)) {
+        prayerDayjs = prayerDayjs.add(1, "day");
+        logger.debug(
+          `[PrayerCountdown] ${prayerName} time ${prayerTime} is in the past, adjusted to tomorrow: ${prayerDayjs.format("YYYY-MM-DD HH:mm")}`,
+        );
       }
 
       let targetDayjs: dayjs.Dayjs | null = null;
