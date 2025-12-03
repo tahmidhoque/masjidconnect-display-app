@@ -1,4 +1,4 @@
-import React, { useEffect, Suspense, lazy, useCallback } from "react";
+import React, { useEffect, Suspense, lazy, useCallback, useMemo, useState, useRef } from "react";
 import { Box, ThemeProvider, CssBaseline } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -16,24 +16,17 @@ import WiFiReconnectOverlay from "./components/common/WiFiReconnectOverlay";
 import { selectShowReconnectOverlay, selectCurrentNetwork } from "./store/slices/wifiSlice";
 import { OrientationProvider } from "./contexts/OrientationContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
-// Clear cached Hijri data to ensure accurate calculation
 import "./utils/clearHijriCache";
-// ✅ DISABLED: Demo imports that were causing console spam in development
-// import "./utils/verifyHijriCalculation";
-// import "./utils/factoryResetDemo";
-// import "./utils/countdownTest";
 import useKioskMode from "./hooks/useKioskMode";
-import useInitializationFlow from "./hooks/useInitializationFlow";
+import useAppLoader from "./hooks/useAppLoader";
 import useFactoryReset from "./hooks/useFactoryReset";
-import useLoadingStateManager, {
-  type AppPhase,
-} from "./hooks/useLoadingStateManager";
 import { setOffline } from "./store/slices/uiSlice";
 import offlineStorage from "./services/offlineStorageService";
 import {
   ComponentPreloader,
   initializeMemoryManagement,
   rpiMemoryManager,
+  isHighStrainDevice,
 } from "./utils/performanceUtils";
 import { crashLogger } from "./utils/crashLogger";
 import "./utils/crashReportViewer";
@@ -44,25 +37,29 @@ import rpiConfig from "./utils/rpiConfig";
 const PairingScreen = lazy(() =>
   ComponentPreloader.preload(
     "PairingScreen",
-    () => import("./components/screens/PairingScreen"),
-  ),
+    () => import("./components/screens/PairingScreen")
+  )
 );
 const DisplayScreen = lazy(() =>
   ComponentPreloader.preload(
     "DisplayScreen",
-    () => import("./components/screens/DisplayScreen"),
-  ),
+    () => import("./components/screens/DisplayScreen")
+  )
 );
 const WiFiSetupScreen = lazy(() =>
   ComponentPreloader.preload(
     "WiFiSetupScreen",
-    () => import("./components/screens/WiFiSetupScreen"),
-  ),
+    () => import("./components/screens/WiFiSetupScreen")
+  )
 );
-// ErrorScreen is loaded dynamically when needed
-// const ErrorScreen = lazy(() =>
-//   ComponentPreloader.preload('ErrorScreen', () => import('./components/screens/ErrorScreen'))
-// );
+
+// Transition timing constants - designed to prevent flashing
+const TRANSITION_DURATION = 800; // ms for fade transitions (smooth feel)
+const TRANSITION_DURATION_HIGH_STRAIN = 600; // Slightly faster for high strain devices but still smooth
+const MIN_LOADING_DISPLAY = 4500; // Minimum time to show loading screen (4.5s for professional feel)
+const MIN_LOADING_DISPLAY_HIGH_STRAIN = 3000; // Shorter for high strain devices (3s)
+const POST_READY_DELAY = 500; // Extra delay after loader reports ready before transitioning
+const TRANSITION_DEBOUNCE = 100; // Minimum time between transition state changes
 
 // Development localStorage monitor for debugging credential issues
 const useLocalStorageMonitor = () => {
@@ -99,7 +96,7 @@ const useLocalStorageMonitor = () => {
 
     logger.info(
       "[DevMonitor] Credential-related localStorage on startup:",
-      credentialContents,
+      credentialContents
     );
 
     const originalSetItem = localStorage.setItem;
@@ -137,11 +134,11 @@ const useLocalStorageMonitor = () => {
           acc[key] = localStorage.getItem(key);
           return acc;
         },
-        {} as Record<string, string | null>,
+        {} as Record<string, string | null>
       );
 
       const hasCredentials = Object.values(credentialValues).some(
-        (v) => v !== null,
+        (v) => v !== null
       );
 
       if (hasCredentials) {
@@ -150,7 +147,7 @@ const useLocalStorageMonitor = () => {
           {
             credentials: credentialValues,
             stack: new Error().stack?.split("\n").slice(1, 4).join("\n"),
-          },
+          }
         );
       }
 
@@ -166,167 +163,389 @@ const useLocalStorageMonitor = () => {
   }, []);
 };
 
+/**
+ * Screen type for transition management
+ */
+type ScreenType = "loading" | "wifi-setup" | "pairing" | "display";
+
+/**
+ * AppRoutes - Simplified routing component with smooth transitions
+ * 
+ * Uses the unified useAppLoader hook for state management
+ * and provides controlled transitions between screens to prevent flashing.
+ */
 const AppRoutes: React.FC = () => {
   useKioskMode();
 
-  // Initialize the app flow and get WiFi setup status
-  const { needsWiFiSetup } = useInitializationFlow();
+  // Performance settings
+  const isHighStrain = useMemo(() => isHighStrainDevice(), []);
+  const minLoadingDisplay = isHighStrain ? MIN_LOADING_DISPLAY_HIGH_STRAIN : MIN_LOADING_DISPLAY;
+  const transitionDuration = isHighStrain ? TRANSITION_DURATION_HIGH_STRAIN : TRANSITION_DURATION;
+  const postReadyDelay = isHighStrain ? POST_READY_DELAY / 2 : POST_READY_DELAY;
 
-  // Use the new unified loading state manager
+  // Use the unified app loader for loading state
   const {
-    currentPhase,
-    shouldShowLoadingScreen,
-    shouldShowDisplay,
-    isTransitioning,
-    progress,
-    statusMessage,
-  } = useLoadingStateManager({
-    minimumLoadingDuration:
-      process.env.NODE_ENV === "development" ? 1500 : 2500, // Shorter in dev
-    contentReadyDelay: process.env.NODE_ENV === "development" ? 600 : 1000, // Faster in dev
-    transitionDuration: 600, // Smooth transition timing
-  });
+    phase,
+    overallProgress,
+    currentTask,
+    tasks,
+    needsWiFiSetup,
+    needsPairing,
+    hasPairingCode,
+    error,
+  } = useAppLoader();
+
+  // Transition state management - prevents flashing by controlling when screens actually change
+  const [activeScreen, setActiveScreen] = useState<ScreenType>("loading");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [loadingOverlayVisible, setLoadingOverlayVisible] = useState(true);
+  const [loadingOverlayMounted, setLoadingOverlayMounted] = useState(true);
+  const loadingStartTimeRef = useRef<number>(Date.now());
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTransitionTimeRef = useRef<number>(0);
+
+  // Handle WiFi connection success
+  const handleWiFiConnected = useCallback(() => {
+    logger.info("[App] WiFi connected, continuing initialisation");
+  }, []);
 
   // Handle loading screen transition completion
   const handleLoadingComplete = useCallback(() => {
     logger.info("[App] Loading screen transition completed");
   }, []);
 
-  // Handle WiFi connection success
-  const handleWiFiConnected = useCallback(() => {
-    logger.info("[App] WiFi connected, continuing initialization");
-    // The initialization flow will automatically resume via the useEffect in useInitializationFlow
+  /**
+   * Determine what screen should be shown based on app loader state
+   */
+  const targetScreen = useMemo((): ScreenType => {
+    if (phase === "wifi-setup" || needsWiFiSetup) {
+      return "wifi-setup";
+    }
+    if ((phase === "pairing" || needsPairing) && hasPairingCode) {
+      return "pairing";
+    }
+    if (phase === "ready") {
+      return "display";
+    }
+    return "loading";
+  }, [phase, needsWiFiSetup, needsPairing, hasPairingCode]);
+
+  /**
+   * Map app loader phase to loading screen phase
+   */
+  const loadingPhase = useMemo(() => {
+    switch (phase) {
+      case "startup":
+        return "initializing" as const;
+      case "wifi-setup":
+        return "initializing" as const;
+      case "pairing":
+        return "pairing" as const;
+      case "loading":
+        return "loading" as const;
+      case "ready":
+        return "displaying" as const;
+      default:
+        return "initializing" as const;
+    }
+  }, [phase]);
+
+  /**
+   * Clear all transition-related timeouts
+   */
+  const clearAllTimeouts = useCallback(() => {
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
+    if (fadeOutTimeoutRef.current) {
+      clearTimeout(fadeOutTimeoutRef.current);
+      fadeOutTimeoutRef.current = null;
+    }
   }, []);
 
-  // CRITICAL FIX: Validate currentPhase to prevent undefined/invalid states
-  const validPhases: AppPhase[] = [
-    "initializing",
-    "wifi-check",
-    "wifi-setup",
-    "checking",
-    "pairing",
-    "loading-content",
-    "preparing",
-    "ready",
-    "displaying",
-  ];
-  const safePhase: AppPhase = validPhases.includes(currentPhase)
-    ? currentPhase
-    : "initializing";
+  /**
+   * Handle screen transitions with minimum display times
+   * This prevents jarring flashes by ensuring:
+   * 1. Loading screen shows for a minimum duration (4.5s standard, 3s RPi)
+   * 2. Transitions fade smoothly using a single opacity transition
+   * 3. Content only renders after loading screen starts fading
+   * 4. Debounce rapid state changes to prevent flicker
+   */
+  useEffect(() => {
+    // Don't transition if we're already transitioning
+    if (isTransitioning) return;
 
-  logger.info("[App] Current app state:", {
-    currentPhase: safePhase,
-    originalPhase: currentPhase,
-    shouldShowLoadingScreen,
-    shouldShowDisplay,
-    isTransitioning,
-    progress,
-  });
+    // Don't transition if target is the same as current
+    if (targetScreen === activeScreen) return;
 
-  // CRITICAL FIX: Always show loading screen for these phases to prevent gaps
-  const shouldForceLoadingScreen =
-    safePhase === "initializing" ||
-    safePhase === "wifi-check" ||
-    safePhase === "checking" ||
-    safePhase === "loading-content" ||
-    safePhase === "preparing" ||
-    safePhase === "ready";
+    // Debounce - prevent rapid transitions
+    const now = Date.now();
+    if (now - lastTransitionTimeRef.current < TRANSITION_DEBOUNCE) {
+      logger.debug("[App] Transition debounced", {
+        timeSinceLastTransition: now - lastTransitionTimeRef.current,
+      });
+      return;
+    }
 
-  // Show WiFi setup screen when network configuration is needed
-  if (safePhase === "wifi-setup" || needsWiFiSetup) {
-    return (
-      <Suspense
-        fallback={
-          <EnhancedLoadingScreen
-            currentPhase="wifi-check"
-            progress={10}
-            statusMessage="Loading WiFi setup..."
-            isTransitioning={false}
-          />
+    // Calculate time since loading started
+    const elapsedTime = Date.now() - loadingStartTimeRef.current;
+    
+    // If transitioning away from loading, ensure minimum display time
+    if (activeScreen === "loading" && targetScreen !== "loading") {
+      // Calculate remaining time to meet minimum display requirement
+      const remainingTime = Math.max(0, minLoadingDisplay - elapsedTime) + postReadyDelay;
+      
+      logger.info("[App] Preparing screen transition", {
+        from: activeScreen,
+        to: targetScreen,
+        elapsedTime,
+        remainingTime,
+        minLoadingDisplay,
+        postReadyDelay,
+      });
+
+      // Clear any existing timeouts
+      clearAllTimeouts();
+
+      // Schedule the transition to start after minimum time
+      transitionTimeoutRef.current = setTimeout(() => {
+        logger.info("[App] Starting screen transition", {
+          from: activeScreen,
+          to: targetScreen,
+          timestamp: Date.now(),
+        });
+        
+        // Mark as transitioning to prevent new transitions
+        setIsTransitioning(true);
+        lastTransitionTimeRef.current = Date.now();
+        
+        // Start fading out the loading screen
+        setLoadingOverlayVisible(false);
+        
+        // After the fade completes, update the active screen and unmount overlay
+        fadeOutTimeoutRef.current = setTimeout(() => {
+          setActiveScreen(targetScreen);
+          setLoadingOverlayMounted(false);
+          setIsTransitioning(false);
+          logger.info("[App] Screen transition complete", { 
+            to: targetScreen,
+            timestamp: Date.now(),
+          });
+        }, transitionDuration);
+      }, remainingTime);
+    } else {
+      // For non-loading transitions (e.g., between wifi-setup and pairing)
+      logger.info("[App] Direct screen transition", {
+        from: activeScreen,
+        to: targetScreen,
+      });
+      
+      clearAllTimeouts();
+      lastTransitionTimeRef.current = Date.now();
+      setIsTransitioning(true);
+      
+      // Brief transition between non-loading screens
+      transitionTimeoutRef.current = setTimeout(() => {
+        setActiveScreen(targetScreen);
+        setIsTransitioning(false);
+        
+        // If transitioning back to loading, reset everything
+        if (targetScreen === "loading") {
+          loadingStartTimeRef.current = Date.now();
+          setLoadingOverlayMounted(true);
+          setLoadingOverlayVisible(true);
         }
-      >
-        <WiFiSetupScreen onConnected={handleWiFiConnected} />
-      </Suspense>
-    );
-  }
+      }, transitionDuration / 2);
+    }
 
-  // CRITICAL FIX: Ensure we always render something - never return null
-  // Show enhanced loading screen when needed
-  if (shouldShowLoadingScreen || shouldForceLoadingScreen) {
-    return (
-      <EnhancedLoadingScreen
-        currentPhase={safePhase}
-        progress={progress}
-        statusMessage={statusMessage || "Loading..."}
-        isTransitioning={isTransitioning}
-        onTransitionComplete={handleLoadingComplete}
-      />
-    );
-  }
+    // Cleanup
+    return () => {
+      clearAllTimeouts();
+    };
+  }, [targetScreen, activeScreen, isTransitioning, minLoadingDisplay, transitionDuration, postReadyDelay, clearAllTimeouts]);
 
-  // Show appropriate screen based on phase - be more specific about when to show each
-  if (safePhase === "pairing") {
-    return (
-      <Suspense
-        fallback={
-          <EnhancedLoadingScreen
-            currentPhase="checking"
-            progress={25}
-            statusMessage="Loading pairing..."
-            isTransitioning={false}
-          />
-        }
-      >
-        <PairingScreen />
-      </Suspense>
-    );
-  }
-
-  if (safePhase === "displaying" && shouldShowDisplay) {
-    return (
-      <Suspense
-        fallback={
-          <EnhancedLoadingScreen
-            currentPhase="preparing"
-            progress={85}
-            statusMessage="Loading display..."
-            isTransitioning={false}
-          />
-        }
-      >
-        <DisplayScreen />
-      </Suspense>
-    );
-  }
-
-  // CRITICAL FIX: Enhanced fallback with logging - ensure something always renders
-  logger.warn(
-    `[App] ⚠️ Unexpected state detected, showing loading screen as fallback`,
-    {
-      currentPhase: safePhase,
-      originalPhase: currentPhase,
-      shouldShowLoadingScreen,
-      shouldShowDisplay,
+  // Log phase changes with timestamps for debugging
+  useEffect(() => {
+    logger.info("[App] Current app state:", {
+      timestamp: Date.now(),
+      phase,
+      loadingPhase,
+      overallProgress,
+      currentTask,
+      needsWiFiSetup,
+      needsPairing,
+      hasPairingCode,
+      activeScreen,
+      targetScreen,
       isTransitioning,
-      progress,
-    },
-  );
+      loadingOverlayVisible,
+      loadingOverlayMounted,
+      elapsedSinceLoadingStart: Date.now() - loadingStartTimeRef.current,
+    });
+  }, [
+    phase,
+    loadingPhase,
+    overallProgress,
+    currentTask,
+    needsWiFiSetup,
+    needsPairing,
+    hasPairingCode,
+    activeScreen,
+    targetScreen,
+    isTransitioning,
+    loadingOverlayVisible,
+    loadingOverlayMounted,
+  ]);
+
+  /**
+   * Cleanup all timeouts on unmount to prevent memory leaks
+   * and avoid state updates after component unmounts
+   */
+  useEffect(() => {
+    return () => {
+      logger.info("[App] AppRoutes unmounting, cleaning up");
+      clearAllTimeouts();
+    };
+  }, [clearAllTimeouts]);
+
+  /**
+   * Render the loading screen overlay
+   * Uses separate mounted/visible states to ensure smooth fade-out:
+   * - loadingOverlayMounted: Whether the component is in the DOM
+   * - loadingOverlayVisible: Whether the component is visible (controls opacity)
+   * 
+   * Sequence: visible=false triggers fade, then mounted=false removes from DOM
+   */
+  const renderLoadingOverlay = () => {
+    // Don't render if not mounted (component has been fully removed after fade)
+    if (!loadingOverlayMounted) return null;
+
+    return (
+      <Box
+        sx={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 1100, // Above other content to cover during transitions
+          // Opacity controlled by loadingOverlayVisible state
+          opacity: loadingOverlayVisible ? 1 : 0,
+          // Smooth ease-out transition for professional feel
+          transition: `opacity ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          // Disable pointer events when fading out
+          pointerEvents: loadingOverlayVisible ? "auto" : "none",
+          // GPU acceleration for smooth animation
+          willChange: isTransitioning ? "opacity" : "auto",
+          transform: "translateZ(0)",
+          backfaceVisibility: "hidden",
+        }}
+      >
+        <EnhancedLoadingScreen
+          currentPhase={loadingPhase}
+          progress={overallProgress}
+          statusMessage={currentTask}
+          isTransitioning={false} // We handle transitions at this level now
+          onTransitionComplete={handleLoadingComplete}
+          tasks={tasks}
+        />
+      </Box>
+    );
+  };
+
+  /**
+   * Render the appropriate content screen
+   * 
+   * Content is only rendered when:
+   * 1. We're transitioning away from loading (to preload behind the fading overlay)
+   * 2. We've completed the transition to a non-loading screen
+   * 
+   * No Fade wrappers here - the loading overlay's opacity transition is the only
+   * visual transition the user sees, preventing double-fade artifacts.
+   */
+  const renderContentScreen = () => {
+    // Don't render content if we're on the loading screen and not yet transitioning
+    // This prevents content from appearing before the loading overlay starts fading
+    if (activeScreen === "loading" && !isTransitioning) {
+      return null;
+    }
+
+    // Determine which screen to render:
+    // - During transition: render the target screen (behind the fading overlay)
+    // - After transition: render the active screen
+    const screenToRender = isTransitioning ? targetScreen : activeScreen;
+
+    // Don't render loading screen as content (it's handled by the overlay)
+    if (screenToRender === "loading") {
+      return null;
+    }
+
+    // Render content without additional Fade wrappers to prevent double-fading
+    // The loading overlay handles the fade-out; content just appears behind it
+    const renderScreen = () => {
+      switch (screenToRender) {
+        case "wifi-setup":
+          return (
+            <Suspense fallback={null}>
+              <WiFiSetupScreen onConnected={handleWiFiConnected} />
+            </Suspense>
+          );
+
+        case "pairing":
+          return (
+            <Suspense fallback={null}>
+              <PairingScreen />
+            </Suspense>
+          );
+
+        case "display":
+          return (
+            <Suspense fallback={null}>
+              <DisplayScreen />
+            </Suspense>
+          );
+
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <Box 
+        sx={{ 
+          width: "100%", 
+          height: "100%",
+          position: "absolute",
+          top: 0,
+          left: 0,
+        }}
+      >
+        {renderScreen()}
+      </Box>
+    );
+  };
+
   return (
-    <EnhancedLoadingScreen
-      currentPhase={safePhase}
-      progress={progress || 0}
-      statusMessage={statusMessage || "Loading..."}
-      isTransitioning={isTransitioning}
-      onTransitionComplete={handleLoadingComplete}
-    />
+    <>
+      {/* Content screen - rendered behind loading overlay */}
+      {renderContentScreen()}
+      
+      {/* Loading screen overlay - fades out when transitioning */}
+      {renderLoadingOverlay()}
+    </>
   );
 };
 
+/**
+ * App - Main application component
+ */
 const App: React.FC = () => {
   // Enable localStorage monitoring in development
   useLocalStorageMonitor();
 
-  // Initialize factory reset functionality
+  // Initialise factory reset functionality
   const { isModalOpen, closeModal, confirmReset, isResetting } =
     useFactoryReset();
 
@@ -337,7 +556,7 @@ const App: React.FC = () => {
   // Setup network status listener and offline storage cleanup
   const dispatch = useDispatch();
   useEffect(() => {
-    // Initialize offline storage cleanup on startup
+    // Initialise offline storage cleanup on startup
     offlineStorage.clearExpiredContent().catch((error) => {
       logger.error("[App] Error clearing expired cache on startup", { error });
     });
@@ -365,7 +584,7 @@ const App: React.FC = () => {
     };
   }, [dispatch]);
 
-  // ADDED: Initialize memory management for stability on Raspberry Pi (conditionally)
+  // Initialise memory management for stability on Raspberry Pi (conditionally)
   useEffect(() => {
     const config = rpiConfig.getConfig();
 
@@ -373,37 +592,37 @@ const App: React.FC = () => {
     if (rpiConfig.isRaspberryPi()) {
       rpiConfig.applyPerformanceCSS();
       logger.info(
-        "✅ RPi performance mode activated - animations and effects disabled",
+        "✅ RPi performance mode activated - animations and effects disabled"
       );
     }
 
-    // Initialize memory management only if not disabled
+    // Initialise memory management only if not disabled
     if (!config.disableMemoryManager) {
       initializeMemoryManagement();
-      logger.info("Memory management initialized");
+      logger.info("Memory management initialised");
     } else {
       logger.info("⚠️ Memory management disabled by RPi config");
     }
   }, []);
 
-  // Initialize crash logging for debugging restarts
+  // Initialise crash logging for debugging restarts
   useEffect(() => {
     crashLogger.initialize();
     logger.info("Application started with crash logging enabled");
   }, []);
 
-  // Initialize RPi GPU optimizations (conditionally)
+  // Initialise RPi GPU optimisations (conditionally)
   useEffect(() => {
     const config = rpiConfig.getConfig();
 
-    // Only initialize GPU optimizer if not disabled
+    // Only initialise GPU optimiser if not disabled
     if (!config.disableGPUOptimizer) {
       rpiGPUOptimizer.initialize();
       return () => {
         rpiGPUOptimizer.cleanup();
       };
     } else {
-      logger.info("⚠️ GPU optimizer disabled by RPi config");
+      logger.info("⚠️ GPU optimiser disabled by RPi config");
     }
   }, []);
 
@@ -430,10 +649,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // NOTE: Startup health check and failsafe timeout mechanisms have been consolidated
-  // into useLoadingStateManager to avoid duplicate timeout logic and race conditions.
-  // The loading state manager now handles all failsafe recovery for stuck phases.
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -452,24 +667,13 @@ const App: React.FC = () => {
                 overflow: "hidden",
                 // Use the same gradient as ModernIslamicBackground to prevent flashing
                 background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
-                // Optimize for performance
+                // Optimise for performance
                 willChange: "auto",
                 transform: "translateZ(0)",
                 backfaceVisibility: "hidden",
               }}
             >
-              <Suspense
-                fallback={
-                  <EnhancedLoadingScreen
-                    currentPhase="checking"
-                    progress={0}
-                    statusMessage="Loading..."
-                    isTransitioning={false}
-                  />
-                }
-              >
-                <AppRoutes />
-              </Suspense>
+              <AppRoutes />
               <GracefulErrorOverlay />
               <EmergencyAlertOverlay />
               <AnalyticsErrorIntegration />

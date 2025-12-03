@@ -280,7 +280,7 @@ const wifiSlice = createSlice({
         state.isScanning = false;
         state.error = action.payload as string;
         state.lastError = action.payload as string;
-        logger.error("[WiFiSlice] Scan failed:", action.payload);
+        logger.error("[WiFiSlice] Scan failed:", { error: action.payload });
       });
 
     // Connect to network
@@ -305,7 +305,7 @@ const wifiSlice = createSlice({
         state.connectionStatus = "failed";
         state.error = action.payload as string;
         state.lastError = action.payload as string;
-        logger.error("[WiFiSlice] Connection failed:", action.payload);
+        logger.error("[WiFiSlice] Connection failed:", { error: action.payload });
       });
 
     // Disconnect from network
@@ -322,7 +322,7 @@ const wifiSlice = createSlice({
       .addCase(disconnectFromNetwork.rejected, (state, action) => {
         state.isConnecting = false;
         state.error = action.payload as string;
-        logger.error("[WiFiSlice] Disconnect failed:", action.payload);
+        logger.error("[WiFiSlice] Disconnect failed:", { error: action.payload });
       });
 
     // Refresh connection status
@@ -331,7 +331,11 @@ const wifiSlice = createSlice({
         const { status, network } = action.payload;
 
         if (network) {
-          state.currentNetwork = network as WiFiNetwork;
+          // Map CurrentNetwork to WiFiNetwork (add inUse property)
+          state.currentNetwork = {
+            ...network,
+            inUse: true, // Currently connected network is always "in use"
+          } as WiFiNetwork;
           state.connectionStatus = "connected";
         } else {
           state.currentNetwork = null;
@@ -408,4 +412,6 @@ export const selectIsConnected = (state: { wifi: WiFiState }) =>
 
 // Export reducer
 export default wifiSlice.reducer;
+
+
 

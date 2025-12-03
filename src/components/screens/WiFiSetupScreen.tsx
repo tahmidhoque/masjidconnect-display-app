@@ -288,8 +288,9 @@ const WiFiSetupScreen: React.FC<WiFiSetupScreenProps> = ({
   const selectedNetworkObj = selectedNetwork
     ? networks.find((n) => n.ssid === selectedNetwork)
     : null;
-  const needsPassword =
-    selectedNetworkObj && WiFiService.requiresPassword(selectedNetworkObj.security);
+  const needsPassword = Boolean(
+    selectedNetworkObj && WiFiService.requiresPassword(selectedNetworkObj.security)
+  );
 
   return (
     <Box

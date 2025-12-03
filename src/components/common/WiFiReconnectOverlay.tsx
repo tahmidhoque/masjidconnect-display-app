@@ -262,8 +262,9 @@ const WiFiReconnectOverlay: React.FC<WiFiReconnectOverlayProps> = ({
   const selectedNetworkObj = selectedNetwork
     ? networks.find((n) => n.ssid === selectedNetwork)
     : null;
-  const needsPassword =
-    selectedNetworkObj && WiFiService.requiresPassword(selectedNetworkObj.security);
+  const needsPassword = Boolean(
+    selectedNetworkObj && WiFiService.requiresPassword(selectedNetworkObj.security)
+  );
 
   if (!isVisible) return null;
 
@@ -632,4 +633,6 @@ const WiFiReconnectOverlay: React.FC<WiFiReconnectOverlayProps> = ({
 };
 
 export default WiFiReconnectOverlay;
+
+
 

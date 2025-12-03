@@ -293,3 +293,4 @@ class OfflineStorageService {
 // Export singleton instance
 const offlineStorage = new OfflineStorageService();
 export default offlineStorage;
+

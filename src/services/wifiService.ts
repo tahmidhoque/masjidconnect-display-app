@@ -131,7 +131,7 @@ class WiFiService {
         return { success: true, networks: result.networks };
       }
 
-      logger.warn("[WiFiService] Scan failed:", result.error);
+      logger.warn("[WiFiService] Scan failed:", { error: result.error });
       return {
         success: false,
         networks: this.lastScanResults,
@@ -182,7 +182,7 @@ class WiFiService {
         };
       }
 
-      logger.warn(`[WiFiService] Failed to connect to ${ssid}:`, result.error);
+      logger.warn(`[WiFiService] Failed to connect to ${ssid}:`, { error: result.error });
       return { success: false, error: result.error || "Connection failed" };
     } catch (error) {
       logger.error(`[WiFiService] Connection error for ${ssid}:`, { error });
@@ -297,7 +297,7 @@ class WiFiService {
         };
       }
 
-      logger.warn("[WiFiService] Disconnect failed:", result.error);
+      logger.warn("[WiFiService] Disconnect failed:", { error: result.error });
       return { success: false, error: result.error || "Disconnect failed" };
     } catch (error) {
       logger.error("[WiFiService] Disconnect error:", { error });
