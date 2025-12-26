@@ -513,45 +513,40 @@ const EnhancedLoadingScreen: React.FC<EnhancedLoadingScreenProps> = memo(
             // This component stays fully opaque and lets the parent fade it out
           }}
         >
-          {/* Rotated container for portrait orientation */}
-          <Box
-            className={shouldRotate ? "rotation-container no-acceleration" : ""}
-            sx={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: "max(100vh, 100vw)",
-              height: "max(100vh, 100vw)",
-              transform: shouldRotate
-                ? "translate(-50%, -50%) rotate(90deg)"
-                : "none",
-              transformOrigin: "center center",
-              opacity: shouldRotate ? 1 : 0,
-              pointerEvents: shouldRotate ? "auto" : "none",
-              overflow: "hidden",
-              willChange: isHighStrain ? "auto" : "transform",
-              backfaceVisibility: "hidden",
-              minWidth: "100vh",
-              minHeight: "100vw",
-            }}
-          >
-            {loadingContent}
-          </Box>
-
-          {/* Non-rotated container for landscape orientation */}
-          <Box
-            sx={{
-              width: "100%",
-              height: "100%",
-              opacity: shouldRotate ? 0 : 1,
-              pointerEvents: shouldRotate ? "none" : "auto",
-              position: "absolute",
-              top: 0,
-              left: 0,
-            }}
-          >
-            {loadingContent}
-          </Box>
+          {shouldRotate ? (
+            // Portrait orientation with rotation transform
+            <Box
+              className="rotation-container no-acceleration"
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                // Swap dimensions for rotation: use viewport height for width,
+                // viewport width for height to ensure proper coverage after rotation
+                width: "100vh",
+                height: "100vw",
+                // Rotation transform - use !important to prevent CSS overrides
+                transform: "translate(-50%, -50%) rotate(90deg) !important",
+                transformOrigin: "center center",
+                overflow: "hidden",
+                // GPU optimizations for RPi
+                willChange: isHighStrain ? "auto" : "transform",
+                backfaceVisibility: "hidden",
+              }}
+            >
+              {loadingContent}
+            </Box>
+          ) : (
+            // Landscape orientation or no rotation needed
+            <Box
+              sx={{
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              {loadingContent}
+            </Box>
+          )}
         </Box>
       </>
     );

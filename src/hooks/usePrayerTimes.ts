@@ -591,6 +591,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             // Check if we are in this prayer's time window
             if (currentTimeStr >= prayer.time) {
               // Prayer adhan time has passed
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:592',message:'Prayer adhan time passed check',data:{prayerName:prayer.name,prayerTime:prayer.time,prayerJamaat:prayer.jamaat,currentTimeStr:currentTimeStr,comparison:`${currentTimeStr} >= ${prayer.time}`},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+              // #endregion
 
               // Check if we have a next prayer to compare against
               const nextSortedPrayer =
@@ -607,6 +610,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
                 if (prayer.jamaat && currentTimeStr < prayer.jamaat) {
                   // Between adhan and jamaat time - next is the jamaat of this same prayer
                   nextIndex = currentPrayerIndex;
+                  // #region agent log
+                  fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:609',message:'NEXT=JAMAAT of same prayer',data:{prayerName:prayer.name,prayerTime:prayer.time,jamaatTime:prayer.jamaat,currentTimeStr:currentTimeStr,nextIndex:nextIndex},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D,E'})}).catch(()=>{});
+                  // #endregion
                   logger.info(
                     `Between ${prayer.name} adhan (${prayer.time}) and jamaat (${prayer.jamaat}) - counting down to jamaat`,
                   );
@@ -622,6 +628,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
                       (p) => p.name === nextSortedPrayer.name,
                     );
                   }
+                  // #region agent log
+                  fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:621',message:'NEXT=next prayer (not jamaat)',data:{currentPrayerName:prayer.name,isLastPrayerOfDay:isLastPrayerOfDay,nextPrayerName:nextIndex>=0?prayers[nextIndex].name:'unknown',nextIndex:nextIndex},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,E'})}).catch(()=>{});
+                  // #endregion
                   logger.info(
                     `Past ${prayer.name} jamaat time or no jamaat - next prayer is ${nextIndex >= 0 ? prayers[nextIndex].name : "unknown"}`,
                   );
@@ -634,12 +643,18 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
         // If no current prayer found, all prayers are in the future
         if (!foundCurrentPrayer) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:636',message:'NO current prayer found - all in future',data:{currentTimeStr:currentTimeStr,sortedPrayers:sortedPrayers.map(p=>({name:p.name,time:p.time}))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           // Next prayer is the first one that hasn't passed yet
           for (let i = 0; i < sortedPrayers.length; i++) {
             if (sortedPrayers[i].time > currentTimeStr) {
               nextIndex = prayers.findIndex(
                 (p) => p.name === sortedPrayers[i].name,
               );
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:639',message:'Found next prayer in future',data:{nextPrayerName:prayers[nextIndex].name,nextPrayerTime:sortedPrayers[i].time,currentTimeStr:currentTimeStr},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+              // #endregion
               logger.info(
                 `All prayers are in future - next prayer is ${prayers[nextIndex].name}`,
               );
@@ -663,6 +678,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // This was causing the highlighting to disappear (issue 2a)
 
       // Log the final result
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:673',message:'calculatePrayersAccurately RESULT',data:{currentIndex:currentIndex,currentPrayer:currentIndex>=0?prayers[currentIndex].name:'none',nextIndex:nextIndex,nextPrayer:nextIndex>=0?prayers[nextIndex].name:'none',nextPrayerTime:nextIndex>=0?prayers[nextIndex].time:'none',nextPrayerJamaat:nextIndex>=0?prayers[nextIndex].jamaat:'none'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,D,E'})}).catch(()=>{});
+      // #endregion
       logger.debug("[calculatePrayersAccurately] Final result:", {
         currentIndex,
         currentPrayer: currentIndex >= 0 ? prayers[currentIndex].name : "none",
@@ -810,6 +828,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       const now = dayjs();
       const currentTimeStr = now.format("HH:mm");
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:833',message:'PREPARING timeUntil for next prayer',data:{nextPrayerName:nextPrayer.name,nextPrayerTime:nextPrayer.time,nextPrayerJamaat:nextPrayer.jamaat,currentTimeStr:currentTimeStr,currentTimeFull:now.format("HH:mm:ss")},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D,E'})}).catch(()=>{});
+      // #endregion
+
       // If next prayer has jamaat time and it's after the adhan time and current time is between adhan and jamaat
       // then countdown to jamaat time, otherwise countdown to adhan time
       if (
@@ -819,6 +841,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       ) {
         // Countdown to jamaat time
         nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.jamaat);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:843',message:'DECISION: Countdown to JAMAAT',data:{prayerName:nextPrayer.name,jamaatTime:nextPrayer.jamaat,timeUntil:nextPrayer.timeUntil,conditions:{hasJamaat:!!nextPrayer.jamaat,adhanPassed:nextPrayer.time<=currentTimeStr,jamaatNotPassed:nextPrayer.jamaat>currentTimeStr}},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D,E'})}).catch(()=>{});
+        // #endregion
         logger.info(
           `Showing countdown to ${nextPrayer.name} jamaat time (${nextPrayer.jamaat})`,
         );
@@ -836,6 +861,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           .second(0)
           .millisecond(0);
 
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:860',message:'CHECKING if prayer passed',data:{prayerName:nextPrayer.name,prayerTime:nextPrayer.time,nowFull:now.format("YYYY-MM-DD HH:mm:ss"),prayerTimeFull:prayerTime.format("YYYY-MM-DD HH:mm:ss"),isAfterResult:now.isAfter(prayerTime),diffSeconds:prayerTime.diff(now,'second')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})}).catch(()=>{});
+        // #endregion
+
         // If prayer time has passed today, it means we're counting down to tomorrow's occurrence
         // Need to be careful comparing dayjs objects
         // Only consider it passed if it's truly *before* now on the same day
@@ -843,6 +872,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           now.isAfter(prayerTime) &&
           !(now.hour() < 6 && nextPrayer.name === "Fajr")
         ) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:871',message:'DECISION: Prayer PASSED - force TOMORROW',data:{prayerName:nextPrayer.name,prayerTime:nextPrayer.time,forceTomorrow:true},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})}).catch(()=>{});
+          // #endregion
           logger.info(
             `Prayer time ${nextPrayer.time} is in the past, adjusting to tomorrow`,
           );
@@ -852,18 +884,28 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           if (now.hour() < 6 && nextPrayer.name === "Fajr") {
             // Use the utility function directly
             nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:876',message:'DECISION: Early morning Fajr',data:{prayerName:nextPrayer.name,prayerTime:nextPrayer.time,timeUntil:nextPrayer.timeUntil},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
             logger.info(
               `Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time}) - early morning hours`,
             );
           } else {
             // Regular countdown to adhan time
             nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:882',message:'DECISION: Regular countdown to ADHAN',data:{prayerName:nextPrayer.name,prayerTime:nextPrayer.time,timeUntil:nextPrayer.timeUntil},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})}).catch(()=>{});
+            // #endregion
             logger.info(
               `Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time})`,
             );
           }
         }
       }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/fe6a527e-d3ea-43ca-ba5f-73642e17c1f7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePrayerTimes.ts:891',message:'FINAL nextPrayer data being passed to component',data:{name:nextPrayer.name,time:nextPrayer.time,jamaat:nextPrayer.jamaat,timeUntil:nextPrayer.timeUntil,isNext:nextPrayer.isNext,isCurrent:nextPrayer.isCurrent},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})}).catch(()=>{});
+      // #endregion
 
       // Update next prayer in state
       setNextPrayer(nextPrayer);

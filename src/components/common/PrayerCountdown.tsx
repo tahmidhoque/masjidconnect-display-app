@@ -98,12 +98,17 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
         return;
       }
 
-      // If prayer time is in the past, it must be tomorrow's prayer
-      // (parent component already determined this is the next prayer)
-      if (now.isAfter(prayerDayjs)) {
+      // If prayer time is significantly in the past (more than 2 minutes), it must be tomorrow's prayer
+      // We use a 2-minute threshold to avoid the bug where current time 16:04:45 thinks 16:04:00 is "in the past"
+      // The parent component (usePrayerTimes) has already determined this is the next prayer,
+      // so we should only add a day if it's CLEARLY in the past (not just seconds/1 minute difference)
+      const diffInSeconds = prayerDayjs.diff(now, 'second');
+      const isPrayerSignificantlyInPast = diffInSeconds < -120; // More than 2 minutes in the past
+      
+      if (isPrayerSignificantlyInPast) {
         prayerDayjs = prayerDayjs.add(1, "day");
         logger.debug(
-          `[PrayerCountdown] ${prayerName} time ${prayerTime} is in the past, adjusted to tomorrow: ${prayerDayjs.format("YYYY-MM-DD HH:mm")}`,
+          `[PrayerCountdown] ${prayerName} time ${prayerTime} is in the past (${diffInSeconds}s), adjusted to tomorrow: ${prayerDayjs.format("YYYY-MM-DD HH:mm")}`,
         );
       }
 
