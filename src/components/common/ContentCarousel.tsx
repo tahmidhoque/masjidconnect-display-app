@@ -1221,6 +1221,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               p: 2,
               borderBottom: "1px solid rgba(255,255,255,0.1)",
               textAlign: "center",
+              width: "100%",
+              overflow: "hidden",
             }}
           >
             <Typography
@@ -1229,6 +1231,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 fontWeight: 600,
                 color: "rgba(255, 193, 7, 1)",
                 fontFamily: "'Poppins', sans-serif",
+                width: "100%",
+                wordWrap: "break-word",
+                overflowWrap: "break-word",
               }}
             >
               Welcome to {masjidName || "your masjid"}
@@ -1275,6 +1280,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               p: 2,
               borderBottom: "1px solid rgba(255,255,255,0.1)",
               textAlign: "center",
+              width: "100%",
+              overflow: "hidden",
             }}
           >
             <Typography
@@ -1283,6 +1290,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 fontWeight: 600,
                 color: "rgba(255, 193, 7, 1)",
                 fontFamily: "'Poppins', sans-serif",
+                width: "100%",
+                wordWrap: "break-word",
+                overflowWrap: "break-word",
               }}
             >
               Error
@@ -1483,6 +1493,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               p: 2,
               borderBottom: "1px solid rgba(255,255,255,0.1)",
               textAlign: "center",
+              width: "100%",
+              overflow: "hidden",
             }}
           >
             <Typography
@@ -1491,6 +1503,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
                 fontWeight: 600,
                 color: "rgba(255, 193, 7, 1)",
                 fontFamily: "'Poppins', sans-serif",
+                width: "100%",
+                wordWrap: "break-word",
+                overflowWrap: "break-word",
               }}
             >
               {titleToShow}
@@ -1526,6 +1541,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
             p: 2,
             borderBottom: "1px solid rgba(255,255,255,0.1)",
             textAlign: "center",
+            width: "100%",
+            overflow: "hidden",
           }}
         >
           <Typography
@@ -1534,6 +1551,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
               fontWeight: 600,
               color: "rgba(255, 193, 7, 1)",
               fontFamily: "'Poppins', sans-serif",
+              width: "100%",
+              wordWrap: "break-word",
+              overflowWrap: "break-word",
             }}
           >
             {titleToShow}

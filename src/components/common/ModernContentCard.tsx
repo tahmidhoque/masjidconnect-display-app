@@ -28,6 +28,7 @@ const ModernContentCard: React.FC<ModernContentCardProps> = ({
     <Box
       sx={{
         height: "100%",
+        width: "100%",
         display: "flex",
         flexDirection: "column",
         background: `linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%)`,
