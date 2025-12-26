@@ -416,11 +416,14 @@ class ApiClient {
       // Map cache keys to storage methods
       if (cacheKey === CACHE_KEYS.CONTENT) {
         // CRITICAL FIX: Content response needs special handling
-        // The API returns { content: [...], lastUpdated: string, schedule?: {...} }
-        // But we need to save it as ScreenContent and extract nested data
-        const contentResponse = data as any;
+        // The API returns a wrapped response: { success, data: {...actual content...}, error, timestamp }
+        // We need to extract the actual content and save nested data separately
+        const wrappedResponse = data as any;
         
-        // If it's the raw API response format, save it as-is
+        // Unwrap the response to get actual content - handle both wrapped and unwrapped formats
+        const contentResponse = wrappedResponse.data || wrappedResponse;
+        
+        // Save the actual content (not the wrapper)
         await storageService.saveScreenContent(contentResponse);
         logger.debug('[ApiClient] Saved screen content to storageService');
         

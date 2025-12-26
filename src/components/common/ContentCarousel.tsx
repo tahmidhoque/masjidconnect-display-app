@@ -156,6 +156,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ variant }) => {
     orientation,
   } = useAppSelector(selectCarouselData);
 
+  // Debug log to see what we're receiving from Redux
+  useEffect(() => {
+    logger.info("[ContentCarousel] Redux state updated", {
+      hasSchedule: !!schedule,
+      scheduleId: schedule?.id,
+      scheduleItemsCount: schedule?.items?.length,
+      eventsCount: events?.length,
+      isLoading: isContentLoading,
+    });
+  }, [schedule, events, isContentLoading]);
+
   // For now, create a simple refreshSchedule function that logs (to be implemented with Redux actions later)
   const refreshSchedule = useCallback((forceRefresh: boolean) => {
     console.log("refreshSchedule called with forceRefresh:", forceRefresh);

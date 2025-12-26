@@ -441,7 +441,7 @@ export const refreshSchedule = createAsyncThunk(
     { rejectWithValue, getState },
   ) => {
     try {
-      logger.debug("[Content] Refreshing schedule...", { forceRefresh });
+      logger.info("[Content] Refreshing schedule...", { forceRefresh });
 
       const state = getState() as { content: ContentState };
       const now = Date.now();
@@ -458,10 +458,20 @@ export const refreshSchedule = createAsyncThunk(
       }
 
       // Schedule is synced as part of content sync
+      logger.info("[Content] Calling syncService.syncContent()...");
       await syncService.syncContent();
+      logger.info("[Content] syncContent() completed");
 
       // Get the schedule from storage after sync
+      logger.info("[Content] Loading schedule from storage...");
       const scheduleData = await storageService.getSchedule();
+      logger.info("[Content] Schedule loaded from storage", {
+        hasSchedule: !!scheduleData,
+        isArray: Array.isArray(scheduleData),
+        scheduleId: Array.isArray(scheduleData) ? undefined : scheduleData?.id,
+        itemsCount: Array.isArray(scheduleData) ? scheduleData.length : scheduleData?.items?.length,
+        rawData: scheduleData,
+      });
 
       if (!scheduleData) {
         logger.warn("[Content] No schedule data received, using fallback", {});
@@ -472,13 +482,17 @@ export const refreshSchedule = createAsyncThunk(
       }
 
       const normalizedSchedule = normalizeScheduleData(scheduleData);
+      logger.info("[Content] Schedule normalized", {
+        normalizedId: normalizedSchedule.id,
+        normalizedItemsCount: normalizedSchedule.items.length,
+      });
 
       return {
         schedule: normalizedSchedule,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("[Content] Error refreshing schedule", { error });
+      logger.error("[Content] Error refreshing schedule", { error: error.message, stack: error.stack });
       return rejectWithValue(error.message || "Failed to refresh schedule");
     }
   },
@@ -504,6 +518,56 @@ export const refreshEvents = createAsyncThunk(
   },
 );
 
+/**
+ * Load cached content from storage into Redux state
+ * This is called on app initialization to restore data without network calls
+ */
+export const loadCachedContent = createAsyncThunk(
+  "content/loadCachedContent",
+  async (_, { rejectWithValue }) => {
+    try {
+      logger.info("[Content] Loading cached content from storage...");
+
+      // Load all cached data from storage in parallel
+      const [schedule, events, prayerTimes, screenContent] = await Promise.all([
+        storageService.getSchedule(),
+        storageService.getEvents(),
+        storageService.getPrayerTimes(),
+        storageService.getScreenContent(),
+      ]);
+
+      // Normalize schedule if it's an array (shouldn't be, but handle it)
+      const normalizedSchedule = schedule 
+        ? (Array.isArray(schedule) ? schedule[0] : schedule)
+        : null;
+
+      // Normalize prayerTimes if it's an array (shouldn't be, but handle it)
+      const normalizedPrayerTimes = prayerTimes
+        ? (Array.isArray(prayerTimes) ? prayerTimes[0] : prayerTimes)
+        : null;
+
+      logger.info("[Content] Cached content loaded", {
+        hasSchedule: !!normalizedSchedule,
+        scheduleItemsCount: normalizedSchedule?.items?.length || 0,
+        eventsCount: events?.length || 0,
+        hasPrayerTimes: !!normalizedPrayerTimes,
+        hasScreenContent: !!screenContent,
+      });
+
+      return {
+        schedule: normalizedSchedule ? normalizeScheduleData(normalizedSchedule) : null,
+        events: events || [],
+        prayerTimes: normalizedPrayerTimes,
+        screenContent,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      logger.error("[Content] Error loading cached content", { error: error.message });
+      return rejectWithValue(error.message || "Failed to load cached content");
+    }
+  },
+);
+
 export const refreshAllContent = createAsyncThunk(
   "content/refreshAllContent",
   async (
@@ -512,6 +576,12 @@ export const refreshAllContent = createAsyncThunk(
   ) => {
     try {
       logger.debug("[Content] Refreshing all content...", { forceRefresh });
+
+      // If not forcing refresh, try to load from cache first
+      if (!forceRefresh) {
+        logger.info("[Content] Loading from cache before refresh");
+        await dispatch(loadCachedContent());
+      }
 
       // Refresh all content in parallel for better performance
       const results = await Promise.allSettled([
@@ -709,6 +779,15 @@ const contentSlice = createSlice({
           state.schedule = action.payload.schedule || null;
           state.lastScheduleUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
+          
+          logger.info("[ContentSlice] Schedule updated in Redux state", {
+            hasSchedule: !!state.schedule,
+            scheduleId: state.schedule?.id,
+            itemsCount: state.schedule?.items?.length,
+            firstItem: state.schedule?.items?.[0],
+          });
+        } else {
+          logger.info("[ContentSlice] Schedule refresh skipped");
         }
 
         // Update general loading state
@@ -751,6 +830,47 @@ const contentSlice = createSlice({
           state.isLoadingContent ||
           state.isLoadingPrayerTimes ||
           state.isLoadingSchedule;
+      });
+
+    // Load cached content
+    builder
+      .addCase(loadCachedContent.pending, (state) => {
+        logger.debug("[ContentSlice] Loading cached content");
+      })
+      .addCase(loadCachedContent.fulfilled, (state, action) => {
+        logger.info("[ContentSlice] Cached content loaded", {
+          hasSchedule: !!action.payload.schedule,
+          scheduleItems: action.payload.schedule?.items?.length || 0,
+          eventsCount: action.payload.events?.length || 0,
+        });
+
+        // Populate state with cached data
+        if (action.payload.schedule) {
+          state.schedule = action.payload.schedule;
+        }
+        if (action.payload.events) {
+          state.events = action.payload.events;
+        }
+        if (action.payload.prayerTimes) {
+          state.prayerTimes = action.payload.prayerTimes;
+        }
+        if (action.payload.screenContent) {
+          state.screenContent = action.payload.screenContent;
+        }
+
+        // Mark loading as complete since we have cached data
+        state.isLoading = false;
+        state.isLoadingContent = false;
+        state.isLoadingSchedule = false;
+        state.isLoadingEvents = false;
+        state.isLoadingPrayerTimes = false;
+        state.lastUpdated = action.payload.timestamp;
+      })
+      .addCase(loadCachedContent.rejected, (state, action) => {
+        logger.warn("[ContentSlice] Failed to load cached content", {
+          error: action.payload,
+        });
+        // Don't set error state - just continue with empty data
       });
 
     // Refresh all content

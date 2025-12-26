@@ -117,7 +117,10 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
 
   // Listen for remote command events
   useEffect(() => {
+    logger.debug('[NotificationBar] Setting up event listeners', { types });
+    
     if (types && !types.includes("remote-command")) {
+      logger.debug('[NotificationBar] Skipping remote-command listeners (not in types)');
       return;
     }
     const handleRestartApp = (event: CustomEvent) => {
@@ -165,6 +168,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
     };
 
     const handleReloadContent = () => {
+      logger.debug('[NotificationBar] handleReloadContent called');
       addNotification({
         type: "info",
         title: "Reloading Content",
@@ -277,7 +281,10 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
     );
     window.addEventListener("remote:force-update", handleForceUpdate);
 
+    logger.debug('[NotificationBar] All event listeners registered');
+
     return () => {
+      logger.debug('[NotificationBar] Cleaning up event listeners');
       window.removeEventListener(
         "remote:restart-app",
         handleRestartApp as EventListener,
@@ -305,7 +312,7 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
       );
       window.removeEventListener("remote:force-update", handleForceUpdate);
     };
-  }, [addNotification, cancelCountdown, types]);
+  }, [addNotification, types]);
 
   // Handle update notifications
   useEffect(() => {
@@ -407,7 +414,6 @@ const NotificationBar: React.FC<NotificationBarProps> = ({ types }) => {
     getCurrentNotification,
     removeNotification,
     addNotification,
-    cancelCountdown,
   ]);
 
   // This component doesn't render anything - it just manages notifications via context

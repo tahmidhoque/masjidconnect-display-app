@@ -41,12 +41,15 @@ export interface EmergencyAlert {
 
 /**
  * Remote command from server
+ * Note: id/commandId may not always be sent by WebSocket server
  */
 export interface RemoteCommand {
-  id: string;
+  id?: string;
+  commandId?: string;
   type: CommandType;
   payload?: Record<string, unknown>;
-  createdAt: string;
+  createdAt?: string;
+  timestamp?: string;
 }
 
 /**
@@ -69,8 +72,10 @@ export type CommandType =
  * Orientation change event
  */
 export interface OrientationChange {
-  orientation: 'landscape' | 'portrait';
-  source: string;
+  id?: string;
+  orientation: string; // Can be 'LANDSCAPE', 'PORTRAIT', 'landscape', or 'portrait' - will be normalized
+  source?: string;
+  updatedAt?: string;
 }
 
 /**
@@ -298,8 +303,8 @@ class WebSocketService {
     });
 
     // Emergency alerts
-    this.socket.on('EMERGENCY_ALERT', (alert: EmergencyAlert) => {
-      logger.info('[WebSocketService] Emergency alert received', { id: alert.id, type: alert.type });
+    this.socket.on('emergency:alert', (alert: EmergencyAlert) => {
+      logger.info('[WebSocketService] Emergency alert received', { id: alert.id, action: (alert as any).action });
       this.emitEvent('emergency:alert', alert);
     });
 
@@ -309,8 +314,8 @@ class WebSocketService {
     });
 
     // Orientation changes
-    this.socket.on('SCREEN_ORIENTATION', (data: OrientationChange) => {
-      logger.info('[WebSocketService] Orientation change', data);
+    this.socket.on('screen:orientation', (data: OrientationChange) => {
+      logger.info('[WebSocketService] Orientation change received', data);
       this.emitEvent('orientation:change', data);
     });
 
@@ -332,7 +337,10 @@ class WebSocketService {
     commandTypes.forEach((type) => {
       this.socket?.on(`screen:command:${type}`, (command: RemoteCommand) => {
         logger.info('[WebSocketService] Command received', { type, id: command.id });
+        console.log(`📨 [WebSocketService] Received WS event: screen:command:${type}`, command);
+        console.log(`🔄 [WebSocketService] Emitting 'command' event with type: ${type}`);
         this.emitEvent('command', { ...command, type });
+        console.log(`✅ [WebSocketService] 'command' event emitted`);
       });
     });
 

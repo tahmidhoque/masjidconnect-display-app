@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Fade } from "@mui/material";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store";
-import { ALERT_COLOR_SCHEMES } from "./EmergencyAlertOverlay";
 import EmergencyAlertOverlay from "./EmergencyAlertOverlay";
 
 /**
@@ -33,9 +32,6 @@ import EmergencyAlertOverlay from "./EmergencyAlertOverlay";
 const EmergencyAlert: React.FC = () => {
   const hasActiveAlert = useSelector(
     (state: RootState) => state.emergency.currentAlert !== null,
-  );
-  const currentAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert,
   );
   const [visible, setVisible] = useState(false);
   const [delayedVisible, setDelayedVisible] = useState(false);

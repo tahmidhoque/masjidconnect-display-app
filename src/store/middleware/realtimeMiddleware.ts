@@ -43,6 +43,7 @@ type AppMiddlewareAPI = MiddlewareAPI<Dispatch<UnknownAction>, unknown>;
 
 /**
  * Convert WebSocket alert to Redux format
+ * Preserves timing data from server for accurate expiration handling
  */
 const convertAlertToReduxFormat = (alert: EmergencyAlert) => {
   return {
@@ -52,7 +53,7 @@ const convertAlertToReduxFormat = (alert: EmergencyAlert) => {
     color: alert.type === 'emergency' ? '#f44336' : alert.type === 'warning' ? '#ff9800' : '#2196f3',
     createdAt: alert.createdAt,
     expiresAt: alert.expiresAt || undefined,
-    timing: undefined,
+    timing: (alert as any).timing || undefined, // Preserve server-calculated timing
     masjidId: credentialService.getMasjidId() || '',
     colorScheme: undefined,
   };
@@ -60,15 +61,28 @@ const convertAlertToReduxFormat = (alert: EmergencyAlert) => {
 
 /**
  * Convert WebSocket command format to API command format
- * WebSocket: { id, type, payload, createdAt }
+ * WebSocket: { id?, commandId?, type, payload?, createdAt?, timestamp? }
  * API: { commandId, type, payload, timestamp }
+ * 
+ * Note: WebSocket server may not always send commandId, so we generate one if missing
  */
 const convertWebSocketCommandToApiFormat = (wsCommand: RemoteCommand): ApiRemoteCommand => {
+  // Generate commandId if not provided by WebSocket server
+  // Try multiple possible field names: commandId, id, or generate new one
+  const commandId = wsCommand.commandId || wsCommand.id || `cmd-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  
+  console.log('🔄 [convertWebSocketCommandToApiFormat] Converting command', {
+    hasCommandId: !!wsCommand.commandId,
+    hasId: !!wsCommand.id,
+    generatedCommandId: commandId,
+    wsCommand,
+  });
+  
   return {
-    commandId: wsCommand.id,
+    commandId,
     type: wsCommand.type,
-    payload: wsCommand.payload,
-    timestamp: wsCommand.createdAt || new Date().toISOString(),
+    payload: wsCommand.payload || {},
+    timestamp: wsCommand.createdAt || wsCommand.timestamp || new Date().toISOString(),
   };
 };
 
@@ -156,18 +170,27 @@ export const realtimeMiddleware: Middleware = (api: AppMiddlewareAPI) => {
         });
 
         const reduxAlert = convertAlertToReduxFormat(alert);
-        api.dispatch(setCurrentAlert(reduxAlert as Parameters<typeof setCurrentAlert>[0]));
-
-        // Store for persistence
-        localStorage.setItem('emergencyAlert', JSON.stringify(reduxAlert));
+        
+        // CRITICAL FIX: Route through emergencyAlertService to set expiration timer
+        // Previously this dispatched directly to Redux, bypassing the service timer
+        import('../../services/emergencyAlertService').then(({ default: emergencyAlertService }) => {
+          emergencyAlertService.setAlert(reduxAlert as any);
+        });
+        
+        // Note: emergencyAlertService will handle localStorage and Redux dispatch via middleware
       })
     );
 
     unsubscribers.push(
       websocketService.on('emergency:clear', () => {
         logger.info('[RealtimeMiddleware] Emergency alert cleared');
-        api.dispatch(setCurrentAlert(null));
-        localStorage.removeItem('emergencyAlert');
+        
+        // CRITICAL FIX: Route through emergencyAlertService to clear timer properly
+        import('../../services/emergencyAlertService').then(({ default: emergencyAlertService }) => {
+          emergencyAlertService.clearAlert();
+        });
+        
+        // Note: emergencyAlertService will handle localStorage and Redux dispatch via middleware
       })
     );
 
@@ -207,18 +230,28 @@ export const realtimeMiddleware: Middleware = (api: AppMiddlewareAPI) => {
     // Remote commands
     unsubscribers.push(
       websocketService.on<RemoteCommand>('command', async (command) => {
+        const commandId = command.commandId || command.id || 'unknown';
         logger.info('[RealtimeMiddleware] Command received', {
           type: command.type,
-          id: command.id,
+          id: commandId,
+        });
+        console.log('🎯 [RealtimeMiddleware] Command event received from websocketService', {
+          command,
+          type: command.type,
+          id: commandId,
+          fullCommand: JSON.stringify(command),
         });
 
         try {
+          console.log('🚀 [RealtimeMiddleware] Calling handleRemoteCommand...');
           await handleRemoteCommand(command);
-          websocketService.acknowledgeCommand(command.id, true);
+          console.log('✅ [RealtimeMiddleware] handleRemoteCommand completed, sending ACK');
+          websocketService.acknowledgeCommand(commandId, true);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Command failed';
           logger.error('[RealtimeMiddleware] Command execution failed', { error: errorMessage });
-          websocketService.acknowledgeCommand(command.id, false, errorMessage);
+          console.error('❌ [RealtimeMiddleware] Command execution failed', { error, errorMessage });
+          websocketService.acknowledgeCommand(commandId, false, errorMessage);
         }
       })
     );
@@ -279,9 +312,16 @@ export const realtimeMiddleware: Middleware = (api: AppMiddlewareAPI) => {
    * - Proper error handling and reporting
    */
   const handleRemoteCommand = async (command: RemoteCommand): Promise<void> => {
+    const commandId = command.commandId || command.id || 'unknown';
     logger.info('[RealtimeMiddleware] Handling command via remoteControlService', { 
       type: command.type, 
-      id: command.id 
+      id: commandId 
+    });
+    console.log('🔧 [RealtimeMiddleware] handleRemoteCommand called', {
+      commandType: command.type,
+      commandId,
+      hasPayload: !!command.payload,
+      command,
     });
 
     // Handle UPDATE_ORIENTATION specially to ensure immediate UI update
@@ -317,9 +357,17 @@ export const realtimeMiddleware: Middleware = (api: AppMiddlewareAPI) => {
     // Convert WebSocket command format to API format expected by remoteControlService
     const apiCommand = convertWebSocketCommandToApiFormat(command);
     
+    console.log('🔄 [RealtimeMiddleware] Converted to API format', {
+      original: command,
+      converted: apiCommand,
+    });
+    console.log('📤 [RealtimeMiddleware] Calling remoteControlService.handleCommandFromHeartbeat...');
+    
     // Delegate to remoteControlService which handles all command types
     // including FORCE_UPDATE, FACTORY_RESET, RESTART_APP, etc.
     await remoteControlService.handleCommandFromHeartbeat(apiCommand);
+    
+    console.log('✅ [RealtimeMiddleware] remoteControlService.handleCommandFromHeartbeat completed');
   };
 
   /**

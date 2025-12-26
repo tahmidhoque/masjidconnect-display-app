@@ -10,6 +10,7 @@ import EmergencyAlertOverlay from "./components/common/EmergencyAlertOverlay";
 import AnalyticsErrorIntegration from "./components/common/AnalyticsErrorIntegration";
 import UpdateNotification from "./components/common/UpdateNotification";
 import RemoteCommandNotification from "./components/common/RemoteCommandNotification";
+import RemoteCommandHandler from "./components/system/RemoteCommandHandler";
 import FactoryResetModal from "./components/common/FactoryResetModal";
 import EnhancedLoadingScreen from "./components/screens/EnhancedLoadingScreen";
 import WiFiReconnectOverlay from "./components/common/WiFiReconnectOverlay";
@@ -679,6 +680,7 @@ const App: React.FC = () => {
               <AnalyticsErrorIntegration />
               <UpdateNotification />
               <RemoteCommandNotification />
+              <RemoteCommandHandler />
 
               {/* WiFi Reconnect Overlay - shown when connection drops after pairing */}
               {showReconnectOverlay && (

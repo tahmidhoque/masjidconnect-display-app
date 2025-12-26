@@ -93,7 +93,8 @@ export default function useInitializationFlow() {
     dispatch(setInitializationStage("fetching"));
 
     try {
-      await dispatch(refreshAllContent({ forceRefresh: true })).unwrap();
+      // Load from cache first, then refresh from API
+      await dispatch(refreshAllContent({ forceRefresh: false })).unwrap();
       
       logger.info("[InitFlow] Content loaded successfully");
       dispatch(setInitializationStage("ready"));

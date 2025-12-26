@@ -64,12 +64,20 @@ class RemoteControlService {
       commandId: command.commandId,
       type: command.type,
     });
+    console.log("📥 [RemoteControlService] handleCommandFromHeartbeat called", {
+      commandId: command.commandId,
+      type: command.type,
+      payload: command.payload,
+      fullCommand: command,
+    });
 
     // Don't process commands when offline
     if (!navigator.onLine) {
       logger.warn("RemoteControlService: Ignoring command - device is offline");
+      console.warn("⚠️ [RemoteControlService] Device is offline, ignoring command");
       return;
     }
+    console.log("✅ [RemoteControlService] Device is online, proceeding...");
 
     // Validate command
     if (!command || !command.type || !command.commandId) {
@@ -78,8 +86,15 @@ class RemoteControlService {
         hasType: !!command?.type,
         hasCommandId: !!command?.commandId,
       });
+      console.error("❌ [RemoteControlService] Invalid command format", {
+        command,
+        hasCommand: !!command,
+        hasType: !!command?.type,
+        hasCommandId: !!command?.commandId,
+      });
       return;
     }
+    console.log("✅ [RemoteControlService] Command validation passed");
 
     // Check for duplicate command IDs
     if (this.processedCommandIds.has(command.commandId)) {
@@ -87,8 +102,12 @@ class RemoteControlService {
         commandId: command.commandId,
         type: command.type,
       });
+      console.warn("⚠️ [RemoteControlService] Duplicate command, already processed", {
+        commandId: command.commandId,
+      });
       return;
     }
+    console.log("✅ [RemoteControlService] Not a duplicate, continuing...");
 
     // Check cooldown to prevent command spam
     const now = Date.now();
@@ -136,11 +155,15 @@ class RemoteControlService {
     this.lastCommandTimestamp[command.type] = now;
 
     // Execute command
+    console.log("🚀 [RemoteControlService] Executing command...", { type: command.type });
     const internalCommand = command as RemoteCommand;
     await this.executeCommand(internalCommand);
+    console.log("✅ [RemoteControlService] Command executed");
 
     // Notify listeners
+    console.log("📢 [RemoteControlService] Notifying listeners...");
     this.notifyListeners(internalCommand);
+    console.log("✅ [RemoteControlService] Listeners notified");
 
     // Process any queued commands
     this.processCommandQueue();
@@ -411,11 +434,20 @@ class RemoteControlService {
     try {
       apiClient.clearCache();
 
+      logger.info("RemoteControlService: Dispatching remote:reload-content event", {
+        commandId: command.commandId,
+      });
+      console.log("🚀 [RemoteControlService] Dispatching event: remote:reload-content", {
+        commandId: command.commandId,
+      });
+      
       window.dispatchEvent(
         new CustomEvent("remote:reload-content", {
           detail: { commandId: command.commandId },
         }),
       );
+      
+      console.log("✅ [RemoteControlService] Event dispatched: remote:reload-content");
 
       return {
         commandId: command.commandId,

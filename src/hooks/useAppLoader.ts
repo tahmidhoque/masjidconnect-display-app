@@ -368,8 +368,8 @@ export default function useAppLoader(): AppLoaderState & {
     const contentStartTime = Date.now();
 
     try {
-      // Start content refresh
-      const contentPromise = dispatch(refreshAllContent({ forceRefresh: true }));
+      // Start content refresh - load from cache first, then refresh from API
+      const contentPromise = dispatch(refreshAllContent({ forceRefresh: false }));
 
       // Animate progress while content loads
       let animationProgress = 0;
