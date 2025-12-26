@@ -156,29 +156,66 @@ class MasjidDisplayClient {
     });
 
     // Set up request interceptor
+    // NOTE: Primary auth headers are now set via axios defaults (see setDefaultAuthHeaders)
+    // This interceptor serves as: 1) Fallback if defaults not set, 2) Logging for debugging
     this.client.interceptors.request.use((config) => {
-      // Add authentication headers if we have credentials
-      if (this.credentials) {
-        config.headers = config.headers || {};
-        config.headers["Authorization"] = `Bearer ${this.credentials.apiKey}`;
-        config.headers["X-Screen-ID"] = this.credentials.screenId;
-
-        // Always set Content-Type header to ensure consistency
-        config.headers["Content-Type"] = "application/json";
-        config.headers["Accept"] = "application/json";
-
-        // Log authentication headers for debugging
-        logger.debug("Request with auth headers", {
-          url: config.url,
-          hasApiKey: !!this.credentials.apiKey,
-          hasScreenId: !!this.credentials.screenId,
-          apiKeyLength: this.credentials.apiKey?.length || 0,
-          screenIdLength: this.credentials.screenId?.length || 0,
-          withCredentials: config.withCredentials,
-        });
-      } else {
-        logger.warn("Request without auth credentials", { url: config.url });
+      // Ensure headers object exists (Axios 1.x compatibility)
+      if (!config.headers) {
+        config.headers = {} as any;
       }
+
+      // Check if Authorization header is already set (from axios defaults)
+      const existingAuth = this.client.defaults.headers.common['Authorization'];
+      const hasAuthInDefaults = !!existingAuth;
+      
+      // Log the request with current header state
+      console.log("📤 [API Request]:", {
+        url: config.url,
+        method: config.method,
+        hasAuthInDefaults,
+        hasCredentialsInMemory: !!this.credentials,
+      });
+
+      // FALLBACK: If no auth header in defaults but we have credentials, something went wrong
+      // Try to recover by setting headers on this specific request
+      if (!hasAuthInDefaults) {
+        // Try to get credentials from memory first
+        if (this.credentials) {
+          console.warn("⚠️ [API] Auth not in defaults but credentials in memory - recovering:", config.url);
+          this.setDefaultAuthHeaders(this.credentials.apiKey, this.credentials.screenId);
+        } else {
+          // Try to load from localStorage as last resort
+          const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || localStorage.getItem("apiKey");
+          const screenId = localStorage.getItem(STORAGE_KEYS.SCREEN_ID) || localStorage.getItem("screenId");
+          
+          if (apiKey && screenId) {
+            console.warn("⚠️ [API] Credentials found in localStorage but not set - recovering:", config.url);
+            
+            // Set credentials in memory and on defaults
+            this.credentials = { apiKey, screenId };
+            this.setDefaultAuthHeaders(apiKey, screenId);
+          } else if (!config.url?.includes('/pairing/') && !config.url?.includes('/unpaired')) {
+            // Only warn if this is not a pairing-related endpoint
+            console.warn("⚠️ [API] Request without credentials:", config.url);
+            logger.warn("Request without auth credentials", { url: config.url });
+          }
+        }
+      }
+
+      // Add masjidId header if available and not already set
+      const masjidId = localStorage.getItem("masjid_id");
+      if (masjidId && !this.client.defaults.headers.common['X-Masjid-ID']) {
+        this.client.defaults.headers.common['X-Masjid-ID'] = masjidId;
+      }
+
+      // Log final state of default headers (these will be sent with the request)
+      const authHeader = this.client.defaults.headers.common['Authorization'];
+      console.log("🎯 [API] Request will be sent with default headers:", {
+        url: config.url,
+        Authorization: authHeader ? `${String(authHeader).substring(0, 30)}...` : "NOT SET",
+        "X-Screen-ID": this.client.defaults.headers.common['X-Screen-ID'] || "NOT SET",
+        "X-Masjid-ID": this.client.defaults.headers.common['X-Masjid-ID'] || "NOT SET",
+      });
 
       return config;
     });
@@ -344,9 +381,20 @@ class MasjidDisplayClient {
 
       if (apiKey && screenId) {
         this.credentials = { apiKey, screenId };
-        logger.info("Credentials loaded from storage", {
+        
+        // CRITICAL: Set default headers on axios instance when loading credentials
+        // This ensures headers are set on app startup, not just when pairing
+        this.setDefaultAuthHeaders(apiKey, screenId);
+        
+        logger.info("Credentials loaded from storage and default headers set", {
           apiKeyLength: apiKey.length,
           screenIdLength: screenId.length,
+        });
+        
+        console.log("🔑 [MasjidDisplayClient] Credentials loaded on startup:", {
+          screenId,
+          apiKeyLength: apiKey.length,
+          headersSet: true,
         });
       } else {
         logger.warn("No credentials found in storage");
@@ -358,7 +406,28 @@ class MasjidDisplayClient {
 
   // Set credentials and save to storage
   public async setCredentials(credentials: ApiCredentials): Promise<void> {
+    // Validate credentials before storing
+    if (!credentials.apiKey || typeof credentials.apiKey !== 'string' || credentials.apiKey.trim() === '') {
+      logger.error("Cannot store credentials: apiKey is missing or invalid", {
+        apiKey: credentials.apiKey,
+        apiKeyType: typeof credentials.apiKey,
+      });
+      throw new Error("Invalid credentials: apiKey is required");
+    }
+
+    if (!credentials.screenId || typeof credentials.screenId !== 'string' || credentials.screenId.trim() === '') {
+      logger.error("Cannot store credentials: screenId is missing or invalid", {
+        screenId: credentials.screenId,
+        screenIdType: typeof credentials.screenId,
+      });
+      throw new Error("Invalid credentials: screenId is required");
+    }
+
     this.credentials = credentials;
+
+    // CRITICAL: Set default headers on axios instance immediately
+    // This ensures headers are always sent with requests, not just via interceptor
+    this.setDefaultAuthHeaders(credentials.apiKey, credentials.screenId);
 
     try {
       // Store in localforage
@@ -380,18 +449,73 @@ class MasjidDisplayClient {
         JSON.stringify(credentials),
       );
 
+      // Verify storage was successful
+      const storedScreenId = localStorage.getItem(STORAGE_KEYS.SCREEN_ID);
+      const storedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+
+      if (storedScreenId !== credentials.screenId || storedApiKey !== credentials.apiKey) {
+        logger.error("Credentials storage verification failed!", {
+          expectedScreenId: credentials.screenId,
+          storedScreenId,
+          expectedApiKey: credentials.apiKey?.substring(0, 10) + '...',
+          storedApiKey: storedApiKey?.substring(0, 10) + '...',
+        });
+      }
+
       logger.info("Credentials saved to storage in all formats", {
         apiKeyLength: credentials.apiKey.length,
         screenIdLength: credentials.screenId.length,
+        screenIdValue: credentials.screenId,
+        verifiedStorage: storedScreenId === credentials.screenId,
+      });
+
+      // Also log to console for debugging
+      console.log("✅ [MasjidDisplayClient] Credentials stored successfully:", {
+        screenId: credentials.screenId,
+        apiKeyLength: credentials.apiKey.length,
       });
     } catch (error) {
       logger.error("Error saving credentials", { error });
+      throw error; // Re-throw to allow caller to handle
     }
+  }
+
+  /**
+   * Set default authentication headers on the axios instance
+   * This ensures headers are always included in requests
+   */
+  private setDefaultAuthHeaders(apiKey: string, screenId: string): void {
+    // Set Authorization header on axios defaults
+    this.client.defaults.headers.common['Authorization'] = `Bearer ${apiKey}`;
+    this.client.defaults.headers.common['X-Screen-ID'] = screenId;
+    
+    // Also set masjidId if available
+    const masjidId = localStorage.getItem("masjid_id");
+    if (masjidId) {
+      this.client.defaults.headers.common['X-Masjid-ID'] = masjidId;
+    }
+    
+    // Log confirmation
+    console.log("🔐 [MasjidDisplayClient] Default auth headers set on axios instance:", {
+      hasAuthorization: !!this.client.defaults.headers.common['Authorization'],
+      hasScreenId: !!this.client.defaults.headers.common['X-Screen-ID'],
+      hasMasjidId: !!this.client.defaults.headers.common['X-Masjid-ID'],
+      authHeaderPreview: `Bearer ${apiKey.substring(0, 10)}...`,
+    });
+    
+    logger.info("Default auth headers set on axios instance", {
+      screenId,
+      apiKeyLength: apiKey.length,
+      hasMasjidId: !!masjidId,
+    });
   }
 
   // Clear credentials from memory and storage
   public async clearCredentials(): Promise<void> {
     this.credentials = null;
+
+    // CRITICAL: Clear default headers from axios instance
+    this.clearDefaultAuthHeaders();
 
     try {
       // Clear from localforage
@@ -417,6 +541,18 @@ class MasjidDisplayClient {
     } catch (error) {
       logger.error("Error clearing credentials", { error });
     }
+  }
+
+  /**
+   * Clear default authentication headers from the axios instance
+   */
+  private clearDefaultAuthHeaders(): void {
+    delete this.client.defaults.headers.common['Authorization'];
+    delete this.client.defaults.headers.common['X-Screen-ID'];
+    delete this.client.defaults.headers.common['X-Masjid-ID'];
+    
+    console.log("🔓 [MasjidDisplayClient] Default auth headers cleared from axios instance");
+    logger.info("Default auth headers cleared from axios instance");
   }
 
   // Check if authenticated
@@ -736,10 +872,25 @@ class MasjidDisplayClient {
         });
       }
 
+      // Strip any headers from options to avoid conflicts with axios defaults
+      const { headers: _, ...optionsWithoutHeaders } = options;
+      
       const response = await this.client.request<any, AxiosResponse<T>>({
         url: normalizedEndpoint,
-        ...options,
+        ...optionsWithoutHeaders,
       });
+      
+      // Log successful response with headers that were actually sent
+      if (!shouldDebounceLog(`response-success-${normalizedEndpoint}`)) {
+        const sentHeaders = response.config.headers;
+        const authSent = sentHeaders?.['Authorization'] || sentHeaders?.get?.('Authorization');
+        console.log("✅ [API] Request completed:", {
+          url: normalizedEndpoint,
+          status: response.status,
+          authHeaderSent: !!authSent,
+          authHeaderValue: authSent ? `${String(authSent).substring(0, 30)}...` : "MISSING",
+        });
+      }
 
       if (!shouldDebounceLog(`response-${normalizedEndpoint}`)) {
         logger.debug(`Response from ${normalizedEndpoint}:`, {
@@ -1465,7 +1616,14 @@ class MasjidDisplayClient {
           if (apiKey) {
             logger.info(
               "API key included in check-simple response, setting credentials directly",
+              { screenId, apiKeyLength: apiKey.length }
             );
+
+            console.log("📦 [checkPairingStatus] Direct credentials from check-simple:", {
+              screenId,
+              apiKeyLength: apiKey.length,
+              hasMasjidId: !!masjidId,
+            });
 
             const credentials: ApiCredentials = {
               apiKey: apiKey,
@@ -1475,12 +1633,26 @@ class MasjidDisplayClient {
             // Set the credentials immediately
             await this.setCredentials(credentials);
 
+            // Verify storage was successful (critical for app restart)
+            const verifyScreenId = localStorage.getItem("masjid_screen_id") || localStorage.getItem("screenId");
+            if (!verifyScreenId) {
+              logger.error("CRITICAL: screenId was not stored after check-simple pairing!");
+              console.error("❌ [checkPairingStatus] CRITICAL: screenId storage failed!", {
+                screenId,
+                localStorage_masjid_screen_id: localStorage.getItem("masjid_screen_id"),
+                localStorage_screenId: localStorage.getItem("screenId"),
+              });
+            } else {
+              console.log("✅ [checkPairingStatus] screenId successfully stored:", verifyScreenId);
+            }
+
             // Set isPaired flag in localStorage for other components to detect
             localStorage.setItem("isPaired", "true");
 
             // Also store masjidId if available
             if (masjidId) {
               localStorage.setItem("masjid_id", masjidId);
+              console.log("✅ [checkPairingStatus] masjidId stored:", masjidId);
             }
 
             // Dispatch a custom event to notify components about authentication
@@ -1563,21 +1735,69 @@ class MasjidDisplayClient {
           credentialsDataKeys: Object.keys(credentialsData || {}),
           rawApiKey: credentialsData?.apiKey,
           rawScreenId: credentialsData?.screenId,
+          rawMasjidId: credentialsData?.masjidId,
+          fullResponse: JSON.stringify(result.data).substring(0, 500),
         });
+
+        // Also log to console for debugging
+        console.log("📦 [fetchPairedCredentials] Raw API response:", {
+          hasNestedData: !!(result.data as any).data,
+          credentialsDataKeys: Object.keys(credentialsData || {}),
+          screenId: credentialsData?.screenId,
+          apiKeyLength: credentialsData?.apiKey?.length || 0,
+        });
+
+        // Validate required fields before creating credentials object
+        if (!credentialsData?.apiKey) {
+          logger.error("API response missing apiKey", { credentialsData });
+          throw new Error("Pairing response missing apiKey");
+        }
+
+        if (!credentialsData?.screenId) {
+          logger.error("API response missing screenId", { credentialsData });
+          throw new Error("Pairing response missing screenId");
+        }
 
         const credentials: ApiCredentials = {
           apiKey: credentialsData.apiKey,
           screenId: credentialsData.screenId,
         };
 
+        // Extract masjidId from response
+        const masjidId = credentialsData.masjidId;
+
         logger.info("Setting credentials from paired-credentials", {
           hasApiKey: !!credentials.apiKey,
           hasScreenId: !!credentials.screenId,
+          hasMasjidId: !!masjidId,
           apiKeyLength: credentials.apiKey?.length || 0,
           screenIdLength: credentials.screenId?.length || 0,
+          screenIdValue: credentials.screenId,
         });
 
         await this.setCredentials(credentials);
+
+        // Store masjidId if available (required for WebSocket connection)
+        if (masjidId) {
+          localStorage.setItem("masjid_id", masjidId);
+          logger.info("Stored masjidId from paired-credentials", { masjidId });
+        } else {
+          logger.warn("No masjidId in paired-credentials response - WebSocket may fail to connect");
+        }
+
+        // Double-check that screenId was stored (critical for app restart)
+        const verifyScreenId = localStorage.getItem("masjid_screen_id") || localStorage.getItem("screenId");
+        if (!verifyScreenId) {
+          logger.error("CRITICAL: screenId was not stored in localStorage after setCredentials!");
+          console.error("❌ [fetchPairedCredentials] CRITICAL: screenId storage failed!", {
+            screenId: credentials.screenId,
+            localStorage_masjid_screen_id: localStorage.getItem("masjid_screen_id"),
+            localStorage_screenId: localStorage.getItem("screenId"),
+          });
+        } else {
+          console.log("✅ [fetchPairedCredentials] screenId successfully stored:", verifyScreenId);
+        }
+
         logger.info("Successfully set credentials after pairing");
 
         // Dispatch authentication event

@@ -4,7 +4,6 @@ import masjidDisplayClient, {
 import storageService from "./storageService";
 import logger, { getLastError } from "../utils/logger";
 import { isLowPowerDevice } from "../utils/performanceUtils";
-import unifiedSSEService from "./unifiedSSEService";
 import remoteControlService from "./remoteControlService";
 import type { RemoteCommand, HeartbeatResponse } from "../api/models";
 
@@ -1076,56 +1075,8 @@ class DataSyncService {
           this.adjustHeartbeatInterval(POLLING_INTERVALS.HEARTBEAT);
         }
 
-        // CRITICAL: If hasPendingEmergencyAlerts is true, check SSE connection health
-        // and force reconnect if connection is stale or not healthy
-        if (hasPendingEmergencyAlerts) {
-          const isHealthy = unifiedSSEService.isConnectionHealthy();
-          logger.info(
-            "Heartbeat indicates pending emergency alerts - checking SSE connection health",
-            {
-              hasPendingEmergencyAlerts,
-              isHealthy,
-            },
-          );
-
-          if (!isHealthy) {
-            logger.warn(
-              "SSE connection is not healthy - forcing reconnection for emergency alerts",
-              {
-                hasPendingEmergencyAlerts,
-                isHealthy,
-              },
-            );
-            try {
-              unifiedSSEService.reconnect();
-              logger.info("SSE reconnection triggered for emergency alerts");
-            } catch (error) {
-              logger.error("Error triggering SSE reconnection", { error });
-            }
-          } else {
-            logger.debug(
-              "SSE connection is healthy - no reconnection needed for emergency alerts",
-            );
-          }
-        }
-
-        // Backward compatibility: If hasPendingEvents is true but no commands and no emergency alerts flag,
-        // it might be for other SSE events - trigger SSE reconnection
-        if (
-          hasPendingEvents &&
-          pendingCommands.length === 0 &&
-          !hasPendingEmergencyAlerts
-        ) {
-          logger.info(
-            "Heartbeat indicates pending events (non-emergency) - triggering SSE reconnection",
-          );
-          try {
-            unifiedSSEService.reconnect();
-            logger.info("SSE reconnection triggered for pending events");
-          } catch (error) {
-            logger.error("Error triggering SSE reconnection", { error });
-          }
-        }
+        // Note: Emergency alerts and pending events are now handled via WebSocket
+        // No SSE reconnection needed - WebSocket handles its own reconnection
       } else {
         // Check if error is auth-related
         const errorMessage = response.error || "";

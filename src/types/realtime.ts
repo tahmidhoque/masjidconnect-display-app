@@ -1,0 +1,153 @@
+/**
+ * Realtime WebSocket Types
+ *
+ * TypeScript interfaces for WebSocket communication with the realtime server.
+ * These types define the structure of events sent and received via Socket.io.
+ */
+
+/**
+ * Emergency alert data received from WebSocket
+ */
+export interface EmergencyAlertData {
+  id: string;
+  title: string;
+  message: string;
+  color: string | null;
+  createdAt: string;
+  expiresAt: string;
+  timing?: {
+    duration: number;
+    remaining: number;
+    autoCloseAt: string;
+  };
+  action: "show" | "clear";
+  colorScheme?: string;
+}
+
+/**
+ * Screen orientation data received from WebSocket
+ */
+export interface ScreenOrientationData {
+  id: string;
+  orientation: "LANDSCAPE" | "PORTRAIT";
+  updatedAt: string;
+}
+
+/**
+ * Remote command data received from WebSocket
+ */
+export interface RemoteCommandData {
+  commandId: string;
+  command: string;
+  payload?: Record<string, unknown>;
+  timestamp: string;
+  sentBy?: string;
+}
+
+/**
+ * Heartbeat metrics sent to the server
+ */
+export interface HeartbeatMetrics {
+  cpuUsage?: number;
+  memoryUsage?: number;
+  networkLatency?: number;
+  temperature?: number;
+  currentContent?: string;
+  version?: string;
+  frameRate?: number;
+  displayBrightness?: number;
+  resolution?: string;
+  storageUsed?: number;
+  bandwidthUsage?: number;
+  connectionType?: string;
+  signalStrength?: number;
+  updateProgress?: number;
+}
+
+/**
+ * Connection configuration for WebSocket
+ */
+export interface RealtimeConnectionConfig {
+  serverUrl: string;
+  screenId: string;
+  masjidId: string;
+  authToken: string;
+}
+
+/**
+ * Event handlers for realtime events
+ */
+export interface RealtimeEventHandlers {
+  onConnect?: () => void;
+  onDisconnect?: (reason: string) => void;
+  onReconnect?: (attemptNumber: number) => void;
+  onReconnecting?: (attemptNumber: number) => void;
+  onEmergencyAlert?: (alert: EmergencyAlertData) => void;
+  onEmergencyClear?: (alertId: string) => void;
+  onOrientationChange?: (orientation: ScreenOrientationData) => void;
+  onCommand?: (command: RemoteCommandData) => void;
+  onError?: (error: Error) => void;
+  onSyncResponse?: (data: Record<string, unknown>) => void;
+}
+
+/**
+ * Connection status for realtime service
+ */
+export type RealtimeConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
+
+/**
+ * Detailed connection status with metadata
+ */
+export interface RealtimeConnectionState {
+  status: RealtimeConnectionStatus;
+  isConnected: boolean;
+  reconnectAttempts: number;
+  lastConnectedAt: number | null;
+  lastDisconnectedAt: number | null;
+  lastError: string | null;
+}
+
+/**
+ * Command acknowledgement payload
+ */
+export interface CommandAcknowledgement {
+  commandId: string;
+  commandType: string;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Error report payload
+ */
+export interface ErrorReport {
+  errorType: string;
+  message: string;
+  errorCode?: string;
+  stack?: string;
+}
+
+/**
+ * Sync request payload
+ */
+export interface SyncRequest {
+  type: "full" | "partial";
+  lastSyncTime?: string;
+}
+
+/**
+ * Status update payload
+ */
+export interface StatusUpdate {
+  status: "ONLINE" | "BUSY" | "OFFLINE";
+  oldStatus?: string;
+}
+
+/**
+ * Content change notification payload
+ */
+export interface ContentChangeNotification {
+  contentId: string;
+  contentType: string;
+}
+

@@ -1,5 +1,5 @@
 import logger from "../utils/logger";
-import masjidDisplayClient from "../api/masjidDisplayClient";
+import apiClient from "../api/apiClient";
 
 // Import Redux types and actions for error reporting
 import { store } from "../store";
@@ -367,12 +367,12 @@ class NetworkStatusService {
    */
   private async testAPIConnectivity(): Promise<boolean> {
     try {
-      const response = await masjidDisplayClient.sendHeartbeat({
-        status: "ONLINE",
+      const response = await apiClient.sendHeartbeat({
+        status: "online",
+        appVersion: "1.0.0",
         metrics: {
           uptime: Math.floor((Date.now() - this.lastOnlineTime) / 1000),
           memoryUsage: 0,
-          lastError: "",
         },
       });
 

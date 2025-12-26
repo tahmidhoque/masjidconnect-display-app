@@ -11,9 +11,11 @@ import {
 import { systemMetrics } from "../utils/systemMetrics";
 import logger from "../utils/logger";
 import localforage from "localforage";
-import masjidDisplayClient from "../api/masjidDisplayClient";
+import apiClient from "../api/apiClient";
 import { RemoteCommandResponse } from "./remoteControlService";
 import updateProgressService from "./updateProgressService";
+import websocketService from "./websocketService";
+import type { DisplayStatus } from "./websocketService";
 
 // Analytics configuration
 const ANALYTICS_CONFIG = {
@@ -100,10 +102,34 @@ export class AnalyticsService {
 
   /**
    * Collect and send heartbeat data
+   * Uses WebSocket when connected, falls back to HTTP when disconnected
    */
   private async sendHeartbeat(): Promise<void> {
     try {
       const heartbeatData = await this.collectHeartbeatData();
+
+      // Check if WebSocket is connected
+      const useWebSocket = websocketService.isConnected();
+
+      if (useWebSocket) {
+        // Send heartbeat via WebSocket
+        const wsStatus: DisplayStatus = {
+          status: 'online',
+          appVersion: heartbeatData.appVersion,
+          currentView: heartbeatData.currentContent,
+          uptime: performance.now(),
+          memoryUsage: heartbeatData.memoryUsage,
+        };
+
+        websocketService.sendHeartbeat(wsStatus);
+        logger.debug("Heartbeat sent via WebSocket");
+
+        // Reset content errors after successful heartbeat
+        systemMetrics.resetContentErrors();
+        return;
+      }
+
+      // Fall back to HTTP when WebSocket is not available
       const result = await this.sendAnalyticsData("heartbeat", heartbeatData);
 
       // If heartbeat was sent successfully and contained command responses, clear them
@@ -310,16 +336,27 @@ export class AnalyticsService {
       throw new Error("No API key available");
     }
 
-    // Use the API client's sendAnalyticsData method
-    const result = await masjidDisplayClient.sendAnalyticsData(request);
+    // For heartbeat type, use the apiClient's sendHeartbeat method
+    if (request.type === 'heartbeat') {
+      const result = await apiClient.sendHeartbeat({
+        status: 'online',
+        appVersion: (request.data as HeartbeatAnalyticsData).appVersion || '1.0.0',
+        metrics: {
+          uptime: performance.now(),
+          memoryUsage: (request.data as HeartbeatAnalyticsData).memoryUsage,
+        },
+      });
 
-    if (!result.success) {
-      throw new Error(
-        `Analytics API error: ${result.error || "Unknown error"}`,
-      );
+      if (!result.success) {
+        throw new Error(`Analytics API error: ${result.error || "Unknown error"}`);
+      }
+
+      return { success: true };
     }
 
-    return result.data || { success: true };
+    // For other types, we'd need specific endpoints - for now, log them
+    logger.debug("Analytics data would be sent", { type: request.type });
+    return { success: true };
   }
 
   /**

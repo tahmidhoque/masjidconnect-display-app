@@ -2,15 +2,15 @@ import React, { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../../store";
 import { logout } from "../../store/slices/authSlice";
-import masjidDisplayClient from "../../api/masjidDisplayClient";
+import apiClient from "../../api/apiClient";
+import environment from "../../config/environment";
 import logger from "../../utils/logger";
-import { POLLING_INTERVALS } from "../../api/masjidDisplayClient";
 
 /**
  * AuthErrorDetector - A component that monitors for authentication errors
  * and handles them by triggering re-authentication when needed.
  *
- * This version respects the polling intervals from the integration guide
+ * This version uses the heartbeat interval from environment config
  * to avoid making too frequent API calls.
  */
 const AuthErrorDetector: React.FC = () => {
@@ -22,10 +22,10 @@ const AuthErrorDetector: React.FC = () => {
   const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0);
   const checkIntervalRef = useRef<number | null>(null);
 
-  // Use heartbeat polling interval from the integration guide
-  const checkInterval = POLLING_INTERVALS.HEARTBEAT;
+  // Use heartbeat polling interval from environment config
+  const checkInterval = environment.heartbeatInterval;
 
-  // Check authentication status on the heartbeat interval from the integration guide
+  // Check authentication status on the heartbeat interval
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -40,7 +40,7 @@ const AuthErrorDetector: React.FC = () => {
       checkAuthStatus();
     }
 
-    // Set up periodic check based on the heartbeat interval from the integration guide
+    // Set up periodic check based on the heartbeat interval
     checkIntervalRef.current = window.setInterval(
       checkAuthStatus,
       checkInterval,
@@ -57,12 +57,12 @@ const AuthErrorDetector: React.FC = () => {
   const checkAuthStatus = async () => {
     try {
       // Make a heartbeat request to test auth (this doubles as our required heartbeat)
-      const response = await masjidDisplayClient.sendHeartbeat({
-        status: "ONLINE",
+      const response = await apiClient.sendHeartbeat({
+        status: "online",
+        appVersion: "1.0.0",
         metrics: {
           uptime: Math.floor((Date.now() - performance.now()) / 1000),
           memoryUsage: 0,
-          lastError: "",
         },
       });
 
@@ -72,10 +72,10 @@ const AuthErrorDetector: React.FC = () => {
           logger.info("Authentication working again after previous errors");
           setConsecutiveErrors(0);
         }
-      } else if (response?.status === 401) {
+      } else if (response?.statusCode === 401) {
         // Authentication error
         logger.warn("Authentication error detected", {
-          status: response?.status,
+          status: response?.statusCode,
           error: response.error,
         });
         setConsecutiveErrors((prev) => prev + 1);

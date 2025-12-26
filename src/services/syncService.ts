@@ -1,233 +1,619 @@
-import masjidDisplayClient from "../api/masjidDisplayClient";
-import offlineStorage from "./offlineStorageService";
-import logger from "../utils/logger";
-
 /**
  * Sync Service
- *
- * Handles automatic synchronization when network connection is restored.
- * Clears expired cache, syncs all content, and sends queued data.
+ * 
+ * Manages data synchronisation between the display app and the backend.
+ * Handles polling, caching, and dispatches Redux actions for state updates.
+ * 
+ * Features:
+ * - Configurable polling intervals per data type
+ * - Smart sync using /api/screen/sync endpoint
+ * - Offline support with cached data
+ * - Redux integration for state management
+ * - Throttling to prevent excessive requests
  */
+
+import apiClient, {
+  ContentResponse,
+  PrayerTimesResponse,
+  EventsResponse,
+  HeartbeatRequest,
+  HeartbeatResponse,
+  SyncStatusResponse,
+  RemoteCommand,
+} from '../api/apiClient';
+import credentialService from './credentialService';
+import environment from '../config/environment';
+import logger from '../utils/logger';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Sync status for each data type
+ */
+export interface SyncStatus {
+  lastSynced: Date | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+/**
+ * Overall sync state
+ */
+export interface SyncState {
+  content: SyncStatus;
+  prayerTimes: SyncStatus;
+  events: SyncStatus;
+  heartbeat: SyncStatus;
+}
+
+/**
+ * Sync result
+ */
+export interface SyncResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  fromCache?: boolean;
+}
+
+/**
+ * Sync event types
+ */
+export type SyncEventType =
+  | 'content:synced'
+  | 'prayerTimes:synced'
+  | 'events:synced'
+  | 'heartbeat:sent'
+  | 'command:received'
+  | 'sync:error'
+  | 'sync:started'
+  | 'sync:completed';
+
+export type SyncEventListener<T = unknown> = (data: T) => void;
+
+// ============================================================================
+// Sync Service Class
+// ============================================================================
+
 class SyncService {
-  private syncQueue: Array<() => Promise<void>> = [];
-  private periodicSyncInterval: NodeJS.Timeout | null = null;
-  private isInitialized: boolean = false;
-  private readonly PERIODIC_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  // Polling intervals
+  private contentInterval: NodeJS.Timeout | null = null;
+  private prayerTimesInterval: NodeJS.Timeout | null = null;
+  private eventsInterval: NodeJS.Timeout | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+
+  // Sync state
+  private state: SyncState = {
+    content: { lastSynced: null, isLoading: false, error: null },
+    prayerTimes: { lastSynced: null, isLoading: false, error: null },
+    events: { lastSynced: null, isLoading: false, error: null },
+    heartbeat: { lastSynced: null, isLoading: false, error: null },
+  };
+
+  // Cached timestamps from sync status
+  private lastKnownTimestamps: SyncStatusResponse | null = null;
+
+  // Event listeners
+  private listeners: Map<SyncEventType, Set<SyncEventListener>> = new Map();
+
+  // State flags
+  private isStarted: boolean = false;
+  private isPaused: boolean = false;
+
+  constructor() {
+    logger.info('[SyncService] Created');
+  }
+
+  // ==========================================================================
+  // Lifecycle
+  // ==========================================================================
 
   /**
-   * Initialize sync service
+   * Start all sync intervals
    */
-  public initialize(): void {
-    if (this.isInitialized) {
-      logger.warn("[Sync] Service already initialized");
+  public start(): void {
+    if (this.isStarted) {
+      logger.debug('[SyncService] Already started');
       return;
     }
 
-    logger.info("[Sync] Initializing sync service");
-    this.isInitialized = true;
+    if (!credentialService.hasCredentials()) {
+      logger.warn('[SyncService] Cannot start - no credentials');
+      return;
+    }
 
-    // Setup online event listener
-    window.addEventListener("online", this.handleReconnection);
+    logger.info('[SyncService] Starting sync intervals');
+    this.isStarted = true;
+    this.isPaused = false;
 
-    // Start periodic sync when online
-    this.startPeriodicSync();
+    // Perform initial sync
+    this.performInitialSync();
 
-    // If already online, perform initial sync
-    if (navigator.onLine) {
-      this.syncAll().catch((error) => {
-        logger.error("[Sync] Error in initial sync", { error });
-      });
+    // Start intervals
+    this.startHeartbeatInterval();
+    this.startContentInterval();
+    this.startPrayerTimesInterval();
+    this.startEventsInterval();
+  }
+
+  /**
+   * Stop all sync intervals
+   */
+  public stop(): void {
+    if (!this.isStarted) {
+      logger.debug('[SyncService] Already stopped');
+      return;
+    }
+
+    logger.info('[SyncService] Stopping sync intervals');
+    this.isStarted = false;
+
+    this.clearAllIntervals();
+  }
+
+  /**
+   * Pause syncing (e.g., when offline)
+   */
+  public pause(): void {
+    if (this.isPaused) return;
+    logger.info('[SyncService] Pausing sync');
+    this.isPaused = true;
+  }
+
+  /**
+   * Resume syncing
+   */
+  public resume(): void {
+    if (!this.isPaused) return;
+    logger.info('[SyncService] Resuming sync');
+    this.isPaused = false;
+
+    // Trigger immediate sync on resume
+    this.syncAll();
+  }
+
+  /**
+   * Clear all intervals
+   */
+  private clearAllIntervals(): void {
+    if (this.contentInterval) {
+      clearInterval(this.contentInterval);
+      this.contentInterval = null;
+    }
+    if (this.prayerTimesInterval) {
+      clearInterval(this.prayerTimesInterval);
+      this.prayerTimesInterval = null;
+    }
+    if (this.eventsInterval) {
+      clearInterval(this.eventsInterval);
+      this.eventsInterval = null;
+    }
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  // ==========================================================================
+  // Interval Setup
+  // ==========================================================================
+
+  private startHeartbeatInterval(): void {
+    // Send heartbeat every 30 seconds
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.isPaused) {
+        this.sendHeartbeat();
+      }
+    }, environment.heartbeatInterval);
+
+    // Send initial heartbeat
+    this.sendHeartbeat();
+  }
+
+  private startContentInterval(): void {
+    // Sync content every 5 minutes
+    this.contentInterval = setInterval(() => {
+      if (!this.isPaused) {
+        this.syncContent();
+      }
+    }, environment.contentSyncInterval);
+  }
+
+  private startPrayerTimesInterval(): void {
+    // Sync prayer times daily (but check more frequently for updates)
+    this.prayerTimesInterval = setInterval(() => {
+      if (!this.isPaused) {
+        this.syncPrayerTimes();
+      }
+    }, environment.prayerTimesSyncInterval);
+  }
+
+  private startEventsInterval(): void {
+    // Sync events every 30 minutes
+    this.eventsInterval = setInterval(() => {
+      if (!this.isPaused) {
+        this.syncEvents();
+      }
+    }, environment.eventsSyncInterval);
+  }
+
+  // ==========================================================================
+  // Sync Methods
+  // ==========================================================================
+
+  /**
+   * Perform initial sync of all data
+   */
+  private async performInitialSync(): Promise<void> {
+    logger.info('[SyncService] Performing initial sync');
+    this.emitEvent('sync:started', null);
+
+    await this.syncAll();
+
+    this.emitEvent('sync:completed', null);
+    logger.info('[SyncService] Initial sync completed');
+  }
+
+  /**
+   * Sync all data types
+   */
+  public async syncAll(): Promise<void> {
+    if (this.isPaused) {
+      logger.debug('[SyncService] Sync skipped - paused');
+      return;
+    }
+
+    // Run syncs in parallel
+    await Promise.all([
+      this.syncContent(),
+      this.syncPrayerTimes(),
+      this.syncEvents(),
+    ]);
+  }
+
+  /**
+   * Sync content from server
+   */
+  public async syncContent(): Promise<SyncResult<ContentResponse>> {
+    if (this.state.content.isLoading) {
+      logger.debug('[SyncService] Content sync already in progress');
+      return { success: false, error: 'Sync already in progress' };
+    }
+
+    this.updateState('content', { isLoading: true, error: null });
+
+    try {
+      // Check if content has changed using sync endpoint
+      const shouldSync = await this.checkIfContentChanged();
+      if (!shouldSync) {
+        logger.debug('[SyncService] Content unchanged, skipping sync');
+        this.updateState('content', { isLoading: false });
+        return { success: true, fromCache: true };
+      }
+
+      const response = await apiClient.getContent();
+
+      if (response.success && response.data) {
+        this.updateState('content', {
+          isLoading: false,
+          lastSynced: new Date(),
+          error: null,
+        });
+
+        this.emitEvent('content:synced', response.data);
+        logger.info('[SyncService] Content synced successfully', {
+          fromCache: response.fromCache,
+        });
+
+        return {
+          success: true,
+          data: response.data,
+          fromCache: response.fromCache,
+        };
+      } else {
+        throw new Error(response.error || 'Failed to fetch content');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.updateState('content', { isLoading: false, error: errorMessage });
+      this.emitEvent('sync:error', { type: 'content', error: errorMessage });
+      logger.error('[SyncService] Content sync failed', { error: errorMessage });
+
+      return { success: false, error: errorMessage };
     }
   }
 
   /**
-   * Start periodic sync when online
+   * Sync prayer times from server
    */
-  private startPeriodicSync(): void {
-    if (this.periodicSyncInterval) {
-      clearInterval(this.periodicSyncInterval);
+  public async syncPrayerTimes(): Promise<SyncResult<PrayerTimesResponse>> {
+    if (this.state.prayerTimes.isLoading) {
+      logger.debug('[SyncService] Prayer times sync already in progress');
+      return { success: false, error: 'Sync already in progress' };
     }
 
-    this.periodicSyncInterval = setInterval(() => {
-      if (navigator.onLine && masjidDisplayClient.isAuthenticated()) {
-        this.syncAll().catch((error) => {
-          logger.error("[Sync] Error in periodic sync", { error });
-        });
-      }
-    }, this.PERIODIC_SYNC_INTERVAL);
+    this.updateState('prayerTimes', { isLoading: true, error: null });
 
-    logger.debug("[Sync] Started periodic sync", {
-      interval: `${this.PERIODIC_SYNC_INTERVAL / 1000 / 60} minutes`,
+    try {
+      const response = await apiClient.getPrayerTimes();
+
+      if (response.success && response.data) {
+        this.updateState('prayerTimes', {
+          isLoading: false,
+          lastSynced: new Date(),
+          error: null,
+        });
+
+        this.emitEvent('prayerTimes:synced', response.data);
+        logger.info('[SyncService] Prayer times synced successfully', {
+          fromCache: response.fromCache,
+        });
+
+        return {
+          success: true,
+          data: response.data,
+          fromCache: response.fromCache,
+        };
+      } else {
+        throw new Error(response.error || 'Failed to fetch prayer times');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.updateState('prayerTimes', { isLoading: false, error: errorMessage });
+      this.emitEvent('sync:error', { type: 'prayerTimes', error: errorMessage });
+      logger.error('[SyncService] Prayer times sync failed', { error: errorMessage });
+
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Sync events from server
+   */
+  public async syncEvents(): Promise<SyncResult<EventsResponse>> {
+    if (this.state.events.isLoading) {
+      logger.debug('[SyncService] Events sync already in progress');
+      return { success: false, error: 'Sync already in progress' };
+    }
+
+    this.updateState('events', { isLoading: true, error: null });
+
+    try {
+      const response = await apiClient.getEvents();
+
+      if (response.success && response.data) {
+        this.updateState('events', {
+          isLoading: false,
+          lastSynced: new Date(),
+          error: null,
+        });
+
+        this.emitEvent('events:synced', response.data);
+        logger.info('[SyncService] Events synced successfully', {
+          fromCache: response.fromCache,
+        });
+
+        return {
+          success: true,
+          data: response.data,
+          fromCache: response.fromCache,
+        };
+      } else {
+        throw new Error(response.error || 'Failed to fetch events');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.updateState('events', { isLoading: false, error: errorMessage });
+      this.emitEvent('sync:error', { type: 'events', error: errorMessage });
+      logger.error('[SyncService] Events sync failed', { error: errorMessage });
+
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Send heartbeat to server
+   */
+  public async sendHeartbeat(): Promise<SyncResult<HeartbeatResponse>> {
+    if (this.state.heartbeat.isLoading) {
+      return { success: false, error: 'Heartbeat in progress' };
+    }
+
+    this.updateState('heartbeat', { isLoading: true, error: null });
+
+    try {
+      const request: HeartbeatRequest = {
+        status: 'online',
+        appVersion: '1.0.0', // TODO: Get from environment
+        currentView: 'display',
+        metrics: {
+          uptime: performance.now(),
+          memoryUsage: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize,
+        },
+      };
+
+      const response = await apiClient.sendHeartbeat(request);
+
+      if (response.success && response.data) {
+        this.updateState('heartbeat', {
+          isLoading: false,
+          lastSynced: new Date(),
+          error: null,
+        });
+
+        // Process any commands received
+        if (response.data.commands && response.data.commands.length > 0) {
+          this.processCommands(response.data.commands);
+        }
+
+        this.emitEvent('heartbeat:sent', response.data);
+        logger.debug('[SyncService] Heartbeat sent successfully');
+
+        return { success: true, data: response.data };
+      } else {
+        throw new Error(response.error || 'Heartbeat failed');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.updateState('heartbeat', { isLoading: false, error: errorMessage });
+      logger.error('[SyncService] Heartbeat failed', { error: errorMessage });
+
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  // ==========================================================================
+  // Smart Sync
+  // ==========================================================================
+
+  /**
+   * Check if content has changed using the sync endpoint
+   */
+  private async checkIfContentChanged(): Promise<boolean> {
+    try {
+      const response = await apiClient.getSyncStatus();
+
+      if (!response.success || !response.data) {
+        // If we can't check, assume we need to sync
+        return true;
+      }
+
+      const newTimestamps = response.data;
+
+      // First sync or no previous timestamps
+      if (!this.lastKnownTimestamps) {
+        this.lastKnownTimestamps = newTimestamps;
+        return true;
+      }
+
+      // Check if content has changed
+      const contentChanged =
+        newTimestamps.contentUpdated !== this.lastKnownTimestamps.contentUpdated;
+
+      if (contentChanged) {
+        this.lastKnownTimestamps = newTimestamps;
+      }
+
+      return contentChanged;
+    } catch (error) {
+      logger.debug('[SyncService] Could not check sync status, proceeding with sync');
+      return true;
+    }
+  }
+
+  // ==========================================================================
+  // Command Processing
+  // ==========================================================================
+
+  /**
+   * Process commands received from heartbeat
+   */
+  private processCommands(commands: RemoteCommand[]): void {
+    logger.info('[SyncService] Processing commands', { count: commands.length });
+
+    commands.forEach((command) => {
+      this.emitEvent('command:received', command);
     });
   }
 
-  /**
-   * Handle reconnection to network
-   */
-  private handleReconnection = async (): Promise<void> => {
-    logger.info("[Sync] Network reconnected, syncing...");
+  // ==========================================================================
+  // State Management
+  // ==========================================================================
 
-    if (!masjidDisplayClient.isAuthenticated()) {
-      logger.warn("[Sync] Not authenticated, skipping sync");
-      return;
-    }
-
-    try {
-      // Clear expired cache first
-      await offlineStorage.clearExpiredContent();
-
-      // Sync all pending data
-      await this.syncAll();
-
-      // Send queued analytics (if analyticsService has flushPendingData)
-      await this.flushPendingAnalytics();
-
-      // Send queued command responses
-      await this.sendPendingCommandResponses();
-
-      logger.info("[Sync] Sync complete");
-    } catch (error) {
-      logger.error("[Sync] Error during reconnection sync", { error });
-    }
-  };
-
-  /**
-   * Sync all content from API
-   */
-  private async syncAll(): Promise<void> {
-    if (!masjidDisplayClient.isAuthenticated()) {
-      logger.warn("[Sync] Cannot sync - not authenticated");
-      return;
-    }
-
-    try {
-      logger.info("[Sync] Starting sync of all content");
-
-      // Fetch latest content in parallel
-      await Promise.all([
-        masjidDisplayClient.getScreenContent(false).catch((error) => {
-          logger.error("[Sync] Error syncing screen content", { error });
-        }),
-        masjidDisplayClient
-          .getPrayerTimes(undefined, undefined, false)
-          .catch((error) => {
-            logger.error("[Sync] Error syncing prayer times", { error });
-          }),
-        masjidDisplayClient.getEvents(5, false).catch((error) => {
-          logger.error("[Sync] Error syncing events", { error });
-        }),
-      ]);
-
-      logger.info("[Sync] All content synced");
-    } catch (error) {
-      logger.error("[Sync] Error syncing content", { error });
-      throw error;
-    }
+  private updateState(key: keyof SyncState, update: Partial<SyncStatus>): void {
+    this.state[key] = { ...this.state[key], ...update };
   }
 
   /**
-   * Flush pending analytics data
+   * Get current sync state
    */
-  private async flushPendingAnalytics(): Promise<void> {
-    try {
-      // Import analyticsService dynamically to avoid circular dependencies
-      const { analyticsService } = await import("./analyticsService");
-
-      // Check if analyticsService has processQueue method (it's private, so we'll try to trigger it)
-      // The analyticsService processes queue automatically, but we can ensure it runs
-      if (
-        analyticsService &&
-        typeof (analyticsService as any).processQueue === "function"
-      ) {
-        await (analyticsService as any).processQueue();
-        logger.info("[Sync] Flushed pending analytics");
-      } else {
-        // Analytics service will process queue automatically, just log
-        logger.debug(
-          "[Sync] Analytics service will process queue automatically",
-        );
-      }
-    } catch (error) {
-      // Analytics service might not be available or initialized
-      logger.debug(
-        "[Sync] Could not flush analytics (service may not be initialized)",
-        { error },
-      );
-    }
+  public getState(): SyncState {
+    return { ...this.state };
   }
 
   /**
-   * Send pending command responses
+   * Check if any sync is in progress
    */
-  private async sendPendingCommandResponses(): Promise<void> {
-    try {
-      const responsesJson = localStorage.getItem("pending_command_responses");
-      if (!responsesJson) {
-        return;
-      }
+  public isSyncing(): boolean {
+    return (
+      this.state.content.isLoading ||
+      this.state.prayerTimes.isLoading ||
+      this.state.events.isLoading ||
+      this.state.heartbeat.isLoading
+    );
+  }
 
-      const responses = JSON.parse(responsesJson);
-      if (!Array.isArray(responses) || responses.length === 0) {
-        return;
-      }
+  // ==========================================================================
+  // Event Subscription
+  // ==========================================================================
 
-      logger.info("[Sync] Sending pending command responses", {
-        count: responses.length,
-      });
-
-      // Send to API via heartbeat endpoint
-      // Note: This assumes the heartbeat endpoint accepts commandResponses
-      const heartbeatResult = await masjidDisplayClient.sendHeartbeat({
-        status: "ONLINE",
-        metrics: {
-          uptime: Date.now() - (window.performance?.timeOrigin || Date.now()),
-          memoryUsage: (performance as any).memory?.usedJSHeapSize || 0,
-          lastError: "",
-        },
-      });
-
-      if (heartbeatResult.success) {
-        // Clear after successful send
-        localStorage.removeItem("pending_command_responses");
-        logger.info("[Sync] Command responses sent successfully");
-      } else {
-        logger.warn(
-          "[Sync] Failed to send command responses, will retry later",
-          {
-            error: heartbeatResult.error,
-          },
-        );
-      }
-    } catch (error) {
-      logger.error("[Sync] Error sending command responses", { error });
-      // Don't clear on error - will retry next time
+  /**
+   * Subscribe to a sync event
+   */
+  public on<T = unknown>(event: SyncEventType, listener: SyncEventListener<T>): () => void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
     }
+
+    this.listeners.get(event)!.add(listener as SyncEventListener);
+
+    return () => {
+      this.listeners.get(event)?.delete(listener as SyncEventListener);
+    };
   }
 
   /**
-   * Manually trigger sync
+   * Emit an event to all listeners
    */
-  public async sync(): Promise<void> {
-    if (!navigator.onLine) {
-      logger.warn("[Sync] Cannot sync - device is offline");
-      return;
-    }
+  private emitEvent<T>(event: SyncEventType, data: T): void {
+    const eventListeners = this.listeners.get(event);
+    if (!eventListeners) return;
 
+    eventListeners.forEach((listener) => {
+      try {
+        listener(data);
+      } catch (error) {
+        logger.error('[SyncService] Error in event listener', { event, error });
+      }
+    });
+  }
+
+  // ==========================================================================
+  // Utility Methods
+  // ==========================================================================
+
+  /**
+   * Force a full refresh of all data
+   */
+  public async forceRefresh(): Promise<void> {
+    logger.info('[SyncService] Forcing full refresh');
+
+    // Clear cached timestamps to force sync
+    this.lastKnownTimestamps = null;
+
+    // Clear API cache
+    await apiClient.clearCache();
+
+    // Perform full sync
     await this.syncAll();
   }
 
   /**
-   * Cleanup sync service
+   * Get time since last sync for a data type
    */
-  public cleanup(): void {
-    if (this.periodicSyncInterval) {
-      clearInterval(this.periodicSyncInterval);
-      this.periodicSyncInterval = null;
-    }
+  public getTimeSinceLastSync(key: keyof SyncState): number | null {
+    const lastSynced = this.state[key].lastSynced;
+    if (!lastSynced) return null;
+    return Date.now() - lastSynced.getTime();
+  }
 
-    window.removeEventListener("online", this.handleReconnection);
-    this.isInitialized = false;
-    logger.info("[Sync] Sync service cleaned up");
+  /**
+   * Check if service is running
+   */
+  public isRunning(): boolean {
+    return this.isStarted && !this.isPaused;
   }
 }
 

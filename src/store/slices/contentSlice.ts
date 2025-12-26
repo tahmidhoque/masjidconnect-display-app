@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { ScreenContent, PrayerTimes, Event, Schedule } from "../../api/models";
-import masjidDisplayClient from "../../api/masjidDisplayClient";
-import dataSyncService from "../../services/dataSyncService";
+import apiClient from "../../api/apiClient";
+import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
 
@@ -287,8 +287,12 @@ export const refreshContent = createAsyncThunk(
         return { skipped: true, reason: "rate_limited" };
       }
 
-      // Use data sync service for robust data fetching
-      await dataSyncService.syncAllData(forceRefresh);
+      // Use sync service for robust data fetching
+      if (forceRefresh) {
+        await syncService.forceRefresh();
+      } else {
+        await syncService.syncContent();
+      }
 
       // Get the content from storage after sync
       const content = await storageService.getScreenContent();
@@ -301,6 +305,18 @@ export const refreshContent = createAsyncThunk(
       const masjidName = extractMasjidName(content);
       const masjidTimezone =
         content.masjid?.timezone || content.data?.masjid?.timezone || null;
+
+      // Extract and store masjidId if available (for WebSocket connection)
+      // This handles cases where the backend includes masjidId in the content response
+      const masjidId =
+        content.masjid?.id || content.data?.masjid?.id || null;
+      if (masjidId) {
+        const existingMasjidId = localStorage.getItem("masjid_id");
+        if (!existingMasjidId || existingMasjidId !== masjidId) {
+          localStorage.setItem("masjid_id", masjidId);
+          logger.info("[Content] Stored masjidId from content response", { masjidId });
+        }
+      }
 
       // Update carousel time if specified in content
       let carouselTime = 30; // default
@@ -348,7 +364,7 @@ export const refreshPrayerTimes = createAsyncThunk(
 
       // First, try to sync prayer times separately (but don't fail if it doesn't work)
       try {
-        await dataSyncService.syncPrayerTimes();
+        await syncService.syncPrayerTimes();
         logger.debug("[Content] Prayer times sync completed successfully");
       } catch (syncError) {
         logger.warn(
@@ -441,7 +457,8 @@ export const refreshSchedule = createAsyncThunk(
         return { skipped: true };
       }
 
-      await dataSyncService.syncSchedule(forceRefresh);
+      // Schedule is synced as part of content sync
+      await syncService.syncContent();
 
       // Get the schedule from storage after sync
       const scheduleData = await storageService.getSchedule();

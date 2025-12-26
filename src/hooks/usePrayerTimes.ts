@@ -11,7 +11,7 @@ import {
   fetchHijriDateElectronSafe,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
-import masjidDisplayClient from "../api/masjidDisplayClient";
+import apiClient from "../api/apiClient";
 import logger from "../utils/logger";
 import dayjs from "dayjs";
 
@@ -437,7 +437,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       currentDayRef.current = newDay;
 
       // Clear all caches first
-      masjidDisplayClient.invalidateAllCaches();
+      apiClient.clearCache();
 
       // Force refresh prayer times with high priority
       refreshPrayerTimesHandler();

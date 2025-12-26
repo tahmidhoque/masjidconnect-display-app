@@ -120,10 +120,15 @@ export interface RemoteCommand {
     | "FORCE_UPDATE"
     | "UPDATE_SETTINGS"
     | "FACTORY_RESET"
-    | "CAPTURE_SCREENSHOT";
+    | "CAPTURE_SCREENSHOT"
+    | "UPDATE_ORIENTATION"
+    | "REFRESH_PRAYER_TIMES"
+    | "DISPLAY_MESSAGE"
+    | "REBOOT_DEVICE";
   payload?: {
     countdown?: number;
     settings?: any;
+    orientation?: string;
     [key: string]: any;
   };
   timestamp: string;
@@ -359,6 +364,7 @@ export interface ScreenContent {
     };
   };
   masjid?: {
+    id?: string; // masjidId - added for WebSocket connection support
     name: string;
     timezone: string;
   };
@@ -369,6 +375,7 @@ export interface ScreenContent {
   // New fields for the updated API format
   data?: {
     masjid?: {
+      id?: string; // masjidId - added for WebSocket connection support
       name: string;
       timezone: string;
       coordinates?: {

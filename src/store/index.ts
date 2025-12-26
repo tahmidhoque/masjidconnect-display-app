@@ -27,6 +27,7 @@ import { emergencyMiddleware } from "./middleware/emergencyMiddleware";
 import { performanceMiddleware } from "./middleware/performanceMiddleware";
 import { updateMiddleware } from "./middleware/updateMiddleware";
 import { orientationMiddleware } from "./middleware/orientationMiddleware";
+import { realtimeMiddleware } from "./middleware/realtimeMiddleware";
 
 // Root reducer
 const rootReducer = combineReducers({
@@ -126,7 +127,8 @@ export const store = configureStore({
       .concat(emergencyMiddleware)
       .concat(performanceMiddleware.middleware)
       .concat(updateMiddleware)
-      .concat(orientationMiddleware),
+      .concat(orientationMiddleware)
+      .concat(realtimeMiddleware),
   // Enable Redux DevTools in development
   devTools: process.env.NODE_ENV === "development",
 });

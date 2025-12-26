@@ -1,21 +1,19 @@
 /**
  * Remote Control Service
  *
- * Handles SSE events from the admin portal for remote device management.
+ * Handles remote commands for device management.
+ * Commands are received via heartbeat polling or WebSocket through realtimeMiddleware.
  * Supports commands: FORCE_UPDATE, RESTART_APP, RELOAD_CONTENT, CLEAR_CACHE,
  * UPDATE_SETTINGS, FACTORY_RESET, CAPTURE_SCREENSHOT
  */
 
 import logger from "../utils/logger";
-import masjidDisplayClient from "../api/masjidDisplayClient";
-import updateService from "./updateService";
-import storageService from "./storageService";
+import apiClient from "../api/apiClient";
 import localforage from "localforage";
 import { analyticsService } from "./analyticsService";
-import unifiedSSEService from "./unifiedSSEService";
 import type { RemoteCommand as ApiRemoteCommand } from "../api/models";
 
-// Event Types for SSE Remote Control
+// Command types
 const REMOTE_COMMAND_TYPES = {
   FORCE_UPDATE: "FORCE_UPDATE",
   RESTART_APP: "RESTART_APP",
@@ -24,6 +22,10 @@ const REMOTE_COMMAND_TYPES = {
   UPDATE_SETTINGS: "UPDATE_SETTINGS",
   FACTORY_RESET: "FACTORY_RESET",
   CAPTURE_SCREENSHOT: "CAPTURE_SCREENSHOT",
+  UPDATE_ORIENTATION: "UPDATE_ORIENTATION",
+  REFRESH_PRAYER_TIMES: "REFRESH_PRAYER_TIMES",
+  DISPLAY_MESSAGE: "DISPLAY_MESSAGE",
+  REBOOT_DEVICE: "REBOOT_DEVICE",
 };
 
 export interface RemoteCommand {
@@ -39,15 +41,7 @@ export interface RemoteCommandResponse {
   message?: string;
   error?: string;
   timestamp: string;
-  executionTime?: number; // milliseconds
-}
-
-export interface ConnectionStatus {
-  connected: boolean;
-  url: string | null;
-  readyState: number | null;
-  reconnectAttempts: number;
-  lastError?: string;
+  executionTime?: number;
 }
 
 class RemoteControlService {
@@ -55,94 +49,18 @@ class RemoteControlService {
   private lastCommandTimestamp: Record<string, number> = {};
   private commandCooldownMs = 2000; // 2 seconds cooldown between commands
   private commandQueue: RemoteCommand[] = [];
-  private commandsInProgress: Set<string> = new Set(); // Track commands currently executing
-  private connectionStatusListeners: Set<(status: ConnectionStatus) => void> =
-    new Set();
+  private commandsInProgress: Set<string> = new Set();
   private maxStoredResponses = 50;
-  private isInitializing = false; // Prevent duplicate initialization
-  private unregisterHandlers: (() => void)[] = []; // Track registered handlers for cleanup
-  private processedCommandIds: Set<string> = new Set(); // Track processed command IDs to prevent duplicates
-  private commandIdCleanupTimers: Map<string, NodeJS.Timeout> = new Map(); // Track cleanup timers for command IDs
+  private processedCommandIds: Set<string> = new Set();
+  private commandIdCleanupTimers: Map<string, NodeJS.Timeout> = new Map();
 
   /**
-   * Initialize the remote control service using the unified SSE connection
-   */
-  public initialize(baseURL: string): void {
-    // Prevent duplicate initialization
-    if (this.isInitializing) {
-      logger.warn(
-        "RemoteControlService: Already initializing, skipping duplicate call",
-      );
-      return;
-    }
-
-    this.isInitializing = true;
-    logger.info("RemoteControlService: Initializing with unified SSE service", {
-      baseURL,
-    });
-    console.log(
-      "🎮 RemoteControlService: Initializing with unified SSE service",
-    );
-
-    // Ensure unified SSE service is initialized
-    unifiedSSEService.initialize(baseURL);
-
-    // Register handlers for all remote command types
-    this.registerEventHandlers();
-
-    this.isInitializing = false;
-  }
-
-  /**
-   * Register event handlers with the unified SSE service
-   * NOTE: Remote commands are now delivered via heartbeat, not SSE
-   * This method is kept for backward compatibility but no longer registers remote command handlers
-   */
-  private registerEventHandlers(): void {
-    // Clean up any existing handlers first
-    if (this.unregisterHandlers.length > 0) {
-      logger.info(
-        "RemoteControlService: Cleaning up existing event handlers before re-registering",
-        {
-          handlerCount: this.unregisterHandlers.length,
-        },
-      );
-      console.log(
-        `🎮 RemoteControlService: Cleaning up ${this.unregisterHandlers.length} existing handler(s)`,
-      );
-    }
-    this.unregisterHandlers.forEach((unregister) => unregister());
-    this.unregisterHandlers = [];
-
-    // NOTE: Remote commands are no longer delivered via SSE
-    // They are now delivered via heartbeat polling
-    // Emergency alerts are still handled by emergencyAlertService via SSE
-    logger.info(
-      "RemoteControlService: Remote commands are now delivered via heartbeat, not SSE",
-    );
-    console.log(
-      "🎮 RemoteControlService: Remote commands are now delivered via heartbeat, not SSE",
-    );
-
-    logger.info(
-      "RemoteControlService: No SSE event handlers registered (commands via heartbeat)",
-      {
-        totalHandlers: this.unregisterHandlers.length,
-      },
-    );
-    console.log(
-      `🎮 RemoteControlService: Event handler registration complete (${this.unregisterHandlers.length} handlers - none for remote commands)`,
-    );
-  }
-
-  /**
-   * Handle a remote command from heartbeat (new approach)
-   * Commands are delivered via heartbeat polling instead of SSE
+   * Handle a remote command from heartbeat or WebSocket
    */
   public async handleCommandFromHeartbeat(
     command: ApiRemoteCommand,
   ): Promise<void> {
-    logger.info("RemoteControlService: Processing command from heartbeat", {
+    logger.info("RemoteControlService: Processing command", {
       commandId: command.commandId,
       type: command.type,
     });
@@ -165,13 +83,10 @@ class RemoteControlService {
 
     // Check for duplicate command IDs
     if (this.processedCommandIds.has(command.commandId)) {
-      logger.warn(
-        "RemoteControlService: Duplicate command detected, skipping",
-        {
-          commandId: command.commandId,
-          type: command.type,
-        },
-      );
+      logger.warn("RemoteControlService: Duplicate command detected, skipping", {
+        commandId: command.commandId,
+        type: command.type,
+      });
       return;
     }
 
@@ -201,12 +116,9 @@ class RemoteControlService {
       );
 
       // Process queue after cooldown period
-      setTimeout(
-        () => {
-          this.processCommandQueue();
-        },
-        this.commandCooldownMs - (now - lastTime),
-      );
+      setTimeout(() => {
+        this.processCommandQueue();
+      }, this.commandCooldownMs - (now - lastTime));
 
       return;
     }
@@ -223,7 +135,7 @@ class RemoteControlService {
 
     this.lastCommandTimestamp[command.type] = now;
 
-    // Execute command (convert to internal RemoteCommand format)
+    // Execute command
     const internalCommand = command as RemoteCommand;
     await this.executeCommand(internalCommand);
 
@@ -233,181 +145,6 @@ class RemoteControlService {
     // Process any queued commands
     this.processCommandQueue();
   }
-
-  /**
-   * Handle a remote command event from SSE (legacy - kept for emergency alerts)
-   */
-  private handleRemoteCommand = (event: MessageEvent): void => {
-    console.log("🎮 RemoteControlService: handleRemoteCommand called!", {
-      eventType: (event as any).type,
-      data: event.data,
-      isOnline: navigator.onLine,
-    });
-
-    // Don't process commands when offline
-    if (!navigator.onLine) {
-      logger.warn("RemoteControlService: Ignoring command - device is offline");
-      console.warn("🎮 RemoteControlService: Command blocked - device offline");
-      return;
-    }
-
-    // CRITICAL: Verify unified SSE connection is ready before processing events
-    const connectionStatus = unifiedSSEService.getConnectionStatus();
-    if (!connectionStatus.connected) {
-      logger.warn(
-        "RemoteControlService: Ignoring command - unified SSE connection not ready",
-        {
-          readyState: connectionStatus.readyState,
-          connected: connectionStatus.connected,
-        },
-      );
-      console.warn(
-        "🎮 RemoteControlService: Command blocked - unified SSE connection not ready",
-        {
-          readyState: connectionStatus.readyState,
-        },
-      );
-      return;
-    }
-
-    const eventType = (event as any).type || "message";
-    logger.info("RemoteControlService: Remote command event received", {
-      eventType,
-      data: event.data,
-      lastEventId: (event as any).lastEventId,
-    });
-    console.log(
-      `🎮 RemoteControlService: Remote command received (event type: ${eventType}):`,
-      event.data,
-    );
-
-    try {
-      let commandData: RemoteCommand;
-
-      // Try to parse the data
-      if (typeof event.data === "string") {
-        try {
-          commandData = JSON.parse(event.data) as RemoteCommand;
-        } catch (parseError) {
-          logger.error(
-            "RemoteControlService: Failed to parse command data as JSON",
-            {
-              error: parseError,
-              data: event.data,
-            },
-          );
-          console.error(
-            "🎮 RemoteControlService: Failed to parse JSON:",
-            parseError,
-          );
-          return;
-        }
-      } else {
-        commandData = event.data as RemoteCommand;
-      }
-
-      // Validate command
-      if (!commandData || !commandData.type || !commandData.commandId) {
-        logger.warn("RemoteControlService: Invalid command format", {
-          commandData,
-          hasType: !!commandData?.type,
-          hasCommandId: !!commandData?.commandId,
-        });
-        console.error(
-          "🎮 RemoteControlService: Invalid command format:",
-          commandData,
-        );
-        return;
-      }
-
-      logger.info("RemoteControlService: Valid command received", {
-        type: commandData.type,
-        commandId: commandData.commandId,
-        timestamp: commandData.timestamp,
-      });
-
-      // CRITICAL: Check for duplicate command IDs to prevent processing the same command multiple times
-      // This prevents the same SSE event from being handled by multiple event listeners
-      if (this.processedCommandIds.has(commandData.commandId)) {
-        logger.warn(
-          "RemoteControlService: Duplicate command detected, skipping",
-          {
-            commandId: commandData.commandId,
-            type: commandData.type,
-          },
-        );
-        console.warn(
-          "🎮 RemoteControlService: Duplicate command detected, skipping:",
-          commandData.commandId,
-        );
-        return;
-      }
-
-      // Check cooldown to prevent command spam
-      const now = Date.now();
-      const lastTime = this.lastCommandTimestamp[commandData.type] || 0;
-
-      if (now - lastTime < this.commandCooldownMs) {
-        logger.warn("RemoteControlService: Command throttled", {
-          type: commandData.type,
-          cooldown: this.commandCooldownMs,
-          commandId: commandData.commandId,
-        });
-
-        // Queue command instead of dropping it
-        this.commandQueue.push(commandData);
-
-        // Dispatch throttled event for UI feedback
-        window.dispatchEvent(
-          new CustomEvent("remote:command-throttled", {
-            detail: {
-              type: commandData.type,
-              commandId: commandData.commandId,
-              queued: true,
-            },
-          }),
-        );
-
-        // Process queue after cooldown period
-        setTimeout(
-          () => {
-            this.processCommandQueue();
-          },
-          this.commandCooldownMs - (now - lastTime),
-        );
-
-        return;
-      }
-
-      // Mark command as processed BEFORE execution to prevent duplicate processing
-      // This must happen after throttling check but before execution
-      this.processedCommandIds.add(commandData.commandId);
-
-      // Schedule cleanup of command ID after 5 seconds
-      // This allows legitimate retries after a delay but prevents immediate duplicates
-      const cleanupTimer = setTimeout(() => {
-        this.processedCommandIds.delete(commandData.commandId);
-        this.commandIdCleanupTimers.delete(commandData.commandId);
-      }, 5000);
-      this.commandIdCleanupTimers.set(commandData.commandId, cleanupTimer);
-
-      this.lastCommandTimestamp[commandData.type] = now;
-
-      // Execute command
-      this.executeCommand(commandData);
-
-      // Notify listeners
-      this.notifyListeners(commandData);
-
-      // Process any queued commands
-      this.processCommandQueue();
-    } catch (error) {
-      console.error(
-        "🎮 RemoteControlService: Error parsing command data:",
-        error,
-      );
-    }
-  };
 
   /**
    * Execute a remote command
@@ -432,26 +169,16 @@ class RemoteControlService {
       commandId: command.commandId,
     });
 
-    // Removed: Command received event dispatch - no longer needed for production
-    // Each command has its own specific notification, so a generic "received" notification is redundant
-
     let response: RemoteCommandResponse;
 
     try {
-      // Log the command type and expected values for debugging
-      logger.debug("RemoteControlService: Executing command switch", {
-        commandType: command.type,
-        expectedRestartApp: REMOTE_COMMAND_TYPES.RESTART_APP,
-        typeMatch: command.type === REMOTE_COMMAND_TYPES.RESTART_APP,
-      });
-
       switch (command.type) {
         case REMOTE_COMMAND_TYPES.FORCE_UPDATE:
           response = await this.handleForceUpdate(command);
           break;
 
         case REMOTE_COMMAND_TYPES.RESTART_APP:
-        case "RESTART_APP": // Also handle string literal for compatibility
+        case "RESTART_APP":
           logger.info("RemoteControlService: Matched RESTART_APP case");
           response = await this.handleRestartApp(command);
           break;
@@ -476,6 +203,22 @@ class RemoteControlService {
           response = await this.handleCaptureScreenshot(command);
           break;
 
+        case REMOTE_COMMAND_TYPES.UPDATE_ORIENTATION:
+          response = await this.handleUpdateOrientation(command);
+          break;
+
+        case REMOTE_COMMAND_TYPES.REFRESH_PRAYER_TIMES:
+          response = await this.handleRefreshPrayerTimes(command);
+          break;
+
+        case REMOTE_COMMAND_TYPES.DISPLAY_MESSAGE:
+          response = await this.handleDisplayMessage(command);
+          break;
+
+        case REMOTE_COMMAND_TYPES.REBOOT_DEVICE:
+          response = await this.handleRebootDevice(command);
+          break;
+
         default:
           response = {
             commandId: command.commandId,
@@ -486,10 +229,7 @@ class RemoteControlService {
           };
       }
 
-      // Add execution time
       response.executionTime = Date.now() - startTime;
-
-      // Send response back to portal via heartbeat or analytics
       this.sendCommandResponse(response);
 
       // Dispatch success event
@@ -518,19 +258,12 @@ class RemoteControlService {
 
       this.sendCommandResponse(response);
     } finally {
-      // Remove from in-progress set
       this.commandsInProgress.delete(command.commandId);
     }
   }
 
   /**
-   * Handler implementations
-   */
-
-  /**
    * Force Update Handler
-   * Checks for updates immediately, downloads if available, and automatically installs
-   * If update is already downloaded, installs immediately without re-checking
    */
   private async handleForceUpdate(
     command: RemoteCommand,
@@ -540,20 +273,16 @@ class RemoteControlService {
     });
 
     try {
-      // Validate command payload if needed
       if (command.payload && typeof command.payload !== "object") {
         throw new Error("Invalid command payload format");
       }
 
-      // Check if running in Electron environment
       const isElectron =
         typeof window !== "undefined" &&
         window.electron !== undefined &&
         window.electron.ipcRenderer !== undefined;
+
       if (!isElectron) {
-        logger.warn(
-          "RemoteControlService: Force update requested but not running in Electron",
-        );
         return {
           commandId: command.commandId,
           success: false,
@@ -563,23 +292,10 @@ class RemoteControlService {
       }
 
       try {
-        // First, check if update is already downloaded
         const updateState =
           await window.electron!.ipcRenderer!.invoke("get-update-state");
 
-        logger.info("RemoteControlService: Current update state", {
-          status: updateState?.status,
-          version: updateState?.version,
-        });
-
-        // If update is already downloaded, install immediately
         if (updateState?.status === "downloaded") {
-          logger.info(
-            "RemoteControlService: Update already downloaded, installing immediately",
-            { version: updateState.version },
-          );
-
-          // Dispatch event for UI feedback
           window.dispatchEvent(
             new CustomEvent("remote:force-update", {
               detail: {
@@ -590,15 +306,13 @@ class RemoteControlService {
             }),
           );
 
-          // Install update immediately
           const installResult = await window.electron!.updater!.installUpdate();
 
           if (!installResult.success) {
             return {
               commandId: command.commandId,
               success: false,
-              error:
-                installResult.error || "Failed to install downloaded update",
+              error: installResult.error || "Failed to install downloaded update",
               timestamp: new Date().toISOString(),
             };
           }
@@ -611,81 +325,10 @@ class RemoteControlService {
           };
         }
 
-        // Update not downloaded yet - trigger check and set up auto-install listener
-        logger.info(
-          "RemoteControlService: Update not downloaded, checking for updates",
-        );
-
-        // Set up one-time listener for update-downloaded event
-        let installListener: (() => void) | null = null;
-        let timeoutId: NodeJS.Timeout | null = null;
-
-        const cleanup = () => {
-          if (installListener) {
-            installListener();
-            installListener = null;
-          }
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-        };
-
-        // Set up listener to auto-install when download completes
-        installListener = window.electron!.updater!.onUpdateDownloaded(
-          async (info: { version: string }) => {
-            logger.info(
-              "RemoteControlService: Update downloaded, auto-installing",
-              { version: info.version },
-            );
-
-            cleanup();
-
-            // Dispatch event for UI feedback
-            window.dispatchEvent(
-              new CustomEvent("remote:force-update", {
-                detail: {
-                  commandId: command.commandId,
-                  action: "installing",
-                  version: info.version,
-                },
-              }),
-            );
-
-            // Install immediately
-            try {
-              const installResult =
-                await window.electron!.updater!.installUpdate();
-              if (!installResult.success) {
-                logger.error("RemoteControlService: Auto-install failed", {
-                  error: installResult.error,
-                });
-              }
-            } catch (installError: any) {
-              logger.error("RemoteControlService: Error during auto-install", {
-                error: installError,
-              });
-            }
-          },
-        );
-
-        // Set timeout to clean up listener after 10 minutes (safety measure)
-        timeoutId = setTimeout(
-          () => {
-            logger.warn(
-              "RemoteControlService: Auto-install listener timeout, cleaning up",
-            );
-            cleanup();
-          },
-          10 * 60 * 1000,
-        );
-
-        // Trigger update check
         const result =
           await window.electron!.ipcRenderer!.invoke("check-for-updates");
 
         if (!result.success) {
-          cleanup();
           return {
             commandId: command.commandId,
             success: false,
@@ -694,44 +337,22 @@ class RemoteControlService {
           };
         }
 
-        // Dispatch custom event for UI to show update notification
-        try {
-          window.dispatchEvent(
-            new CustomEvent("remote:force-update", {
-              detail: {
-                commandId: command.commandId,
-                action: "checking",
-              },
-            }),
-          );
-        } catch (eventError) {
-          logger.warn("RemoteControlService: Error dispatching update event", {
-            error: eventError,
-          });
-          // Continue execution even if event dispatch fails
-        }
+        window.dispatchEvent(
+          new CustomEvent("remote:force-update", {
+            detail: { commandId: command.commandId, action: "checking" },
+          }),
+        );
 
         return {
           commandId: command.commandId,
           success: true,
-          message:
-            "Update check initiated. Will auto-install when download completes.",
+          message: "Update check initiated",
           timestamp: new Date().toISOString(),
         };
       } catch (ipcError: any) {
-        logger.error("RemoteControlService: IPC error in force update", {
-          error: ipcError,
-        });
-        throw new Error(
-          `Force update failed: ${ipcError.message || "Unknown error"}`,
-        );
+        throw new Error(`Force update failed: ${ipcError.message || "Unknown error"}`);
       }
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in force update", {
-        error: error.message || error,
-        stack: error.stack,
-        commandId: command.commandId,
-      });
       return {
         commandId: command.commandId,
         success: false,
@@ -743,7 +364,6 @@ class RemoteControlService {
 
   /**
    * Restart App Handler
-   * Shows countdown notification and restarts the app
    */
   private async handleRestartApp(
     command: RemoteCommand,
@@ -753,18 +373,14 @@ class RemoteControlService {
     });
 
     try {
-      // Dispatch event to show countdown notification
       window.dispatchEvent(
         new CustomEvent("remote:restart-app", {
           detail: {
             commandId: command.commandId,
-            countdown: command.payload?.countdown || 10, // Default 10 seconds
+            countdown: command.payload?.countdown || 10,
           },
         }),
       );
-
-      // The actual restart will be triggered after countdown completes
-      // This is handled by the RemoteCommandNotification component
 
       return {
         commandId: command.commandId,
@@ -773,7 +389,6 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in restart app", { error });
       return {
         commandId: command.commandId,
         success: false,
@@ -785,7 +400,6 @@ class RemoteControlService {
 
   /**
    * Reload Content Handler
-   * Invalidates all caches and reloads content from API
    */
   private async handleReloadContent(
     command: RemoteCommand,
@@ -795,18 +409,13 @@ class RemoteControlService {
     });
 
     try {
-      // Invalidate all API caches
-      masjidDisplayClient.invalidateAllCaches();
+      apiClient.clearCache();
 
-      // Show loading indicator
       window.dispatchEvent(
         new CustomEvent("remote:reload-content", {
           detail: { commandId: command.commandId },
         }),
       );
-
-      // Reload will be handled by Redux actions triggered by the event
-      // Components will re-fetch data automatically
 
       return {
         commandId: command.commandId,
@@ -815,7 +424,6 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in reload content", { error });
       return {
         commandId: command.commandId,
         success: false,
@@ -827,7 +435,6 @@ class RemoteControlService {
 
   /**
    * Clear Cache Handler
-   * Clears all caches including localStorage, localforage, and service worker
    */
   private async handleClearCache(
     command: RemoteCommand,
@@ -837,12 +444,9 @@ class RemoteControlService {
     });
 
     try {
-      // Clear localforage
       await localforage.clear();
       logger.info("Cleared localforage");
 
-      // Clear localStorage (except credentials and pairing state)
-      // CRITICAL: Preserve Redux persist state which contains auth state
       const preserveKeys = [
         "masjid_api_key",
         "masjid_screen_id",
@@ -851,89 +455,36 @@ class RemoteControlService {
         "device_id",
         "masjidconnect_credentials",
         "isPaired",
-        "masjidconnect-root", // Redux persist state - contains auth, content, emergency slices
+        "masjidconnect-root",
       ];
 
       const allKeys = Object.keys(localStorage);
       const keysToRemove: string[] = [];
-      const keysPreserved: string[] = [];
 
       allKeys.forEach((key) => {
         if (!preserveKeys.includes(key)) {
           keysToRemove.push(key);
           localStorage.removeItem(key);
-        } else {
-          keysPreserved.push(key);
         }
       });
 
-      logger.info(
-        "Cleared localStorage (preserved credentials and Redux state)",
-        {
-          preserved: keysPreserved,
-          removed: keysToRemove.length,
-          removedKeys: keysToRemove.slice(0, 10), // Log first 10 removed keys for debugging
-        },
-      );
-      console.log("🧹 Clear Cache: Preserved keys:", keysPreserved);
-      console.log("🧹 Clear Cache: Removed", keysToRemove.length, "keys");
+      logger.info("Cleared localStorage (preserved credentials)");
 
-      // Clear service worker cache
       if ("caches" in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map((name) => caches.delete(name)));
         logger.info("Cleared service worker caches");
       }
 
-      // Invalidate API caches
-      masjidDisplayClient.invalidateAllCaches();
-
-      // CRITICAL: Cleanup all SSE connections before reload to prevent stale connections
-      logger.info(
-        "RemoteControlService: Cleaning up SSE connections before reload",
-      );
-
-      // Cleanup this service's connection
+      apiClient.clearCache();
       this.cleanup();
 
-      // Cleanup other SSE services
-      try {
-        const { default: emergencyAlertService } =
-          await import("./emergencyAlertService");
-        emergencyAlertService.cleanup();
-        logger.info("RemoteControlService: Cleaned up emergency alert service");
-      } catch (error) {
-        logger.warn(
-          "RemoteControlService: Could not cleanup emergency alert service",
-          { error },
-        );
-      }
-
-      try {
-        const { default: orientationEventService } =
-          await import("./orientationEventService");
-        orientationEventService.cleanup();
-        logger.info(
-          "RemoteControlService: Cleaned up orientation event service",
-        );
-      } catch (error) {
-        logger.warn(
-          "RemoteControlService: Could not cleanup orientation event service",
-          { error },
-        );
-      }
-
-      // Dispatch event for UI feedback
       window.dispatchEvent(
         new CustomEvent("remote:clear-cache", {
           detail: { commandId: command.commandId },
         }),
       );
 
-      // Small delay after cleanup to ensure connections are closed
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Reload page to apply changes
       setTimeout(() => {
         window.location.reload();
       }, 2000);
@@ -945,7 +496,6 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in clear cache", { error });
       return {
         commandId: command.commandId,
         success: false,
@@ -957,7 +507,6 @@ class RemoteControlService {
 
   /**
    * Update Settings Handler
-   * Receives settings update from portal and applies them
    */
   private async handleUpdateSettings(
     command: RemoteCommand,
@@ -977,15 +526,7 @@ class RemoteControlService {
       }
 
       const settings = command.payload.settings;
-
-      // Validate settings schema (basic validation)
-      // In a real implementation, you'd have a more robust validation
-      const allowedSettings = [
-        "orientation",
-        "brightness",
-        "autoUpdate",
-        "displaySchedule",
-      ];
+      const allowedSettings = ["orientation", "brightness", "autoUpdate", "displaySchedule"];
       const receivedKeys = Object.keys(settings);
 
       const invalidKeys = receivedKeys.filter(
@@ -1000,12 +541,10 @@ class RemoteControlService {
         };
       }
 
-      // Store settings
       Object.entries(settings).forEach(([key, value]) => {
         localStorage.setItem(`setting_${key}`, JSON.stringify(value));
       });
 
-      // Dispatch event for UI to apply settings
       window.dispatchEvent(
         new CustomEvent("remote:update-settings", {
           detail: { commandId: command.commandId, settings },
@@ -1019,7 +558,6 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in update settings", { error });
       return {
         commandId: command.commandId,
         success: false,
@@ -1031,7 +569,6 @@ class RemoteControlService {
 
   /**
    * Factory Reset Handler
-   * Shows confirmation countdown and triggers factory reset
    */
   private async handleFactoryReset(
     command: RemoteCommand,
@@ -1041,19 +578,14 @@ class RemoteControlService {
     });
 
     try {
-      // Dispatch event to show confirmation countdown (30 seconds)
       window.dispatchEvent(
         new CustomEvent("remote:factory-reset", {
           detail: {
             commandId: command.commandId,
-            countdown: command.payload?.countdown || 30, // Default 30 seconds
+            countdown: command.payload?.countdown || 30,
           },
         }),
       );
-
-      // The actual factory reset will be triggered after countdown completes
-      // This is handled by the RemoteCommandNotification component
-      // which will call the useFactoryReset hook
 
       return {
         commandId: command.commandId,
@@ -1062,7 +594,6 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in factory reset", { error });
       return {
         commandId: command.commandId,
         success: false,
@@ -1074,7 +605,6 @@ class RemoteControlService {
 
   /**
    * Capture Screenshot Handler
-   * Captures current screen and uploads to portal
    */
   private async handleCaptureScreenshot(
     command: RemoteCommand,
@@ -1084,18 +614,15 @@ class RemoteControlService {
     });
 
     try {
-      // Dynamically import html2canvas for screenshot capture
       const html2canvas = await import("html2canvas");
 
-      // Capture screenshot
       const canvas = await html2canvas.default(document.body, {
         allowTaint: true,
         useCORS: true,
         logging: false,
-        scale: 0.5, // Reduce quality for faster upload
+        scale: 0.5,
       });
 
-      // Convert to JPEG blob (80% quality)
       const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob((blob: Blob | null) => resolve(blob), "image/jpeg", 0.8);
       });
@@ -1104,19 +631,11 @@ class RemoteControlService {
         throw new Error("Failed to create screenshot blob");
       }
 
-      // Upload screenshot
-      // In a real implementation, you would upload this to your API
-      // For now, we'll store it locally and include it in the response
       const base64 = await this.blobToBase64(blob);
 
-      // Store for retrieval
       localStorage.setItem("last_screenshot", base64);
-      localStorage.setItem(
-        "last_screenshot_timestamp",
-        new Date().toISOString(),
-      );
+      localStorage.setItem("last_screenshot_timestamp", new Date().toISOString());
 
-      // Dispatch event
       window.dispatchEvent(
         new CustomEvent("remote:screenshot-captured", {
           detail: { commandId: command.commandId },
@@ -1130,13 +649,215 @@ class RemoteControlService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      logger.error("RemoteControlService: Error in capture screenshot", {
-        error,
-      });
       return {
         commandId: command.commandId,
         success: false,
         error: error.message || "Screenshot capture failed",
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * Update Orientation Handler
+   */
+  private async handleUpdateOrientation(
+    command: RemoteCommand,
+  ): Promise<RemoteCommandResponse> {
+    logger.info("RemoteControlService: Update orientation command received", {
+      commandId: command.commandId,
+    });
+
+    try {
+      if (!command.payload || typeof command.payload !== "object") {
+        return {
+          commandId: command.commandId,
+          success: false,
+          error: "No orientation payload provided",
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      const orientation = (command.payload as Record<string, unknown>).orientation;
+      if (typeof orientation !== "string") {
+        return {
+          commandId: command.commandId,
+          success: false,
+          error: "Invalid orientation value",
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      const normalizedOrientation = orientation.toUpperCase();
+      if (normalizedOrientation !== "LANDSCAPE" && normalizedOrientation !== "PORTRAIT") {
+        return {
+          commandId: command.commandId,
+          success: false,
+          error: `Invalid orientation: ${orientation}. Must be LANDSCAPE or PORTRAIT`,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // Store in localStorage
+      localStorage.setItem("screen_orientation", normalizedOrientation);
+
+      // Dispatch custom event for React components
+      window.dispatchEvent(
+        new CustomEvent("orientation-changed", {
+          detail: {
+            orientation: normalizedOrientation,
+            timestamp: Date.now(),
+            source: "remote-command",
+          },
+        }),
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("remote:update-orientation", {
+          detail: { commandId: command.commandId, orientation: normalizedOrientation },
+        }),
+      );
+
+      return {
+        commandId: command.commandId,
+        success: true,
+        message: `Orientation updated to ${normalizedOrientation}`,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      return {
+        commandId: command.commandId,
+        success: false,
+        error: error.message || "Update orientation failed",
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * Refresh Prayer Times Handler
+   */
+  private async handleRefreshPrayerTimes(
+    command: RemoteCommand,
+  ): Promise<RemoteCommandResponse> {
+    logger.info("RemoteControlService: Refresh prayer times command received", {
+      commandId: command.commandId,
+    });
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent("remote:refresh-prayer-times", {
+          detail: { commandId: command.commandId },
+        }),
+      );
+
+      return {
+        commandId: command.commandId,
+        success: true,
+        message: "Prayer times refresh initiated",
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      return {
+        commandId: command.commandId,
+        success: false,
+        error: error.message || "Refresh prayer times failed",
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * Display Message Handler
+   */
+  private async handleDisplayMessage(
+    command: RemoteCommand,
+  ): Promise<RemoteCommandResponse> {
+    logger.info("RemoteControlService: Display message command received", {
+      commandId: command.commandId,
+    });
+
+    try {
+      if (!command.payload || typeof command.payload !== "object") {
+        return {
+          commandId: command.commandId,
+          success: false,
+          error: "No message payload provided",
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("remote:display-message", {
+          detail: { commandId: command.commandId, ...command.payload },
+        }),
+      );
+
+      return {
+        commandId: command.commandId,
+        success: true,
+        message: "Message display initiated",
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      return {
+        commandId: command.commandId,
+        success: false,
+        error: error.message || "Display message failed",
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * Reboot Device Handler
+   */
+  private async handleRebootDevice(
+    command: RemoteCommand,
+  ): Promise<RemoteCommandResponse> {
+    logger.info("RemoteControlService: Reboot device command received", {
+      commandId: command.commandId,
+    });
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent("remote:reboot-device", {
+          detail: {
+            commandId: command.commandId,
+            countdown: command.payload?.countdown || 5,
+          },
+        }),
+      );
+
+      // For Electron apps - use ipcRenderer if available
+      const isElectron =
+        typeof window !== "undefined" &&
+        window.electron !== undefined &&
+        window.electron.app !== undefined;
+
+      if (isElectron && window.electron?.app?.relaunch) {
+        setTimeout(() => {
+          window.electron!.app!.relaunch();
+          window.electron!.app!.exit();
+        }, (command.payload?.countdown || 5) * 1000);
+      } else {
+        // Fallback: reload the page
+        setTimeout(() => {
+          window.location.reload();
+        }, (command.payload?.countdown || 5) * 1000);
+      }
+
+      return {
+        commandId: command.commandId,
+        success: true,
+        message: "Reboot initiated",
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      return {
+        commandId: command.commandId,
+        success: false,
+        error: error.message || "Reboot device failed",
         timestamp: new Date().toISOString(),
       };
     }
@@ -1162,61 +883,32 @@ class RemoteControlService {
 
   /**
    * Send command response back to portal
-   * Stores responses in structured format with metadata, limits to last 50 entries
    */
   private sendCommandResponse(response: RemoteCommandResponse): void {
     logger.info("RemoteControlService: Sending command response", response);
 
     try {
-      // Retrieve existing responses
       const storedResponses = localStorage.getItem("pending_command_responses");
       const responses: RemoteCommandResponse[] = storedResponses
         ? JSON.parse(storedResponses)
         : [];
 
-      // Add new response
       responses.push(response);
 
-      // Keep only last 50 responses (FIFO)
       if (responses.length > this.maxStoredResponses) {
         responses.splice(0, responses.length - this.maxStoredResponses);
       }
 
-      // Store back to localStorage
-      localStorage.setItem(
-        "pending_command_responses",
-        JSON.stringify(responses),
-      );
+      localStorage.setItem("pending_command_responses", JSON.stringify(responses));
 
-      logger.debug("RemoteControlService: Command response stored", {
-        commandId: response.commandId,
-        totalResponses: responses.length,
-      });
-
-      // Trigger immediate heartbeat attempt if analytics service is initialized
-      // This will be handled by analyticsService when it sends the heartbeat
       try {
-        // Try to trigger heartbeat immediately
-        if (
-          analyticsService &&
-          typeof (analyticsService as any).sendHeartbeat === "function"
-        ) {
-          // Use setTimeout to avoid blocking
+        if (analyticsService && typeof (analyticsService as any).sendHeartbeat === "function") {
           setTimeout(() => {
-            (analyticsService as any).sendHeartbeat().catch((err: any) => {
-              logger.debug(
-                "RemoteControlService: Could not trigger immediate heartbeat",
-                { err },
-              );
-            });
+            (analyticsService as any).sendHeartbeat().catch(() => {});
           }, 100);
         }
-      } catch (error) {
+      } catch {
         // Silently fail - heartbeat will be sent on next interval
-        logger.debug(
-          "RemoteControlService: Could not trigger immediate heartbeat",
-          { error },
-        );
       }
     } catch (error: any) {
       logger.error("RemoteControlService: Error storing command response", {
@@ -1244,62 +936,9 @@ class RemoteControlService {
       try {
         listener(command);
       } catch (error) {
-        logger.error("RemoteControlService: Error notifying listener", {
-          error,
-        });
+        logger.error("RemoteControlService: Error notifying listener", { error });
       }
     });
-  }
-
-  /**
-   * Get connection status (delegates to unified SSE service)
-   */
-  public getConnectionStatus(): ConnectionStatus {
-    return unifiedSSEService.getConnectionStatus();
-  }
-
-  /**
-   * Add a listener for connection status changes (delegates to unified SSE service)
-   */
-  public addConnectionStatusListener(
-    callback: (status: ConnectionStatus) => void,
-  ): () => void {
-    // Subscribe to unified SSE service connection status
-    const unregister = unifiedSSEService.addConnectionStatusListener(
-      (status) => {
-        // Also notify our own listeners
-        this.connectionStatusListeners.forEach((listener) => {
-          try {
-            listener(status);
-          } catch (error) {
-            logger.error(
-              "RemoteControlService: Error notifying connection status listener",
-              { error },
-            );
-          }
-        });
-
-        // Dispatch custom event for UI components
-        window.dispatchEvent(
-          new CustomEvent("remote-control:connection-status", {
-            detail: status,
-          }),
-        );
-
-        // Call the callback
-        callback(status);
-      },
-    );
-
-    this.connectionStatusListeners.add(callback);
-
-    // Immediately call with current status
-    callback(this.getConnectionStatus());
-
-    return () => {
-      unregister();
-      this.connectionStatusListeners.delete(callback);
-    };
   }
 
   /**
@@ -1319,18 +958,15 @@ class RemoteControlService {
 
     const lastTime = this.lastCommandTimestamp[command.type] || 0;
 
-    // Check if cooldown has passed
     if (now - lastTime >= this.commandCooldownMs) {
       this.lastCommandTimestamp[command.type] = now;
       this.executeCommand(command);
       this.notifyListeners(command);
 
-      // Process next queued command
       setTimeout(() => {
         this.processCommandQueue();
       }, this.commandCooldownMs);
     } else {
-      // Put command back at front of queue
       this.commandQueue.unshift(command);
     }
   }
@@ -1341,23 +977,13 @@ class RemoteControlService {
   public cleanup(): void {
     logger.info("RemoteControlService: Cleaning up");
 
-    // Unregister all event handlers
-    this.unregisterHandlers.forEach((unregister) => unregister());
-    this.unregisterHandlers = [];
-
-    // Clear all command ID cleanup timers
     this.commandIdCleanupTimers.forEach((timer) => clearTimeout(timer));
     this.commandIdCleanupTimers.clear();
 
-    // Note: We don't close the unified SSE connection here as other services may be using it
-    // The unified service manages its own lifecycle
-
     this.commandListeners.clear();
-    this.connectionStatusListeners.clear();
     this.commandQueue = [];
     this.commandsInProgress.clear();
     this.processedCommandIds.clear();
-    this.isInitializing = false;
   }
 }
 

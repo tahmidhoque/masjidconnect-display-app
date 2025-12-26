@@ -74,6 +74,58 @@ REACT_APP_API_URL=https://portal.masjidconnect.co.uk/api
 - `development` - Development mode with debugging enabled
 - `production` - Production mode with optimisations enabled
 
+## Optional - WebSocket Configuration
+
+### REACT_APP_USE_WEBSOCKET
+
+**Type**: String (`'true'` or `'false'`)  
+**Default**: `false`  
+**Required**: No  
+**Description**: Enable WebSocket-based real-time communication instead of SSE (Server-Sent Events).
+
+**Usage:**
+
+- Set to `'true'` to use WebSocket for real-time events (emergency alerts, orientation changes, remote commands)
+- When disabled (default), uses SSE for backward compatibility
+- WebSocket provides more reliable bidirectional communication
+
+**Used in:**
+
+- `src/services/realtimeService.ts` - WebSocket service
+- `src/store/middleware/realtimeMiddleware.ts` - Redux middleware
+- `src/store/middleware/emergencyMiddleware.ts` - SSE fallback control
+- `src/hooks/useConnectionStatus.ts` - Connection status monitoring
+- `src/services/analyticsService.ts` - Heartbeat delivery
+
+**Example:**
+
+```bash
+REACT_APP_USE_WEBSOCKET=true
+```
+
+### REACT_APP_REALTIME_URL
+
+**Type**: String (URL)  
+**Default**: `https://realtime.masjidconnect.com` (production) / `http://localhost:3002` (development)  
+**Required**: No  
+**Description**: The WebSocket server URL for real-time communication.
+
+**Usage:**
+
+- Only used when `REACT_APP_USE_WEBSOCKET=true`
+- Override to connect to a different realtime server
+- Uses Socket.io protocol
+
+**Used in:**
+
+- `src/services/realtimeService.ts` - WebSocket connection
+
+**Example:**
+
+```bash
+REACT_APP_REALTIME_URL=https://realtime.masjidconnect.com
+```
+
 ## Optional - Development/Debugging
 
 ### REACT_APP_USE_CORS_PROXY
@@ -287,6 +339,8 @@ If a variable is not set, the codebase includes fallback defaults:
 - `REACT_APP_API_URL` → `https://portal.masjidconnect.co.uk/api`
 - `REACT_APP_VERSION` → `0.0.1` (if package.json version unavailable)
 - `UPDATE_CHANNEL` → `'latest'`
+- `REACT_APP_USE_WEBSOCKET` → `false` (uses SSE by default)
+- `REACT_APP_REALTIME_URL` → `https://realtime.masjidconnect.com` (production)
 
 ### Verification
 

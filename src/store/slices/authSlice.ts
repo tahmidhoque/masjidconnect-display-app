@@ -1,17 +1,22 @@
-import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import masjidDisplayClient from "../../api/masjidDisplayClient";
-import {
-  ApiCredentials,
-  RequestPairingCodeResponse,
-  CheckPairingStatusResponse,
-} from "../../api/models";
-import logger from "../../utils/logger";
-import dataSyncService from "../../services/dataSyncService";
-import { analyticsService } from "../../services/analyticsService";
-// Define Orientation type locally instead of importing from context
-export type Orientation = "LANDSCAPE" | "PORTRAIT";
+/**
+ * Auth Slice
+ * 
+ * Redux slice for authentication state management.
+ * Uses the new credentialService and apiClient for all operations.
+ */
 
-// State interface
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import apiClient, { PairedCredentialsResponse } from '../../api/apiClient';
+import credentialService from '../../services/credentialService';
+import logger from '../../utils/logger';
+
+// Define Orientation type
+export type Orientation = 'LANDSCAPE' | 'PORTRAIT';
+
+// ============================================================================
+// State Interface
+// ============================================================================
+
 export interface AuthState {
   // Authentication status
   isAuthenticated: boolean;
@@ -27,6 +32,7 @@ export interface AuthState {
   // Credentials
   screenId: string | null;
   apiKey: string | null;
+  masjidId: string | null;
 
   // Error handling
   pairingError: string | null;
@@ -41,7 +47,10 @@ export interface AuthState {
   isCheckingPairingStatus: boolean;
 }
 
-// Initial state
+// ============================================================================
+// Initial State
+// ============================================================================
+
 const initialState: AuthState = {
   isAuthenticated: false,
   isPaired: false,
@@ -52,6 +61,7 @@ const initialState: AuthState = {
   isPolling: false,
   screenId: null,
   apiKey: null,
+  masjidId: null,
   pairingError: null,
   authError: null,
   lastPairingCodeRequestTime: null,
@@ -60,32 +70,49 @@ const initialState: AuthState = {
   isCheckingPairingStatus: false,
 };
 
-// Async thunks
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Get device info for pairing request
+ */
+function getDeviceInfo(orientation: Orientation) {
+  return {
+    name: `Display ${Date.now()}`,
+    type: 'WEB',
+    platform: navigator.platform || 'Unknown',
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    orientation: orientation.toLowerCase(),
+    appVersion: '1.0.0', // TODO: Get from environment
+  };
+}
+
+// ============================================================================
+// Async Thunks
+// ============================================================================
+
+/**
+ * Request a new pairing code
+ */
 export const requestPairingCode = createAsyncThunk(
-  "auth/requestPairingCode",
+  'auth/requestPairingCode',
   async (orientation: Orientation, { rejectWithValue }) => {
     try {
-      logger.debug("[Auth] Requesting pairing code with orientation", {
-        orientation,
-      });
+      logger.info('[Auth] Requesting pairing code', { orientation });
 
-      const response = await masjidDisplayClient.requestPairingCode({
-        deviceType: "WEB",
-        orientation,
-      });
+      const deviceInfo = getDeviceInfo(orientation);
+      const response = await apiClient.requestPairingCode(deviceInfo);
 
       if (response.success && response.data) {
-        logger.debug("[Auth] Pairing code received", {
+        logger.info('[Auth] Pairing code received', {
           pairingCode: response.data.pairingCode,
+          expiresAt: response.data.expiresAt,
         });
 
-        // Store in localStorage for persistence across app restarts
-        localStorage.setItem("pairingCode", response.data.pairingCode);
-        localStorage.setItem("pairingCodeExpiresAt", response.data.expiresAt);
-        localStorage.setItem(
-          "lastPairingCodeRequestTime",
-          Date.now().toString(),
-        );
+        // Store pairing code for persistence
+        localStorage.setItem('pairingCode', response.data.pairingCode);
+        localStorage.setItem('pairingCodeExpiresAt', response.data.expiresAt);
 
         return {
           pairingCode: response.data.pairingCode,
@@ -93,297 +120,206 @@ export const requestPairingCode = createAsyncThunk(
           requestTime: Date.now(),
         };
       } else {
-        throw new Error(response.error || "Failed to request pairing code");
+        throw new Error(response.error || 'Failed to request pairing code');
       }
-    } catch (error: any) {
-      logger.error("[Auth] Error requesting pairing code", { error });
-      return rejectWithValue(error.message || "Failed to request pairing code");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to request pairing code';
+      logger.error('[Auth] Error requesting pairing code', { error: errorMessage });
+      return rejectWithValue(errorMessage);
     }
-  },
+  }
 );
 
+/**
+ * Check pairing status and get credentials if paired
+ */
 export const checkPairingStatus = createAsyncThunk(
-  "auth/checkPairingStatus",
+  'auth/checkPairingStatus',
   async (pairingCode: string, { rejectWithValue }) => {
     try {
-      logger.debug("[Auth] Checking pairing status for code", { pairingCode });
+      logger.debug('[Auth] Checking pairing status', { pairingCode });
 
-      const isPaired =
-        await masjidDisplayClient.checkPairingStatus(pairingCode);
+      // Step 1: Check if pairing is complete
+      const statusResponse = await apiClient.checkPairingStatus(pairingCode);
 
-      logger.debug("[Auth] Pairing status checked", { isPaired });
-
-      if (isPaired) {
-        // Get the credentials from localStorage since API client already stores them there
-        const apiKey =
-          localStorage.getItem("masjid_api_key") ||
-          localStorage.getItem("apiKey");
-        const screenId =
-          localStorage.getItem("masjid_screen_id") ||
-          localStorage.getItem("screenId");
-
-        logger.info("[Auth] Redux checking for credentials in localStorage", {
-          hasApiKey: !!apiKey,
-          hasScreenId: !!screenId,
-          apiKeyLength: apiKey?.length || 0,
-          screenIdLength: screenId?.length || 0,
-          isPaired,
-        });
-
-        if (apiKey && screenId) {
-          // Store credentials in multiple formats for compatibility
-          localStorage.setItem("masjid_api_key", apiKey);
-          localStorage.setItem("masjid_screen_id", screenId);
-          localStorage.setItem("apiKey", apiKey);
-          localStorage.setItem("screenId", screenId);
-          localStorage.setItem(
-            "masjidconnect_credentials",
-            JSON.stringify({
-              apiKey,
-              screenId,
-            }),
-          );
-
-          // Clear pairing data
-          localStorage.removeItem("pairingCode");
-          localStorage.removeItem("pairingCodeExpiresAt");
-          localStorage.removeItem("lastPairingCodeRequestTime");
-
-          // Initialize API client
-          masjidDisplayClient.setCredentials({ apiKey, screenId });
-
-          logger.info("[Auth] Redux returning successful pairing result", {
-            isPaired: true,
-            hasCredentials: true,
-          });
-
-          return {
-            isPaired: true,
-            credentials: { apiKey, screenId },
-          };
-        } else {
-          return {
-            isPaired: false,
-            credentials: null,
-          };
-        }
-      } else {
-        return {
-          isPaired: false,
-          credentials: null,
-        };
+      if (!statusResponse.success) {
+        throw new Error(statusResponse.error || 'Failed to check pairing status');
       }
-    } catch (error: any) {
-      logger.error("[Auth] Error checking pairing status", { error });
-      return rejectWithValue(error.message || "Failed to check pairing status");
+
+      if (!statusResponse.data?.isPaired) {
+        logger.debug('[Auth] Not yet paired');
+        return { isPaired: false, credentials: null };
+      }
+
+      // Step 2: Pairing is complete, fetch credentials
+      logger.info('[Auth] Device is paired, fetching credentials');
+      const credentialsResponse = await apiClient.getPairedCredentials(pairingCode);
+
+      if (!credentialsResponse.success || !credentialsResponse.data) {
+        throw new Error(credentialsResponse.error || 'Failed to fetch credentials');
+      }
+
+      const { apiKey, screenId, masjidId, masjidName, screenName, orientation } = 
+        credentialsResponse.data;
+
+      // Credentials are automatically saved by apiClient.getPairedCredentials
+      // But let's verify and store additional info
+      logger.info('[Auth] Credentials received and saved', {
+        screenId,
+        masjidId,
+        masjidName,
+        screenName,
+      });
+
+      // Store additional info
+      if (masjidName) localStorage.setItem('masjid_name', masjidName);
+      if (screenName) localStorage.setItem('screen_name', screenName);
+      if (orientation) localStorage.setItem('screen_orientation', orientation);
+
+      // Clear pairing data
+      localStorage.removeItem('pairingCode');
+      localStorage.removeItem('pairingCodeExpiresAt');
+
+      return {
+        isPaired: true,
+        credentials: { apiKey, screenId, masjidId },
+        masjidName,
+        screenName,
+        orientation,
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to check pairing status';
+      logger.error('[Auth] Error checking pairing status', { error: errorMessage });
+      return rejectWithValue(errorMessage);
     }
-  },
+  }
 );
 
+/**
+ * Initialise auth state from storage
+ */
 export const initializeFromStorage = createAsyncThunk(
-  "auth/initializeFromStorage",
+  'auth/initializeFromStorage',
   async (_, { rejectWithValue }) => {
     try {
-      logger.debug("[Auth] Initializing from storage...");
+      logger.info('[Auth] Initialising from storage');
 
-      // Check for credentials in multiple formats with enhanced logging
-      const checkAllCredentialFormats = () => {
-        logger.debug("[Auth] === Checking All Credential Formats ===");
+      // Initialise credential service
+      credentialService.initialise();
+      credentialService.debugLogState();
 
-        const formats = [
-          {
-            name: "Primary masjid_* format",
-            apiKey: localStorage.getItem("masjid_api_key"),
-            screenId: localStorage.getItem("masjid_screen_id"),
-          },
-          {
-            name: "Simple format",
-            apiKey: localStorage.getItem("apiKey"),
-            screenId: localStorage.getItem("screenId"),
-          },
-        ];
+      // Check for existing credentials
+      const credentials = credentialService.getCredentials();
 
-        // Log what we found in each format
-        formats.forEach((format) => {
-          logger.debug(`[Auth] ${format.name}:`, {
-            hasApiKey: !!format.apiKey,
-            hasScreenId: !!format.screenId,
-            apiKeyLength: format.apiKey?.length || 0,
-            screenIdLength: format.screenId?.length || 0,
-          });
+      if (credentials && credentials.apiKey && credentials.screenId) {
+        logger.info('[Auth] Valid credentials found', {
+          screenId: credentials.screenId,
+          hasMasjidId: !!credentials.masjidId,
         });
 
-        // Check each format
-        for (const format of formats) {
-          if (format.apiKey && format.screenId) {
-            logger.info(`[Auth] ✅ Valid credentials found in ${format.name}`);
-            return {
-              apiKey: format.apiKey,
-              screenId: format.screenId,
-              found: true,
-            };
-          }
-        }
+        // Clean up any old pairing data
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
 
-        // Try JSON format
-        try {
-          const jsonCreds = localStorage.getItem("masjidconnect_credentials");
-          logger.debug("[Auth] JSON credentials check:", {
-            exists: !!jsonCreds,
-            length: jsonCreds?.length || 0,
-          });
-
-          if (jsonCreds) {
-            const parsed = JSON.parse(jsonCreds);
-            if (parsed.apiKey && parsed.screenId) {
-              logger.info("[Auth] ✅ Valid credentials found in JSON format");
-              return {
-                apiKey: parsed.apiKey,
-                screenId: parsed.screenId,
-                found: true,
-              };
-            }
-          }
-        } catch (error) {
-          logger.warn("[Auth] Failed to parse JSON credentials", { error });
-        }
-
-        logger.warn("[Auth] ❌ No valid credentials found in any format");
-        return { apiKey: null, screenId: null, found: false };
-      };
-
-      const { apiKey, screenId, found } = checkAllCredentialFormats();
-
-      if (found && apiKey && screenId) {
-        logger.info(
-          "[Auth] Valid credentials found, initializing authentication...",
-          {
-            apiKeyLength: apiKey.length,
-            screenIdLength: screenId.length,
+        return {
+          credentials: {
+            apiKey: credentials.apiKey,
+            screenId: credentials.screenId,
+            masjidId: credentials.masjidId || null,
           },
-        );
-
-        // Ensure consistent localStorage state - save in ALL formats for compatibility
-        const credentialData = { apiKey, screenId };
-
-        localStorage.setItem("masjid_api_key", apiKey);
-        localStorage.setItem("masjid_screen_id", screenId);
-        localStorage.setItem("apiKey", apiKey);
-        localStorage.setItem("screenId", screenId);
-        localStorage.setItem(
-          "masjidconnect_credentials",
-          JSON.stringify(credentialData),
-        );
-        localStorage.setItem("isPaired", "true");
-
-        logger.debug("[Auth] Credentials saved in all formats for consistency");
-
-        // Initialize API client
-        masjidDisplayClient.setCredentials({ apiKey, screenId });
-
-        // Clean up localStorage pairing items
-        localStorage.removeItem("pairingCode");
-        localStorage.removeItem("pairingCodeExpiresAt");
-        localStorage.removeItem("lastPairingCodeRequestTime");
-
-        return {
-          credentials: { apiKey, screenId },
-          pairingData: null,
-        };
-      } else {
-        logger.info(
-          "[Auth] No valid credentials found, checking for pairing data...",
-        );
-
-        // Check for stored pairing code
-        const storedPairingCode = localStorage.getItem("pairingCode");
-        const storedPairingCodeExpiresAt = localStorage.getItem(
-          "pairingCodeExpiresAt",
-        );
-
-        if (storedPairingCode && storedPairingCodeExpiresAt) {
-          const expiresAt = new Date(storedPairingCodeExpiresAt);
-          const now = new Date();
-
-          logger.debug("[Auth] Found stored pairing code", {
-            code: storedPairingCode,
-            expiresAt: expiresAt.toISOString(),
-            isExpired: expiresAt <= now,
-          });
-
-          if (expiresAt > now) {
-            logger.debug("[Auth] Restoring valid pairing code");
-            return {
-              credentials: null,
-              pairingData: {
-                pairingCode: storedPairingCode,
-                expiresAt: storedPairingCodeExpiresAt,
-              },
-            };
-          } else {
-            // Clear expired pairing code
-            logger.debug("[Auth] Clearing expired pairing code");
-            localStorage.removeItem("pairingCode");
-            localStorage.removeItem("pairingCodeExpiresAt");
-          }
-        }
-
-        logger.info("[Auth] No valid credentials or pairing data found");
-        return {
-          credentials: null,
           pairingData: null,
         };
       }
-    } catch (error: any) {
-      logger.error("[Auth] Error initializing from storage", { error });
-      return rejectWithValue(
-        error.message || "Failed to initialize from storage",
-      );
+
+      // Check for stored pairing code (resuming pairing flow)
+      const storedPairingCode = localStorage.getItem('pairingCode');
+      const storedPairingCodeExpiresAt = localStorage.getItem('pairingCodeExpiresAt');
+
+      if (storedPairingCode && storedPairingCodeExpiresAt) {
+        const expiresAt = new Date(storedPairingCodeExpiresAt);
+        const now = new Date();
+
+        if (expiresAt > now) {
+          logger.info('[Auth] Found valid pairing code, resuming pairing flow');
+          return {
+            credentials: null,
+            pairingData: {
+              pairingCode: storedPairingCode,
+              expiresAt: storedPairingCodeExpiresAt,
+            },
+          };
+        } else {
+          // Clear expired pairing code
+          logger.debug('[Auth] Clearing expired pairing code');
+          localStorage.removeItem('pairingCode');
+          localStorage.removeItem('pairingCodeExpiresAt');
+        }
+      }
+
+      logger.info('[Auth] No valid credentials or pairing data found');
+      return {
+        credentials: null,
+        pairingData: null,
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialise from storage';
+      logger.error('[Auth] Error initialising from storage', { error: errorMessage });
+      return rejectWithValue(errorMessage);
     }
-  },
+  }
 );
 
+// ============================================================================
 // Slice
+// ============================================================================
+
 const authSlice = createSlice({
-  name: "auth",
+  name: 'auth',
   initialState,
   reducers: {
-    // Synchronous actions
+    // Set paired status
     setIsPaired: (state, action: PayloadAction<boolean>) => {
       state.isPaired = action.payload;
       state.isAuthenticated = action.payload;
     },
 
+    // Set polling status
     setPolling: (state, action: PayloadAction<boolean>) => {
       state.isPolling = action.payload;
     },
 
+    // Set pairing code expired
     setPairingCodeExpired: (state, action: PayloadAction<boolean>) => {
       state.isPairingCodeExpired = action.payload;
       if (action.payload) {
-        // Clear expired pairing code
         state.pairingCode = null;
         state.pairingCodeExpiresAt = null;
-        localStorage.removeItem("pairingCode");
-        localStorage.removeItem("pairingCodeExpiresAt");
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
       }
     },
 
+    // Clear pairing error
     clearPairingError: (state) => {
       state.pairingError = null;
     },
 
+    // Clear auth error
     clearAuthError: (state) => {
       state.authError = null;
     },
 
+    // Logout
     logout: (state) => {
-      // Reset auth state
+      logger.info('[Auth] Logging out');
+
+      // Reset state
       state.isAuthenticated = false;
       state.isPaired = false;
       state.isPairing = false;
       state.screenId = null;
       state.apiKey = null;
+      state.masjidId = null;
       state.pairingCode = null;
       state.pairingCodeExpiresAt = null;
       state.isPairingCodeExpired = false;
@@ -392,22 +328,20 @@ const authSlice = createSlice({
       state.authError = null;
       state.lastPairingCodeRequestTime = null;
 
-      // Clear localStorage
-      localStorage.removeItem("masjid_api_key");
-      localStorage.removeItem("masjid_screen_id");
-      localStorage.removeItem("apiKey");
-      localStorage.removeItem("screenId");
-      localStorage.removeItem("masjidconnect_credentials");
-      localStorage.removeItem("pairingCode");
-      localStorage.removeItem("pairingCodeExpiresAt");
-      localStorage.removeItem("lastPairingCodeRequestTime");
+      // Clear credentials via service
+      credentialService.clearCredentials();
 
-      // Reset API client
-      masjidDisplayClient.clearCredentials();
+      // Clear additional localStorage items
+      localStorage.removeItem('pairingCode');
+      localStorage.removeItem('pairingCodeExpiresAt');
+      localStorage.removeItem('masjid_name');
+      localStorage.removeItem('screen_name');
+      localStorage.removeItem('screen_orientation');
 
-      logger.debug("[Auth] Logged out successfully");
+      logger.info('[Auth] Logout complete');
     },
 
+    // Set last updated
     setLastUpdated: (state) => {
       state.lastUpdated = new Date().toISOString();
     },
@@ -444,21 +378,9 @@ const authSlice = createSlice({
       .addCase(checkPairingStatus.fulfilled, (state, action) => {
         state.isCheckingPairingStatus = false;
 
-        logger.info(
-          "[Auth] Redux reducer received checkPairingStatus.fulfilled",
-          {
-            isPaired: action.payload.isPaired,
-            hasCredentials: !!action.payload.credentials,
-            payload: action.payload,
-          },
-        );
-
         if (action.payload.isPaired && action.payload.credentials) {
-          logger.info("[Auth] Redux updating state to authenticated", {
-            oldAuthenticated: state.isAuthenticated,
-            newAuthenticated: true,
-            oldPairing: state.isPairing,
-            newPairing: false,
+          logger.info('[Auth] Pairing complete, updating state', {
+            screenId: action.payload.credentials.screenId,
           });
 
           state.isAuthenticated = true;
@@ -466,35 +388,11 @@ const authSlice = createSlice({
           state.isPairing = false;
           state.screenId = action.payload.credentials.screenId;
           state.apiKey = action.payload.credentials.apiKey;
+          state.masjidId = action.payload.credentials.masjidId || null;
           state.pairingCode = null;
           state.pairingCodeExpiresAt = null;
           state.isPairingCodeExpired = false;
           state.isPolling = false;
-
-          // Initialize services when pairing is successful
-          try {
-            dataSyncService.initialize();
-            analyticsService.initialize(action.payload.credentials.apiKey);
-            // Initialize sync service for offline support (async, don't await in reducer)
-            import("../../services/syncService")
-              .then((syncServiceModule) => {
-                syncServiceModule.default.initialize();
-                logger.info("[Auth] Sync service initialized after pairing");
-              })
-              .catch((error) => {
-                logger.error(
-                  "[Auth] Error initializing sync service after pairing",
-                  { error },
-                );
-              });
-            logger.info(
-              "[Auth] Services initialized successfully after pairing",
-            );
-          } catch (error) {
-            logger.error("[Auth] Error initializing services after pairing", {
-              error,
-            });
-          }
           state.pairingError = null;
           state.lastUpdated = new Date().toISOString();
         }
@@ -504,46 +402,28 @@ const authSlice = createSlice({
         state.pairingError = action.payload as string;
       });
 
-    // Initialize from storage
+    // Initialise from storage
     builder
       .addCase(initializeFromStorage.pending, (state) => {
         state.authError = null;
       })
       .addCase(initializeFromStorage.fulfilled, (state, action) => {
         if (action.payload.credentials) {
+          logger.info('[Auth] Authenticated from storage');
+
           state.isAuthenticated = true;
           state.isPaired = true;
           state.screenId = action.payload.credentials.screenId;
           state.apiKey = action.payload.credentials.apiKey;
+          state.masjidId = action.payload.credentials.masjidId;
           state.isPairing = false;
           state.pairingCode = null;
           state.pairingCodeExpiresAt = null;
           state.isPairingCodeExpired = false;
           state.isPolling = false;
-
-          // Initialize services when authentication is successful
-          try {
-            dataSyncService.initialize();
-            analyticsService.initialize(action.payload.credentials.apiKey);
-            // Initialize sync service for offline support (async, don't await in reducer)
-            import("../../services/syncService")
-              .then((syncServiceModule) => {
-                syncServiceModule.default.initialize();
-                logger.info("[Auth] Sync service initialized from storage");
-              })
-              .catch((error) => {
-                logger.error(
-                  "[Auth] Error initializing sync service from storage",
-                  { error },
-                );
-              });
-            logger.info(
-              "[Auth] Services initialized successfully from storage",
-            );
-          } catch (error) {
-            logger.error("[Auth] Error initializing services", { error });
-          }
         } else if (action.payload.pairingData) {
+          logger.info('[Auth] Resuming pairing from storage');
+
           state.pairingCode = action.payload.pairingData.pairingCode;
           state.pairingCodeExpiresAt = action.payload.pairingData.expiresAt;
           state.isPairing = true;
@@ -557,7 +437,10 @@ const authSlice = createSlice({
   },
 });
 
-// Export actions
+// ============================================================================
+// Exports
+// ============================================================================
+
 export const {
   setIsPaired,
   setPolling,
@@ -583,6 +466,8 @@ export const selectIsPairingCodeExpired = (state: { auth: AuthState }) =>
   state.auth.isPairingCodeExpired;
 export const selectScreenId = (state: { auth: AuthState }) =>
   state.auth.screenId;
+export const selectMasjidId = (state: { auth: AuthState }) =>
+  state.auth.masjidId;
 export const selectPairingError = (state: { auth: AuthState }) =>
   state.auth.pairingError;
 export const selectAuthError = (state: { auth: AuthState }) =>
