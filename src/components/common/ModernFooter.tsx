@@ -45,6 +45,26 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
 
   const isPortrait = orientation === "portrait";
   const currentNotification = getCurrentNotification();
+  
+  // State to control when to show "Powered by" section
+  // This delays showing it until notification has fully exited
+  const [showPoweredBy, setShowPoweredBy] = useState(!currentNotification);
+  
+  // Sequence the transitions: hide PoweredBy immediately when notification appears,
+  // but delay showing PoweredBy until notification has exited
+  React.useEffect(() => {
+    if (currentNotification) {
+      // Notification appearing - hide PoweredBy immediately
+      setShowPoweredBy(false);
+    } else {
+      // Notification cleared - delay showing PoweredBy to allow notification exit animation
+      const timer = setTimeout(() => {
+        setShowPoweredBy(true);
+      }, 350); // Wait for notification exit animation (300ms) + small buffer
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentNotification]);
 
   // Get notification color based on type
   const getNotificationColor = (type: string) => {
@@ -177,7 +197,14 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
         )}
 
       {/* Notification - takes over full footer when present */}
-      <Fade in={!!currentNotification} timeout={500} unmountOnExit>
+      <Fade 
+        in={!!currentNotification} 
+        timeout={{
+          enter: 400,
+          exit: 300,
+        }}
+        unmountOnExit
+      >
         <Box
           sx={{
             display: "flex",
@@ -241,7 +268,14 @@ const ModernFooter: React.FC<ModernFooterProps> = ({
       </Fade>
 
       {/* Powered by section - fades in when no notification */}
-      <Fade in={!currentNotification} timeout={500} unmountOnExit>
+      <Fade 
+        in={showPoweredBy} 
+        timeout={{
+          enter: 500,
+          exit: 250,
+        }}
+        unmountOnExit
+      >
         <Box
           sx={{
             display: "flex",

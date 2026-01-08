@@ -270,9 +270,23 @@ class WebSocketService {
   private setupSocketListeners(): void {
     if (!this.socket) return;
 
+    // DEBUG: Log ALL incoming events using onAny
+    this.socket.onAny((event: string, ...args: unknown[]) => {
+      console.log('🔔 [WebSocketService] RAW EVENT RECEIVED:', {
+        event,
+        data: args[0],
+        timestamp: new Date().toISOString()
+      });
+    });
+
     // Connection events
     this.socket.on('connect', () => {
       logger.info('[WebSocketService] Connected', { socketId: this.socket?.id });
+      console.log('🔌 [WebSocketService] Socket connected', { 
+        socketId: this.socket?.id,
+        connected: this.socket?.connected,
+        auth: this.socket?.auth 
+      });
       this.reconnectAttempts = 0;
       this.setConnectionState('connected');
       this.startHeartbeat();
@@ -300,6 +314,14 @@ class WebSocketService {
     // Server confirms connection
     this.socket.on('display:connected', (data: Record<string, unknown>) => {
       logger.info('[WebSocketService] Server confirmed connection', data);
+      console.log('✅ [WebSocketService] Server confirmed display connection', {
+        data,
+        socketId: this.socket?.id,
+        credentials: {
+          screenId: credentialService.getScreenId(),
+          masjidId: credentialService.getMasjidId()
+        }
+      });
     });
 
     // Emergency alerts

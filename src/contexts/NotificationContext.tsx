@@ -102,7 +102,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     return notifications.length > 0
       ? notifications[notifications.length - 1]
       : null;
-  }, [notifications]);
+  }, [notifications.length, notifications[notifications.length - 1]?.id]);
 
   return (
     <NotificationContext.Provider
