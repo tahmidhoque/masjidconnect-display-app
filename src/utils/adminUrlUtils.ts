@@ -2,20 +2,26 @@
  * Utility functions for generating admin URLs
  */
 
+// Hardcoded production API URL - endpoints already include 'api/' prefix
+const PRODUCTION_API_URL = "https://portal.masjidconnect.co.uk";
+
 /**
  * Gets the API base URL from environment variables
- * Always respects REACT_APP_API_URL if set, regardless of NODE_ENV
+ * Uses hardcoded production URL in production builds for reliability
  */
 export const getApiBaseUrl = (): string => {
-  // Always use REACT_APP_API_URL if set (works in both dev and prod)
+  // In production, always use the hardcoded production URL
+  if (process.env.NODE_ENV === "production") {
+    return PRODUCTION_API_URL;
+  }
+
+  // In development, allow environment variable override
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
 
-  // Fallback: localhost in development, production URL otherwise
-  return process.env.NODE_ENV === "development"
-    ? "http://localhost:3000"
-    : "https://portal.masjidconnect.co.uk/api";
+  // Development fallback
+  return "http://localhost:3000";
 };
 
 /**

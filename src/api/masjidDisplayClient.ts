@@ -107,6 +107,9 @@ function shouldDebounceLog(key: string, intervalMs: number = 10000): boolean {
   return false; // Don't debounce
 }
 
+// Hardcoded production API URL - endpoints already include 'api/' prefix
+const PRODUCTION_API_URL = "https://portal.masjidconnect.co.uk";
+
 class MasjidDisplayClient {
   private client: AxiosInstance;
   private credentials: ApiCredentials | null = null;
@@ -121,9 +124,11 @@ class MasjidDisplayClient {
   private authInitialized: boolean = false;
 
   constructor() {
-    // Set the baseURL from environment or use default production URL
-    let baseURL =
-      process.env.REACT_APP_API_URL || "https://portal.masjidconnect.co.uk/api";
+    // Set the baseURL: use hardcoded production URL in production builds,
+    // allow environment variable override in development
+    let baseURL = process.env.NODE_ENV === "production"
+      ? PRODUCTION_API_URL
+      : (process.env.REACT_APP_API_URL || "http://localhost:3000");
 
     // Remove any trailing slash for consistency
     baseURL = baseURL.replace(/\/$/, "");
