@@ -1,0 +1,826 @@
+# MasjidConnect Display App - Comprehensive Development Rules
+
+## 1. PROJECT CONTEXT
+
+### What This Application Is
+The MasjidConnect Display App is a **digital signage application** for mosques to display:
+- Prayer times (Adhan and Jamaat times)
+- Announcements
+- Events
+- Emergency alerts
+- Islamic content (Hadith, Quranic verses)
+
+### Critical Design Constraints
+- **NO USER INPUT**: End users never interact with the display (except initial pairing)
+- **OFFLINE-FIRST**: Must work reliably without internet connection
+- **ALWAYS-ON**: Designed to run 24/7 on Raspberry Pi devices
+- **PERFORMANCE**: Must run smoothly on low-powered hardware
+- **AUTO-RECOVERY**: Must self-heal from errors without manual intervention
+
+### Target Platforms
+- Raspberry Pi 4 (primary target)
+- Electron desktop application (development/testing)
+- Must handle both landscape and portrait orientations
+
+---
+
+## 2. ARCHITECTURE OVERVIEW
+
+### Data Flow Architecture
+```
+API (Backend)
+    ↓
+API Client (masjidDisplayClient.ts)
+    ↓
+Redux Async Thunks (contentSlice.ts, authSlice.ts)
+    ↓
+Redux Store (store/index.ts)
+    ↓ ← → Redux Middleware (realtimeMiddleware, emergencyMiddleware)
+    ↓
+Redux Persist → Storage Service (storageService.ts)
+    ↓
+React Components ← Custom Hooks (usePrayerTimes, useAppLoader)
+```
+
+### Storage Hierarchy
+1. **Electron Store** - Primary (when running in Electron)
+2. **LocalForage** - Secondary (IndexedDB/WebSQL)
+3. **localStorage** - Fallback (small data only)
+
+### Key Architectural Patterns
+- **Redux Toolkit** for state management
+- **Service Layer Pattern** with singleton exports
+- **Custom Middleware** for cross-cutting concerns
+- **Hook Composition** for reusable logic
+- **Context Providers** for non-Redux state (ErrorBoundary, UnsavedChanges)
+
+---
+
+## 3. REDUX/STATE MANAGEMENT RULES
+
+### Core Principles
+1. **ALWAYS use async thunks in slices for API calls** - Never call API directly from components
+2. **ALWAYS check loading states** before rendering data-dependent UI
+3. **ALWAYS handle both array AND object formats** in data processing
+4. **NEVER bypass Redux** - No direct state mutations
+
+### Redux Slice Pattern
+```typescript
+// ✅ CORRECT: Async thunk in slice
+export const fetchContent = createAsyncThunk(
+  'content/fetchContent',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await masjidDisplayClient.getContent();
+      return response.data; // ← Check for nested .data property
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// ❌ WRONG: API call in component
+const MyComponent = () => {
+  const fetchData = async () => {
+    const data = await masjidDisplayClient.getContent(); // DON'T DO THIS
+    // ...
+  };
+};
+```
+
+### State Shape Rules
+1. **Loading States**: Check BOTH global `isLoading` and specific states (e.g., `isPrayerTimesLoading`)
+2. **Error States**: Always have `error: string | null` in slice state
+3. **Data Normalization**: Use helper functions to normalize API responses consistently
+
+### Redux Selector Usage
+```typescript
+// ✅ CORRECT: Use selectors from slice files
+import { selectPrayerTimes } from '@/store/slices/contentSlice';
+const prayerTimes = useSelector(selectPrayerTimes);
+
+// ❌ WRONG: Inline selector logic
+const prayerTimes = useSelector(state => state.content.prayerTimes?.data);
+```
+
+### Redux Persist Configuration
+- **NEVER add functions or non-serializable data** to persisted state
+- **ALWAYS use blacklist/whitelist** appropriately (see `store/index.ts`)
+- **ALWAYS handle rehydration** in reducers (check for `REHYDRATE` action type if needed)
+
+---
+
+## 4. API & DATA HANDLING RULES
+
+### API Response Structure
+All API responses follow this pattern:
+```typescript
+{
+  success: boolean;
+  data: T; // ← ALWAYS nested in .data
+  message?: string;
+}
+```
+
+### API Call Pattern
+```typescript
+// ✅ CORRECT: Handle nested data and error cases
+const response = await masjidDisplayClient.getContent();
+if (response.success && response.data) {
+  // Process response.data (not response directly)
+  const normalized = normalizeData(response.data);
+  return normalized;
+} else {
+  throw new Error(response.message || 'Failed to fetch');
+}
+
+// ❌ WRONG: Assuming flat response
+const data = await masjidDisplayClient.getContent();
+return data; // This is the wrapper, not the actual data!
+```
+
+### Data Format Handling
+**CRITICAL**: Backend sometimes returns arrays, sometimes objects with nested arrays. ALWAYS handle both:
+
+```typescript
+// ✅ CORRECT: Handle both formats
+const normalizeContent = (data: any) => {
+  // Check if data is directly an array
+  if (Array.isArray(data)) {
+    return data;
+  }
+  
+  // Check if data has nested properties
+  if (data?.announcements) {
+    return data.announcements;
+  }
+  
+  // Fallback
+  return [];
+};
+
+// ❌ WRONG: Assume one format
+const items = data.announcements; // Breaks if data IS the array
+```
+
+### Debouncing Pattern
+Use the existing debounceMap pattern for throttling operations:
+
+```typescript
+// See src/services/syncService.ts for reference
+const debounceMap = new Map<string, NodeJS.Timeout>();
+
+const debouncedSync = (key: string, fn: () => void, delay: number) => {
+  if (debounceMap.has(key)) {
+    clearTimeout(debounceMap.get(key)!);
+  }
+  debounceMap.set(key, setTimeout(fn, delay));
+};
+```
+
+### Credential Storage
+**CRITICAL**: There are multiple credential storage formats. ALWAYS use credentialService:
+
+```typescript
+// ✅ CORRECT: Use credentialService
+import credentialService from '@/services/credentialService';
+const creds = await credentialService.getCredentials();
+
+// ❌ WRONG: Direct localStorage access
+const screenId = localStorage.getItem('screenId'); // Inconsistent format!
+```
+
+---
+
+## 5. SERVICE LAYER RULES
+
+### Service Singleton Pattern
+All services are **singleton exports**. Import the default export:
+
+```typescript
+// ✅ CORRECT
+import storageService from '@/services/storageService';
+import syncService from '@/services/syncService';
+
+// ❌ WRONG: Don't re-instantiate
+import { StorageService } from '@/services/storageService';
+const storage = new StorageService(); // Creates duplicate instance!
+```
+
+### Service Responsibilities
+
+#### storageService.ts
+- **Purpose**: Persistent data storage across layers
+- **Use for**: Storing content, credentials, configuration
+- **Key Methods**: `get()`, `set()`, `remove()`, `clear()`
+- **Storage Order**: Electron Store → LocalForage → localStorage
+
+#### syncService.ts
+- **Purpose**: Data synchronization with backend
+- **Use for**: Periodic fetching, conflict resolution
+- **Key Methods**: `startSync()`, `stopSync()`, `syncNow()`
+- **Pattern**: Uses debouncing to prevent excessive API calls
+
+#### credentialService.ts
+- **Purpose**: Manage authentication credentials
+- **Use for**: Screen pairing, API authentication
+- **Key Methods**: `saveCredentials()`, `getCredentials()`, `clearCredentials()`
+- **CRITICAL**: This normalizes different credential formats
+
+#### prayerTimeService.ts
+- **Purpose**: Calculate prayer times using complex algorithms
+- **Use for**: Prayer time calculations, adjustments
+- **Key Methods**: `calculatePrayerTimes()`, `getNextPrayer()`
+- **NOTE**: Complex calculation logic, use existing implementation
+
+---
+
+## 6. COMPONENT DEVELOPMENT RULES
+
+### Component Structure
+```typescript
+/**
+ * ComponentName
+ * 
+ * Description of what this component does.
+ */
+const ComponentName: React.FC<ComponentProps> = ({ prop1, prop2 }) => {
+  // 1. Hooks (top of component)
+  const dispatch = useDispatch();
+  const data = useSelector(selectData);
+  
+  // 2. Refs (for preventing re-renders)
+  const previousValueRef = useRef<string | null>(null);
+  
+  // 3. Local state
+  const [localState, setLocalState] = useState<StateType>(initial);
+  
+  // 4. Effects
+  useEffect(() => {
+    // Side effect
+    return () => {
+      // Cleanup
+    };
+  }, [dependencies]);
+  
+  // 5. Event handlers
+  const handleEvent = useCallback(() => {
+    // Handle event
+  }, [dependencies]);
+  
+  // 6. Render helpers
+  const renderSection = () => {
+    return <div>Section</div>;
+  };
+  
+  // 7. Loading/error states first
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorDisplay error={error} />;
+  
+  // 8. Main render
+  return (
+    <Container>
+      {/* Component JSX */}
+    </Container>
+  );
+};
+
+export default ComponentName;
+```
+
+### Use Existing Custom Hooks
+**DO NOT REIMPLEMENT** these hooks - use them:
+
+1. **usePrayerTimes** - Prayer time calculations and current prayer detection
+2. **useAppLoader** - App initialization and loading states
+3. **useOrientation** - Detect landscape/portrait orientation
+4. **useCountdown** - Countdown timers (with proper cleanup)
+
+```typescript
+// ✅ CORRECT: Use existing hook
+import usePrayerTimes from '@/hooks/usePrayerTimes';
+const { nextPrayer, timeUntilNext } = usePrayerTimes();
+
+// ❌ WRONG: Reimplement prayer logic
+const calculateNextPrayer = () => {
+  // Complex calculation that already exists in hook
+};
+```
+
+### Refs for Performance
+Use refs to prevent unnecessary re-renders in calculation-heavy components:
+
+```typescript
+// ✅ CORRECT: Use ref to prevent re-calculation
+const previousTimeRef = useRef<string | null>(null);
+
+useEffect(() => {
+  if (currentTime !== previousTimeRef.current) {
+    previousTimeRef.current = currentTime;
+    // Do expensive calculation
+  }
+}, [currentTime]);
+
+// ❌ WRONG: Re-calculate on every render
+const result = expensiveCalculation(data); // Runs every render!
+```
+
+### Loading State Patterns
+```typescript
+// ✅ CORRECT: Check loading before rendering data
+const Component = () => {
+  const { data, isLoading, error } = useSelector(selectContent);
+  
+  if (isLoading) return <Skeleton />;
+  if (error) return <ErrorDisplay error={error} />;
+  if (!data) return <EmptyState />;
+  
+  return <DataDisplay data={data} />;
+};
+
+// ❌ WRONG: Render without checking
+const Component = () => {
+  const { data } = useSelector(selectContent);
+  return <DataDisplay data={data} />; // Crashes if data is null!
+};
+```
+
+### Offline Handling
+```typescript
+// ✅ CORRECT: Handle offline scenarios
+const Component = () => {
+  const isOnline = useSelector(selectIsOnline);
+  const cachedData = useSelector(selectCachedContent);
+  
+  if (!isOnline && cachedData) {
+    return (
+      <>
+        <OfflineBadge />
+        <DataDisplay data={cachedData} />
+      </>
+    );
+  }
+  
+  // ... normal flow
+};
+```
+
+---
+
+## 7. PERFORMANCE RULES (Raspberry Pi Optimizations)
+
+### Memory Management
+1. **ALWAYS cleanup intervals and timeouts** in useEffect cleanup
+2. **AVOID storing large objects in state** - use refs if data doesn't need to trigger re-renders
+3. **USE React.memo** for expensive components that receive stable props
+
+```typescript
+// ✅ CORRECT: Cleanup intervals
+useEffect(() => {
+  const interval = setInterval(() => {
+    // Update
+  }, 1000);
+  
+  return () => clearInterval(interval); // ← CRITICAL
+}, []);
+
+// ❌ WRONG: Memory leak
+useEffect(() => {
+  setInterval(() => {
+    // Update
+  }, 1000); // Never cleared!
+}, []);
+```
+
+### Rendering Optimization
+```typescript
+// ✅ CORRECT: Memoize expensive components
+const ExpensiveComponent = React.memo(({ data }) => {
+  // Expensive rendering logic
+}, (prevProps, nextProps) => {
+  return prevProps.data.id === nextProps.data.id; // Custom comparison
+});
+
+// ✅ CORRECT: Memoize calculations
+const calculatedValue = useMemo(() => {
+  return expensiveCalculation(data);
+}, [data]);
+
+// ✅ CORRECT: Memoize callbacks
+const handleClick = useCallback(() => {
+  doSomething(id);
+}, [id]);
+```
+
+### Image/Asset Optimization
+- **ALWAYS use optimized images** (compressed, appropriate resolution)
+- **LAZY load non-critical images** using React.lazy or loading="lazy"
+- **PRELOAD critical assets** that must appear immediately
+
+### Avoid Animation Overload
+- **LIMIT animations** on Raspberry Pi (they're expensive)
+- **USE CSS transitions** over JavaScript animations when possible
+- **DISABLE animations** for low-performance mode (see config)
+
+---
+
+## 8. CRITICAL FIXES & KNOWN ISSUES
+
+### Prayer Time Calculation Edge Cases
+**CRITICAL**: Prayer time logic has many edge cases. Study `src/hooks/usePrayerTimes.ts` before modifying:
+- Midnight crossing (Isha → Fajr transition)
+- Daylight Saving Time changes
+- Jamaat time adjustments
+- Manual overrides vs calculated times
+
+### Data Format Inconsistencies
+**CRITICAL**: Backend returns inconsistent formats. ALWAYS normalize:
+```typescript
+// Announcements might be:
+// Format 1: { data: { announcements: [...] } }
+// Format 2: { data: [...] }
+// Format 3: [...]
+
+// ALWAYS handle all three in reducers
+```
+
+### SSE/WebSocket Connection Management
+**CRITICAL**: Real-time connections in `realtimeMiddleware.ts` must:
+- Auto-reconnect on failure
+- Handle authentication errors
+- Clean up on unmount
+- NOT create multiple connections
+
+### Debug Code Removal
+**CRITICAL**: Search for and remove these before production:
+- `// #region agent log` - Debug fetch calls
+- `console.log()` statements outside logger utility
+- Test data hardcoded in components
+
+---
+
+## 9. COMMON PITFALLS - DO NOT DO THESE
+
+### ❌ DON'T: Skip Loading States
+```typescript
+// ❌ WRONG
+const Component = () => {
+  const data = useSelector(selectData);
+  return <div>{data.map(...)}</div>; // Crashes if data is null
+};
+```
+
+### ❌ DON'T: Call API Directly from Components
+```typescript
+// ❌ WRONG
+const Component = () => {
+  useEffect(() => {
+    masjidDisplayClient.getContent().then(data => {
+      // Direct API call bypasses Redux
+    });
+  }, []);
+};
+```
+
+### ❌ DON'T: Mutate Redux State Directly
+```typescript
+// ❌ WRONG
+const reducer = (state, action) => {
+  state.items.push(action.payload); // Direct mutation
+  return state;
+};
+
+// ✅ CORRECT (Redux Toolkit handles this with Immer)
+const reducer = (state, action) => {
+  state.items.push(action.payload); // OK in Redux Toolkit reducers
+};
+```
+
+### ❌ DON'T: Forget Cleanup in Effects
+```typescript
+// ❌ WRONG
+useEffect(() => {
+  const ws = new WebSocket(url);
+  ws.onmessage = handleMessage;
+  // No cleanup - connection leak!
+}, []);
+
+// ✅ CORRECT
+useEffect(() => {
+  const ws = new WebSocket(url);
+  ws.onmessage = handleMessage;
+  
+  return () => {
+    ws.close(); // Cleanup
+  };
+}, []);
+```
+
+### ❌ DON'T: Use localStorage for Large Data
+```typescript
+// ❌ WRONG
+localStorage.setItem('content', JSON.stringify(largeObject)); // 5MB limit
+
+// ✅ CORRECT
+await storageService.set('content', largeObject); // Uses LocalForage
+```
+
+### ❌ DON'T: Re-instantiate Services
+```typescript
+// ❌ WRONG
+import { StorageService } from '@/services/storageService';
+const storage = new StorageService(); // Creates new instance
+
+// ✅ CORRECT
+import storageService from '@/services/storageService'; // Use singleton
+```
+
+### ❌ DON'T: Ignore Offline Scenarios
+```typescript
+// ❌ WRONG
+const data = await fetchFromAPI(); // Fails when offline, no fallback
+
+// ✅ CORRECT
+try {
+  const data = await fetchFromAPI();
+  await storageService.set('cache', data);
+  return data;
+} catch (error) {
+  const cached = await storageService.get('cache');
+  if (cached) return cached;
+  throw error;
+}
+```
+
+---
+
+## 10. DEBUGGING CHECKLIST
+
+When encountering issues, follow this systematic approach:
+
+### Step 1: Check Data Flow
+1. **API Response**: Console log in async thunk - is `response.data` structured correctly?
+2. **Redux State**: Use Redux DevTools - is data being stored correctly?
+3. **Selector**: Console log in component - is selector returning expected data?
+4. **Component Render**: Add console log - is component receiving data?
+
+### Step 2: Check State Conditions
+1. **Loading State**: Is `isLoading` true when it should be false?
+2. **Error State**: Check Redux state for error messages
+3. **Authentication**: Verify credentials exist in credentialService
+4. **Network**: Check if offline mode is incorrectly triggered
+
+### Step 3: Check Common Issues
+1. **Data Format**: Are you handling both array and object formats?
+2. **Nested Data**: Are you accessing `response.data` not just `response`?
+3. **Null Checks**: Are you checking for null/undefined before accessing properties?
+4. **Memory Leaks**: Are all intervals/timeouts/subscriptions cleaned up?
+
+### Step 4: Check Redux Middleware
+1. **realtimeMiddleware**: Is SSE connection established?
+2. **emergencyMiddleware**: Is emergency alert logic interfering?
+3. **redux-persist**: Is rehydration happening before component mount?
+
+### Step 5: Check Services
+1. **storageService**: Is data persisting correctly across sessions?
+2. **syncService**: Is sync interval running as expected?
+3. **credentialService**: Are credentials in the correct format?
+
+---
+
+## 11. TESTING GUIDELINES
+
+### What to Test
+1. **Utility Functions**: Pure functions with no side effects
+2. **Custom Hooks**: State management and side effect logic
+3. **Redux Slices**: Reducers and async thunks
+4. **Components**: Rendering, user interactions, conditional logic
+
+### Testing Patterns
+```typescript
+// ✅ CORRECT: Test behavior, not implementation
+test('displays prayer times when loaded', () => {
+  render(<PrayerTimesDisplay />);
+  expect(screen.getByText(/Fajr/i)).toBeInTheDocument();
+});
+
+// ❌ WRONG: Test implementation details
+test('calls usePrayerTimes hook', () => {
+  const spy = jest.spyOn(hooks, 'usePrayerTimes');
+  render(<PrayerTimesDisplay />);
+  expect(spy).toHaveBeenCalled(); // Too implementation-specific
+});
+```
+
+### Mock Patterns
+```typescript
+// Mock Redux store
+const mockStore = configureStore({
+  reducer: {
+    content: contentReducer,
+  },
+  preloadedState: {
+    content: mockContentState,
+  },
+});
+
+// Mock API client
+jest.mock('@/api/masjidDisplayClient', () => ({
+  getContent: jest.fn(() => Promise.resolve(mockResponse)),
+}));
+```
+
+---
+
+## 12. LOGGING & DEBUGGING RULES
+
+### Use Logger Utility
+**ALWAYS use the logger utility** instead of console.log:
+
+```typescript
+// ✅ CORRECT
+import logger from '@/utils/logger';
+logger.info('User paired screen', { screenId });
+logger.error('Failed to fetch content', { error });
+logger.debug('Prayer time calculation', { result });
+
+// ❌ WRONG
+console.log('User paired screen', screenId); // No context, no levels
+```
+
+### Logger Levels
+- `logger.error()` - Critical errors that need attention
+- `logger.warn()` - Warnings about potential issues
+- `logger.info()` - Important information about app state
+- `logger.debug()` - Detailed information for debugging (dev only)
+
+### Remove Debug Code
+Before committing, search for and remove:
+```bash
+# Search for debug patterns
+grep -r "// #region agent log" src/
+grep -r "console.log" src/
+grep -r "debugger" src/
+```
+
+---
+
+## 13. DOCUMENTATION REQUIREMENTS
+
+### When to Add Documentation
+1. **Complex Logic**: Any algorithm or calculation that isn't immediately obvious
+2. **Workarounds**: When you've implemented a fix for a known issue
+3. **API Integrations**: Document expected request/response formats
+4. **Critical Paths**: Code that must work correctly for app to function
+
+### JSDoc Format
+```typescript
+/**
+ * Calculate the next prayer time based on current time
+ * 
+ * @param prayerTimes - Today's prayer times from the API
+ * @param currentTime - Current time as Date object
+ * @returns The next prayer with name, time, and minutes until
+ * 
+ * @example
+ * const next = getNextPrayer(prayerTimes, new Date());
+ * // { name: 'Zuhr', time: '13:30', minutesUntil: 45 }
+ */
+```
+
+---
+
+## 14. FINAL CHECKLIST BEFORE COMMITTING
+
+### Code Quality
+- [ ] No `console.log()` statements (use logger utility)
+- [ ] No `// #region agent log` debug sections
+- [ ] No hardcoded test data
+- [ ] All TypeScript types properly defined
+- [ ] No `any` types unless absolutely necessary
+
+### Redux/State
+- [ ] API calls are in async thunks, not components
+- [ ] Loading/error states handled in UI
+- [ ] Data normalization applied
+- [ ] Both array and object formats handled
+
+### Performance
+- [ ] All intervals/timeouts cleaned up in useEffect
+- [ ] Expensive components memoized with React.memo
+- [ ] Expensive calculations wrapped in useMemo
+- [ ] Event handlers wrapped in useCallback
+
+### Testing
+- [ ] Tests pass: `npm test`
+- [ ] TypeScript compiles: `npm run build`
+- [ ] Linter passes: `npm run lint`
+- [ ] App runs in Electron: `npm run electron`
+
+### Documentation
+- [ ] Complex logic documented with JSDoc
+- [ ] README updated if public API changed
+- [ ] Comments added for non-obvious code
+
+---
+
+## 15. UNDERSTANDING DATA FLOW - CRITICAL
+
+### Before Making ANY Changes
+**ALWAYS trace the complete data flow:**
+
+1. **API Layer**: What endpoint is being called? (`src/api/masjidDisplayClient.ts`)
+2. **Response Format**: What structure does the response have? (Check API docs or console log)
+3. **Redux Thunk**: How is the data being processed in the async thunk?
+4. **Redux State**: What shape is stored in Redux? (Check slice reducer)
+5. **Redux Persist**: Is this data persisted? (Check store configuration)
+6. **Storage Service**: Is data also stored via storageService?
+7. **Selector**: How is the data being selected from Redux?
+8. **Component**: How is the component consuming the data?
+
+### Example: Adding a New Feature
+```typescript
+// 1. API Client - Add endpoint
+export const getNewFeature = async () => {
+  return await apiClient.get<NewFeatureResponse>('/new-feature');
+};
+
+// 2. Redux Slice - Add async thunk
+export const fetchNewFeature = createAsyncThunk(
+  'content/fetchNewFeature',
+  async (_, { rejectWithValue }) => {
+    const response = await masjidDisplayClient.getNewFeature();
+    if (response.success) {
+      return response.data; // Handle nested .data
+    }
+    return rejectWithValue(response.message);
+  }
+);
+
+// 3. Redux Slice - Add reducer case
+builder.addCase(fetchNewFeature.fulfilled, (state, action) => {
+  state.newFeature = action.payload;
+  state.isLoading = false;
+});
+
+// 4. Redux Slice - Add selector
+export const selectNewFeature = (state: RootState) => 
+  state.content.newFeature;
+
+// 5. Component - Use selector and dispatch
+const Component = () => {
+  const dispatch = useDispatch();
+  const newFeature = useSelector(selectNewFeature);
+  
+  useEffect(() => {
+    dispatch(fetchNewFeature());
+  }, [dispatch]);
+  
+  // ... render
+};
+```
+
+---
+
+## 16. ELECTRON-SPECIFIC RULES
+
+### IPC Communication
+When adding Electron IPC:
+```typescript
+// Main process (electron/main.js)
+ipcMain.handle('get-data', async () => {
+  return await getData();
+});
+
+// Preload (electron/preload.js)
+contextBridge.exposeInMainWorld('electron', {
+  getData: () => ipcRenderer.invoke('get-data'),
+});
+
+// Renderer (src/*)
+const data = await window.electron.getData();
+```
+
+### File System Access
+**ALWAYS use Electron APIs** for file system access, not Node fs directly:
+```typescript
+// ✅ CORRECT: Use IPC
+const path = await window.electron.getAppPath();
+
+// ❌ WRONG: Direct fs access in renderer
+import fs from 'fs'; // Won't work in renderer process
+```
+
+---
+
+## SUMMARY
+
+This rules file is your source of truth for development patterns in this codebase. When in doubt:
+
+1. **Read the existing code** in the relevant slice/service/component
+2. **Follow the established patterns** - don't invent new ones
+3. **Trace the complete data flow** before making changes
+4. **Test thoroughly** including offline scenarios
+5. **Document complex logic** for future developers
+
+Remember: This app runs 24/7 on low-powered devices with unreliable connectivity. **Reliability, performance, and offline capability** are paramount.
