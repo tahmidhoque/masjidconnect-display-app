@@ -44,11 +44,11 @@ export interface EnvironmentConfig {
 const DEFAULTS = {
   // Production URLs
   PRODUCTION_API_URL: 'https://portal.masjidconnect.co.uk',
-  PRODUCTION_REALTIME_URL: 'wss://realtime.masjidconnect.co.uk',
+  PRODUCTION_REALTIME_URL: 'https://masjidconnect-realtime.fly.dev',
   
   // Development URLs
   DEV_API_URL: 'http://localhost:3001',
-  DEV_REALTIME_URL: 'ws://localhost:3002',
+  DEV_REALTIME_URL: 'http://localhost:3002',
   
   // CORS Proxy (development only)
   CORS_PROXY_URL: 'http://localhost:8080',

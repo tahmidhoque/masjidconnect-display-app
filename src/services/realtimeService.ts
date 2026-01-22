@@ -69,26 +69,24 @@ class RealtimeService {
     return true;
   }
 
+  // Hardcoded production WebSocket URL
+  private static readonly PRODUCTION_REALTIME_URL = "https://masjidconnect-realtime.fly.dev";
+
   /**
    * Get the realtime server URL
+   * Uses hardcoded production URL in production builds for reliability
    */
   public getServerUrl(): string {
-    const envUrl = process.env.REACT_APP_REALTIME_URL;
-    let url =
-      envUrl ||
-      (process.env.NODE_ENV === "development"
-        ? "http://localhost:3002"
-        : "http://realtime.masjidconnect.co.uk");
-
-    // Warn if using default URL in production
-    if (!envUrl && process.env.NODE_ENV === "production") {
-      logger.info(
-        "[RealtimeService] Using default realtime URL",
-        {
-          currentUrl: url,
-        }
-      );
+    // In production, always use the hardcoded production URL
+    if (process.env.NODE_ENV === "production") {
+      const url = RealtimeService.PRODUCTION_REALTIME_URL;
+      logger.info("[RealtimeService] Using hardcoded production URL", { url });
+      return url;
     }
+
+    // In development, allow environment variable override
+    const envUrl = process.env.REACT_APP_REALTIME_URL;
+    let url = envUrl || "http://localhost:3002";
 
     // Remove trailing slash if present
     url = url.replace(/\/$/, "");
@@ -98,7 +96,6 @@ class RealtimeService {
       url,
       fromEnv: !!envUrl,
       nodeEnv: process.env.NODE_ENV,
-      envValue: envUrl,
     });
 
     return url;
