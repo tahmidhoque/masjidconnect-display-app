@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PrayerTimes } from "../api/models";
+import { PrayerTimes, TimeFormat } from "../api/models";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
-import { refreshPrayerTimes } from "../store/slices/contentSlice";
+import { refreshPrayerTimes, selectTimeFormat } from "../store/slices/contentSlice";
 import {
   formatTimeToDisplay,
   getNextPrayerTime,
@@ -43,11 +43,12 @@ const PRAYER_NAMES = ["Fajr", "Sunrise", "Zuhr", "Asr", "Maghrib", "Isha"];
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in countdown
 
 export const usePrayerTimes = (): PrayerTimesHook => {
-  // Get prayerTimes from Redux store
+  // Get prayerTimes and timeFormat from Redux store
   const dispatch = useDispatch<AppDispatch>();
   const prayerTimes = useSelector(
     (state: RootState) => state.content.prayerTimes,
   );
+  const timeFormat = useSelector(selectTimeFormat);
 
   // Use refs to prevent unnecessary re-processing
   const lastProcessedTimes = useRef<PrayerTimes | null>(null);
@@ -791,8 +792,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           name,
           time,
           jamaat,
-          displayTime: formatTimeToDisplay(time),
-          displayJamaat: jamaat ? formatTimeToDisplay(jamaat) : undefined,
+          displayTime: formatTimeToDisplay(time, timeFormat),
+          displayJamaat: jamaat ? formatTimeToDisplay(jamaat, timeFormat) : undefined,
           isNext: false,
           isCurrent: false,
           timeUntil: "",
@@ -920,16 +921,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // Set Jumuah time if it's Friday
     if (isJumuahToday && todayData && todayData.jummahJamaat) {
       setJumuahTime(todayData.jummahJamaat);
-      setJumuahDisplayTime(formatTimeToDisplay(todayData.jummahJamaat));
+      setJumuahDisplayTime(formatTimeToDisplay(todayData.jummahJamaat, timeFormat));
 
       // Set Khutbah time if available
       if (todayData.jummahKhutbah) {
-        setJumuahKhutbahTime(formatTimeToDisplay(todayData.jummahKhutbah));
+        setJumuahKhutbahTime(formatTimeToDisplay(todayData.jummahKhutbah, timeFormat));
       }
     }
   }, [
     prayerTimes,
     isJumuahToday,
+    timeFormat,
     calculateCurrentPrayer,
     calculatePrayersAccurately,
   ]);
@@ -993,6 +995,23 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prayerTimes]); // Only depend on prayerTimes
+
+  // Re-process prayer times when timeFormat changes
+  useEffect(() => {
+    if (prayerTimes && initializedRef.current) {
+      // Clear the last processed data to force reprocessing with new format
+      lastProcessedTimes.current = null;
+      lastProcessedDate.current = "";
+      
+      // Process with new time format
+      const timerId = setTimeout(() => {
+        processPrayerTimes();
+      }, 10);
+
+      return () => clearTimeout(timerId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeFormat]); // Only re-process when timeFormat changes
 
   return {
     todaysPrayerTimes,

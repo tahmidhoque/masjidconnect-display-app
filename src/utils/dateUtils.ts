@@ -3,20 +3,58 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat"; // For parsing specific formats like 'h:mm A'
 import duration from "dayjs/plugin/duration"; // For diff calculations
 import relativeTime from "dayjs/plugin/relativeTime"; // For human-readable durations
+import { TimeFormat } from "../api/models";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
 
-// Format time string (e.g., "16:30") to display format (e.g., "16:30")
-export const formatTimeToDisplay = (timeString: string): string => {
+/**
+ * Format a 24-hour time string to 12-hour format with AM/PM
+ * 
+ * @param timeString - Time in 24-hour format (e.g., "16:30")
+ * @returns Time in 12-hour format (e.g., "4:30 PM")
+ */
+export const formatTimeTo12Hour = (timeString: string): string => {
   if (!timeString) return "";
 
   const [hours, minutes] = timeString.split(":").map(Number);
 
   if (isNaN(hours) || isNaN(minutes)) return timeString;
 
-  // Use 24-hour format instead of AM/PM
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 || 12; // Convert 0 to 12 for midnight, handle 12 for noon
+
+  return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+};
+
+/**
+ * Format time string to display format based on the specified format preference
+ * 
+ * @param timeString - Time in 24-hour format (e.g., "16:30")
+ * @param format - Time format preference ('12h' or '24h'), defaults to '24h'
+ * @returns Formatted time string based on the format preference
+ * 
+ * @example
+ * formatTimeToDisplay("16:30", "24h") // Returns "16:30"
+ * formatTimeToDisplay("16:30", "12h") // Returns "4:30 PM"
+ * formatTimeToDisplay("09:00", "12h") // Returns "9:00 AM"
+ */
+export const formatTimeToDisplay = (
+  timeString: string,
+  format: TimeFormat = "24h",
+): string => {
+  if (!timeString) return "";
+
+  const [hours, minutes] = timeString.split(":").map(Number);
+
+  if (isNaN(hours) || isNaN(minutes)) return timeString;
+
+  if (format === "12h") {
+    return formatTimeTo12Hour(timeString);
+  }
+
+  // Default: 24-hour format
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 };
 

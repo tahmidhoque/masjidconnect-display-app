@@ -291,6 +291,24 @@ export interface AnalyticsResponse {
   message?: string;
 }
 
+// Display Settings Types
+/**
+ * Time format preference for displaying times
+ * - '12h': 12-hour format with AM/PM (e.g., "4:30 PM")
+ * - '24h': 24-hour format (e.g., "16:30")
+ */
+export type TimeFormat = "12h" | "24h";
+
+/**
+ * Screen content configuration settings
+ * These are controlled from the admin portal
+ */
+export interface ScreenContentConfig {
+  carouselInterval?: number; // Interval in seconds for carousel rotation
+  timeFormat?: TimeFormat; // Time display format preference
+  [key: string]: any; // Allow additional settings
+}
+
 // Content Types
 export type ContentItemType =
   | "VERSE_HADITH"
@@ -357,7 +375,7 @@ export interface ScreenContent {
     id: string;
     name: string;
     orientation: "LANDSCAPE" | "PORTRAIT";
-    contentConfig: any;
+    contentConfig: ScreenContentConfig;
     masjid?: {
       name: string;
       timezone: string;
@@ -387,7 +405,7 @@ export interface ScreenContent {
       id: string;
       name: string;
       orientation: "LANDSCAPE" | "PORTRAIT";
-      contentConfig?: any;
+      contentConfig?: ScreenContentConfig;
       masjid?: {
         name: string;
         timezone: string;

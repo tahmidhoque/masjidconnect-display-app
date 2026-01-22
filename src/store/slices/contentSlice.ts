@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { ScreenContent, PrayerTimes, Event, Schedule } from "../../api/models";
+import { ScreenContent, PrayerTimes, Event, Schedule, TimeFormat } from "../../api/models";
 import apiClient from "../../api/apiClient";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
@@ -27,6 +27,7 @@ export interface ContentState {
 
   // UI settings
   carouselTime: number;
+  timeFormat: TimeFormat;
 
   // Prayer announcements
   showPrayerAnnouncement: boolean;
@@ -63,6 +64,7 @@ const initialState: ContentState = {
   masjidName: DEFAULT_MASJID_NAME,
   masjidTimezone: null,
   carouselTime: 30,
+  timeFormat: "24h", // Default to 24-hour format
   showPrayerAnnouncement: false,
   prayerAnnouncementName: "",
   isPrayerJamaat: false,
@@ -327,11 +329,19 @@ export const refreshContent = createAsyncThunk(
         ); // 5-300 seconds
       }
 
+      // Extract time format preference from content config
+      // Default to '24h' if not specified for backward compatibility
+      const timeFormat: TimeFormat =
+        content.screen?.contentConfig?.timeFormat ||
+        content.data?.screen?.contentConfig?.timeFormat ||
+        "24h";
+
       return {
         content: content || null,
         masjidName: masjidName || null,
         masjidTimezone: masjidTimezone || null,
         carouselTime: carouselTime || 30,
+        timeFormat,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
@@ -693,6 +703,7 @@ const contentSlice = createSlice({
           state.masjidName = action.payload.masjidName || null;
           state.masjidTimezone = action.payload.masjidTimezone || null;
           state.carouselTime = action.payload.carouselTime || 30;
+          state.timeFormat = action.payload.timeFormat || "24h";
           state.lastContentUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
         }
@@ -929,6 +940,8 @@ export const selectMasjidTimezone = (state: { content: ContentState }) =>
   state.content.masjidTimezone;
 export const selectCarouselTime = (state: { content: ContentState }) =>
   state.content.carouselTime;
+export const selectTimeFormat = (state: { content: ContentState }) =>
+  state.content.timeFormat;
 export const selectShowPrayerAnnouncement = (state: {
   content: ContentState;
 }) => state.content.showPrayerAnnouncement;

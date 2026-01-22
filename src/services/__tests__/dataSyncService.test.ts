@@ -238,7 +238,7 @@ describe.skip("DataSyncService - SKIPPED: Axios ESM import issues", () => {
         data: {
           schedule: mockSchedule,
         },
-      };
+      } as any; // Type assertion for test mock data with nested structure
 
       mockedClient.getScreenContent.mockResolvedValue(
         createSuccessResponse(nestedResponse),
