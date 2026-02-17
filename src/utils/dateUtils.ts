@@ -184,36 +184,21 @@ export const getNextPrayerTime = (
   // Sort prayers by time
   prayers.sort((a, b) => a.time.localeCompare(b.time));
 
-  const currentDayjs = dayjs(currentTime); // Use dayjs
+  const currentDayjs = dayjs(currentTime);
   const currentTimeString = currentDayjs.format("HH:mm");
 
-  console.log("Current time:", currentTimeString);
-  console.log(
-    "Prayer times available:",
-    prayers.map((p) => `${p.name}: ${p.time}`).join(", "),
-  );
-
-  // Find the next prayer
+  // Find the next prayer whose adhan hasn't passed yet
   for (const prayer of prayers) {
     if (prayer.time > currentTimeString) {
-      console.log(
-        `Found next prayer: ${prayer.name} at ${prayer.time}, current time is ${currentTimeString}`,
-      );
       return { name: prayer.name, time: prayer.time };
     }
   }
 
-  // If no prayer is found, it means all prayers for today have passed
-  // Return the first prayer for the next day (first prayer in sorted list)
+  // All prayers for today have passed — return first prayer for tomorrow
   if (prayers.length > 0) {
-    console.log(
-      `All prayers for today have passed. Next prayer is first prayer tomorrow: ${prayers[0].name} at ${prayers[0].time}`,
-    );
     return { name: prayers[0].name, time: prayers[0].time };
   }
 
-  // Fallback in case the prayers array is empty
-  console.log("No prayers found in the data");
   return { name: "", time: "" };
 };
 
@@ -248,30 +233,17 @@ export const getTimeUntilNextPrayer = (
       .second(0)
       .millisecond(0);
 
-    // Debug information
-    console.log(`Calculating time until prayer at ${nextPrayerTime}`);
-    console.log(`Current time: ${now.format("HH:mm:ss")}`);
-    console.log(`Parsed prayer time today: ${prayerDayjs.format("HH:mm:ss")}`);
-
     // If next prayer time is earlier than current time or forceTomorrow is true,
     // it means it's for tomorrow
     if (prayerDayjs.isBefore(now) || forceTomorrow) {
       prayerDayjs = prayerDayjs.add(1, "day");
-      console.log(
-        `Prayer time adjusted to tomorrow: ${prayerDayjs.format("YYYY-MM-DD HH:mm:ss")}`,
-      );
     }
 
     // Calculate diff in seconds
     const diffSeconds = prayerDayjs.diff(now, "second");
 
     if (diffSeconds <= 0) {
-      // If difference is zero or negative, it means the time has just passed or is now.
-      // Avoid returning '0 mins' which might be confusing.
-      // Consider returning 'Now' or a minimal positive duration like '1 min' depending on desired UX.
-      // For now, returning '0 sec' for consistency.
-      console.log(`Time until prayer is zero or negative: ${diffSeconds}s`);
-      return "0 sec";
+      return "0s";
     }
 
     // Format time using custom logic for display consistency
@@ -279,22 +251,13 @@ export const getTimeUntilNextPrayer = (
     const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
     const diffSecondsRemainder = diffSeconds % 60;
 
-    console.log(
-      `Time until prayer: ${diffHours}h ${diffMinutes}m ${diffSecondsRemainder}s`,
-    );
-
-    // For longer times (> 1 hour), return a more human-readable format
+    // Always include seconds so the countdown visibly ticks on the display
     if (diffHours > 0) {
-      return `${diffHours} hr${diffHours > 1 ? "s" : ""} ${diffMinutes} min${diffMinutes > 1 ? "s" : ""}`;
-    }
-    // For shorter times (< 1 hour but > 0 minutes), include minutes and seconds
-    else if (diffMinutes > 0) {
-      // Only show seconds if minutes > 0 for brevity, consistent with old logic? Let's keep seconds.
-      return `${diffMinutes} min${diffMinutes > 1 ? "s" : ""} ${diffSecondsRemainder} sec${diffSecondsRemainder !== 1 ? "s" : ""}`;
-    }
-    // For times less than 1 minute
-    else {
-      return `${diffSecondsRemainder} sec${diffSecondsRemainder !== 1 ? "s" : ""}`;
+      return `${diffHours}h ${String(diffMinutes).padStart(2, '0')}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
+    } else if (diffMinutes > 0) {
+      return `${diffMinutes}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
+    } else {
+      return `${diffSecondsRemainder}s`;
     }
   } catch (error) {
     console.error(

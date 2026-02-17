@@ -37,6 +37,19 @@ interface ContentCarouselProps {
  */
 const MIN_SCALE = 0.45;
 
+/** Map API content types to user-friendly labels for the carousel badge */
+function getContentTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    verse_hadith: 'Verse & Hadith',
+    announcement: 'Announcement',
+    prayer_times: 'Prayer Times',
+    event: 'Event',
+    content: 'Content',
+    custom: 'Content',
+  };
+  return labels[type.toLowerCase()] ?? type;
+}
+
 const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
@@ -146,7 +159,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
             } : undefined}
           >
             {/* Type badge */}
-            <span className="badge badge-emerald self-start">{item.type}</span>
+            <span className="badge badge-emerald self-start">{getContentTypeLabel(item.type)}</span>
 
             {/* Title */}
             {item.title && (
