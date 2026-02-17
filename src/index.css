@@ -305,7 +305,11 @@ html, body {
   margin: 1rem 0;
 }
 
-/* Emergency alert overlay */
+/* ============================================================
+   Emergency alert overlay
+   ============================================================ */
+
+/* Full-viewport backdrop — solid so the display behind is fully hidden */
 .emergency-overlay {
   position: fixed;
   inset: 0;
@@ -313,8 +317,67 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(230, 57, 70, 0.95);
+  background: var(--color-midnight-dark);
+  opacity: 1;
+  transition: opacity 400ms ease-out;
+  /* Ensure nothing bleeds through */
+  isolation: isolate;
 }
+
+.emergency-overlay.fade-out {
+  opacity: 0;
+  transition: opacity 300ms ease-in;
+}
+
+/* Animated card */
+@keyframes alertSlideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes alertGlow {
+  0%, 100% { box-shadow: 0 0 40px var(--alert-glow, rgba(230,57,70,0.25)); }
+  50%      { box-shadow: 0 0 70px var(--alert-glow, rgba(230,57,70,0.4)); }
+}
+
+.alert-card {
+  animation: alertSlideIn 0.5s ease-out, alertGlow 3s ease-in-out 0.6s infinite;
+  background: rgba(10, 38, 71, 0.85);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 88%;
+  max-width: 960px;
+  max-height: 88%;
+}
+
+/* Top accent stripe — the only strong colour hit */
+.alert-card::before {
+  content: '';
+  display: block;
+  height: 5px;
+  flex-shrink: 0;
+  background: var(--alert-accent, var(--color-alert-red));
+}
+
+/* Colour-scheme accent variables */
+.alert-scheme-red    { --alert-accent: #E63946; --alert-glow: rgba(230,57,70,0.3);  }
+.alert-scheme-orange { --alert-accent: #F4A261; --alert-glow: rgba(244,162,97,0.3); }
+.alert-scheme-amber  { --alert-accent: #E9C46A; --alert-glow: rgba(233,196,106,0.3);}
+.alert-scheme-blue   { --alert-accent: #4895EF; --alert-glow: rgba(72,149,239,0.3); }
+.alert-scheme-green  { --alert-accent: #2A9D8F; --alert-glow: rgba(42,157,143,0.3); }
+.alert-scheme-purple { --alert-accent: #9B5DE5; --alert-glow: rgba(155,93,229,0.3); }
+.alert-scheme-dark   { --alert-accent: #78909C; --alert-glow: rgba(120,144,156,0.3);}
+
+/* Solid scheme-tinted backgrounds — fully opaque so content behind is hidden */
+.alert-bg-red    { background: #0d1c2e; }
+.alert-bg-orange { background: #0d1c2e; }
+.alert-bg-amber  { background: #0d1c2e; }
+.alert-bg-blue   { background: #0d1c2e; }
+.alert-bg-green  { background: #0d1c2e; }
+.alert-bg-purple { background: #0d1c2e; }
+.alert-bg-dark   { background: #0d1c2e; }
 
 /* Scrollbar hidden (for carousel-style content) */
 .no-scrollbar::-webkit-scrollbar { display: none; }

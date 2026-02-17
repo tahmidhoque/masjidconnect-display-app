@@ -15,7 +15,10 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 import type { RootState } from './store';
 import { setOffline } from './store/slices/uiSlice';
+import { clearCurrentAlert } from './store/slices/emergencySlice';
 import useAppLoader from './hooks/useAppLoader';
+import useDevKeyboard from './hooks/useDevKeyboard';
+import { useRotationHandling } from './hooks/useRotationHandling';
 import logger from './utils/logger';
 
 /* ------------------------------------------------------------------
@@ -59,20 +62,142 @@ const ErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => void }> 
 
 /* ------------------------------------------------------------------
    EmergencyOverlay — full-screen emergency alert
-   ------------------------------------------------------------------ */
-const EmergencyOverlay: React.FC = () => {
-  const alert = useSelector((s: RootState) => s.emergency.currentAlert);
-  if (!alert) return null;
 
-  return (
-    <div className="emergency-overlay animate-scale-in">
-      <div className="flex flex-col items-center gap-6 text-center p-8 max-w-2xl">
-        <span className="text-display text-white">⚠️</span>
-        <h1 className="text-heading text-white">{alert.title ?? 'Emergency Alert'}</h1>
-        {alert.message && <p className="text-subheading text-white/90">{alert.message}</p>}
+   Replicates the original pre-overhaul design:
+     • Gradient colour schemes (RED / ORANGE / AMBER / BLUE / GREEN / PURPLE / DARK)
+     • Fade-in-scale + pulse animation on the card
+     • Smooth fade-in / fade-out of the overlay
+     • Orientation rotation via useRotationHandling
+     • Auto-clear once expiresAt passes
+   ------------------------------------------------------------------ */
+
+type AlertScheme = 'red' | 'orange' | 'amber' | 'blue' | 'green' | 'purple' | 'dark';
+
+/** Map API colorScheme to our CSS suffix */
+function resolveScheme(alert: { colorScheme?: string; color?: string }): AlertScheme {
+  const raw = (alert.colorScheme ?? '').toUpperCase();
+  const map: Record<string, AlertScheme> = {
+    RED: 'red', ORANGE: 'orange', AMBER: 'amber',
+    BLUE: 'blue', GREEN: 'green', PURPLE: 'purple', DARK: 'dark',
+  };
+  if (map[raw]) return map[raw];
+
+  // Fallback: match hex colour
+  const c = (alert.color ?? '').toLowerCase();
+  if (c.includes('ff9800') || c.includes('orange')) return 'orange';
+  if (c.includes('ffc107') || c.includes('amber'))  return 'amber';
+  if (c.includes('2196f3') || c.includes('blue'))   return 'blue';
+  if (c.includes('4caf50') || c.includes('green'))  return 'green';
+  if (c.includes('9c27b0') || c.includes('purple')) return 'purple';
+  if (c.includes('37474f') || c.includes('263238')) return 'dark';
+  return 'red';
+}
+
+const EmergencyOverlay: React.FC = () => {
+  const dispatch = useDispatch();
+  const alert = useSelector((s: RootState) => s.emergency.currentAlert);
+  const orientation: 'LANDSCAPE' | 'PORTRAIT' =
+    useSelector((s: RootState) => s.content.screenContent?.screen?.orientation) ?? 'LANDSCAPE';
+
+  const { shouldRotate } = useRotationHandling(orientation);
+
+  // Animation states: mount → visible → fade-out → unmount
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (alert) {
+      setMounted(true);
+      // Slight delay so the DOM mounts before we trigger the CSS transition
+      requestAnimationFrame(() => setVisible(true));
+
+      // Auto-clear when expiresAt passes
+      if (alert.expiresAt) {
+        const ms = new Date(alert.expiresAt).getTime() - Date.now();
+        if (ms > 0) {
+          expiryTimerRef.current = setTimeout(() => {
+            dispatch(clearCurrentAlert());
+          }, ms);
+        } else {
+          dispatch(clearCurrentAlert());
+        }
+      }
+    } else {
+      // Fade out, then unmount
+      setVisible(false);
+      fadeTimerRef.current = setTimeout(() => setMounted(false), 350);
+    }
+
+    return () => {
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+      if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+    };
+  }, [alert, dispatch]);
+
+  if (!mounted) return null;
+
+  const scheme = alert ? resolveScheme(alert) : 'red';
+
+  const AlertContent = () => (
+    <div className={`emergency-overlay ${visible ? '' : 'fade-out'} alert-bg-${scheme}`}>
+      <div className={`alert-card alert-scheme-${scheme}`}>
+
+        {/* Icon + badge */}
+        <div className="flex flex-col items-center gap-3 pt-8 pb-2">
+          <span className="text-[3.5rem] leading-none">⚠️</span>
+          <span
+            className="inline-block px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest"
+            style={{ background: 'var(--alert-accent)', color: '#fff' }}
+          >
+            Emergency Alert
+          </span>
+        </div>
+
+        {/* Title */}
+        <div className="px-8 pt-4 pb-2 text-center">
+          <h1 className="text-heading text-text-primary font-bold">
+            {alert?.title ?? 'Emergency Alert'}
+          </h1>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-auto w-24 h-px opacity-30" style={{ background: 'var(--alert-accent)' }} />
+
+        {/* Body */}
+        <div className="flex-1 flex items-center justify-center px-10 py-8">
+          <p className="text-body text-text-secondary text-center leading-relaxed whitespace-pre-wrap max-w-2xl">
+            {alert?.message ?? 'Emergency alert details not available'}
+          </p>
+        </div>
+
       </div>
     </div>
   );
+
+  if (shouldRotate) {
+    return (
+      <div
+        className="fixed inset-0 gpu-accelerated"
+        style={{
+          zIndex: 9999,
+          top: '50%',
+          left: '50%',
+          width: '100vh',
+          height: '100vw',
+          transform: 'translate(-50%, -50%) rotate(90deg)',
+          transformOrigin: 'center center',
+          overflow: 'hidden',
+          backfaceVisibility: 'hidden',
+        }}
+      >
+        <AlertContent />
+      </div>
+    );
+  }
+
+  return <AlertContent />;
 };
 
 /* ------------------------------------------------------------------
@@ -192,6 +317,9 @@ const AppRoutes: React.FC = () => {
    ------------------------------------------------------------------ */
 const App: React.FC = () => {
   const dispatch = useDispatch();
+
+  /** Dev-only keyboard shortcuts (Alt+1–7 for alerts, Escape to clear) */
+  useDevKeyboard();
 
   /** Online / Offline listener */
   useEffect(() => {
