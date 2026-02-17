@@ -20,21 +20,53 @@ import {
   VersionInfo,
 } from "./models";
 import logger, { setLastError } from "../utils/logger";
-import {
-  createErrorResponse,
-  normalizeApiResponse,
-  validateApiResponse,
-} from "../utils/apiErrorHandler";
-import { withDeduplication } from "../utils/requestDeduplication";
-import offlineStorage from "../services/offlineStorageService";
+
+// Inline helpers (previously in apiErrorHandler / requestDeduplication)
+function createErrorResponse<T = unknown>(error: unknown, statusCode?: number): ApiResponse<T> {
+  const msg = error instanceof Error ? error.message : String(error);
+  return { success: false, data: null, error: msg, status: statusCode };
+}
+function normalizeApiResponse<T>(response: any): ApiResponse<T> {
+  if (response?.success !== undefined) return { ...response, data: response.data ?? null };
+  if (response?.data !== undefined) return { success: true, data: response.data };
+  return { success: true, data: response };
+}
+function validateApiResponse<T>(response: any): ApiResponse<T> {
+  if (response && typeof response === 'object' && 'success' in response) {
+    return { ...response, data: response.data ?? null };
+  }
+  return { success: false, data: null, error: 'Invalid API response' };
+}
 // Note: We'll dispatch errors via a callback to avoid circular dependencies
 // The store will be passed to the client after initialization
 
+/**
+ * Offline storage shim (replaces deleted offlineStorageService).
+ * Delegates to localforage for content caching with TTL.
+ */
+const offlineStorage = {
+  async storeContent(type: string, key: string, data: unknown, _ttlSeconds?: number): Promise<void> {
+    try {
+      await localforage.setItem(`offline:${type}:${key}`, { data, ts: Date.now() });
+    } catch { /* best effort */ }
+  },
+  async getContent(type: string, key: string): Promise<unknown | null> {
+    try {
+      const entry = await localforage.getItem<{ data: unknown; ts: number }>(`offline:${type}:${key}`);
+      if (!entry) return null;
+      // Expire after 24 hours
+      if (Date.now() - entry.ts > 24 * 60 * 60 * 1000) {
+        await localforage.removeItem(`offline:${type}:${key}`);
+        return null;
+      }
+      return entry.data;
+    } catch { return null; }
+  },
+};
+
 // CORS proxy configuration for development
-const USE_CORS_PROXY = process.env.REACT_APP_USE_CORS_PROXY === "true";
-const CORS_PROXY_URL =
-  process.env.REACT_APP_CORS_PROXY_URL ||
-  "https://cors-anywhere.herokuapp.com/";
+const USE_CORS_PROXY = false;
+const CORS_PROXY_URL = "";
 
 // Cache expiration times (in milliseconds)
 const CACHE_EXPIRATION = {
@@ -72,18 +104,10 @@ const STORAGE_KEYS = {
   SCREEN_ID: "masjid_screen_id",
 };
 
-// Check if we're running in Electron
-const isElectron = () => {
-  return typeof window !== "undefined" && window.electron !== undefined;
-};
-
-// Access the Electron store through the contextBridge
-const electronStore =
-  isElectron() && window.electron?.store ? window.electron.store : null;
-
-if (electronStore) {
-  console.log("Electron store initialized successfully in API client");
-}
+// Electron has been removed — the app now runs in Chromium kiosk mode.
+// These shims exist to prevent errors in any code paths that once checked for Electron.
+const isElectron = () => false;
+const electronStore = null;
 
 // Cache interface
 interface CacheItem<T> {
@@ -126,15 +150,15 @@ class MasjidDisplayClient {
   constructor() {
     // Set the baseURL: use hardcoded production URL in production builds,
     // allow environment variable override in development
-    let baseURL = process.env.NODE_ENV === "production"
+    let baseURL = import.meta.env.PROD
       ? PRODUCTION_API_URL
-      : (process.env.REACT_APP_API_URL || "http://localhost:3000");
+      : (import.meta.env.VITE_API_URL || "http://localhost:3000");
 
     // Remove any trailing slash for consistency
     baseURL = baseURL.replace(/\/$/, "");
 
     // Apply CORS proxy in development if enabled
-    if (USE_CORS_PROXY && process.env.NODE_ENV === "development") {
+    if (USE_CORS_PROXY && import.meta.env.DEV) {
       // Ensure we don't double-apply the CORS proxy
       if (!baseURL.includes(CORS_PROXY_URL)) {
         logger.info(`Using CORS proxy: ${CORS_PROXY_URL}${baseURL}`);
@@ -783,17 +807,7 @@ class MasjidDisplayClient {
         },
       );
 
-      // Use request deduplication to prevent multiple simultaneous calls to the same endpoint
-      const deduplicationKey = `${normalizedEndpoint}:${JSON.stringify(options)}`;
-      const response = await withDeduplication(
-        deduplicationKey,
-        () => this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime),
-        {
-          ttl: 5000, // 5 second deduplication window
-          forceRefresh: forceRefresh,
-          skipCache: true, // Use our own caching mechanism
-        },
-      );
+      const response = await this.fetchWithRetry<T>(normalizedEndpoint, options, cacheTime);
 
       // If success, update cache with current timestamp
       if (response.success && response.data) {
@@ -1077,7 +1091,7 @@ class MasjidDisplayClient {
         endpoint,
         fullUrl: `${this.baseURL}/${endpoint}`,
         corsProxyEnabled: USE_CORS_PROXY,
-        environment: process.env.NODE_ENV,
+        environment: import.meta.env.MODE,
         screenId: this.credentials?.screenId,
       });
 
@@ -1153,7 +1167,7 @@ class MasjidDisplayClient {
         type: analyticsRequest.type,
         fullUrl: `${this.baseURL}/${endpoint}`,
         corsProxyEnabled: USE_CORS_PROXY,
-        environment: process.env.NODE_ENV,
+        environment: import.meta.env.MODE,
         screenId: this.credentials?.screenId,
       });
 
@@ -1336,22 +1350,16 @@ class MasjidDisplayClient {
       if (cachedTimes) {
         logger.info("Using cached prayer times due to auth not ready");
         return {
-          data: cachedTimes,
+          data: cachedTimes as PrayerTimes[],
           success: true,
           cached: true,
           offlineFallback: true,
         };
       }
 
-      // Fallback to legacy storage
+      // Fallback to localforage storage
       try {
-        let storedTimes: PrayerTimes[] | null = null;
-        if (electronStore) {
-          storedTimes = electronStore.get("prayerTimes", null);
-        }
-        if (!storedTimes) {
-          storedTimes = await localforage.getItem<PrayerTimes[]>("prayerTimes");
-        }
+        const storedTimes = await localforage.getItem<PrayerTimes[]>("prayerTimes");
         if (storedTimes) {
           return {
             data: storedTimes,
@@ -1404,13 +1412,13 @@ class MasjidDisplayClient {
         );
         if (cachedTimes) {
           return {
-            data: cachedTimes,
+            data: cachedTimes as PrayerTimes[],
             success: true,
             cached: true,
             offlineFallback: true,
           };
         }
-        return createErrorResponse("Failed to fetch prayer times");
+        return createErrorResponse<PrayerTimes[]>("Failed to fetch prayer times");
       }
     }
 
@@ -1443,14 +1451,14 @@ class MasjidDisplayClient {
       if (cachedEvents) {
         logger.info("Using cached events due to auth not ready");
         return {
-          data: cachedEvents,
+          data: cachedEvents as EventsResponse,
           success: true,
           cached: true,
           offlineFallback: true,
         };
       }
 
-      // Fallback to legacy storage
+      // Fallback to localforage storage
       try {
         const storedEvents =
           await localforage.getItem<EventsResponse>("events");
@@ -1502,13 +1510,13 @@ class MasjidDisplayClient {
         );
         if (cachedEvents) {
           return {
-            data: cachedEvents,
+            data: cachedEvents as EventsResponse,
             success: true,
             cached: true,
             offlineFallback: true,
           };
         }
-        return createErrorResponse("Failed to fetch events");
+        return createErrorResponse<EventsResponse>("Failed to fetch events");
       }
     }
 
@@ -2018,10 +2026,18 @@ class MasjidDisplayClient {
 
       const latestVersionInfo = result.data;
 
-      // Import version comparison utility
-      const { isNewerVersion } = await import("../utils/versionManager");
+      // Simple semver comparison (a > b means update available)
+      const compareParts = (a: string, b: string): boolean => {
+        const pa = a.replace(/^v/, '').split('.').map(Number);
+        const pb = b.replace(/^v/, '').split('.').map(Number);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true;
+          if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false;
+        }
+        return false;
+      };
 
-      const updateAvailable = isNewerVersion(
+      const updateAvailable = compareParts(
         latestVersionInfo.version,
         currentVersion,
       );

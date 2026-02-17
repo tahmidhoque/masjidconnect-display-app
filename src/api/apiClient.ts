@@ -424,35 +424,28 @@ class ApiClient {
         const contentResponse = wrappedResponse.data || wrappedResponse;
         
         // Save the actual content (not the wrapper)
-        await storageService.saveScreenContent(contentResponse);
+        await storageService.set('screenContent', contentResponse);
         logger.debug('[ApiClient] Saved screen content to storageService');
-        
-        // CRITICAL: Extract and save schedule separately for Redux
-        // Schedule might be in the content response or nested in ScreenContent
+
         if (contentResponse.schedule) {
-          await storageService.saveSchedule(contentResponse.schedule);
-          logger.debug('[ApiClient] Extracted and saved schedule separately', {
-            hasItems: !!contentResponse.schedule.items,
-            itemCount: contentResponse.schedule.items?.length || 0,
-          });
+          await storageService.set('schedule', contentResponse.schedule);
+          logger.debug('[ApiClient] Saved schedule separately');
         }
-        
-        // Also extract and save prayer times if present in content
+
         if (contentResponse.prayerTimes) {
-          await storageService.savePrayerTimes(contentResponse.prayerTimes);
-          logger.debug('[ApiClient] Extracted and saved prayer times from content');
+          await storageService.set('prayerTimes', contentResponse.prayerTimes);
+          logger.debug('[ApiClient] Saved prayer times from content');
         }
-        
-        // Extract and save events if present
+
         if (contentResponse.events) {
-          await storageService.saveEvents(contentResponse.events);
-          logger.debug('[ApiClient] Extracted and saved events from content');
+          await storageService.set('events', contentResponse.events);
+          logger.debug('[ApiClient] Saved events from content');
         }
       } else if (cacheKey.startsWith(CACHE_KEYS.PRAYER_TIMES)) {
-        await storageService.savePrayerTimes(data as any);
+        await storageService.set('prayerTimes', data);
         logger.debug('[ApiClient] Saved prayer times to storageService');
       } else if (cacheKey === CACHE_KEYS.EVENTS) {
-        await storageService.saveEvents(data as any);
+        await storageService.set('events', data);
         logger.debug('[ApiClient] Saved events to storageService');
       }
     } catch (error) {

@@ -1,368 +1,365 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Fade,
-  Paper,
-  IconButton,
-  Tooltip,
-} from "@mui/material";
-import { Refresh as RefreshIcon } from "@mui/icons-material";
-import { useSelector, useDispatch } from "react-redux";
-import type { RootState, AppDispatch } from "../../store";
+/**
+ * PairingScreen
+ *
+ * Handles the pairing process for new devices:
+ *  1. Displays a pairing code (large, readable from a distance)
+ *  2. Renders a QR code linking to the admin portal pairing URL
+ *  3. Polls the backend every 5 s to check if pairing has completed
+ *  4. Automatically refreshes the code when it expires
+ *
+ * Layout: two-column in landscape (instructions left, code + QR right).
+ * All styling uses Tailwind — no MUI.
+ */
 
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { QRCodeSVG } from 'qrcode.react';
+import type { RootState, AppDispatch } from '../../store';
 import {
   requestPairingCode,
   checkPairingStatus,
-  clearPairingError,
-} from "../../store/slices/authSlice";
+  setPairingCodeExpired,
+} from '../../store/slices/authSlice';
+import { IslamicPattern } from '../display';
+import { getAdminBaseUrl, getPairingUrl } from '../../utils/adminUrlUtils';
+import logoGold from '../../assets/logos/logo-gold.svg';
+import logoBlue from '../../assets/logos/logo-notext-blue.svg';
+import logger from '../../utils/logger';
 
-import PairingScreenLayout from "./pairing/PairingScreenLayout";
-import QRCodeDisplay from "./pairing/QRCodeDisplay";
-import PairingInstructions from "./pairing/PairingInstructions";
-import PairingCode from "./pairing/PairingCode";
+/** Polling interval for checking pairing status (ms) */
+const POLL_INTERVAL_MS = 5_000;
+/** Retry delay after a polling error (ms) */
+const POLL_ERROR_DELAY_MS = 10_000;
 
-import {
-  reportError,
-  ErrorCode,
-  ErrorSeverity,
-} from "../../store/slices/errorSlice";
-import logger from "../../utils/logger";
-import logoNoTextBlue from "../../assets/logos/logo-notext-blue.svg";
-import { getAdminBaseUrl, getPairingUrl } from "../../utils/adminUrlUtils";
+/* ------------------------------------------------------------------ */
+/*  Countdown Hook                                                     */
+/* ------------------------------------------------------------------ */
 
 /**
- * PairingScreen Component
- *
- * Handles the pairing process for new devices by:
- * 1. Displaying a QR code with pairing instructions
- * 2. Polling the server to check if pairing has been completed
- * 3. Redirecting to the main display once paired
- *
- * Note: This is a non-interactive display, so the pairing is done through another device.
+ * Returns a human-readable "M:SS" countdown string.
+ * Returns "Expired" when the time has passed.
  */
-export interface PairingScreenProps {
-  onPairingComplete?: () => void;
-}
+function useCountdown(expiresAt: string | null): string {
+  const [timeLeft, setTimeLeft] = useState('');
 
-const PairingScreen: React.FC<PairingScreenProps> = ({ onPairingComplete }) => {
-  // Redux selectors
-  const dispatch = useDispatch<AppDispatch>();
-  const {
-    pairingCode,
-    pairingCodeExpiresAt,
-    isPairingCodeExpired,
-    pairingError,
-    isRequestingPairingCode,
-    isCheckingPairingStatus,
-    isAuthenticated,
-    isPaired,
-  } = useSelector((state: RootState) => state.auth);
-
-  // Local state
-  const [fadeIn, setFadeIn] = useState<boolean>(false);
-  const [pairingAttempts, setPairingAttempts] = useState<number>(0);
-  const [isPolling, setIsPolling] = useState<boolean>(false);
-  const requestInProgress = useRef<boolean>(false);
-  const pollingRef = useRef<boolean>(false);
-
-  // Track if component is mounted
-  const isMounted = useRef<boolean>(true);
-
-  // Add separate state for QR code loading
-  const [isQrLoading, setIsQrLoading] = useState<boolean>(false);
-
-  // Remove navigation effect since we use Redux state management for screen transitions
-  // The useInitializationFlow hook handles the transition to "ready" state when authenticated
-
-  // Handle refresh functionality
-  const handleRefresh = useCallback(async () => {
-    try {
-      setIsQrLoading(true);
-      requestInProgress.current = true;
-      await dispatch(requestPairingCode("LANDSCAPE")); // Use default orientation
-      setPairingAttempts((prev) => prev + 1);
-    } catch (error: any) {
-      // Show blocking network error overlay ONLY if this is the initial pairing attempt
-      if (
-        pairingAttempts === 0 &&
-        error?.message?.includes("ERR_CONNECTION_REFUSED")
-      ) {
-        dispatch(
-          reportError({
-            code: ErrorCode.NET_CONNECTION_FAILED,
-            message: "Unable to connect to the server",
-            severity: ErrorSeverity.CRITICAL,
-          }),
-        );
-      }
-    } finally {
-      setIsQrLoading(false);
-      requestInProgress.current = false;
+  useEffect(() => {
+    if (!expiresAt) {
+      setTimeLeft('');
+      return;
     }
-  }, [dispatch, pairingAttempts]);
 
-  // Start polling for pairing status
-  const startPolling = useCallback(
-    async (code: string) => {
-      if (pollingRef.current || !code) {
-        console.log(
-          "[PairingScreen] Polling already active or no code provided",
-        );
+    const expirationMs = new Date(expiresAt).getTime();
+
+    const tick = () => {
+      const distance = expirationMs - Date.now();
+      if (distance <= 0) {
+        setTimeLeft('Expired');
         return;
       }
+      const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((distance % (1000 * 60)) / 1000);
+      setTimeLeft(`${m}:${s < 10 ? '0' : ''}${s}`);
+    };
 
-      console.log("[PairingScreen] Starting polling for code:", code);
+    tick();
+    const id = setInterval(tick, 1_000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+
+  return timeLeft;
+}
+
+/* ------------------------------------------------------------------ */
+/*  PairingScreen Component                                            */
+/* ------------------------------------------------------------------ */
+
+const PairingScreen: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+
+  /* ---- Redux state ---- */
+  const pairingCode = useSelector((s: RootState) => s.auth.pairingCode);
+  const pairingCodeExpiresAt = useSelector((s: RootState) => s.auth.pairingCodeExpiresAt);
+  const isPairingCodeExpired = useSelector((s: RootState) => s.auth.isPairingCodeExpired);
+  const isRequestingPairingCode = useSelector((s: RootState) => s.auth.isRequestingPairingCode);
+  const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
+
+  /* ---- Countdown ---- */
+  const timeLeft = useCountdown(pairingCodeExpiresAt);
+
+  /* ---- Detect expiry from the countdown ---- */
+  useEffect(() => {
+    if (timeLeft === 'Expired' && !isPairingCodeExpired) {
+      dispatch(setPairingCodeExpired(true));
+    }
+  }, [timeLeft, isPairingCodeExpired, dispatch]);
+
+  /* ---- Refs for polling lifecycle ---- */
+  const mountedRef = useRef(true);
+  const pollingRef = useRef(false);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      pollingRef.current = false;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
+
+  /* ---- Polling loop ---- */
+  const startPolling = useCallback(
+    async (code: string) => {
+      if (pollingRef.current || !code || !mountedRef.current) return;
+
       pollingRef.current = true;
-      setIsPolling(true);
 
       try {
-        const resultAction = await dispatch(checkPairingStatus(code));
+        const result = await dispatch(checkPairingStatus(code)).unwrap();
 
-        if (!isMounted.current) {
-          console.log("[PairingScreen] Component unmounted during polling");
-          return;
-        }
+        if (!mountedRef.current) return;
 
-        console.log("[PairingScreen] checkPairingStatus result:", {
-          type: resultAction.type,
-          payload: resultAction.payload,
-          meta: resultAction.meta,
-        });
-
-        // Check if the action was fulfilled and pairing was actually successful
-        if (
-          checkPairingStatus.fulfilled.match(resultAction) &&
-          resultAction.payload?.isPaired === true
-        ) {
-          console.log("[PairingScreen] Device paired successfully!");
+        if (result.isPaired) {
+          logger.info('[PairingScreen] Device paired successfully');
           pollingRef.current = false;
-          setIsPolling(false);
-
-          // Call the onPairingComplete callback if provided
-          if (onPairingComplete) {
-            console.log("[PairingScreen] Calling onPairingComplete callback");
-            onPairingComplete();
-          }
-
-          // Screen transition is now handled by useInitializationFlow automatically
-          // But let's also log the current auth state to verify
-          console.log(
-            "[PairingScreen] Pairing complete - checking current auth state",
-          );
-        } else {
-          console.log(
-            "[PairingScreen] Device not yet paired, continuing to poll...",
-            {
-              actionFulfilled: checkPairingStatus.fulfilled.match(resultAction),
-              isPaired: (resultAction.payload as any)?.isPaired,
-              payload: resultAction.payload,
-            },
-          );
-          pollingRef.current = false; // Allow next poll
-          setTimeout(() => {
-            if (isMounted.current && !pollingRef.current) {
-              startPolling(code);
-            }
-          }, 5000); // Poll every 5 seconds
+          return; // Auth state change triggers screen transition via useAppLoader
         }
-      } catch (error) {
-        console.error("[PairingScreen] Error during polling:", error);
+
+        // Not paired yet — schedule next poll
         pollingRef.current = false;
-        setIsPolling(false);
+        pollTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) startPolling(code);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        logger.error('[PairingScreen] Polling error', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        pollingRef.current = false;
 
-        if (isMounted.current) {
-          dispatch(
-            reportError({
-              code: ErrorCode.AUTH_PAIRING_FAILED,
-              message: "Failed to check pairing status",
-              severity: ErrorSeverity.MEDIUM,
-            }),
-          );
-
-          // Retry after delay
-          setTimeout(() => {
-            if (isMounted.current && !pollingRef.current) {
-              startPolling(code);
-            }
-          }, 10000); // Retry after 10 seconds on error
-        }
+        // Retry with a longer delay on error
+        pollTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) startPolling(code);
+        }, POLL_ERROR_DELAY_MS);
       }
     },
-    [dispatch, onPairingComplete],
+    [dispatch],
   );
 
-  // Request a new code if the current one expires
+  /* ---- Start polling when a valid code exists ---- */
   useEffect(() => {
-    if (
-      isPairingCodeExpired &&
-      !isRequestingPairingCode &&
-      !pollingRef.current &&
-      !requestInProgress.current
-    ) {
-      console.log(
-        "[PairingScreen] Detected expired code, requesting a new one",
-      );
-      handleRefresh();
-    }
-  }, [isPairingCodeExpired, isRequestingPairingCode, handleRefresh]);
-
-  // Initial pairing code request on mount
-  useEffect(() => {
-    console.log("[PairingScreen] Component mounted");
-
-    // Set mounted flag and animate in immediately
-    isMounted.current = true;
-    setFadeIn(true);
-
-    // If we already have a valid pairing code, start polling
-    if (pairingCode && !isPairingCodeExpired) {
-      console.log(
-        "[PairingScreen] Valid pairing code exists, will start polling",
-      );
-
-      // Start polling after a reasonable delay
-      const pollTimer = setTimeout(() => {
-        if (isMounted.current && !pollingRef.current) {
-          startPolling(pairingCode);
-        }
-      }, 2000);
-
-      return () => {
-        clearTimeout(pollTimer);
-        isMounted.current = false;
-        pollingRef.current = false;
-      };
-    }
-
-    // If no pairing code, the initialization flow will handle requesting one
-    console.log(
-      "[PairingScreen] Waiting for pairing code from initialization flow...",
-    );
-
-    return () => {
-      isMounted.current = false;
-      pollingRef.current = false;
-    };
-  }, []); // Empty dependency array - only run once on mount
-
-  // Start polling when we have a valid code but aren't polling
-  useEffect(() => {
-    // Only start polling if we have all the right conditions
     if (
       pairingCode &&
       !isPairingCodeExpired &&
       !pollingRef.current &&
-      !isRequestingPairingCode &&
-      !requestInProgress.current &&
-      isMounted.current
+      !isAuthenticated
     ) {
-      console.log("[PairingScreen] Auto-starting polling with valid code");
+      const delay = setTimeout(() => {
+        if (mountedRef.current) startPolling(pairingCode);
+      }, 1_500); // Small initial delay to let the UI settle
 
-      const timer = setTimeout(() => {
-        if (isMounted.current && !pollingRef.current) {
-          startPolling(pairingCode);
+      return () => clearTimeout(delay);
+    }
+  }, [pairingCode, isPairingCodeExpired, isAuthenticated, startPolling]);
+
+  /* ---- Auto-refresh when code expires ---- */
+  useEffect(() => {
+    if (isPairingCodeExpired && !isRequestingPairingCode) {
+      logger.info('[PairingScreen] Code expired, requesting new one');
+      const delay = setTimeout(() => {
+        if (mountedRef.current) {
+          dispatch(requestPairingCode('LANDSCAPE'));
         }
-      }, 1000);
-
-      return () => clearTimeout(timer);
+      }, 2_000);
+      return () => clearTimeout(delay);
     }
-  }, [
-    pairingCode,
-    isPairingCodeExpired,
-    isRequestingPairingCode,
-    startPolling,
-  ]);
+  }, [isPairingCodeExpired, isRequestingPairingCode, dispatch]);
 
-  // Cleanup effect to ensure polling stops when component unmounts
-  useEffect(() => {
-    return () => {
-      console.log("[PairingScreen] Cleanup - stopping all polling");
-      pollingRef.current = false;
-      setIsPolling(false);
-      isMounted.current = false;
-    };
-  }, []);
-
-  // Handle pairing errors
-  useEffect(() => {
-    if (pairingError) {
-      // Show on-brand error overlay
-      dispatch(
-        reportError({
-          code: ErrorCode.API_SERVER_DOWN,
-          message: pairingError,
-          severity: ErrorSeverity.MEDIUM,
-          source: "PairingScreen",
-          metadata: { pairingError },
-        }),
-      );
-
-      // Only request a new code if the error is about an expired code
-      if (
-        pairingError.includes("expired") &&
-        !isRequestingPairingCode &&
-        !requestInProgress.current
-      ) {
-        setTimeout(() => {
-          if (
-            isMounted.current &&
-            !requestInProgress.current &&
-            !isRequestingPairingCode
-          ) {
-            handleRefresh();
-          }
-        }, 3000);
-      }
+  /* ---- Refresh handler (manual) ---- */
+  const handleRefresh = useCallback(() => {
+    if (!isRequestingPairingCode) {
+      dispatch(requestPairingCode('LANDSCAPE'));
     }
-  }, [pairingError, dispatch, handleRefresh, isRequestingPairingCode]);
+  }, [dispatch, isRequestingPairingCode]);
 
-  // Generate the QR code URL for pairing
-  const qrCodeUrl = pairingCode ? getPairingUrl(pairingCode) : "";
-
-  // Get the admin base URL for instructions
-  const adminBaseUrl = getAdminBaseUrl();
-
-  // Left section (instructions)
-  const leftSection = <PairingInstructions adminBaseUrl={adminBaseUrl} />;
-
-  // Right section (pairing code and QR code)
-  const rightSection = (
-    <>
-      <PairingCode
-        pairingCode={pairingCode}
-        expiresAt={pairingCodeExpiresAt}
-        isExpired={isPairingCodeExpired}
-        onRefresh={handleRefresh}
-        isLoading={isRequestingPairingCode}
-      />
-
-      <QRCodeDisplay
-        qrCodeUrl={qrCodeUrl}
-        pairingCode={pairingCode}
-        isPairing={isQrLoading} // Use specific QR loading state
-        logoSrc={logoNoTextBlue}
-        adminBaseUrl={adminBaseUrl}
-      />
-    </>
+  /* ---- Derived values ---- */
+  const adminBaseUrl = useMemo(() => getAdminBaseUrl(), []);
+  const qrCodeUrl = useMemo(
+    () => (pairingCode ? getPairingUrl(pairingCode) : ''),
+    [pairingCode],
   );
 
-  // If already authenticated, redirect to the main screen
-  useEffect(() => {
-    if (isAuthenticated && isPaired) {
-      // Screen transition is now handled by useInitializationFlow automatically
-    }
-  }, [isAuthenticated, isPaired]);
+  /** Format code with spaces between characters for legibility */
+  const formattedCode = useMemo(() => {
+    if (!pairingCode) return null;
+    return pairingCode.split('').join(' ');
+  }, [pairingCode]);
+
+  /* ================================================================ */
+  /*  Render                                                           */
+  /* ================================================================ */
 
   return (
-    <PairingScreenLayout
-      orientation="LANDSCAPE"
-      fadeIn={fadeIn}
-      leftSection={leftSection}
-      rightSection={rightSection}
-    />
+    <div className="fullscreen flex flex-col bg-midnight relative overflow-hidden">
+      {/* Background pattern */}
+      <div className="absolute inset-0 pointer-events-none">
+        <IslamicPattern opacity={0.03} />
+      </div>
+
+      {/* Gold logo — top-left */}
+      <div className="absolute top-6 left-8 z-10 w-16 max-w-[80px] min-w-[50px]">
+        <img src={logoGold} alt="MasjidConnect" className="w-full h-auto" />
+      </div>
+
+      {/* Main content — two-column layout */}
+      <div className="relative z-10 flex-1 flex items-center justify-center px-8 py-6 gap-16 animate-fade-in">
+        {/* ---- Left column: Instructions ---- */}
+        <div className="flex-1 max-w-md flex flex-col gap-6">
+          <h1 className="text-3xl font-bold text-gold leading-tight">
+            Pair Your Display
+          </h1>
+
+          <p className="text-base text-text-secondary leading-relaxed">
+            Follow these steps to connect this display to your MasjidConnect account:
+          </p>
+
+          <ol className="flex flex-col gap-5 mt-2">
+            <li className="flex flex-col gap-1">
+              <span className="text-lg font-semibold text-text-primary">
+                1. Go to MasjidConnect Dashboard
+              </span>
+              <span className="text-sm text-text-muted">
+                Visit{' '}
+                <span className="text-gold break-all">{adminBaseUrl}</span>
+              </span>
+            </li>
+
+            <li className="flex flex-col gap-1">
+              <span className="text-lg font-semibold text-text-primary">
+                2. Enter the Pairing Code or Scan QR
+              </span>
+              <span className="text-sm text-text-muted">
+                Use the code shown or scan the QR code with your phone
+              </span>
+            </li>
+
+            <li className="flex flex-col gap-1">
+              <span className="text-lg font-semibold text-text-primary">
+                3. Configure Display Settings
+              </span>
+              <span className="text-sm text-text-muted">
+                Set the display name, orientation and other options
+              </span>
+            </li>
+          </ol>
+
+          <p className="text-xs text-text-muted mt-4">
+            Need help? Visit{' '}
+            <a
+              href="https://masjidconnect.co.uk/support"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gold hover:underline"
+            >
+              masjidconnect.co.uk/support
+            </a>
+          </p>
+        </div>
+
+        {/* ---- Right column: Pairing code + QR ---- */}
+        <div className="flex-1 max-w-md flex flex-col items-center gap-6">
+          {/* Pairing Code heading */}
+          <h2 className="text-2xl font-bold text-text-primary">Pairing Code</h2>
+
+          {/* Code display */}
+          <div className="h-[100px] flex flex-col items-center justify-center">
+            {formattedCode ? (
+              <>
+                <span className="text-5xl font-bold tracking-[0.3em] text-gold select-all tabular-nums">
+                  {formattedCode}
+                </span>
+
+                {/* Countdown / expiry */}
+                {pairingCodeExpiresAt && (
+                  <div className="flex items-center gap-3 mt-3">
+                    <span
+                      className={`text-sm ${
+                        isPairingCodeExpired || timeLeft === 'Expired'
+                          ? 'text-red-400'
+                          : 'text-text-muted'
+                      }`}
+                    >
+                      {isPairingCodeExpired || timeLeft === 'Expired'
+                        ? 'Code expired'
+                        : `Expires in ${timeLeft}`}
+                    </span>
+
+                    {(isPairingCodeExpired || timeLeft === 'Expired') && (
+                      <button
+                        onClick={handleRefresh}
+                        disabled={isRequestingPairingCode}
+                        className="text-sm text-gold font-semibold hover:underline disabled:opacity-50"
+                      >
+                        Refresh
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Shimmer placeholder while code loads */
+              <div className="w-64 h-14 animate-shimmer rounded-xl" />
+            )}
+          </div>
+
+          {/* QR Code */}
+          <div className="relative w-[260px] h-[260px] bg-white rounded-2xl p-4 flex items-center justify-center shadow-lg">
+            {/* Loading overlay */}
+            {isRequestingPairingCode && (
+              <div className="absolute inset-0 bg-white/70 rounded-2xl flex items-center justify-center z-10">
+                <div className="w-10 h-10 border-4 border-midnight/20 border-t-midnight rounded-full animate-spin" />
+              </div>
+            )}
+
+            {pairingCode ? (
+              <QRCodeSVG
+                key={`qr-${pairingCode}`}
+                value={qrCodeUrl}
+                size={220}
+                bgColor="#ffffff"
+                fgColor="#0A2647"
+                level="H"
+                includeMargin={false}
+                imageSettings={{
+                  src: logoBlue,
+                  x: undefined,
+                  y: undefined,
+                  height: 44,
+                  width: 44,
+                  excavate: true,
+                }}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-10 h-10 border-4 border-midnight/20 border-t-midnight rounded-full animate-spin" />
+                <span className="text-sm text-midnight/60">Generating QR code…</span>
+              </div>
+            )}
+          </div>
+
+          {/* QR helper text */}
+          <p className="text-xs text-text-muted text-center max-w-xs">
+            Scan this QR code or visit{' '}
+            <span className="text-gold break-all">{adminBaseUrl}/pair</span>
+          </p>
+
+          {/* Polling status */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald animate-subtle-pulse" />
+            <span className="text-text-secondary">Waiting for pairing…</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

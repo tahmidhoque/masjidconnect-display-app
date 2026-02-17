@@ -1,0 +1,31 @@
+# =============================================================================
+# MasjidConnect Kiosk — systemd service
+#
+# Launches Chromium in kiosk mode after the display server is running.
+#
+# Install:
+#   sudo cp deploy/masjidconnect-kiosk.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable masjidconnect-kiosk
+#   sudo systemctl start masjidconnect-kiosk
+# =============================================================================
+
+[Unit]
+Description=MasjidConnect Kiosk (Chromium)
+After=masjidconnect-display.service graphical-session.target
+Requires=masjidconnect-display.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/bin/bash /opt/masjidconnect/deploy/kiosk.sh 3001
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target

@@ -499,14 +499,15 @@ export type AlertColorType =
   | "#263238" // DARK
   | string; // Allow for custom colors
 
-import { AlertColorSchemeKey } from "../components/common/EmergencyAlertOverlay";
+/** Alert colour scheme keys (previously imported from EmergencyAlertOverlay component) */
+export type AlertColorSchemeKey = 'RED' | 'ORANGE' | 'AMBER' | 'BLUE' | 'GREEN' | 'PURPLE' | 'DARK' | string;
 
 export interface EmergencyAlert {
   id: string;
   title: string;
   message: string;
   color: AlertColorType;
-  colorScheme?: AlertColorSchemeKey; // Name of predefined color scheme (RED, PURPLE, etc)
+  colorScheme?: AlertColorSchemeKey;
   expiresAt: string; // ISO date string when alert expires
   createdAt: string; // ISO date string when alert was created
   masjidId: string; // ID of the masjid that created the alert

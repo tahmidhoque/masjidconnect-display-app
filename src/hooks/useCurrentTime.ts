@@ -172,7 +172,7 @@ export { globalTimeManager };
 // ✅ DISABLED: Auto-run time manager logs (was causing console spam)
 // Uncomment the lines below if you need to debug time management
 /*
-if (process.env.NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
   setTimeout(() => {
     console.log('⏰ Centralized Time Manager Active');
     console.log('💡 Run showTimeManagerStats() to see timer statistics');

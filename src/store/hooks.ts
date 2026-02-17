@@ -1,13 +1,17 @@
-import { useDispatch, useSelector, TypedUseSelectorHook } from "react-redux";
-import { createSelector } from "@reduxjs/toolkit";
-import type { RootState, AppDispatch } from "./index";
+/**
+ * Typed Redux Hooks & Memoised Selectors
+ */
 
-// Use throughout your app instead of plain `useDispatch` and `useSelector`
+import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
+import { createSelector } from '@reduxjs/toolkit';
+import type { RootState, AppDispatch } from './index';
+
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
-// Optimized memoized selectors for performance
-// Note: Avoid selectors that return the entire state slice - they cause unnecessary re-renders
+/* ------------------------------------------------------------------ */
+/*  Memoised selectors                                                */
+/* ------------------------------------------------------------------ */
 
 export const selectAuthStatus = createSelector(
   (state: RootState) => state.auth,
@@ -31,38 +35,24 @@ export const selectContentData = createSelector(
   }),
 );
 
-// ✅ FIXED: Add proper transformation to avoid identity function warning
 export const selectPrayerTimes = createSelector(
   (state: RootState) => state.content.prayerTimes,
   (prayerTimes) => ({
     data: prayerTimes,
     hasData: !!prayerTimes,
-    timestamp: prayerTimes ? new Date().getTime() : null,
   }),
 );
 
-// ✅ FIXED: Add proper transformation
-export const selectContentItems = createSelector(
-  (state: RootState) => state.content.screenContent?.schedule?.items,
-  (items) => ({
-    items: items || [],
-    count: items?.length || 0,
-    hasItems: !!(items && items.length > 0),
-  }),
-);
-
-// ✅ FIXED: Add proper transformation
 export const selectSchedule = createSelector(
   (state: RootState) => state.content.schedule,
   (schedule) => ({
     data: schedule,
     hasSchedule: !!schedule,
     itemsCount: schedule?.items?.length || 0,
-    name: schedule?.name || "Default Schedule",
+    name: schedule?.name || 'Default Schedule',
   }),
 );
 
-// ✅ FIXED: Add proper transformation
 export const selectEvents = createSelector(
   (state: RootState) => state.content.events,
   (events) => ({
@@ -72,12 +62,11 @@ export const selectEvents = createSelector(
   }),
 );
 
-// ✅ FIXED: Add proper transformation
 export const selectMasjidName = createSelector(
   (state: RootState) => state.content.masjidName,
-  (masjidName) => ({
-    name: masjidName || "MasjidConnect",
-    hasCustomName: !!masjidName,
+  (name) => ({
+    name: name || 'MasjidConnect',
+    hasCustomName: !!name,
   }),
 );
 
@@ -93,15 +82,9 @@ export const selectUIStatus = createSelector(
 
 export const selectCurrentAlert = createSelector(
   (state: RootState) => state.emergency.currentAlert,
-  (currentAlert) => currentAlert,
+  (alert) => alert,
 );
 
-export const selectActiveErrors = createSelector(
-  (state: RootState) => state.errors.activeErrors,
-  (activeErrors) => activeErrors || [],
-);
-
-// Prayer announcement selectors
 export const selectPrayerAnnouncement = createSelector(
   (state: RootState) => state.content,
   (content) => ({
@@ -111,65 +94,44 @@ export const selectPrayerAnnouncement = createSelector(
   }),
 );
 
-// Combined selectors for commonly used data combinations
-export const selectDisplayData = createSelector(
-  [selectContentData, selectUIStatus, selectCurrentAlert],
-  (content, ui, currentAlert) => ({
-    ...content,
-    ...ui,
-    currentAlert,
-  }),
-);
-
-// ✅ FIXED: Optimized selector for content carousel - avoid spread operations that cause identity issues
+/** Combined selector for the content carousel */
 export const selectCarouselData = createSelector(
   [
-    (state: RootState) => state.content.schedule,
-    (state: RootState) => state.content.events,
-    (state: RootState) => state.content.masjidName,
-    (state: RootState) => state.content.isLoading,
-    (state: RootState) => state.emergency.currentAlert,
-    (state: RootState) => state.content.carouselTime,
-    (state: RootState) => state.content.showPrayerAnnouncement,
-    (state: RootState) => state.content.prayerAnnouncementName,
-    (state: RootState) => state.content.isPrayerJamaat,
-    (state: RootState) => state.ui.orientation,
+    (s: RootState) => s.content.schedule,
+    (s: RootState) => s.content.events,
+    (s: RootState) => s.content.masjidName,
+    (s: RootState) => s.content.isLoading,
+    (s: RootState) => s.emergency.currentAlert,
+    (s: RootState) => s.content.carouselTime,
+    (s: RootState) => s.content.showPrayerAnnouncement,
+    (s: RootState) => s.content.prayerAnnouncementName,
+    (s: RootState) => s.content.isPrayerJamaat,
+    (s: RootState) => s.ui.orientation,
   ],
-  (
-    schedule,
-    events,
-    masjidName,
-    isLoading,
-    currentAlert,
-    carouselTime,
-    showPrayerAnnouncement,
-    prayerAnnouncementName,
-    isPrayerJamaat,
-    orientation,
-  ) => ({
+  (schedule, events, masjidName, isLoading, currentAlert, carouselTime, showAnnouncement, announcementName, isJamaat, orientation) => ({
     schedule,
     events: events || [],
-    masjidName: masjidName || "MasjidConnect",
+    masjidName: masjidName || 'MasjidConnect',
     isLoading,
     currentAlert,
     carouselTime,
-    showPrayerAnnouncement,
-    prayerAnnouncementName,
-    isPrayerJamaat,
+    showPrayerAnnouncement: showAnnouncement,
+    prayerAnnouncementName: announcementName,
+    isPrayerJamaat: isJamaat,
     orientation,
   }),
 );
 
-// ✅ FIXED: Performance-optimized selector for ModernLandscapeDisplay
+/** Combined selector for the main display layout */
 export const selectLandscapeDisplayData = createSelector(
   [
-    (state: RootState) => state.content.masjidName,
-    (state: RootState) => state.content.prayerTimes,
-    (state: RootState) => state.emergency.currentAlert,
-    (state: RootState) => state.ui.orientation,
+    (s: RootState) => s.content.masjidName,
+    (s: RootState) => s.content.prayerTimes,
+    (s: RootState) => s.emergency.currentAlert,
+    (s: RootState) => s.ui.orientation,
   ],
   (masjidName, prayerTimes, currentAlert, orientation) => ({
-    masjidName: masjidName || "MasjidConnect",
+    masjidName: masjidName || 'MasjidConnect',
     prayerTimes,
     currentAlert,
     orientation,

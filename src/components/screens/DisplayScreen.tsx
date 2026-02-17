@@ -1,503 +1,127 @@
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  useMemo,
-  useCallback,
-  memo,
-  createContext,
-  useContext,
-} from "react";
-import { Box, Fade, useTheme } from "@mui/material";
-import { useSelector, useDispatch } from "react-redux";
-import type { RootState, AppDispatch } from "../../store";
-import { refreshAllContent } from "../../store/slices/contentSlice";
-import { setOrientation } from "../../store/slices/uiSlice";
-import {
-  createTestAlert,
-  clearCurrentAlert,
-} from "../../store/slices/emergencySlice";
-import useRotationHandling from "../../hooks/useRotationHandling";
-import { ALERT_COLOR_SCHEMES } from "../common/EmergencyAlertOverlay";
-import ModernLandscapeDisplay from "../layouts/ModernLandscapeDisplay";
-import ModernPortraitDisplay from "../layouts/ModernPortraitDisplay";
-import { OrientationTransition } from "../common/OrientationTransition";
-import { useOrientation } from "../../contexts/OrientationContext";
-import logger from "../../utils/logger";
-import {
-  isLowPowerDevice,
-  getDevicePerformanceProfile,
-  isHighStrainDevice,
-} from "../../utils/performanceUtils";
+/**
+ * DisplayScreen
+ *
+ * The main running display. Renders prayer times, countdown, content carousel,
+ * header, and footer using either landscape or portrait layout depending on
+ * the screen's configured orientation.
+ *
+ * Data is sourced from Redux (contentSlice) and hooks (usePrayerTimes).
+ */
 
-// Animation context for coordinating staggered animations
-interface AnimationContextType {
-  isAlertTransitioning: boolean;
-  isDisplayReady: boolean;
-  getComponentAnimation: (componentId: string) => {
-    opacity: number;
-    transform: string;
-    transition: string;
-  };
+import React, { useMemo } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
+
+import { LandscapeLayout, PortraitLayout, OrientationWrapper } from '../layout';
+import {
+  Header,
+  Footer,
+  PrayerTimesPanel,
+  PrayerCountdown,
+  ContentCarousel,
+  IslamicPattern,
+} from '../display';
+
+import type { CarouselItem } from '../display/ContentCarousel';
+
+/**
+ * Extract carousel items from the Redux screenContent.
+ * Handles both array and object formats (see cursor rules §4).
+ */
+function buildCarouselItems(screenContent: any): CarouselItem[] {
+  if (!screenContent) return [];
+
+  const items: CarouselItem[] = [];
+
+  // Schedule items
+  const schedule = screenContent.schedule ?? screenContent.data?.schedule;
+  const scheduleItems = Array.isArray(schedule) ? schedule : schedule?.items;
+  if (Array.isArray(scheduleItems)) {
+    for (const item of scheduleItems) {
+      if (!item) continue;
+      items.push({
+        id: item.id ?? `sched-${items.length}`,
+        type: item.type ?? 'Content',
+        title: item.title ?? item.content?.title,
+        body: item.content?.body ?? item.content?.translation ?? item.body,
+        arabicBody: item.content?.arabicText ?? item.content?.arabic,
+        source: item.content?.source ?? item.content?.reference,
+      });
+    }
+  }
+
+  // Events
+  const rawEvents = screenContent.events ?? screenContent.data?.events;
+  const events = Array.isArray(rawEvents) ? rawEvents : (rawEvents as any)?.data;
+  if (Array.isArray(events)) {
+    for (const evt of events) {
+      if (!evt) continue;
+      items.push({
+        id: evt.id ?? `evt-${items.length}`,
+        type: 'Event',
+        title: evt.title ?? evt.name,
+        body: evt.description,
+      });
+    }
+  }
+
+  return items;
 }
 
-const AnimationContext = createContext<AnimationContextType | null>(null);
+const DisplayScreen: React.FC = () => {
+  const screenContent = useSelector((s: RootState) => s.content.screenContent);
+  const orientation: 'LANDSCAPE' | 'PORTRAIT' =
+    screenContent?.screen?.orientation ?? 'LANDSCAPE';
 
-export const useDisplayAnimation = () => {
-  const context = useContext(AnimationContext);
-  if (!context) {
-    return {
-      isAlertTransitioning: false,
-      isDisplayReady: true,
-      getComponentAnimation: () => ({
-        opacity: 1,
-        transform: "scale(1)",
-        transition: "none",
-      }),
-    };
-  }
-  return context;
-};
+  const masjidName =
+    screenContent?.masjid?.name ??
+    screenContent?.screen?.masjid?.name ??
+    screenContent?.data?.masjid?.name ??
+    null;
 
-// Get performance-aware animation delays
-const getAnimationDelays = () => {
-  const profile = getDevicePerformanceProfile();
-  const isHighStrain = isHighStrainDevice();
+  const carouselInterval =
+    screenContent?.screen?.contentConfig?.carouselInterval ?? 30;
 
-  if (isHighStrain) {
-    // No delays for 4K RPi - immediate rendering
-    return {
-      background: 0,
-      layout: 0,
-      content: 0,
-      alerts: 0,
-    };
-  } else if (profile.profile === "low") {
-    // Reduced delays for low-power devices
-    return {
-      background: 50,
-      layout: 100,
-      content: 150,
-      alerts: 200,
-    };
-  } else {
-    // Standard delays for more powerful devices
-    return {
-      background: 100,
-      layout: 200,
-      content: 300,
-      alerts: 400,
-    };
-  }
-};
+  const carouselItems = useMemo(() => buildCarouselItems(screenContent), [screenContent]);
 
-// Performance-aware constants
-const ANIMATION_DELAYS = getAnimationDelays();
-const DISPLAY_MOUNT_DURATION = isHighStrainDevice() ? 100 : 500; // Much faster for 4K
-const ALERT_ANIMATION_DURATION = isHighStrainDevice() ? 200 : 600;
-const FADE_DURATION = isHighStrainDevice() ? 200 : 400;
-
-// Memoized DisplayScreen component
-const DisplayScreen: React.FC = memo(() => {
-  const dispatch = useDispatch<AppDispatch>();
-  const theme = useTheme();
-
-  // Get performance profile
-  const performanceProfile = useMemo(() => getDevicePerformanceProfile(), []);
-  const isHighStrain = isHighStrainDevice();
-  const shouldDisableAnimations =
-    !performanceProfile.recommendations.enableAnimations;
-
-  // Get orientation from context (includes transition state)
-  const { orientation, isChanging: isOrientationChanging } = useOrientation();
-
-  // Redux selectors
-  const currentAlert = useSelector(
-    (state: RootState) => state.emergency.currentAlert,
-  );
-
-  // Local state with performance optimizations
-  const [isMounted, setIsMounted] = useState(isHighStrain); // Immediate for 4K
-  const [isDisplayReady, setIsDisplayReady] = useState(isHighStrain); // Immediate for 4K
-  const [isAlertTransitioning, setIsAlertTransitioning] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<
-    "idle" | "dissolving" | "restoring"
-  >("idle");
-
-  // Progressive loading for 4K displays
-  const [componentsLoaded, setComponentsLoaded] = useState({
-    background: !isHighStrain, // Load immediately if not high strain
-    layout: !isHighStrain,
-    content: !isHighStrain,
-  });
-
-  // Refs
-  const mountTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Rotation handling - use orientation from context
-  const rotationInfo = useRotationHandling(orientation);
-
-  // Progressive loading effect for 4K displays
-  useEffect(() => {
-    if (!isHighStrain) return;
-
-    // Load components progressively with minimal delays for 4K displays
-    const timeouts: NodeJS.Timeout[] = [];
-
-    timeouts.push(
-      setTimeout(
-        () => setComponentsLoaded((prev) => ({ ...prev, background: true })),
-        50,
-      ),
-    );
-    timeouts.push(
-      setTimeout(
-        () => setComponentsLoaded((prev) => ({ ...prev, layout: true })),
-        100,
-      ),
-    );
-    timeouts.push(
-      setTimeout(
-        () => setComponentsLoaded((prev) => ({ ...prev, content: true })),
-        150,
-      ),
-    );
-
-    return () => {
-      timeouts.forEach((timeout) => clearTimeout(timeout));
-    };
-  }, [isHighStrain]);
-
-  // Performance-aware component animation function
-  const getComponentAnimation = useCallback(
-    (componentId: string) => {
-      if (shouldDisableAnimations || isHighStrain) {
-        // No animations for 4K displays - immediate visibility
-        return {
-          opacity: 1,
-          transform: "scale(1)",
-          transition: "none",
-        };
-      }
-
-      const delay =
-        ANIMATION_DELAYS[componentId as keyof typeof ANIMATION_DELAYS] || 0;
-      const isVisible = isMounted && isDisplayReady && !isAlertTransitioning;
-      const isRestoring = animationPhase === "restoring";
-
-      let opacity = 1;
-      let transform = "scale(1)";
-
-      if (!isVisible && !isRestoring) {
-        opacity = 0;
-        transform = "scale(0.95)";
-      } else if (isAlertTransitioning && animationPhase === "dissolving") {
-        opacity = 0.3;
-        transform = "scale(0.98)";
-      }
-
-      return {
-        opacity,
-        transform,
-        transition: `opacity ${FADE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms, transform ${FADE_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms`,
-      };
-    },
-    [
-      isMounted,
-      isDisplayReady,
-      isAlertTransitioning,
-      animationPhase,
-      shouldDisableAnimations,
-      isHighStrain,
-    ],
-  );
-
-  // Memoize animation context to prevent unnecessary re-renders
-  const animationContextValue = useMemo(
-    () => ({
-      isAlertTransitioning,
-      isDisplayReady,
-      getComponentAnimation,
-    }),
-    [isAlertTransitioning, isDisplayReady, getComponentAnimation],
-  );
-
-  // Mount and display readiness effect (optimized for 4K)
-  useEffect(() => {
-    logger.info(
-      "[DisplayScreen] Component mounted, starting readiness sequence",
-    );
-
-    if (isHighStrain) {
-      // Immediate readiness for 4K displays
-      setIsMounted(true);
-      setIsDisplayReady(true);
-      logger.info("[DisplayScreen] 4K Display - immediate readiness");
-    } else {
-      // Start mount animation for non-4K displays
-      setIsMounted(true);
-
-      // Mark display as ready after animation completes
-      const readinessDelay =
-        DISPLAY_MOUNT_DURATION +
-        Math.max(...Object.values(ANIMATION_DELAYS)) +
-        200;
-      mountTimerRef.current = setTimeout(() => {
-        logger.info("[DisplayScreen] Display ready - all animations complete");
-        setIsDisplayReady(true);
-      }, readinessDelay);
-    }
-
-    return () => {
-      if (mountTimerRef.current) {
-        clearTimeout(mountTimerRef.current);
-      }
-    };
-  }, [isHighStrain]);
-
-  // Alert animation effect (simplified for 4K)
-  useEffect(() => {
-    if (currentAlert) {
-      setIsAlertTransitioning(true);
-      setAnimationPhase("dissolving");
-
-      if (currentAlert.id.startsWith("test-alert-")) {
-        const expiresAt = new Date(currentAlert.expiresAt).getTime();
-        const now = Date.now();
-        const timeUntilExpiry = Math.max(0, expiresAt - now);
-
-        if (alertTimeoutRef.current) {
-          clearTimeout(alertTimeoutRef.current);
-        }
-
-        alertTimeoutRef.current = setTimeout(() => {
-          dispatch(clearCurrentAlert());
-        }, timeUntilExpiry);
-      }
-    } else {
-      if (isAlertTransitioning) {
-        setAnimationPhase("restoring");
-
-        const maxDelay = isHighStrain
-          ? 100
-          : Math.max(...Object.values(ANIMATION_DELAYS));
-        const restoreDelay = isHighStrain
-          ? 150
-          : maxDelay + ALERT_ANIMATION_DURATION + 50;
-
-        setTimeout(() => {
-          setIsAlertTransitioning(false);
-          setAnimationPhase("idle");
-        }, restoreDelay);
-      }
-
-      if (alertTimeoutRef.current) {
-        clearTimeout(alertTimeoutRef.current);
-        alertTimeoutRef.current = null;
-      }
-    }
-
-    return () => {
-      if (alertTimeoutRef.current) {
-        clearTimeout(alertTimeoutRef.current);
-      }
-    };
-  }, [currentAlert, dispatch, isAlertTransitioning, isHighStrain]);
-
-  // Keyboard shortcuts for testing
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || !event.shiftKey) return;
-
-      if (event.key === "1") {
-        dispatch(
-          createTestAlert({
-            type: "RED",
-            duration: 10,
-          }),
-        );
-      } else if (event.key === "2") {
-        dispatch(
-          createTestAlert({
-            type: "AMBER",
-            duration: 8,
-          }),
-        );
-      } else if (event.key === "3") {
-        dispatch(
-          createTestAlert({
-            type: "BLUE",
-            duration: 6,
-          }),
-        );
-      } else if (event.key === "c") {
-        dispatch(clearCurrentAlert());
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyPress);
-    return () => {
-      window.removeEventListener("keydown", handleKeyPress);
-    };
-  }, [dispatch]);
-
-  // Performance monitoring and content refresh - optimized for 4K
-  useEffect(() => {
-    const isLowPower = isLowPowerDevice();
-    // Longer intervals for 4K displays to reduce load
-    const intervalMs = isHighStrain ? 900000 : isLowPower ? 600000 : 300000; // 15min, 10min, or 5min
-
-    const interval = setInterval(() => {
-      logger.info("Periodic content refresh");
-      dispatch(refreshAllContent({ forceRefresh: true }));
-    }, intervalMs);
-
-    return () => clearInterval(interval);
-  }, [dispatch, isHighStrain]);
-
-  // Memory management integration for 4K displays
-  useEffect(() => {
-    if (!isHighStrain) return;
-
-    // Register cleanup callback for display screen
-    const { MemoryManager } = require("../../utils/performanceUtils");
-    const unregister = MemoryManager.registerCleanupCallback(() => {
-      // Clear any cached DOM references
-      const images = document.querySelectorAll('img[src^="blob:"]');
-      images.forEach((img) => {
-        const htmlImg = img as HTMLImageElement;
-        if (htmlImg.src && htmlImg.src.startsWith("blob:")) {
-          URL.revokeObjectURL(htmlImg.src);
-        }
-      });
-
-      // Force garbage collection of React fiber nodes
-      if (window.gc && typeof window.gc === "function") {
-        setTimeout(() => window.gc!(), 100);
-      }
-    });
-
-    return unregister;
-  }, [isHighStrain]);
-
-  // Memoize the display component with transition wrapper
-  const DisplayComponent = useMemo(() => {
-    logger.info(`DisplayScreen: Rendering ${orientation} layout`, {
-      isChanging: isOrientationChanging,
-    });
-
-    const layout =
-      orientation === "LANDSCAPE" ? (
-        <ModernLandscapeDisplay />
-      ) : (
-        <ModernPortraitDisplay />
-      );
-
-    return <OrientationTransition>{layout}</OrientationTransition>;
-  }, [orientation, isOrientationChanging]);
-
-  // Wait for content to be available (progressive loading for 4K)
-  if (!componentsLoaded.background) {
-    logger.info("[DisplayScreen] Waiting for background to be available");
-    return (
-      <Box
-        sx={{
-          width: "100vw",
-          height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "primary.main",
-        }}
-      >
-        {/* Minimal loading indicator for 4K */}
-        <Box
-          sx={{
-            color: "white",
-            fontSize: isHighStrain ? "1rem" : "1.2rem",
-            opacity: 0.7,
-          }}
-        >
-          Loading display...
-        </Box>
-      </Box>
-    );
-  }
+  const headerSlot = <Header masjidName={masjidName} />;
+  const footerSlot = <Footer />;
+  const prayerPanel = <PrayerTimesPanel />;
+  const countdown = <PrayerCountdown />;
+  const carousel = <ContentCarousel items={carouselItems} interval={carouselInterval} />;
+  const bg = <IslamicPattern />;
 
   return (
-    <AnimationContext.Provider value={animationContextValue}>
-      <Fade in={isMounted} timeout={FADE_DURATION}>
-        <Box
-          sx={{
-            width: "100vw",
-            height: "100vh",
-            overflow: "hidden",
-            position: "fixed",
-            top: 0,
-            left: 0,
-            // Set background to prevent dark blocks showing through
-            backgroundColor: theme.palette.primary.dark,
-            // 4K optimizations
-            willChange: isHighStrain ? "auto" : "transform",
-            transform: isHighStrain ? "none" : "translateZ(0)",
-            backfaceVisibility: isHighStrain ? "visible" : "hidden",
-            // Smooth transition during orientation changes
-            transition:
-              isOrientationChanging && !isHighStrain
-                ? "all 0.3s ease-in-out"
-                : "none",
-          }}
-        >
-          {rotationInfo.shouldRotate ? (
-            // Apply rotation for portrait orientation
-            <Box
-              className="rotation-container no-acceleration"
-              sx={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                // Swap dimensions for rotation: use viewport height for width,
-                // viewport width for height to ensure proper coverage after rotation
-                width: "100vh",
-                height: "100vw",
-                transformOrigin: "center center",
-                // Rotation transform - inline styles have higher specificity than CSS classes
-                // The .no-acceleration and .rotation-container classes ensure this isn't overridden
-                transform: "translate(-50%, -50%) rotate(90deg)",
-                // Ensure no overflow or positioning issues
-                overflow: "hidden",
-                // GPU optimizations for RPi
-                willChange: isHighStrain ? "auto" : "transform",
-                backfaceVisibility: "hidden",
-                // Smooth transition during orientation changes
-                transition:
-                  isOrientationChanging && !isHighStrain
-                    ? "transform 0.3s ease-in-out"
-                    : "none",
-              }}
-            >
-              {DisplayComponent}
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                width: "100%",
-                height: "100%",
-                // Smooth transition during orientation changes
-                transition:
-                  isOrientationChanging && !isHighStrain
-                    ? "all 0.3s ease-in-out"
-                    : "none",
-              }}
-            >
-              {DisplayComponent}
-            </Box>
-          )}
-        </Box>
-      </Fade>
-    </AnimationContext.Provider>
+    <OrientationWrapper orientation={orientation}>
+      {orientation === 'PORTRAIT' ? (
+        <PortraitLayout
+          header={headerSlot}
+          prayerSection={
+            <div className="flex flex-col gap-3 h-full">
+              {prayerPanel}
+              {countdown}
+            </div>
+          }
+          content={carousel}
+          footer={footerSlot}
+          background={bg}
+        />
+      ) : (
+        <LandscapeLayout
+          header={headerSlot}
+          content={carousel}
+          sidebar={
+            <>
+              {prayerPanel}
+              {countdown}
+            </>
+          }
+          footer={footerSlot}
+          background={bg}
+        />
+      )}
+    </OrientationWrapper>
   );
-});
+};
 
 export default DisplayScreen;

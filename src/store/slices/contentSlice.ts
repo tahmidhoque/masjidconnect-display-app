@@ -297,7 +297,7 @@ export const refreshContent = createAsyncThunk(
       }
 
       // Get the content from storage after sync
-      const content = await storageService.getScreenContent();
+      const content = await storageService.get<ScreenContent>('screenContent');
 
       if (!content) {
         throw new Error("No content received from server");
@@ -384,14 +384,14 @@ export const refreshPrayerTimes = createAsyncThunk(
       }
 
       // Try to get prayer times from storage
-      let prayerTimes = await storageService.getPrayerTimes();
+      let prayerTimes = await storageService.get<PrayerTimes>('prayerTimes');
 
       // If no prayer times found separately, try to extract from screen content
       if (!prayerTimes) {
         logger.info(
           "[Content] No separate prayer times found, extracting from screen content...",
         );
-        const screenContent = await storageService.getScreenContent();
+        const screenContent = await storageService.get<ScreenContent>('screenContent');
 
         if (screenContent) {
           // Try different possible locations for prayer times in screen content
@@ -409,7 +409,7 @@ export const refreshPrayerTimes = createAsyncThunk(
 
           // If we found prayer times in screen content, save them separately for future use
           if (prayerTimes) {
-            await storageService.savePrayerTimes(prayerTimes);
+            await storageService.set('prayerTimes', prayerTimes);
             logger.info(
               "[Content] Saved extracted prayer times separately for future use",
             );
@@ -474,7 +474,7 @@ export const refreshSchedule = createAsyncThunk(
 
       // Get the schedule from storage after sync
       logger.info("[Content] Loading schedule from storage...");
-      const scheduleData = await storageService.getSchedule();
+      const scheduleData = await storageService.get<any>('schedule');
       logger.info("[Content] Schedule loaded from storage", {
         hasSchedule: !!scheduleData,
         isArray: Array.isArray(scheduleData),
@@ -515,7 +515,7 @@ export const refreshEvents = createAsyncThunk(
       logger.debug("[Content] Refreshing events...");
 
       // Get existing events from storage for now
-      const events = await storageService.getEvents();
+      const events = await storageService.get<any>('events');
 
       return {
         events: events || [],
@@ -540,10 +540,10 @@ export const loadCachedContent = createAsyncThunk(
 
       // Load all cached data from storage in parallel
       const [schedule, events, prayerTimes, screenContent] = await Promise.all([
-        storageService.getSchedule(),
-        storageService.getEvents(),
-        storageService.getPrayerTimes(),
-        storageService.getScreenContent(),
+        storageService.get<any>('schedule'),
+        storageService.get<any>('events'),
+        storageService.get<PrayerTimes>('prayerTimes'),
+        storageService.get<ScreenContent>('screenContent'),
       ]);
 
       // Normalize schedule if it's an array (shouldn't be, but handle it)

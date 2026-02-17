@@ -1,0 +1,34 @@
+# =============================================================================
+# MasjidConnect Display — systemd service
+#
+# Install:
+#   sudo cp deploy/masjidconnect-display.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable masjidconnect-display
+#   sudo systemctl start masjidconnect-display
+# =============================================================================
+
+[Unit]
+Description=MasjidConnect Display App
+After=network.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/masjidconnect
+Environment=PORT=3001
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/masjidconnect/deploy/server.mjs
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits for RPi stability
+MemoryMax=512M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target
