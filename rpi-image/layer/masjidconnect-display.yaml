@@ -1,0 +1,44 @@
+# METABEGIN
+# X-Env-Layer-Name: masjidconnect-display
+# X-Env-Layer-Desc: MasjidConnect Display App — Node server + Chromium kiosk (cage).
+#   Expects app archive at IGconf_masjidconnect_app_archive (tar.gz from npm run package).
+# X-Env-Layer-Requires: rpi-user-credentials,systemd-net-min
+#
+# X-Env-VarPrefix: masjidconnect
+# X-Env-Var-app_archive: app/masjidconnect-display.tar.gz
+# X-Env-Var-app_archive-Desc: Path to masjidconnect-display-*.tar.gz (relative to -S or absolute)
+# X-Env-Var-app_archive-Required: n
+# X-Env-Var-app_archive-Set: y
+# METAEND
+---
+mmdebstrap:
+  packages:
+    - chromium
+    - cage
+    - curl
+    - ca-certificates
+  customize-hooks:
+    # Install Node.js 20 from NodeSource (build host needs network)
+    - |
+      chroot $1 /bin/bash -c 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs' || true
+    # Extract app archive to /opt/masjidconnect (path relative to -S or absolute)
+    - |
+      ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"
+      if [ -z "$ARCHIVE" ]; then
+        echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"
+        exit 1
+      fi
+      if [ ! -f "$ARCHIVE" ]; then
+        echo "MasjidConnect app archive not found: $ARCHIVE (place tar.gz in rpi-image/app/ or set IGconf_masjidconnect_app_archive)"
+        exit 1
+      fi
+      mkdir -p $1/opt/masjidconnect
+      cp "$ARCHIVE" $1/tmp/masjidconnect-app.tar.gz
+      chroot $1 /bin/bash -c 'tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect --strip-components=1 && rm /tmp/masjidconnect-app.tar.gz'
+    # Ownership (pi user is typically 1000:1000)
+    - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
+    # Install display server systemd unit
+    - cp $1/opt/masjidconnect/deploy/masjidconnect-display.service $1/etc/systemd/system/
+    # Install cage-based kiosk unit (no X11 required)
+    - env KIOSK_USER="$IGconf_device_user1" envsubst '${KIOSK_USER}' < kiosk-cage.service.tpl > $1/etc/systemd/system/masjidconnect-kiosk.service
+    - $BDEBSTRAP_HOOKS/enable-units "$1" masjidconnect-display masjidconnect-kiosk

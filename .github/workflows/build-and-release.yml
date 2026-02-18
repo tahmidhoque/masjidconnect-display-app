@@ -81,9 +81,80 @@ jobs:
           path: masjidconnect-display-*.tar.gz
           retention-days: 5
 
+  build-image:
+    name: Build RPi image
+    needs: build
+    runs-on: ubuntu-latest
+    # rpi-image-gen builds arm64 rootfs; QEMU user emulation is used on x86 runners.
+    # For faster builds, use a self-hosted arm64 runner and remove setup-qemu.
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (arm64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Download app archive
+        uses: actions/download-artifact@v4
+        with:
+          name: masjidconnect-display
+          path: ./artifacts
+
+      - name: Prepare app archive for image build
+        run: |
+          mkdir -p rpi-image/app
+          cp artifacts/masjidconnect-display-*.tar.gz rpi-image/app/masjidconnect-display.tar.gz
+
+      - name: Clone rpi-image-gen
+        run: |
+          git clone --depth 1 https://github.com/raspberrypi/rpi-image-gen.git ../rpi-image-gen
+
+      - name: Install rpi-image-gen dependencies
+        run: |
+          sudo ../rpi-image-gen/install_deps.sh
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Register QEMU for chroot (arm64)
+        run: |
+          sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || true
+          # Fallback: binfmt_misc for qemu-aarch64 if Docker method unavailable
+          if [ ! -f /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+            sudo apt-get update -qq && sudo apt-get install -y qemu-user-static
+            sudo update-binfmts --enable qemu-aarch64 || true
+          fi
+
+      - name: Build RPi image
+        run: |
+          cd ../rpi-image-gen
+          ./rpi-image-gen build -S "$GITHUB_WORKSPACE/rpi-image" -c "$GITHUB_WORKSPACE/rpi-image/config/masjidconnect.yaml"
+
+      - name: Locate and upload image artifact
+        run: |
+          cd ../rpi-image-gen
+          IMG=$(find work -name "*.img" -type f | head -1)
+          if [ -z "$IMG" ]; then
+            echo "No .img file found under work/"
+            find work -type f 2>/dev/null || true
+            exit 1
+          fi
+          cp "$IMG" "$GITHUB_WORKSPACE/masjidconnect-display.img"
+          cd "$GITHUB_WORKSPACE"
+          sha256sum masjidconnect-display.img > masjidconnect-display.img.sha256
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: masjidconnect-display-image
+          path: |
+            masjidconnect-display.img
+            masjidconnect-display.img.sha256
+          retention-days: 5
+
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [build, build-image]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
 
@@ -104,18 +175,28 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Release version: $VERSION"
 
-      - name: Download artifact
+      - name: Download app artifact
         uses: actions/download-artifact@v4
         with:
           name: masjidconnect-display
           path: ./artifacts
 
-      - name: Generate checksums
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: masjidconnect-display-image
+          path: ./artifacts/image
+
+      - name: Generate checksums and prepare release files
         run: |
           cd artifacts
           for file in *.tar.gz; do
             sha256sum "$file" > "$file.sha256"
           done
+          if [ -d image ]; then
+            mv image/masjidconnect-display.img image/masjidconnect-display.img.sha256 . 2>/dev/null || true
+            rm -rf image
+          fi
 
       - name: Generate release notes
         id: release-notes
@@ -151,7 +232,11 @@ jobs:
 
           $CHANGES
 
-          ### Installation (Raspberry Pi)
+          ### Option A: Pre-built image (easiest)
+
+          Download \`masjidconnect-display.img\`, flash to an SD card with [Etcher](https://etcher.balena.io/) or Raspberry Pi Imager ("Use custom"), then boot the Pi. No manual install needed.
+
+          ### Option B: Manual install (tar.gz)
 
           \`\`\`bash
           VERSION="${VERSION}"
@@ -186,6 +271,8 @@ jobs:
           files: |
             artifacts/*.tar.gz
             artifacts/*.sha256
+            artifacts/*.img
+            artifacts/*.img.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

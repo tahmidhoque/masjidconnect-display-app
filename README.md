@@ -98,6 +98,8 @@ The app is deployed as a **tar.gz archive** on Raspberry Pi: no .deb, no Electro
 
 ## Raspberry Pi Deployment
 
+You can either **install from a release archive** (steps below) or **build a custom SD card image** with the app already installed so you only need to flash and boot — see **[rpi-image/README.md](rpi-image/README.md)** (uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-gen)).
+
 ### Architecture
 
 - **Node.js server** (`deploy/server.mjs`) serves `dist/` on http://localhost:3001.

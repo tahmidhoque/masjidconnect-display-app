@@ -1,0 +1,2 @@
+# Place masjidconnect-display-<version>.tar.gz here before building the image.
+# Copy from project root after: npm run package

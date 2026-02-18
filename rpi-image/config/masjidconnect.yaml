@@ -1,0 +1,19 @@
+# MasjidConnect Display — rpi-image-gen config
+# Builds a bootable image with the app pre-installed; flash SD and boot.
+# Requires: rpi-image-gen (https://github.com/raspberrypi/rpi-image-gen)
+# Build host: Raspberry Pi OS 64-bit (Bookworm or Trixie) recommended.
+
+include:
+  file: bookworm-minbase.yaml
+
+image:
+  name: masjidconnect-display
+  root_part_size: 250%
+
+layer:
+  app: masjidconnect-display
+
+# Path to the app tar.gz (from npm run package). Relative to source dir (-S).
+# Override when running: rpi-image-gen build -S ./rpi-image -c config/masjidconnect.yaml -- IGconf_masjidconnect_app_archive=/path/to/app.tar.gz
+masjidconnect:
+  app_archive: app/masjidconnect-display.tar.gz
