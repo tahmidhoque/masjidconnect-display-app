@@ -37,10 +37,10 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({ isRamadan = false }
   }
 
   return (
-    <div className="panel flex flex-col gap-1 h-full overflow-hidden">
-      <h2 className="text-subheading text-gold font-semibold mb-2">Prayer Times</h2>
+    <div className="panel flex flex-col gap-1 flex-1 min-h-0 overflow-hidden py-4 px-5">
+      <h2 className="text-subheading text-gold font-semibold mb-1 shrink-0">Prayer Times</h2>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex-1 min-h-0 flex flex-col gap-1 justify-center">
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
           const isCurrent = prayer.isCurrent;
@@ -50,7 +50,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({ isRamadan = false }
             <div
               key={prayer.name}
               className={`
-                flex items-center justify-between px-4 py-2.5 rounded-lg
+                flex items-center justify-between px-3 py-1.5 rounded-lg
                 transition-colors duration-normal
                 ${isNext ? 'bg-emerald/15 border border-emerald/30' : ''}
                 ${isCurrent ? 'animate-subtle-pulse bg-gold/10 border border-gold/20' : ''}
@@ -96,7 +96,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({ isRamadan = false }
       </div>
 
       {/* Legend — right-aligned to sit under the time columns */}
-      <div className="flex items-center justify-end gap-4 mt-2 pt-2 border-t border-border">
+      <div className="shrink-0 flex items-center justify-end gap-4 mt-1 pt-1 border-t border-border">
         <span className="text-caption text-text-muted">Adhan</span>
         <span className="text-caption text-gold/60">Jamaat</span>
       </div>

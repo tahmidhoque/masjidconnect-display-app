@@ -120,10 +120,10 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
     return (
       <div
         className={`
-          card-elevated iftar-countdown-card gpu-accelerated
+          card-elevated iftar-countdown-card gpu-accelerated shrink-0
           flex flex-col items-center justify-center text-center
           border border-gold/20
-          ${compact ? 'gap-1 py-3' : 'gap-2 py-5'}
+          ${compact ? 'gap-1 py-3' : 'gap-1.5 py-3'}
         `}
       >
         {/* Dual label */}
@@ -141,7 +141,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
         <h3
           className={`
             text-emerald-light font-bold
-            ${compact ? 'text-subheading' : 'text-heading'}
+            ${compact ? 'text-body' : 'text-subheading'}
           `}
         >
           {nextPrayer.name}
@@ -151,7 +151,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
         <p
           className={`
             text-gold font-bold countdown-stable
-            ${compact ? 'text-heading' : 'text-display'}
+            ${compact ? 'text-subheading' : 'text-heading'}
           `}
         >
           {ramadanCountdown}
@@ -173,9 +173,9 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
   return (
     <div
       className={`
-        card-elevated gpu-accelerated
+        card-elevated gpu-accelerated shrink-0
         border border-gold/20
-        ${compact ? 'py-3 px-3' : 'py-4 px-4'}
+        ${compact ? 'py-3 px-3' : 'py-3 px-4'}
       `}
     >
       <div className={`grid grid-cols-2 ${compact ? 'gap-2' : 'gap-4'}`}>

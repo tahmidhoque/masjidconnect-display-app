@@ -16,6 +16,7 @@
  *   Ctrl + Shift + 0  — Clear current alert
  *   Ctrl + Shift + R  — Toggle Ramadan mode
  *   Ctrl + Shift + J  — Cycle prayer phase (jamaat-soon → in-prayer → auto)
+ *   Ctrl + Shift + O  — Cycle orientation (landscape → portrait → auto)
  *   Escape            — Clear current alert
  */
 
@@ -29,6 +30,21 @@ import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
 import type { PrayerPhase } from './usePrayerPhase';
 import logger from '../utils/logger';
+
+/* ------------------------------------------------------------------ */
+/*  Orientation dev override                                           */
+/* ------------------------------------------------------------------ */
+
+type Orientation = 'LANDSCAPE' | 'PORTRAIT';
+
+/** Custom event dispatched when the dev orientation override changes */
+export const ORIENTATION_FORCE_EVENT = 'orientation-force-change';
+
+declare global {
+  interface Window {
+    __ORIENTATION_FORCE?: Orientation | undefined;
+  }
+}
 
 /**
  * Alert colour keyed by the character produced by Shift+digit.
@@ -101,6 +117,29 @@ function togglePrayerPhaseForce(): void {
   window.dispatchEvent(new Event(PRAYER_PHASE_FORCE_EVENT));
 }
 
+/**
+ * Cycle the orientation dev override on `window`.
+ * Three states: LANDSCAPE → PORTRAIT → auto-detect → LANDSCAPE …
+ */
+const ORIENTATION_CYCLE: (Orientation | undefined)[] = [
+  'LANDSCAPE',
+  'PORTRAIT',
+  undefined,
+];
+
+function toggleOrientationForce(): void {
+  const current = window.__ORIENTATION_FORCE;
+  const currentIdx = ORIENTATION_CYCLE.indexOf(current);
+  const nextIdx = (currentIdx + 1) % ORIENTATION_CYCLE.length;
+  const next = ORIENTATION_CYCLE[nextIdx];
+
+  window.__ORIENTATION_FORCE = next;
+  const label = next ?? 'auto-detect';
+  logger.info(`[DevKeyboard] Orientation force: ${label}`);
+
+  window.dispatchEvent(new Event(ORIENTATION_FORCE_EVENT));
+}
+
 const useDevKeyboard = (): void => {
   const dispatch = useDispatch();
 
@@ -125,6 +164,7 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+0': 'Clear current alert',
       'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
       'Ctrl+Shift+J': 'Cycle prayer phase (jamaat-soon → in-prayer → auto)',
+      'Ctrl+Shift+O': 'Cycle orientation (landscape → portrait → auto)',
       'Escape': 'Clear current alert',
     });
 
@@ -142,6 +182,13 @@ const useDevKeyboard = (): void => {
         if (e.key === 'J' || e.key === 'j') {
           e.preventDefault();
           togglePrayerPhaseForce();
+          return;
+        }
+
+        // Orientation toggle (O or o)
+        if (e.key === 'O' || e.key === 'o') {
+          e.preventDefault();
+          toggleOrientationForce();
           return;
         }
 

@@ -55,8 +55,8 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
           {content}
         </section>
 
-        {/* Right column — prayer times */}
-        <aside className="flex-[50] min-w-0 flex flex-col gap-4">
+        {/* Right column — prayer times + countdown */}
+        <aside className="flex-[50] min-w-0 flex flex-col gap-3">
           {sidebar}
         </aside>
       </main>

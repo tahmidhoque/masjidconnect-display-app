@@ -19,9 +19,10 @@
  * Data is sourced from Redux (contentSlice) and hooks.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
 import { LandscapeLayout, PortraitLayout, OrientationWrapper } from '../layout';
 import {
@@ -87,8 +88,20 @@ function buildCarouselItems(screenContent: any): CarouselItem[] {
 
 const DisplayScreen: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
+
+  /* Dev-mode orientation override (Ctrl+Shift+O) */
+  const [orientationOverride, setOrientationOverride] = useState<
+    'LANDSCAPE' | 'PORTRAIT' | undefined
+  >(() => window.__ORIENTATION_FORCE);
+
+  useEffect(() => {
+    const handler = () => setOrientationOverride(window.__ORIENTATION_FORCE);
+    window.addEventListener(ORIENTATION_FORCE_EVENT, handler);
+    return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
+  }, []);
+
   const orientation: 'LANDSCAPE' | 'PORTRAIT' =
-    screenContent?.screen?.orientation ?? 'LANDSCAPE';
+    orientationOverride ?? screenContent?.screen?.orientation ?? 'LANDSCAPE';
 
   const masjidName =
     screenContent?.masjid?.name ??

@@ -17,7 +17,7 @@ import type { RootState } from './store';
 import { setOffline } from './store/slices/uiSlice';
 import { clearCurrentAlert } from './store/slices/emergencySlice';
 import useAppLoader from './hooks/useAppLoader';
-import useDevKeyboard from './hooks/useDevKeyboard';
+import useDevKeyboard, { ORIENTATION_FORCE_EVENT } from './hooks/useDevKeyboard';
 import { useRotationHandling } from './hooks/useRotationHandling';
 import logger from './utils/logger';
 
@@ -96,8 +96,23 @@ function resolveScheme(alert: { colorScheme?: string; color?: string }): AlertSc
 const EmergencyOverlay: React.FC = () => {
   const dispatch = useDispatch();
   const alert = useSelector((s: RootState) => s.emergency.currentAlert);
+
+  /* Dev-mode orientation override (Ctrl+Shift+O) */
+  const [orientationOverride, setOrientationOverride] = useState<
+    'LANDSCAPE' | 'PORTRAIT' | undefined
+  >(() => window.__ORIENTATION_FORCE);
+
+  useEffect(() => {
+    const handler = () => setOrientationOverride(window.__ORIENTATION_FORCE);
+    window.addEventListener(ORIENTATION_FORCE_EVENT, handler);
+    return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
+  }, []);
+
+  const storeOrientation = useSelector(
+    (s: RootState) => s.content.screenContent?.screen?.orientation,
+  );
   const orientation: 'LANDSCAPE' | 'PORTRAIT' =
-    useSelector((s: RootState) => s.content.screenContent?.screen?.orientation) ?? 'LANDSCAPE';
+    orientationOverride ?? storeOrientation ?? 'LANDSCAPE';
 
   const { shouldRotate } = useRotationHandling(orientation);
 
