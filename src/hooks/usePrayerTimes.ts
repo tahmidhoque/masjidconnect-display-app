@@ -328,37 +328,43 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
   }, [prayerTimes, refreshPrayerTimesHandler]);
 
-  // Process prayer times data and update state
-  const processPrayerTimes = useCallback(() => {
+  // Process prayer times data and update state.
+  // When forceReprocess is true (e.g. from the periodic timer), we always recalculate
+  // current/next prayer so the countdown advances after reaching zero; we do not
+  // update lastProcessedTimes/lastProcessedDate so Redux-driven dedupe is unchanged.
+  const processPrayerTimes = useCallback((forceReprocess?: boolean) => {
     if (!prayerTimes || calculationsRef.current.isProcessing) {
       return;
     }
 
-    // Check if we've already processed this exact data
     const currentDate = new Date().toISOString().split("T")[0];
-    if (
-      lastProcessedTimes.current === prayerTimes &&
-      lastProcessedDate.current === currentDate
-    ) {
-      return; // Skip if already processed this data for today
-    }
 
-    const now = Date.now();
+    if (!forceReprocess) {
+      // Check if we've already processed this exact data (Redux-driven path only)
+      if (
+        lastProcessedTimes.current === prayerTimes &&
+        lastProcessedDate.current === currentDate
+      ) {
+        return; // Skip if already processed this data for today
+      }
 
-    // Prevent excessive processing
-    if (now - calculationsRef.current.lastProcessTime < MIN_PROCESS_INTERVAL) {
-      return;
+      // Prevent excessive processing when not forced
+      const now = Date.now();
+      if (now - calculationsRef.current.lastProcessTime < MIN_PROCESS_INTERVAL) {
+        return;
+      }
     }
 
     calculationsRef.current.isProcessing = true;
-    calculationsRef.current.lastProcessTime = now;
+    calculationsRef.current.lastProcessTime = Date.now();
 
     try {
       logger.debug("Processing prayer times data");
 
-      // Update processed data refs
-      lastProcessedTimes.current = prayerTimes;
-      lastProcessedDate.current = currentDate;
+      if (!forceReprocess) {
+        lastProcessedTimes.current = prayerTimes;
+        lastProcessedDate.current = currentDate;
+      }
 
       // Check for date change first
       checkForDayChange();
@@ -915,10 +921,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         }
       }
 
-      // Set up timer to update calculations every minute and check for day change
+      // Set up timer to periodically recalculate current/next prayer so countdown
+      // advances after reaching zero. forceReprocess(true) bypasses "already
+      // processed today" so we always refresh; interval 15s for snappy transition.
       const timer = setInterval(() => {
         try {
-          processPrayerTimes();
+          processPrayerTimes(true);
 
           // Check if we need to update the Hijri date (once per hour)
           const now = new Date();
@@ -929,7 +937,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         } catch (error) {
           logger.error("Error in timer update", { error });
         }
-      }, 60 * 1000);
+      }, 15 * 1000);
 
       return () => clearInterval(timer);
     } catch (error) {

@@ -97,7 +97,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({ isRamadan = false }
 
       {/* Legend — right-aligned to sit under the time columns */}
       <div className="shrink-0 flex items-center justify-end gap-4 mt-1 pt-1 border-t border-border">
-        <span className="text-caption text-text-muted">Adhan</span>
+        <span className="text-caption text-text-muted">Start</span>
         <span className="text-caption text-gold/60">Jamaat</span>
       </div>
     </div>
