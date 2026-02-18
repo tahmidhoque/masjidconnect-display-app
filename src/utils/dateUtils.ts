@@ -374,22 +374,16 @@ export const calculateApproximateHijriDate = (date?: Date): string => {
 };
 
 /**
- * Enhanced Hijri date fetching with fallback to accurate calculation
+ * Fetch the Hijri date string, falling back to local calculation on error.
  */
-export const fetchHijriDateElectronSafe = async (
+export const fetchHijriDate = async (
   dateString?: string,
 ): Promise<string> => {
-  // Use accurate local calculation as primary method
   const targetDate = dateString ? new Date(dateString) : new Date();
 
   try {
-    // For now, use our accurate local calculation
-    const result = calculateApproximateHijriDate(targetDate);
-    console.log("Calculated Hijri date:", result);
-    return result;
-  } catch (error) {
-    console.error("Error calculating Hijri date:", error);
-    // Final fallback
+    return calculateApproximateHijriDate(targetDate);
+  } catch {
     return calculateApproximateHijriDate(targetDate);
   }
 };

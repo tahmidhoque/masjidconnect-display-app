@@ -188,7 +188,6 @@ export interface HeartbeatAnalyticsData {
   // Application Information (REQUIRED)
   appVersion: string; // Current app version (e.g., "1.2.3")
   platform: string; // Platform (e.g., "Linux armv7l")
-  electronVersion?: string; // Electron version
 
   // System Performance (REQUIRED)
   cpuUsage: number; // CPU usage percentage (0-100)

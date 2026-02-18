@@ -1,7 +1,7 @@
 /**
  * Global type declarations
  *
- * Companion service API types (replaces Electron IPC).
+ * Companion service API types.
  * The companion service runs locally on RPi and exposes a REST API.
  */
 

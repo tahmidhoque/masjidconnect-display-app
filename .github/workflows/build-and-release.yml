@@ -9,30 +9,23 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., 1.0.0)"
+        description: "Version to release (e.g., 1.0.0). Defaults to package.json version."
         required: false
         type: string
 
-# Allow manual workflow runs
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build for Raspberry Pi
+    name: Build
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        arch:
-          - armv7l
-          - arm64
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history for proper versioning
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,99 +33,52 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Get version from package.json
-        id: package-version
+      - name: Get version
+        id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-          # Validate version format (semantic versioning)
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
-            echo "❌ Invalid version format: $VERSION"
-            echo "Version must follow semantic versioning (e.g., 1.0.0, 1.0.0-beta.1)"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            echo "Invalid version format: $VERSION"
             exit 1
           fi
-          echo "✅ Version format validated"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test -- --watchAll=false --passWithNoTests
+      - name: Lint
+        run: npm run lint
 
-      - name: Build React app
-        run: npm run build:fix-paths
+      - name: Build and package
+        run: npm run package
         env:
-          # Required: API URL for production builds
-          # Set as GitHub Secret: REACT_APP_API_URL
-          # Falls back to default if secret not set
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://portal.masjidconnect.co.uk' }}
-          REACT_APP_VERSION: ${{ steps.package-version.outputs.VERSION }}
-          CI: false
-          DISABLE_ESLINT_PLUGIN: false
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://portal.masjidconnect.co.uk' }}
 
-      - name: Prepare RPI build
-        run: node scripts/prepare-rpi-build.js
-
-      - name: Build Electron app for ${{ matrix.arch }}
+      - name: Validate archive
         run: |
-          # Ensure after-install.sh is executable
-          chmod +x after-install.sh || true
-          chmod +x after-remove.sh || true
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ARCHIVE="masjidconnect-display-${VERSION}.tar.gz"
 
-          # Build for specific architecture
-          if [ "${{ matrix.arch }}" = "armv7l" ]; then
-            npx electron-builder --linux deb --armv7l --publish never
-          else
-            npx electron-builder --linux deb --arm64 --publish never
-          fi
-        env:
-          # Required: API URL for production builds
-          # Set as GitHub Secret: REACT_APP_API_URL
-          # Falls back to default if secret not set
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://portal.masjidconnect.co.uk' }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REACT_APP_VERSION: ${{ steps.package-version.outputs.VERSION }}
-
-      - name: Validate build artifacts
-        run: |
-          echo "Validating build artifacts for ${{ matrix.arch }}..."
-          if [ ! -d "dist" ]; then
-            echo "❌ dist directory not found"
+          if [ ! -f "$ARCHIVE" ]; then
+            echo "Archive not found: $ARCHIVE"
             exit 1
           fi
 
-          # Check for .deb file
-          DEB_FILE=$(find dist -name "*.deb" -type f | head -1)
-          if [ -z "$DEB_FILE" ]; then
-            echo "❌ No .deb file found in dist directory"
+          SIZE=$(stat -c%s "$ARCHIVE" 2>/dev/null || stat -f%z "$ARCHIVE" 2>/dev/null)
+          if [ "$SIZE" -lt 1024 ]; then
+            echo "Archive is suspiciously small: $SIZE bytes"
             exit 1
           fi
 
-          # Validate .deb file size (should be > 0)
-          DEB_SIZE=$(stat -f%z "$DEB_FILE" 2>/dev/null || stat -c%s "$DEB_FILE" 2>/dev/null)
-          if [ "$DEB_SIZE" -eq 0 ]; then
-            echo "❌ .deb file is empty"
-            exit 1
-          fi
+          echo "Archive validated: $ARCHIVE ($SIZE bytes)"
 
-          echo "✅ Build artifacts validated"
-          echo "   Found: $(basename "$DEB_FILE")"
-          echo "   Size: $DEB_SIZE bytes"
-
-      - name: List dist directory
-        run: |
-          echo "Contents of dist directory:"
-          ls -lah dist/ || echo "No dist directory found"
-
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: masjidconnect-display-${{ matrix.arch }}
-          path: |
-            dist/*.deb
-            dist/*.tar.gz
+          name: masjidconnect-display
+          path: masjidconnect-display-*.tar.gz
           retention-days: 5
 
   release:
@@ -148,116 +94,86 @@ jobs:
       - name: Get version
         id: get-version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
-            if [ -z "$VERSION" ]; then
-              VERSION=$(node -p "require('./package.json').version")
-            fi
-          else
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(node -p "require('./package.json').version")
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Release version: $VERSION"
 
-      - name: Download armv7l artifacts
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: masjidconnect-display-armv7l
-          path: ./artifacts/armv7l
+          name: masjidconnect-display
+          path: ./artifacts
 
-      - name: Download arm64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: masjidconnect-display-arm64
-          path: ./artifacts/arm64
-
-      - name: Generate SHA256 checksums
+      - name: Generate checksums
         run: |
           cd artifacts
-          find . -name "*.deb" -o -name "*.tar.gz" | while read file; do
+          for file in *.tar.gz; do
             sha256sum "$file" > "$file.sha256"
           done
-          cd ..
-
-      - name: Validate release artifacts
-        run: |
-          echo "Validating release artifacts..."
-          # Check that both architectures have artifacts
-          if [ ! -f "artifacts/armv7l"/*.deb ] && [ ! -f "artifacts/arm64"/*.deb ]; then
-            echo "❌ No .deb files found in artifacts"
-            exit 1
-          fi
-          echo "✅ Release artifacts validated"
 
       - name: Generate release notes
         id: release-notes
         run: |
           VERSION="${{ steps.get-version.outputs.VERSION }}"
 
-          # Try to get release notes from CHANGELOG.md if it exists
           if [ -f "CHANGELOG.md" ]; then
-            echo "Found CHANGELOG.md, extracting release notes..."
-            # Extract the section for this version
             awk -v version="$VERSION" '
-              /^## \[/ { 
-                if ($0 ~ "\\[" version "\\]") { 
-                  in_section=1; 
-                  next 
-                } else if (in_section && /^## \[/) { 
-                  exit 
-                }
+              /^## \[/ {
+                if ($0 ~ "\\[" version "\\]") { in_section=1; next }
+                else if (in_section && /^## \[/) { exit }
               }
               in_section { print }
             ' CHANGELOG.md > changelog-section.md || true
-            
-            if [ -s changelog-section.md ]; then
-              CHANGELOG_CONTENT=$(cat changelog-section.md)
-            fi
           fi
 
-          # Get commits since last tag as fallback
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -z "$PREVIOUS_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD | head -20)
           else
-            COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD | head -20)
+            COMMITS=$(git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG"..HEAD | head -20)
           fi
 
-          # Use CHANGELOG if available, otherwise use commits
-          if [ -n "$CHANGELOG_CONTENT" ]; then
-            CHANGES_SECTION="$CHANGELOG_CONTENT"
+          if [ -s changelog-section.md ]; then
+            CHANGES=$(cat changelog-section.md)
           else
-            CHANGES_SECTION="### Changes\n$COMMITS"
+            CHANGES="### Changes
+          $COMMITS"
           fi
 
-          # Create release notes
           cat << EOF > release-notes.md
           ## What's New in v$VERSION
 
-          $CHANGES_SECTION
+          $CHANGES
 
-          ### Installation
+          ### Installation (Raspberry Pi)
 
-          #### Raspberry Pi 4 / 5 (ARM64)
           \`\`\`bash
-          wget https://github.com/${{ github.repository }}/releases/download/v$VERSION/masjidconnect-display-$VERSION-arm64.deb
-          sudo dpkg -i masjidconnect-display-$VERSION-arm64.deb
+          VERSION="${VERSION}"
+          wget https://github.com/${{ github.repository }}/releases/download/v\${VERSION}/masjidconnect-display-\${VERSION}.tar.gz
+          sudo mkdir -p /opt/masjidconnect
+          sudo tar -xzf masjidconnect-display-\${VERSION}.tar.gz -C /opt/masjidconnect
+          sudo /opt/masjidconnect/deploy/install.sh
           \`\`\`
 
-          #### Raspberry Pi 3 (ARMv7l)
+          ### Updating an Existing Installation
+
           \`\`\`bash
-          wget https://github.com/${{ github.repository }}/releases/download/v$VERSION/masjidconnect-display-$VERSION-armv7l.deb
-          sudo dpkg -i masjidconnect-display-$VERSION-armv7l.deb
+          VERSION="${VERSION}"
+          wget https://github.com/${{ github.repository }}/releases/download/v\${VERSION}/masjidconnect-display-\${VERSION}.tar.gz
+          sudo systemctl stop masjidconnect-kiosk masjidconnect-display
+          sudo tar -xzf masjidconnect-display-\${VERSION}.tar.gz -C /opt/masjidconnect
+          sudo systemctl start masjidconnect-display masjidconnect-kiosk
           \`\`\`
 
           ### Checksums
           SHA256 checksums are provided for all artifacts to verify integrity.
-
-          ### Auto-Update
-          The app will automatically check for updates hourly. Updates can also be triggered manually via the admin portal.
           EOF
-
-          cat release-notes.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -268,9 +184,8 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.get-version.outputs.VERSION, '-') }}
           files: |
-            artifacts/**/*.deb
-            artifacts/**/*.tar.gz
-            artifacts/**/*.sha256
+            artifacts/*.tar.gz
+            artifacts/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -278,6 +193,4 @@ jobs:
         uses: geekyeggo/delete-artifact@v4
         continue-on-error: true
         with:
-          name: |
-            masjidconnect-display-armv7l
-            masjidconnect-display-arm64
+          name: masjidconnect-display

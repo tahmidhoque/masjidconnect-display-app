@@ -104,11 +104,6 @@ const STORAGE_KEYS = {
   SCREEN_ID: "masjid_screen_id",
 };
 
-// Electron has been removed — the app now runs in Chromium kiosk mode.
-// These shims exist to prevent errors in any code paths that once checked for Electron.
-const isElectron = () => false;
-const electronStore = null;
-
 // Cache interface
 interface CacheItem<T> {
   data: T;

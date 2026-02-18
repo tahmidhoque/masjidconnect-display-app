@@ -8,7 +8,7 @@ import {
   getNextPrayerTime,
   getTimeUntilNextPrayer,
   parseTimeString,
-  fetchHijriDateElectronSafe,
+  fetchHijriDate,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
 import apiClient from "../api/apiClient";
@@ -373,7 +373,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   }, [prayerTimes]);
 
   // Get and update Hijri date - memoized to prevent rerenders
-  const fetchHijriDate = useCallback(async () => {
+  const refreshHijriDate = useCallback(async () => {
     try {
       logger.info("Fetching Hijri date from API");
       // Set a temporary loading state immediately
@@ -384,10 +384,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       localStorage.removeItem("hijriDateTimestamp");
       logger.info("Cleared cached Hijri date to ensure fresh calculation");
 
-      // Use our Electron-safe function to get the Hijri date
-      logger.info("Using accurate method to calculate Hijri date");
-
-      const hijriDateStr = await fetchHijriDateElectronSafe();
+      const hijriDateStr = await fetchHijriDate();
 
       // Cache the result in localStorage
       localStorage.setItem("hijriDate", hijriDateStr);
@@ -419,7 +416,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
       // Schedule a retry in 60 seconds
       setTimeout(() => {
-        fetchHijriDate();
+        refreshHijriDate();
       }, 60000);
     }
   }, []);
@@ -450,9 +447,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       setIsJumuahToday(now.day() === 5);
 
       // Refresh Hijri date
-      fetchHijriDate();
+      refreshHijriDate();
     }
-  }, [refreshPrayerTimesHandler, fetchHijriDate]);
+  }, [refreshPrayerTimesHandler, refreshHijriDate]);
 
   // Helper function to determine current prayer - memoized
   const calculateCurrentPrayer = useCallback(
@@ -910,7 +907,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         initializedRef.current = true;
 
         // Always fetch Hijri date on initial load, don't wait for prayerTimes
-        fetchHijriDate();
+        refreshHijriDate();
 
         // Process prayer times if available
         if (prayerTimes) {
@@ -927,7 +924,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           const now = new Date();
           if (now.getMinutes() === 0) {
             // Update at the top of each hour
-            fetchHijriDate();
+            refreshHijriDate();
           }
         } catch (error) {
           logger.error("Error in timer update", { error });

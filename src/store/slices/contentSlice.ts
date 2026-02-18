@@ -266,7 +266,7 @@ export const refreshContent = createAsyncThunk(
       const now = Date.now();
       const lastCall = debounceMap.get(debounceKey) || 0;
 
-      // Aggressive debouncing to prevent rapid firing (especially in Electron)
+      // Aggressive debouncing to prevent rapid firing
       if (!forceRefresh && now - lastCall < MIN_REFRESH_INTERVAL) {
         logger.debug("[Content] Debouncing refresh call - too recent", {
           lastCall: new Date(lastCall).toISOString(),

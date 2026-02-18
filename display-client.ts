@@ -1,10 +1,8 @@
 /**
  * Display App WebSocket Client
  *
- * This is a reference implementation for the Electron display app's
- * WebSocket connection to the realtime server.
- *
- * Copy this file to the Electron display app and adapt as needed.
+ * Reference implementation for the display app's WebSocket connection
+ * to the realtime server.
  *
  * Usage:
  *   import { RealtimeClient } from './display-client';

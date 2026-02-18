@@ -2,7 +2,6 @@
  * Storage Service
  *
  * Persistent key-value storage using LocalForage (IndexedDB with localStorage fallback).
- * Replaces the previous multi-layer Electron Store -> LocalForage -> localStorage approach.
  */
 
 import localforage from 'localforage';
