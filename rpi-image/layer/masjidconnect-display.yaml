@@ -21,8 +21,9 @@ mmdebstrap:
     # Install Node.js 20 from NodeSource (build host needs network)
     - |
       chroot $1 /bin/bash -c 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs' || true
-    # Extract app archive to /opt/masjidconnect (path relative to -S or absolute). Single line to avoid newline-in-path issues in mmdebstrap.
-    - ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"; [ -z "$ARCHIVE" ] && { echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"; exit 1; }; [ ! -f "$ARCHIVE" ] && { echo "MasjidConnect app archive not found: $ARCHIVE"; exit 1; }; mkdir -p "$1/opt/masjidconnect"; cp "$ARCHIVE" "$1/tmp/masjidconnect-app.tar.gz"; chroot "$1" /bin/bash -c "tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect && rm /tmp/masjidconnect-app.tar.gz"
+    # Extract app archive to /opt/masjidconnect (path relative to -S or absolute). One line so YAML does not parse colons as map; use |- so it stays a string.
+    - |
+      ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"; [ -z "$ARCHIVE" ] && { echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"; exit 1; }; [ ! -f "$ARCHIVE" ] && { echo "MasjidConnect app archive not found: $ARCHIVE"; exit 1; }; mkdir -p "$1/opt/masjidconnect"; cp "$ARCHIVE" "$1/tmp/masjidconnect-app.tar.gz"; chroot "$1" /bin/bash -c "tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect && rm /tmp/masjidconnect-app.tar.gz"
     # Ownership (pi user is typically 1000:1000)
     - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
     # Install display server systemd unit
