@@ -5,7 +5,13 @@
  * header, and footer using either landscape or portrait layout depending on
  * the screen's configured orientation.
  *
- * Data is sourced from Redux (contentSlice) and hooks (usePrayerTimes).
+ * During Ramadan mode (auto-detected from the Hijri calendar), the display:
+ *  - Swaps the background pattern to a crescent/star motif
+ *  - Inserts an IftarCountdown hero element during fasting hours
+ *  - Passes Ramadan props to Header (day badge) and PrayerTimesPanel (labels)
+ *  - Applies the green/gold theme via useRamadanMode's CSS side effect
+ *
+ * Data is sourced from Redux (contentSlice) and hooks.
  */
 
 import React, { useMemo } from 'react';
@@ -20,8 +26,11 @@ import {
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
+  RamadanPattern,
+  RamadanCountdownBar,
 } from '../display';
 
+import useRamadanMode from '../../hooks/useRamadanMode';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -84,22 +93,52 @@ const DisplayScreen: React.FC = () => {
 
   const carouselItems = useMemo(() => buildCarouselItems(screenContent), [screenContent]);
 
-  const headerSlot = <Header masjidName={masjidName} />;
+  /* ---- Ramadan mode (auto-detected from Hijri calendar) ---- */
+  const ramadan = useRamadanMode();
+  const isPortrait = orientation === 'PORTRAIT';
+
+  /* ---- Compose slots ---- */
+  const headerSlot = (
+    <Header
+      masjidName={masjidName}
+      isRamadan={ramadan.isRamadan}
+      ramadanDay={ramadan.ramadanDay}
+    />
+  );
+
   const footerSlot = <Footer />;
-  const prayerPanel = <PrayerTimesPanel />;
+  const prayerPanel = <PrayerTimesPanel isRamadan={ramadan.isRamadan} />;
   const countdown = <PrayerCountdown />;
   const carousel = <ContentCarousel items={carouselItems} interval={carouselInterval} />;
-  const bg = <IslamicPattern />;
+
+  /* Background: crescent pattern during Ramadan, geometric otherwise */
+  const bg = ramadan.isRamadan ? <RamadanPattern /> : <IslamicPattern />;
+
+  /**
+   * Countdown slot: during Ramadan, use the unified RamadanCountdownBar
+   * which merges Suhoor/Iftar + Next Prayer into a single compact card.
+   * Outside Ramadan, use the standard PrayerCountdown.
+   */
+  const countdownSlot = ramadan.isRamadan ? (
+    <RamadanCountdownBar
+      iftarTime={ramadan.iftarTime}
+      suhoorEndTime={ramadan.suhoorEndTime}
+      isFastingHours={ramadan.isFastingHours}
+      compact={isPortrait}
+    />
+  ) : (
+    countdown
+  );
 
   return (
     <OrientationWrapper orientation={orientation}>
-      {orientation === 'PORTRAIT' ? (
+      {isPortrait ? (
         <PortraitLayout
           header={headerSlot}
           prayerSection={
             <div className="flex flex-col gap-3 h-full">
               {prayerPanel}
-              {countdown}
+              {countdownSlot}
             </div>
           }
           content={carousel}
@@ -113,7 +152,7 @@ const DisplayScreen: React.FC = () => {
           sidebar={
             <>
               {prayerPanel}
-              {countdown}
+              {countdownSlot}
             </>
           }
           footer={footerSlot}

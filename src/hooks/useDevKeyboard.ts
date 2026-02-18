@@ -14,6 +14,7 @@
  *   Ctrl + Shift + 6  — PURPLE alert             (15 s)
  *   Ctrl + Shift + 7  — DARK alert               (15 s)
  *   Ctrl + Shift + 0  — Clear current alert
+ *   Ctrl + Shift + R  — Toggle Ramadan mode
  *   Escape            — Clear current alert
  */
 
@@ -23,6 +24,7 @@ import {
   createTestAlert,
   clearCurrentAlert,
 } from '../store/slices/emergencySlice';
+import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import logger from '../utils/logger';
 
 /**
@@ -44,6 +46,31 @@ const ALERT_MAP: Record<string, string> = {
 const CLEAR_KEYS = new Set(['0', ')']);
 
 const TEST_ALERT_DURATION = 15; // seconds
+
+/**
+ * Cycle the Ramadan mode dev override flag on `window`.
+ * Three states:  force ON → force OFF → auto-detect → force ON …
+ *
+ * Dispatches a custom event so `useRamadanMode` can react via
+ * useState (the window property alone is not reactive to React).
+ */
+function toggleRamadanForce(): void {
+  if (window.__RAMADAN_FORCE === true) {
+    // ON → OFF
+    window.__RAMADAN_FORCE = false;
+    logger.info('[DevKeyboard] Ramadan mode force OFF');
+  } else if (window.__RAMADAN_FORCE === false) {
+    // OFF → auto-detect
+    window.__RAMADAN_FORCE = undefined;
+    logger.info('[DevKeyboard] Ramadan mode auto-detect');
+  } else {
+    // auto-detect (undefined) → ON
+    window.__RAMADAN_FORCE = true;
+    logger.info('[DevKeyboard] Ramadan mode force ON');
+  }
+  // Notify useRamadanMode so it picks up the new value via setState
+  window.dispatchEvent(new Event(RAMADAN_FORCE_EVENT));
+}
 
 const useDevKeyboard = (): void => {
   const dispatch = useDispatch();
@@ -67,12 +94,20 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+6': 'PURPLE alert (15 s)',
       'Ctrl+Shift+7': 'DARK alert (15 s)',
       'Ctrl+Shift+0': 'Clear current alert',
+      'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
       'Escape': 'Clear current alert',
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl + Shift + digit → trigger / clear alert
+      // Ctrl + Shift + key → special actions
       if (e.ctrlKey && e.shiftKey && !e.metaKey) {
+        // Ramadan mode toggle (R or r)
+        if (e.key === 'R' || e.key === 'r') {
+          e.preventDefault();
+          toggleRamadanForce();
+          return;
+        }
+
         const alertType = ALERT_MAP[e.key];
 
         if (alertType) {

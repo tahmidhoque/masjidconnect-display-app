@@ -428,3 +428,75 @@ html, body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* ============================================================
+   Ramadan Mode Theme
+   ============================================================
+   When [data-theme="ramadan"] is set on <html>, override
+   the design tokens with a green-and-gold palette. All Tailwind
+   utilities (bg-midnight, text-emerald, text-gold, etc.)
+   automatically resolve to the Ramadan values.
+   ============================================================ */
+[data-theme="ramadan"] {
+  /* Primary palette → deep forest green */
+  --color-midnight: #0D3B2E;
+  --color-midnight-light: #1B5E3A;
+  --color-midnight-dark: #0A2A1E;
+
+  /* Secondary palette → warm gold (was teal) */
+  --color-emerald: #D4A84A;
+  --color-emerald-light: #E9C46A;
+  --color-emerald-dark: #B8922F;
+
+  /* Accent palette → lighter gold highlights */
+  --color-gold: #F0D48A;
+  --color-gold-light: #F5E0A8;
+  --color-gold-dark: #E9C46A;
+
+  /* Slightly dimmer surface for green bg contrast */
+  --color-surface: rgba(255, 255, 255, 0.06);
+  --color-surface-hover: rgba(255, 255, 255, 0.10);
+  --color-surface-active: rgba(255, 255, 255, 0.14);
+}
+
+/* Override hardcoded rgba(10,38,71,...) backgrounds used in
+   .card-elevated, .panel, and .alert-card with green equivalents */
+[data-theme="ramadan"] .card-elevated {
+  background: rgba(13, 59, 46, 0.85);
+}
+
+[data-theme="ramadan"] .panel {
+  background: rgba(13, 59, 46, 0.6);
+}
+
+[data-theme="ramadan"] .alert-card {
+  background: rgba(13, 59, 46, 0.85);
+}
+
+/* Alert overlay backgrounds → green-tinted */
+[data-theme="ramadan"] .alert-bg-red,
+[data-theme="ramadan"] .alert-bg-orange,
+[data-theme="ramadan"] .alert-bg-amber,
+[data-theme="ramadan"] .alert-bg-blue,
+[data-theme="ramadan"] .alert-bg-green,
+[data-theme="ramadan"] .alert-bg-purple,
+[data-theme="ramadan"] .alert-bg-dark {
+  background: #0a2a1e;
+}
+
+/* Badge overrides — use Ramadan gold tints */
+[data-theme="ramadan"] .badge-emerald {
+  background: rgba(212, 168, 74, 0.2);
+  color: var(--color-emerald-light);
+  border-color: rgba(212, 168, 74, 0.3);
+}
+
+/* Iftar countdown glow animation (Ramadan-only) */
+@keyframes iftarGlow {
+  0%, 100% { box-shadow: 0 0 30px rgba(212, 168, 74, 0.15); }
+  50%      { box-shadow: 0 0 50px rgba(212, 168, 74, 0.3); }
+}
+
+.iftar-countdown-card {
+  animation: iftarGlow 4s ease-in-out infinite;
+}

@@ -4,14 +4,29 @@
  * Displays today's prayer times in a vertical list.
  * Highlights the current/next prayer. Uses the usePrayerTimes hook.
  *
+ * During Ramadan mode, shows contextual labels:
+ *  - "Suhoor ends" next to Fajr
+ *  - "Iftar" next to Maghrib
+ *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
 
 import React from 'react';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 
-const PrayerTimesPanel: React.FC = () => {
-  const { todaysPrayerTimes, nextPrayer, currentPrayer } = usePrayerTimes();
+/** Ramadan-specific labels mapped to prayer names */
+const RAMADAN_LABELS: Record<string, string> = {
+  Fajr: 'Suhoor ends',
+  Maghrib: 'Iftar',
+};
+
+interface PrayerTimesPanelProps {
+  /** Whether Ramadan mode is active — shows Suhoor/Iftar annotations */
+  isRamadan?: boolean;
+}
+
+const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({ isRamadan = false }) => {
+  const { todaysPrayerTimes } = usePrayerTimes();
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
@@ -29,6 +44,7 @@ const PrayerTimesPanel: React.FC = () => {
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
           const isCurrent = prayer.isCurrent;
+          const ramadanLabel = isRamadan ? RAMADAN_LABELS[prayer.name] : undefined;
 
           return (
             <div
@@ -52,6 +68,13 @@ const PrayerTimesPanel: React.FC = () => {
                 <span className={`text-body font-medium ${isNext ? 'text-emerald-light' : isCurrent ? 'text-gold' : 'text-text-primary'}`}>
                   {prayer.name}
                 </span>
+
+                {/* Ramadan contextual label (e.g. "Suhoor ends", "Iftar") */}
+                {ramadanLabel && (
+                  <span className="text-xs text-gold/60 font-normal italic">
+                    {ramadanLabel}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-4">

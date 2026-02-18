@@ -3,8 +3,10 @@
  *
  * Displays the current date/time, Hijri date, and masjid name.
  * Features a subtle semi-transparent panel with a gold accent line
- * and a gold gradient on the masjid name — matching the original
- * ModernHeader design, but rendered with Tailwind (no MUI).
+ * and a gold gradient on the masjid name.
+ *
+ * During Ramadan mode, the Hijri date line is replaced with a
+ * "Ramadan Mubarak — Day X" badge to reinforce the seasonal context.
  */
 
 import React, { useMemo } from 'react';
@@ -14,6 +16,10 @@ import logoGold from '../../assets/logos/logo-gold.svg';
 
 interface HeaderProps {
   masjidName?: string | null;
+  /** Whether Ramadan mode is active */
+  isRamadan?: boolean;
+  /** Current day of Ramadan (1-30) */
+  ramadanDay?: number | null;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -22,7 +28,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const Header: React.FC<HeaderProps> = ({ masjidName }) => {
+const Header: React.FC<HeaderProps> = ({ masjidName, isRamadan = false, ramadanDay = null }) => {
   const currentTime = useCurrentTime();
 
   const hours = currentTime.getHours();
@@ -36,6 +42,14 @@ const Header: React.FC<HeaderProps> = ({ masjidName }) => {
   // Recalculate Hijri date once per calendar day
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hijriDate = useMemo(() => calculateApproximateHijriDate(), [currentTime.getDate()]);
+
+  /** Subtitle line: Ramadan badge or standard Hijri date */
+  const subtitleContent = useMemo(() => {
+    if (isRamadan && ramadanDay != null) {
+      return `Ramadan Mubarak — Day ${ramadanDay}`;
+    }
+    return hijriDate;
+  }, [isRamadan, ramadanDay, hijriDate]);
 
   return (
     <div
@@ -54,7 +68,7 @@ const Header: React.FC<HeaderProps> = ({ masjidName }) => {
         }}
       />
 
-      {/* Left — Logo + Masjid name + Hijri date */}
+      {/* Left — Logo + Masjid name + Hijri/Ramadan subtitle */}
       <div className="flex items-center gap-3 min-w-0">
         <img
           src={logoGold}
@@ -75,7 +89,13 @@ const Header: React.FC<HeaderProps> = ({ masjidName }) => {
               {masjidName}
             </h1>
           )}
-          <p className="text-xs text-text-muted truncate">{hijriDate}</p>
+          <p
+            className={`text-xs truncate ${
+              isRamadan ? 'text-gold/70 font-medium' : 'text-text-muted'
+            }`}
+          >
+            {subtitleContent}
+          </p>
         </div>
       </div>
 
