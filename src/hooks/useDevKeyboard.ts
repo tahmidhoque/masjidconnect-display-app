@@ -15,6 +15,7 @@
  *   Ctrl + Shift + 7  — DARK alert               (15 s)
  *   Ctrl + Shift + 0  — Clear current alert
  *   Ctrl + Shift + R  — Toggle Ramadan mode
+ *   Ctrl + Shift + J  — Cycle prayer phase (jamaat-soon → in-prayer → auto)
  *   Escape            — Clear current alert
  */
 
@@ -25,6 +26,8 @@ import {
   clearCurrentAlert,
 } from '../store/slices/emergencySlice';
 import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
+import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
+import type { PrayerPhase } from './usePrayerPhase';
 import logger from '../utils/logger';
 
 /**
@@ -72,6 +75,32 @@ function toggleRamadanForce(): void {
   window.dispatchEvent(new Event(RAMADAN_FORCE_EVENT));
 }
 
+/**
+ * Cycle the prayer phase dev override flag on `window`.
+ * Three states: jamaat-soon → in-prayer → auto-detect → jamaat-soon …
+ *
+ * Dispatches a custom event so `usePrayerPhase` can react via
+ * useState (the window property alone is not reactive to React).
+ */
+const PRAYER_PHASE_CYCLE: (PrayerPhase | undefined)[] = [
+  'jamaat-soon',
+  'in-prayer',
+  undefined,
+];
+
+function togglePrayerPhaseForce(): void {
+  const current = window.__PRAYER_PHASE_FORCE;
+  const currentIdx = PRAYER_PHASE_CYCLE.indexOf(current);
+  const nextIdx = (currentIdx + 1) % PRAYER_PHASE_CYCLE.length;
+  const nextPhase = PRAYER_PHASE_CYCLE[nextIdx];
+
+  window.__PRAYER_PHASE_FORCE = nextPhase;
+  const label = nextPhase ?? 'auto-detect';
+  logger.info(`[DevKeyboard] Prayer phase force: ${label}`);
+
+  window.dispatchEvent(new Event(PRAYER_PHASE_FORCE_EVENT));
+}
+
 const useDevKeyboard = (): void => {
   const dispatch = useDispatch();
 
@@ -95,6 +124,7 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+7': 'DARK alert (15 s)',
       'Ctrl+Shift+0': 'Clear current alert',
       'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
+      'Ctrl+Shift+J': 'Cycle prayer phase (jamaat-soon → in-prayer → auto)',
       'Escape': 'Clear current alert',
     });
 
@@ -105,6 +135,13 @@ const useDevKeyboard = (): void => {
         if (e.key === 'R' || e.key === 'r') {
           e.preventDefault();
           toggleRamadanForce();
+          return;
+        }
+
+        // Prayer phase toggle (J or j)
+        if (e.key === 'J' || e.key === 'j') {
+          e.preventDefault();
+          togglePrayerPhaseForce();
           return;
         }
 

@@ -5,6 +5,11 @@
  * header, and footer using either landscape or portrait layout depending on
  * the screen's configured orientation.
  *
+ * Prayer phase awareness:
+ *  - `countdown-adhan` / `countdown-jamaat` — normal carousel
+ *  - `jamaat-soon` — replaces carousel with phones-off graphic
+ *  - `in-prayer` — replaces carousel with calm "Jamaat in progress" screen
+ *
  * During Ramadan mode (auto-detected from the Hijri calendar), the display:
  *  - Swaps the background pattern to a crescent/star motif
  *  - Inserts an IftarCountdown hero element during fasting hours
@@ -28,9 +33,12 @@ import {
   IslamicPattern,
   RamadanPattern,
   RamadanCountdownBar,
+  SilentPhonesGraphic,
+  InPrayerScreen,
 } from '../display';
 
 import useRamadanMode from '../../hooks/useRamadanMode';
+import usePrayerPhase from '../../hooks/usePrayerPhase';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -97,6 +105,9 @@ const DisplayScreen: React.FC = () => {
   const ramadan = useRamadanMode();
   const isPortrait = orientation === 'PORTRAIT';
 
+  /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
+  const { phase: prayerPhase, prayerName: phasePrayerName } = usePrayerPhase();
+
   /* ---- Compose slots ---- */
   const headerSlot = (
     <Header
@@ -108,8 +119,24 @@ const DisplayScreen: React.FC = () => {
 
   const footerSlot = <Footer />;
   const prayerPanel = <PrayerTimesPanel isRamadan={ramadan.isRamadan} />;
-  const countdown = <PrayerCountdown />;
-  const carousel = <ContentCarousel items={carouselItems} interval={carouselInterval} />;
+  const countdown = <PrayerCountdown phase={prayerPhase} />;
+
+  /**
+   * Content slot: swapped based on the current prayer phase.
+   *   jamaat-soon — phones-off prohibition graphic
+   *   in-prayer   — calm "Jamaat in progress" screen
+   *   otherwise   — normal content carousel
+   */
+  const contentSlot = useMemo(() => {
+    switch (prayerPhase) {
+      case 'jamaat-soon':
+        return <SilentPhonesGraphic />;
+      case 'in-prayer':
+        return <InPrayerScreen prayerName={phasePrayerName} />;
+      default:
+        return <ContentCarousel items={carouselItems} interval={carouselInterval} />;
+    }
+  }, [prayerPhase, phasePrayerName, carouselItems, carouselInterval]);
 
   /* Background: crescent pattern during Ramadan, geometric otherwise */
   const bg = ramadan.isRamadan ? <RamadanPattern /> : <IslamicPattern />;
@@ -141,14 +168,14 @@ const DisplayScreen: React.FC = () => {
               {countdownSlot}
             </div>
           }
-          content={carousel}
+          content={contentSlot}
           footer={footerSlot}
           background={bg}
         />
       ) : (
         <LandscapeLayout
           header={headerSlot}
-          content={carousel}
+          content={contentSlot}
           sidebar={
             <>
               {prayerPanel}

@@ -1,7 +1,10 @@
 /**
  * PrayerCountdown
  *
- * Shows a live countdown to the next prayer.
+ * Shows a live countdown to the next prayer or jamaat, with phase-aware
+ * labels. During `in-prayer` phase, displays a calm "Jamaat in progress"
+ * message instead of the countdown digits.
+ *
  * Computes the remaining time every second using useCurrentTime,
  * rather than relying on the static timeUntil from usePrayerTimes.
  * GPU-safe: uses transform/opacity only for animation.
@@ -11,8 +14,31 @@ import React, { useMemo } from 'react';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer } from '../../utils/dateUtils';
+import type { PrayerPhase } from '../../hooks/usePrayerPhase';
 
-const PrayerCountdown: React.FC = () => {
+interface PrayerCountdownProps {
+  /** Current prayer phase — controls labels and in-prayer display */
+  phase?: PrayerPhase;
+}
+
+/**
+ * Map a prayer phase to its top label text.
+ */
+function phaseLabel(phase: PrayerPhase | undefined): string {
+  switch (phase) {
+    case 'countdown-jamaat':
+      return 'Jamaat in';
+    case 'jamaat-soon':
+      return 'Jamaat starts in';
+    case 'in-prayer':
+      return 'In Progress';
+    case 'countdown-adhan':
+    default:
+      return 'Next Prayer';
+  }
+}
+
+const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   const { nextPrayer } = usePrayerTimes();
   const currentTime = useCurrentTime();
 
@@ -56,19 +82,37 @@ const PrayerCountdown: React.FC = () => {
     return null;
   }
 
+  /* ---- In-prayer: calm static display, no ticking countdown ---- */
+  if (phase === 'in-prayer') {
+    return (
+      <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
+        <p className="text-caption text-text-muted uppercase tracking-wider">
+          {phaseLabel(phase)}
+        </p>
+        <h3 className="text-heading text-gold font-bold">{nextPrayer.name}</h3>
+        <p className="text-body text-text-muted">
+          Jamaat in progress
+        </p>
+      </div>
+    );
+  }
+
+  /* ---- Normal / jamaat countdown display ---- */
   return (
     <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
-      <p className="text-caption text-text-muted uppercase tracking-wider">Next Prayer</p>
+      <p className="text-caption text-text-muted uppercase tracking-wider">
+        {phaseLabel(phase)}
+      </p>
       <h3 className="text-heading text-emerald-light font-bold">{nextPrayer.name}</h3>
 
       {liveCountdown && (
-        <p className="text-subheading text-gold tabular-nums font-semibold">
+        <p className="text-subheading text-gold countdown-stable font-semibold">
           {liveCountdown}
         </p>
       )}
 
       {nextPrayer.displayTime && (
-        <p className="text-caption text-text-secondary tabular-nums">{nextPrayer.displayTime}</p>
+        <p className="text-caption text-text-secondary countdown-stable">{nextPrayer.displayTime}</p>
       )}
     </div>
   );

@@ -209,6 +209,17 @@ html, body {
   animation: countdownTick 1s ease-in-out;
 }
 
+/* Stable-width countdown text — prevents layout shift as digits change.
+   Uses tabular-nums so every digit occupies the same width, plus a
+   min-width in `ch` units sized for the widest common format (XXm XXs). */
+.countdown-stable {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  display: inline-block;
+  min-width: 8ch;
+  text-align: center;
+}
+
 /* Shimmer loading placeholder */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }

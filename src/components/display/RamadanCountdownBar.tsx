@@ -150,7 +150,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
         {/* Countdown */}
         <p
           className={`
-            text-gold font-bold tabular-nums
+            text-gold font-bold countdown-stable
             ${compact ? 'text-heading' : 'text-display'}
           `}
         >
@@ -159,7 +159,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
 
         {/* Time */}
         {nextPrayer.displayTime && (
-          <p className="text-caption text-text-secondary tabular-nums">
+          <p className="text-caption text-text-secondary countdown-stable">
             {nextPrayer.displayTime}
           </p>
         )}
@@ -195,14 +195,14 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
             <>
               <h3
                 className={`
-                  text-gold font-bold tabular-nums
+                  text-gold font-bold countdown-stable
                   ${compact ? 'text-subheading' : 'text-heading'}
                 `}
               >
                 {ramadanCountdown}
               </h3>
               {ramadanDisplayTime && (
-                <p className="text-caption text-text-secondary tabular-nums">
+                <p className="text-caption text-text-secondary countdown-stable">
                   {ramadanPrayerName} &middot; {ramadanDisplayTime}
                 </p>
               )}
@@ -212,7 +212,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
             displaySuhoorTime && (
               <p
                 className={`
-                  text-gold font-semibold tabular-nums
+                  text-gold font-semibold countdown-stable
                   ${compact ? 'text-body' : 'text-subheading'}
                 `}
               >
@@ -245,7 +245,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           {nextPrayerCountdown && (
             <p
               className={`
-                text-gold font-semibold tabular-nums
+                text-gold font-semibold countdown-stable
                 ${compact ? 'text-subheading' : 'text-heading'}
               `}
             >
@@ -254,7 +254,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           )}
 
           {nextPrayer.displayTime && (
-            <p className="text-caption text-text-secondary tabular-nums">
+            <p className="text-caption text-text-secondary countdown-stable">
               {nextPrayer.displayTime}
             </p>
           )}

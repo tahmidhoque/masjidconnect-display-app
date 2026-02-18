@@ -7,3 +7,5 @@ export { default as IslamicPattern } from './IslamicPattern';
 export { default as RamadanPattern } from './RamadanPattern';
 export { default as IftarCountdown } from './IftarCountdown';
 export { default as RamadanCountdownBar } from './RamadanCountdownBar';
+export { default as SilentPhonesGraphic } from './SilentPhonesGraphic';
+export { default as InPrayerScreen } from './InPrayerScreen';

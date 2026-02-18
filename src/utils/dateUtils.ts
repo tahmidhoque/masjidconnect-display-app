@@ -251,13 +251,13 @@ export const getTimeUntilNextPrayer = (
     const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
     const diffSecondsRemainder = diffSeconds % 60;
 
-    // Always include seconds so the countdown visibly ticks on the display
+    // Always include seconds so the countdown visibly ticks on the display.
+    // Minutes are always shown (even when 0) to prevent layout width jumps.
+    // All digit groups are zero-padded for stable tabular-nums rendering.
     if (diffHours > 0) {
       return `${diffHours}h ${String(diffMinutes).padStart(2, '0')}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
-    } else if (diffMinutes > 0) {
-      return `${diffMinutes}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
     } else {
-      return `${diffSecondsRemainder}s`;
+      return `${String(diffMinutes).padStart(2, '0')}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
     }
   } catch (error) {
     console.error(
