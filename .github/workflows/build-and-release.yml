@@ -126,6 +126,22 @@ jobs:
             sudo update-binfmts --enable qemu-aarch64 || true
           fi
 
+      # Cross-arch build: mmdebstrap's chroot has no Debian keyring; pre-populate keydir so apt can verify repos.
+      - name: Pre-populate Debian keyring for arm64 chroot
+        run: |
+          mkdir -p ../rpi-image-gen/work/keys
+          # Install keyring on host (Ubuntu has it) and copy into keydir for the build
+          sudo apt-get update -qq && sudo apt-get install -y debian-archive-keyring
+          if [ -f /usr/share/keyrings/debian-archive-keyring.gpg ]; then
+            sudo cp /usr/share/keyrings/debian-archive-keyring.gpg ../rpi-image-gen/work/keys/
+          fi
+          # If not available from host, fetch Bookworm keys via GPG and export
+          if [ ! -f ../rpi-image-gen/work/keys/debian-archive-keyring.gpg ]; then
+            gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131 78DBA3BC47EF2265 F8D2585B8783D481 54404762BBB6E853 BDE6D2B9216EC7A8
+            gpg --batch --export 6ED0E7B82643E131 78DBA3BC47EF2265 F8D2585B8783D481 54404762BBB6E853 BDE6D2B9216EC7A8 > ../rpi-image-gen/work/keys/debian-archive-keyring.gpg
+          fi
+          ls -la ../rpi-image-gen/work/keys/
+
       - name: Build RPi image
         run: |
           cd ../rpi-image-gen
