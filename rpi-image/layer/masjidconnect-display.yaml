@@ -28,6 +28,6 @@ mmdebstrap:
     - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
     # Install display server systemd unit
     - cp $1/opt/masjidconnect/deploy/masjidconnect-display.service $1/etc/systemd/system/
-    # Install cage-based kiosk unit (no X11 required)
-    - env KIOSK_USER="$IGconf_device_user1" envsubst '${KIOSK_USER}' < kiosk-cage.service.tpl > $1/etc/systemd/system/masjidconnect-kiosk.service
+    # Install cage-based kiosk unit (no X11 required). SRCROOT is set by rpi-image-gen to our layer source dir.
+    - env KIOSK_USER="$IGconf_device_user1" envsubst '${KIOSK_USER}' < "${SRCROOT}/layer/kiosk-cage.service.tpl" > "$1/etc/systemd/system/masjidconnect-kiosk.service"
     - $BDEBSTRAP_HOOKS/enable-units "$1" masjidconnect-display masjidconnect-kiosk
