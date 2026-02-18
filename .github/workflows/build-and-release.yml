@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - overhaul/vite-tailwind-chromium
     tags:
       - "v*"
   workflow_dispatch:
