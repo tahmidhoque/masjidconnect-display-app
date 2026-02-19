@@ -15,7 +15,8 @@
 set -euo pipefail
 
 APP_DIR="/opt/masjidconnect"
-SERVICE_USER="pi"
+# Use the user who ran sudo (e.g. mcadmin); fall back to pi for classic Raspberry Pi OS
+SERVICE_USER="${SUDO_USER:-pi}"
 
 echo "============================================"
 echo "  MasjidConnect Display — Installer"
@@ -56,6 +57,12 @@ if ! command -v unclutter &>/dev/null; then
   apt-get install -y unclutter
 fi
 
+# Ensure SERVICE_USER exists
+if ! getent passwd "${SERVICE_USER}" >/dev/null 2>&1; then
+  echo "ERROR: User '${SERVICE_USER}' not found. Create it or run as: sudo -u <your-username> -- bash -c './deploy/install.sh'"
+  exit 1
+fi
+
 # Create app directory
 echo "Setting up ${APP_DIR}..."
 mkdir -p "${APP_DIR}"
@@ -73,10 +80,15 @@ chmod +x "${APP_DIR}/deploy/server.mjs"
 # Set ownership
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}"
 
-# Install systemd services
-echo "Installing systemd services..."
-cp deploy/masjidconnect-display.service /etc/systemd/system/
-cp deploy/masjidconnect-kiosk.service /etc/systemd/system/
+# Install systemd services (substitute SERVICE_USER into unit files)
+echo "Installing systemd services (running as ${SERVICE_USER})..."
+sed -e "s/^User=.*/User=${SERVICE_USER}/" \
+    -e "s/^Group=.*/Group=${SERVICE_USER}/" \
+    deploy/masjidconnect-display.service > /etc/systemd/system/masjidconnect-display.service
+sed -e "s/^User=.*/User=${SERVICE_USER}/" \
+    -e "s/^Group=.*/Group=${SERVICE_USER}/" \
+    -e "s|/home/pi/|/home/${SERVICE_USER}/|g" \
+    deploy/masjidconnect-kiosk.service > /etc/systemd/system/masjidconnect-kiosk.service
 systemctl daemon-reload
 
 # Enable services
