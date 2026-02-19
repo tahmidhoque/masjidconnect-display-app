@@ -23,6 +23,8 @@ export interface CarouselItem {
   arabicBody?: string;
   source?: string;
   imageUrl?: string;
+  /** Display duration in seconds for this slide (overrides default interval when set) */
+  duration?: number;
 }
 
 interface ContentCarouselProps {
@@ -70,16 +72,22 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
     }, 700); // matches --duration-crossfade
   }, [safeItems.length]);
 
-  /** Auto-advance timer */
+  /** Per-item auto-advance: use current slide's duration (from API) or default interval */
   useEffect(() => {
     if (safeItems.length <= 1) return;
 
-    const id = setInterval(advance, interval * 1000);
+    const item = safeItems[activeIdx];
+    const seconds = item?.duration != null && item.duration > 0
+      ? Math.max(5, Math.min(300, Number(item.duration)))
+      : interval;
+    const ms = seconds * 1000;
+
+    const id = setTimeout(advance, ms);
     return () => {
-      clearInterval(id);
+      clearTimeout(id);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [advance, interval, safeItems.length]);
+  }, [activeIdx, advance, interval, safeItems, safeItems.length]);
 
   /** Reset index if items change */
   useEffect(() => {
@@ -160,6 +168,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
           >
             {/* Type badge */}
             <span className="badge badge-emerald self-start">{getContentTypeLabel(item.type)}</span>
+
+            {/* Image — constrained so it doesn't overflow; same scale applies */}
+            {item.imageUrl && (
+              <div className="flex justify-center min-h-0 max-h-[40vh] w-full">
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                />
+              </div>
+            )}
 
             {/* Title */}
             {item.title && (

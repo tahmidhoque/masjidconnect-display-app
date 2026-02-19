@@ -43,51 +43,153 @@ import usePrayerPhase from '../../hooks/usePrayerPhase';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
- * Extract carousel items from the Redux screenContent.
- * Handles both array and object formats (see cursor rules §4).
+ * Map a single schedule item (normalized or raw) to a CarouselItem.
+ * Normalized items have type, title, content (with body/description/arabicText/source/imageUrl).
+ * Raw items may have contentItem wrapper — we read from both top-level and contentItem.
+ * Supports common API shapes: body, description, message, text, and string content.
  */
-function buildCarouselItems(screenContent: any): CarouselItem[] {
-  if (!screenContent) return [];
+function scheduleItemToCarouselItem(item: any, index: number): CarouselItem {
+  const content = item.content ?? item.contentItem?.content ?? {};
+  const title =
+    item.title ??
+    item.contentItem?.title ??
+    content.title ??
+    'No Title';
+  const type = item.type ?? item.contentItem?.type ?? 'Content';
 
+  // Body: try all common API field names (announcements often use message or text)
+  const body =
+    (typeof content === 'string' ? content : null) ??
+    content.body ??
+    content.description ??
+    content.message ??
+    content.text ??
+    content.translation ??
+    content.shortDescription ??
+    (item as any).body ??
+    (item as any).description ??
+    (item as any).message ??
+    (item.contentItem && typeof item.contentItem === 'object'
+      ? (item.contentItem as any).body ?? (item.contentItem as any).message ?? (item.contentItem as any).description
+      : undefined);
+
+  // Image: try common field names
+  const imageUrl =
+    content.imageUrl ??
+    content.bannerUrl ??
+    content.image ??
+    content.thumbnailUrl ??
+    content.displayThumbnail ??
+    (item as any).imageUrl ??
+    (item as any).bannerUrl;
+
+  // Duration: per-item display time in seconds (API/contentItem use seconds, e.g. 20, 30)
+  const rawDuration = item.duration ?? item.contentItem?.duration ?? content.duration;
+  const duration =
+    typeof rawDuration === 'number' && rawDuration > 0
+      ? rawDuration <= 300
+        ? rawDuration
+        : rawDuration / 1000
+      : undefined;
+
+  return {
+    id: item.id ?? `sched-${index}`,
+    type: typeof type === 'string' ? type : 'Content',
+    title: typeof title === 'string' ? title : undefined,
+    body: typeof body === 'string' ? body : undefined,
+    arabicBody: content.arabicText ?? content.arabic,
+    source: content.source ?? content.reference,
+    imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
+    duration: duration,
+  };
+}
+
+/**
+ * Map a single event (from events array) to a CarouselItem.
+ */
+function eventToCarouselItem(evt: any, index: number): CarouselItem {
+  const desc =
+    evt.description ??
+    evt.shortDescription ??
+    (evt.content && (typeof evt.content === 'object'
+      ? evt.content.description ?? evt.content.shortDescription
+      : undefined));
+  const imageUrl =
+    evt.displayThumbnail ??
+    evt.bannerImageUrl ??
+    evt.thumbnailImageUrl ??
+    (evt.content && typeof evt.content === 'object'
+      ? evt.content.imageUrl ?? evt.content.bannerUrl
+      : undefined);
+  // Duration: display time in seconds (API may send displayDuration or duration)
+  const rawDuration = evt.displayDuration ?? evt.duration ?? (evt.content && typeof evt.content === 'object' ? (evt.content as any).duration : undefined);
+  const duration =
+    typeof rawDuration === 'number' && rawDuration > 0
+      ? rawDuration <= 300
+        ? rawDuration
+        : rawDuration / 1000
+      : undefined;
+
+  return {
+    id: evt.id ?? `evt-${index}`,
+    type: 'Event',
+    title: evt.title ?? evt.name,
+    body: typeof desc === 'string' ? desc : undefined,
+    imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
+    duration,
+  };
+}
+
+/**
+ * Build carousel items from normalized schedule and events when available,
+ * otherwise fall back to raw screenContent with contentItem and imageUrl support.
+ */
+function buildCarouselItems(
+  schedule: { items?: any[] } | null,
+  events: any[] | null,
+  screenContent: any
+): CarouselItem[] {
   const items: CarouselItem[] = [];
 
-  // Schedule items
-  const schedule = screenContent.schedule ?? screenContent.data?.schedule;
-  const scheduleItems = Array.isArray(schedule) ? schedule : schedule?.items;
-  if (Array.isArray(scheduleItems)) {
-    for (const item of scheduleItems) {
-      if (!item) continue;
-      items.push({
-        id: item.id ?? `sched-${items.length}`,
-        type: item.type ?? 'Content',
-        title: item.title ?? item.content?.title,
-        body: item.content?.body ?? item.content?.translation ?? item.body,
-        arabicBody: item.content?.arabicText ?? item.content?.arabic,
-        source: item.content?.source ?? item.content?.reference,
+  // Prefer normalized schedule from state when it has items
+  const scheduleItems = schedule?.items;
+  if (Array.isArray(scheduleItems) && scheduleItems.length > 0) {
+    scheduleItems.forEach((item, i) => {
+      if (!item) return;
+      items.push(scheduleItemToCarouselItem(item, items.length));
+    });
+  } else {
+    // Fallback: build from raw screenContent schedule
+    const rawSchedule = screenContent?.schedule ?? screenContent?.data?.schedule;
+    const rawItems = Array.isArray(rawSchedule) ? rawSchedule : rawSchedule?.items;
+    if (Array.isArray(rawItems)) {
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        items.push(scheduleItemToCarouselItem(item, items.length));
       });
     }
   }
 
-  // Events
-  const rawEvents = screenContent.events ?? screenContent.data?.events;
-  const events = Array.isArray(rawEvents) ? rawEvents : (rawEvents as any)?.data;
-  if (Array.isArray(events)) {
-    for (const evt of events) {
-      if (!evt) continue;
-      items.push({
-        id: evt.id ?? `evt-${items.length}`,
-        type: 'Event',
-        title: evt.title ?? evt.name,
-        body: evt.description,
-      });
-    }
+  // Prefer events from state when available
+  let eventsList: any[] = [];
+  if (Array.isArray(events) && events.length > 0) {
+    eventsList = events;
+  } else {
+    const rawEvents = screenContent?.events ?? screenContent?.data?.events;
+    eventsList = Array.isArray(rawEvents) ? rawEvents : (rawEvents as any)?.data ?? [];
   }
+  eventsList.forEach((evt, i) => {
+    if (!evt) return;
+    items.push(eventToCarouselItem(evt, items.length));
+  });
 
   return items;
 }
 
 const DisplayScreen: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
+  const schedule = useSelector((s: RootState) => s.content.schedule);
+  const events = useSelector((s: RootState) => s.content.events);
 
   /* Dev-mode orientation override (Ctrl+Shift+O) */
   const [orientationOverride, setOrientationOverride] = useState<
@@ -112,7 +214,10 @@ const DisplayScreen: React.FC = () => {
   const carouselInterval =
     screenContent?.screen?.contentConfig?.carouselInterval ?? 30;
 
-  const carouselItems = useMemo(() => buildCarouselItems(screenContent), [screenContent]);
+  const carouselItems = useMemo(
+    () => buildCarouselItems(schedule, events, screenContent),
+    [schedule, events, screenContent]
+  );
 
   /* ---- Ramadan mode (auto-detected from Hijri calendar) ---- */
   const ramadan = useRamadanMode();
