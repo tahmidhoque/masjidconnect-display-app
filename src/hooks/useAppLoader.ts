@@ -36,6 +36,7 @@ export interface AppLoaderState {
 
 const DEFAULT_TASKS: LoadingTask[] = [
   { id: 'credentials', label: 'Checking credentials', status: 'pending', progress: 0 },
+  { id: 'pairing-code', label: 'Preparing pairing code', status: 'pending', progress: 0 },
   { id: 'content', label: 'Loading content', status: 'pending', progress: 0 },
   { id: 'prayer-times', label: 'Fetching prayer times', status: 'pending', progress: 0 },
 ];
@@ -57,6 +58,7 @@ export const useAppLoader = (): AppLoaderState => {
   const [tasks, setTasks] = useState<LoadingTask[]>(DEFAULT_TASKS);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const pairingCodeFlowStartedRef = useRef(false);
 
   /** Update a task's status */
   const updateTask = useCallback((id: string, update: Partial<LoadingTask>) => {
@@ -99,76 +101,120 @@ export const useAppLoader = (): AppLoaderState => {
   }, [dispatch, updateTask]);
 
   /* ------------------------------------------------------------------ */
-  /*  Phase: PAIRING — request pairing code if not authenticated        */
+  /*  Phase: after credentials — either go to loading (auth) or pre-pairing */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (phase !== 'startup') return;
 
-    // Credentials loaded — decide next step
     const credentialsTask = tasks.find((t) => t.id === 'credentials');
     if (!credentialsTask || credentialsTask.status === 'loading' || credentialsTask.status === 'pending') return;
 
     if (isAuthenticated) {
       logger.info('[AppLoader] Authenticated, loading data');
+      updateTask('pairing-code', { status: 'skipped', progress: 100 });
       setPhase('loading');
-    } else if (isPairing && pairingCode) {
+      return;
+    }
+    if (isPairing && pairingCode) {
       logger.info('[AppLoader] Resuming pairing');
       setPhase('pairing');
-    } else {
-      logger.info('[AppLoader] Not authenticated, requesting pairing code');
-      dispatch(requestPairingCode('LANDSCAPE'));
-      setPhase('pairing');
+      return;
     }
-  }, [phase, tasks, isAuthenticated, isPairing, pairingCode, dispatch]);
+
+    /* Pre-pairing: stay on loading screen until pairing code is ready */
+    if (pairingCodeFlowStartedRef.current) return;
+    pairingCodeFlowStartedRef.current = true;
+
+    logger.info('[AppLoader] Not authenticated, preparing pairing code');
+    updateTask('content', { status: 'skipped', progress: 100 });
+    updateTask('prayer-times', { status: 'skipped', progress: 100 });
+    updateTask('pairing-code', { status: 'loading', progress: 0 });
+    dispatch(setLoadingMessage('Preparing pairing code...'));
+
+    const minDurationMs = 1500;
+    const start = Date.now();
+
+    const run = async () => {
+      try {
+        await dispatch(requestPairingCode('LANDSCAPE')).unwrap();
+      } catch (err) {
+        logger.warn('[AppLoader] Pairing code request failed', { error: err });
+      }
+      const elapsed = Date.now() - start;
+      if (elapsed < minDurationMs) {
+        await new Promise((r) => setTimeout(r, minDurationMs - elapsed));
+      }
+      updateTask('pairing-code', { status: 'complete', progress: 100 });
+      logger.info('[AppLoader] Pairing code ready, showing pairing screen');
+      setPhase('pairing');
+    };
+    run();
+  }, [phase, tasks, isAuthenticated, isPairing, pairingCode, dispatch, updateTask]);
 
   /* ------------------------------------------------------------------ */
-  /*  Phase: LOADING — fetch content and prayer times                   */
+  /*  Phase: LOADING — fetch content and prayer times; ready only when  */
+  /*  refreshAllContent settles (fresh data on load, or cache if offline) */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (phase !== 'loading') return;
 
     dispatch(setInitializationStage('content'));
     dispatch(setLoadingMessage('Loading content...'));
-
     updateTask('content', { status: 'loading', progress: 20 });
     updateTask('prayer-times', { status: 'loading', progress: 20 });
 
-    dispatch(refreshAllContent({ forceRefresh: true }));
+    let cancelled = false;
+    dispatch(refreshAllContent({ forceRefresh: true }))
+      .then(() => {
+        if (cancelled) return;
+        updateTask('content', { status: 'complete', progress: 100 });
+        updateTask('prayer-times', { status: 'complete', progress: 100 });
+        dispatch(setInitializing(false));
+        setPhase('ready');
+        logger.info('[AppLoader] All data loaded');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        updateTask('content', { status: 'complete', progress: 100 });
+        updateTask('prayer-times', { status: 'complete', progress: 100 });
+        dispatch(setInitializing(false));
+        setPhase('ready');
+        logger.warn('[AppLoader] Refresh failed, proceeding with cached data');
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [phase, dispatch, updateTask]);
 
-  /** Track content load progress */
-  useEffect(() => {
-    if (phase !== 'loading') return;
-
-    if (screenContent) updateTask('content', { status: 'complete', progress: 100 });
-    if (prayerTimes) updateTask('prayer-times', { status: 'complete', progress: 100 });
-
-    if (screenContent && prayerTimes) {
-      logger.info('[AppLoader] All data loaded');
-      dispatch(setInitializing(false));
-      setPhase('ready');
-    }
-  }, [phase, screenContent, prayerTimes, dispatch, updateTask]);
-
-  /** If content loading takes >15s, proceed anyway with whatever we have */
+  /** If content loading takes >15s, proceed anyway */
   useEffect(() => {
     if (phase !== 'loading') return;
     const timeout = setTimeout(() => {
-      if (phase === 'loading') {
-        logger.warn('[AppLoader] Loading timeout, proceeding anyway');
-        dispatch(setInitializing(false));
-        setPhase('ready');
-      }
+      logger.warn('[AppLoader] Loading timeout, proceeding anyway');
+      dispatch(setInitializing(false));
+      setPhase('ready');
     }, 15_000);
     return () => clearTimeout(timeout);
   }, [phase, dispatch]);
 
-  /** Transition from pairing to loading when authentication completes */
+  /** Transition from pairing to loading when authentication completes; reset tasks */
   useEffect(() => {
-    if (phase === 'pairing' && isAuthenticated) {
-      logger.info('[AppLoader] Paired, loading data');
-      setPhase('loading');
-    }
+    if (phase !== 'pairing' || !isAuthenticated) return;
+
+    logger.info('[AppLoader] Paired, loading data');
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === 'credentials' || t.id === 'pairing-code') {
+          return { ...t, status: 'complete' as const, progress: 100 };
+        }
+        if (t.id === 'content' || t.id === 'prayer-times') {
+          return { ...t, status: 'pending' as const, progress: 0 };
+        }
+        return t;
+      }),
+    );
+    setPhase('loading');
   }, [phase, isAuthenticated]);
 
   return {

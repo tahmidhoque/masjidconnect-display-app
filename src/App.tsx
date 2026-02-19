@@ -284,7 +284,7 @@ const AppRoutes: React.FC = () => {
         setActiveScreen(targetScreen);
         setIsTransitioning(false);
         if (targetScreen === 'loading') {
-          loadStartRef.current = Date.now();
+          loadStartRef.current = Date.now(); // Ensures MIN_LOADING_MS applies to initial and post-pairing load
           setOverlayMounted(true);
           setOverlayVisible(true);
         }
