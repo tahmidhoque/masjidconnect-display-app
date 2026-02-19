@@ -62,7 +62,7 @@ const Header: React.FC<HeaderProps> = ({ masjidName, isRamadan = false, ramadanD
     >
       {/* Gold accent line at the bottom */}
       <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[3px] w-[60px] rounded-sm"
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[0.2rem] w-[3.75rem] rounded-sm"
         style={{
           background: 'linear-gradient(90deg, var(--color-gold), var(--color-gold-light))',
         }}

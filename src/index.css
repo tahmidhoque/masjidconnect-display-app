@@ -49,9 +49,18 @@
 
 /* ============================================================
    Global Styles
+   ============================================================
+   Resolution-independent scaling: design reference 1920×1080.
+   Root font-size scales with viewport so all rem-based layout,
+   spacing, and typography scale together (720p, 1080p, 4K).
    ============================================================ */
 * {
   cursor: none !important;
+}
+
+html {
+  /* Scale 1rem with viewport; vmin so landscape and portrait behave consistently */
+  font-size: clamp(10px, calc(16px * (100vmin / 1080)), 32px);
 }
 
 html, body {
@@ -151,13 +160,13 @@ html, body {
 
 /* Crossfade animation for content carousel */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(0.5rem); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeOut {
   from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 0; transform: translateY(-0.5rem); }
 }
 
 .animate-fade-in {
@@ -180,7 +189,7 @@ html, body {
 
 /* Slide-in from right */
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(24px); }
+  from { opacity: 0; transform: translateX(1.5rem); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
@@ -201,7 +210,7 @@ html, body {
 /* Countdown ticker */
 @keyframes countdownTick {
   0%   { transform: translateY(0); opacity: 1; }
-  50%  { transform: translateY(-4px); opacity: 0.6; }
+  50%  { transform: translateY(-0.25rem); opacity: 0.6; }
   100% { transform: translateY(0); opacity: 1; }
 }
 
@@ -342,7 +351,7 @@ html, body {
 
 /* Animated card */
 @keyframes alertSlideIn {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  from { opacity: 0; transform: translateY(1rem) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes alertGlow {
@@ -359,7 +368,7 @@ html, body {
   display: flex;
   flex-direction: column;
   width: 88%;
-  max-width: 960px;
+  max-width: 60rem;
   max-height: 88%;
 }
 
@@ -395,35 +404,35 @@ html, body {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ============================================================
-   Typography utilities
+   Typography utilities (rem-only so they scale with root)
    ============================================================ */
 .text-display {
-  font-size: clamp(3rem, 6vw, 6rem);
+  font-size: clamp(2rem, 3.5rem, 4rem);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
 
 .text-heading {
-  font-size: clamp(1.5rem, 3vw, 3rem);
+  font-size: clamp(1.25rem, 1.75rem, 2rem);
   font-weight: 600;
   line-height: 1.2;
 }
 
 .text-subheading {
-  font-size: clamp(1rem, 1.5vw, 1.5rem);
+  font-size: clamp(0.9rem, 1.1rem, 1.25rem);
   font-weight: 500;
   line-height: 1.3;
 }
 
 .text-body {
-  font-size: clamp(0.875rem, 1.2vw, 1.125rem);
+  font-size: clamp(0.8rem, 0.95rem, 1rem);
   font-weight: 400;
   line-height: 1.6;
 }
 
 .text-caption {
-  font-size: clamp(0.7rem, 0.9vw, 0.875rem);
+  font-size: clamp(0.65rem, 0.75rem, 0.85rem);
   font-weight: 400;
   line-height: 1.4;
   color: var(--color-text-secondary);

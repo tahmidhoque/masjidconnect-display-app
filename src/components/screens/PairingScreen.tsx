@@ -93,10 +93,28 @@ const PairingScreen: React.FC = () => {
     }
   }, [timeLeft, isPairingCodeExpired, dispatch]);
 
+  /* ---- Measure QR container so QRCodeSVG size scales with resolution ---- */
+  useEffect(() => {
+    const el = qrContainerRef.current;
+    if (!el) return;
+    const updateSize = () => {
+      const min = Math.min(el.clientWidth, el.clientHeight);
+      setQrSize(Math.max(100, Math.floor(min * 0.85)));
+    };
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   /* ---- Refs for polling lifecycle ---- */
   const mountedRef = useRef(true);
   const pollingRef = useRef(false);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ---- QR code size: measure rem-sized container so QR scales with resolution ---- */
+  const qrContainerRef = useRef<HTMLDivElement>(null);
+  const [qrSize, setQrSize] = useState(220);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -206,7 +224,7 @@ const PairingScreen: React.FC = () => {
       </div>
 
       {/* Gold logo — top-left */}
-      <div className="absolute top-6 left-8 z-10 w-16 max-w-[80px] min-w-[50px]">
+      <div className="absolute top-6 left-8 z-10 w-16 max-w-[5rem] min-w-[3.125rem]">
         <img src={logoGold} alt="MasjidConnect" className="w-full h-auto" />
       </div>
 
@@ -271,7 +289,7 @@ const PairingScreen: React.FC = () => {
           <h2 className="text-2xl font-bold text-text-primary">Pairing Code</h2>
 
           {/* Code display */}
-          <div className="h-[100px] flex flex-col items-center justify-center">
+          <div className="h-[6.25rem] flex flex-col items-center justify-center">
             {formattedCode ? (
               <>
                 <span className="text-5xl font-bold tracking-[0.3em] text-gold select-all tabular-nums">
@@ -311,8 +329,11 @@ const PairingScreen: React.FC = () => {
             )}
           </div>
 
-          {/* QR Code */}
-          <div className="relative w-[260px] h-[260px] bg-white rounded-2xl p-4 flex items-center justify-center shadow-lg">
+          {/* QR Code — container is rem-sized so it scales with root; QR size is measured to fit */}
+          <div
+            ref={qrContainerRef}
+            className="relative w-[16.25rem] h-[16.25rem] bg-white rounded-2xl p-4 flex items-center justify-center shadow-lg"
+          >
             {/* Loading overlay */}
             {isRequestingPairingCode && (
               <div className="absolute inset-0 bg-white/70 rounded-2xl flex items-center justify-center z-10">
@@ -324,7 +345,7 @@ const PairingScreen: React.FC = () => {
               <QRCodeSVG
                 key={`qr-${pairingCode}`}
                 value={qrCodeUrl}
-                size={220}
+                size={qrSize}
                 bgColor="#ffffff"
                 fgColor="#0A2647"
                 level="H"
