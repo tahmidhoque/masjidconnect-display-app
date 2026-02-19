@@ -33,6 +33,17 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+# Use chromium or chromium-browser (package name differs: chromium on Trixie, chromium-browser on Bookworm)
+CHROMIUM=""
+if command -v chromium-browser &>/dev/null; then
+  CHROMIUM="chromium-browser"
+elif command -v chromium &>/dev/null; then
+  CHROMIUM="chromium"
+else
+  echo "[Kiosk] ERROR: Chromium not found. Install chromium or chromium-browser." >&2
+  exit 1
+fi
+
 # Launch Chromium in kiosk mode
 #   --kiosk               : Full-screen, no address bar
 #   --noerrdialogs        : Suppress error pop-ups
@@ -46,7 +57,7 @@ done
 #   --disable-dev-shm-usage : Use /tmp for shared memory (avoids /dev/shm limits on RPi)
 #   --force-device-scale-factor=1 : Prevent display scaling issues
 
-exec chromium-browser \
+exec ${CHROMIUM} \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \

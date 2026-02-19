@@ -41,10 +41,13 @@ if [ "$NODE_VERSION" -lt 18 ]; then
   exit 1
 fi
 
-# Check for Chromium
-if ! command -v chromium-browser &>/dev/null; then
+# Check for Chromium (chromium-browser on Bookworm, chromium on Trixie and others)
+if ! command -v chromium-browser &>/dev/null && ! command -v chromium &>/dev/null; then
   echo "Installing Chromium..."
-  apt-get update && apt-get install -y chromium-browser
+  apt-get update
+  if ! apt-get install -y chromium-browser 2>/dev/null; then
+    apt-get install -y chromium
+  fi
 fi
 
 # Install unclutter for hiding cursor
