@@ -50,7 +50,7 @@
 /* ============================================================
    Global Styles
    ============================================================
-   Resolution-independent scaling: design reference 1920×1080.
+   Resolution-independent scaling: design reference 1280×720 (720p).
    Root font-size scales with viewport so all rem-based layout,
    spacing, and typography scale together (720p, 1080p, 4K).
    ============================================================ */
@@ -60,7 +60,7 @@
 
 html {
   /* Scale 1rem with viewport; vmin so landscape and portrait behave consistently */
-  font-size: clamp(10px, calc(16px * (100vmin / 1080)), 32px);
+  font-size: clamp(10px, calc(16px * (100vmin / 720)), 48px);
 }
 
 html, body {

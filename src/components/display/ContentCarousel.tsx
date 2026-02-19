@@ -169,9 +169,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
             {/* Type badge */}
             <span className="badge badge-emerald self-start">{getContentTypeLabel(item.type)}</span>
 
-            {/* Image — constrained so it doesn't overflow; same scale applies */}
+            {/* Image — constrained so it doesn't overflow; rem-based to match 720p scaling */}
             {item.imageUrl && (
-              <div className="flex justify-center min-h-0 max-h-[40vh] w-full">
+              <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
                 <img
                   src={item.imageUrl}
                   alt=""

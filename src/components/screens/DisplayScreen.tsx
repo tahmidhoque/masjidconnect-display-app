@@ -24,7 +24,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
-import { LandscapeLayout, PortraitLayout, OrientationWrapper } from '../layout';
+import { LandscapeLayout, PortraitLayout, OrientationWrapper, ReferenceViewport } from '../layout';
 import {
   Header,
   Footer,
@@ -277,33 +277,35 @@ const DisplayScreen: React.FC = () => {
 
   return (
     <OrientationWrapper orientation={orientation}>
-      {isPortrait ? (
-        <PortraitLayout
-          header={headerSlot}
-          prayerSection={
-            <div className="flex flex-col gap-3 h-full">
-              {prayerPanel}
-              {countdownSlot}
-            </div>
-          }
-          content={contentSlot}
-          footer={footerSlot}
-          background={bg}
-        />
-      ) : (
-        <LandscapeLayout
-          header={headerSlot}
-          content={contentSlot}
-          sidebar={
-            <>
-              {prayerPanel}
-              {countdownSlot}
-            </>
-          }
-          footer={footerSlot}
-          background={bg}
-        />
-      )}
+      <ReferenceViewport orientation={orientation}>
+        {isPortrait ? (
+          <PortraitLayout
+            header={headerSlot}
+            prayerSection={
+              <div className="flex flex-col gap-3 h-full">
+                {prayerPanel}
+                {countdownSlot}
+              </div>
+            }
+            content={contentSlot}
+            footer={footerSlot}
+            background={bg}
+          />
+        ) : (
+          <LandscapeLayout
+            header={headerSlot}
+            content={contentSlot}
+            sidebar={
+              <>
+                {prayerPanel}
+                {countdownSlot}
+              </>
+            }
+            footer={footerSlot}
+            background={bg}
+          />
+        )}
+      </ReferenceViewport>
     </OrientationWrapper>
   );
 };
