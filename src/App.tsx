@@ -19,6 +19,7 @@ import { clearCurrentAlert } from './store/slices/emergencySlice';
 import useAppLoader from './hooks/useAppLoader';
 import useDevKeyboard, { ORIENTATION_FORCE_EVENT } from './hooks/useDevKeyboard';
 import { useRotationHandling } from './hooks/useRotationHandling';
+import { OrientationWrapper } from './components/layout';
 import logger from './utils/logger';
 
 /* ------------------------------------------------------------------
@@ -218,8 +219,21 @@ const EmergencyOverlay: React.FC = () => {
 /* ------------------------------------------------------------------
    AppRoutes — manages screen transitions
    ------------------------------------------------------------------ */
+/** Orientation for loading overlay: match display (from content or stored at pairing). */
+function useLoadingOrientation(): 'LANDSCAPE' | 'PORTRAIT' {
+  const fromContent = useSelector(
+    (s: RootState) => s.content.screenContent?.screen?.orientation,
+  );
+  const fromStorage =
+    typeof localStorage !== 'undefined'
+      ? (localStorage.getItem('screen_orientation') as 'LANDSCAPE' | 'PORTRAIT' | null)
+      : null;
+  return fromContent ?? fromStorage ?? 'LANDSCAPE';
+}
+
 const AppRoutes: React.FC = () => {
   const { phase, overallProgress, currentTask, tasks, hasPairingCode } = useAppLoader();
+  const loadingOrientation = useLoadingOrientation();
 
   const [activeScreen, setActiveScreen] = useState<ScreenType>('loading');
   const [overlayVisible, setOverlayVisible] = useState(true);
@@ -299,7 +313,7 @@ const AppRoutes: React.FC = () => {
     );
   };
 
-  /* ---- Loading overlay ---- */
+  /* ---- Loading overlay — same orientation as display ---- */
   const renderLoadingOverlay = () => {
     if (!overlayMounted) return null;
 
@@ -312,9 +326,11 @@ const AppRoutes: React.FC = () => {
           pointerEvents: overlayVisible ? 'auto' : 'none',
         }}
       >
-        <Suspense fallback={null}>
-          <LoadingScreen progress={overallProgress} message={currentTask} tasks={tasks} />
-        </Suspense>
+        <OrientationWrapper orientation={loadingOrientation}>
+          <Suspense fallback={null}>
+            <LoadingScreen progress={overallProgress} message={currentTask} tasks={tasks} />
+          </Suspense>
+        </OrientationWrapper>
       </div>
     );
   };

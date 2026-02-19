@@ -13,6 +13,7 @@
 import React from 'react';
 import type { LoadingTask } from '../../hooks/useAppLoader';
 import { IslamicPattern } from '../display';
+import logoGold from '../../assets/logos/logo-gold.svg';
 
 interface LoadingScreenProps {
   progress: number;
@@ -24,7 +25,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, message, tasks 
   const clampedProgress = Math.min(Math.max(progress, 0), 100);
 
   return (
-    <div className="fullscreen flex flex-col items-center justify-center bg-midnight relative overflow-hidden">
+    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-midnight overflow-hidden">
       {/* Subtle background */}
       <div className="absolute inset-0 pointer-events-none">
         <IslamicPattern opacity={0.03} />
@@ -32,12 +33,13 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, message, tasks 
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-8 animate-fade-in">
-        {/* Logo area */}
+        {/* Logo area — MasjidConnect branding */}
         <div className="flex flex-col items-center gap-3">
-          {/* Star/crescent icon via CSS */}
-          <div className="w-16 h-16 rounded-2xl bg-emerald/20 border border-emerald/30 flex items-center justify-center mb-2">
-            <span className="text-3xl text-emerald">☪</span>
-          </div>
+          <img
+            src={logoGold}
+            alt="MasjidConnect"
+            className="h-14 w-auto max-w-[12rem]"
+          />
           <h1 className="text-heading text-gold font-bold tracking-tight">MasjidConnect</h1>
           <p className="text-caption text-text-muted">Digital Display System</p>
         </div>
