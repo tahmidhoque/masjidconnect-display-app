@@ -327,77 +327,108 @@ html, body {
 
 /* ============================================================
    Emergency alert overlay
+   Full-screen takeover — category colour background, three zones.
    ============================================================ */
 
-/* Full-viewport backdrop — solid so the display behind is fully hidden */
+/* Entry: fast fade-in + subtle scale-up (urgent information) */
+@keyframes emergency-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Exit: fade-out only (no scale — avoids "hiding" read) */
+@keyframes emergency-exit {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Critical urgency: pulsing red glow on the overlay border */
+@keyframes emergency-pulse {
+  0%   { box-shadow: 0 0 0 0    rgba(211, 47, 47, 0.8); }
+  70%  { box-shadow: 0 0 0 24px rgba(211, 47, 47, 0);   }
+  100% { box-shadow: 0 0 0 0    rgba(211, 47, 47, 0);   }
+}
+
+/* Base overlay — covers 100vw × 100vh, always on top */
 .emergency-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-midnight-dark);
-  opacity: 1;
-  transition: opacity 400ms ease-out;
-  /* Ensure nothing bleeds through */
+  flex-direction: column;
+  overflow: hidden;
+  animation: emergency-enter 0.3s ease-out forwards;
   isolation: isolate;
 }
 
-.emergency-overlay.fade-out {
-  opacity: 0;
-  transition: opacity 300ms ease-in;
+/* Urgency variants */
+.emergency-overlay--critical {
+  animation: emergency-enter 0.3s ease-out forwards,
+             emergency-pulse 1.5s ease-in-out 0.3s infinite;
+  border: 4px solid rgba(255, 255, 255, 0.6);
 }
 
-/* Animated card */
-@keyframes alertSlideIn {
-  from { opacity: 0; transform: translateY(1rem) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes alertGlow {
-  0%, 100% { box-shadow: 0 0 40px var(--alert-glow, rgba(230,57,70,0.25)); }
-  50%      { box-shadow: 0 0 70px var(--alert-glow, rgba(230,57,70,0.4)); }
+.emergency-overlay--high {
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
 }
 
-.alert-card {
-  animation: alertSlideIn 0.5s ease-out, alertGlow 3s ease-in-out 0.6s infinite;
-  background: rgba(10, 38, 71, 0.85);
-  border: 1px solid var(--color-border-strong);
-  border-radius: 1.25rem;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  width: 88%;
-  max-width: 60rem;
-  max-height: 88%;
+.emergency-overlay--medium {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Top accent stripe — the only strong colour hit */
-.alert-card::before {
-  content: '';
-  display: block;
-  height: 5px;
-  flex-shrink: 0;
-  background: var(--alert-accent, var(--color-alert-red));
+/* Exit state — trigger 400ms before unmounting */
+.emergency-overlay--exiting {
+  animation: emergency-exit 0.4s ease-in forwards !important;
 }
 
-/* Colour-scheme accent variables */
-.alert-scheme-red    { --alert-accent: #E63946; --alert-glow: rgba(230,57,70,0.3);  }
-.alert-scheme-orange { --alert-accent: #F4A261; --alert-glow: rgba(244,162,97,0.3); }
-.alert-scheme-amber  { --alert-accent: #E9C46A; --alert-glow: rgba(233,196,106,0.3);}
-.alert-scheme-blue   { --alert-accent: #4895EF; --alert-glow: rgba(72,149,239,0.3); }
-.alert-scheme-green  { --alert-accent: #2A9D8F; --alert-glow: rgba(42,157,143,0.3); }
-.alert-scheme-purple { --alert-accent: #9B5DE5; --alert-glow: rgba(155,93,229,0.3); }
-.alert-scheme-dark   { --alert-accent: #78909C; --alert-glow: rgba(120,144,156,0.3);}
+/* Zone tint bar (header + footer darkened overlay) */
+.emergency-zone-tint {
+  background: rgba(0, 0, 0, 0.25);
+}
 
-/* Solid scheme-tinted backgrounds — fully opaque so content behind is hidden */
-.alert-bg-red    { background: #0d1c2e; }
-.alert-bg-orange { background: #0d1c2e; }
-.alert-bg-amber  { background: #0d1c2e; }
-.alert-bg-blue   { background: #0d1c2e; }
-.alert-bg-green  { background: #0d1c2e; }
-.alert-bg-purple { background: #0d1c2e; }
-.alert-bg-dark   { background: #0d1c2e; }
+/*
+ * Emergency overlay typography — vw-based so the overlay fills the screen
+ * at any resolution (these are intentionally vw, not rem; the overlay is a
+ * full-screen takeover where the standard rem-scaling approach doesn't apply).
+ */
+.emergency-category-label {
+  font-size: 1.4vw;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.emergency-title {
+  font-size: 4.5vw;
+  line-height: 1.3;
+}
+
+.emergency-message {
+  font-size: 2.2vw;
+  line-height: 1.5;
+}
+
+.emergency-countdown {
+  font-size: 1.6vw;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+
+.emergency-footer-text {
+  font-size: 1.1vw;
+  font-weight: 400;
+  line-height: 1;
+}
 
 /* Scrollbar hidden (for carousel-style content) */
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -480,28 +511,13 @@ html, body {
 }
 
 /* Override hardcoded rgba(10,38,71,...) backgrounds used in
-   .card-elevated, .panel, and .alert-card with green equivalents */
+   .card-elevated and .panel with green equivalents */
 [data-theme="ramadan"] .card-elevated {
   background: rgba(13, 59, 46, 0.85);
 }
 
 [data-theme="ramadan"] .panel {
   background: rgba(13, 59, 46, 0.6);
-}
-
-[data-theme="ramadan"] .alert-card {
-  background: rgba(13, 59, 46, 0.85);
-}
-
-/* Alert overlay backgrounds → green-tinted */
-[data-theme="ramadan"] .alert-bg-red,
-[data-theme="ramadan"] .alert-bg-orange,
-[data-theme="ramadan"] .alert-bg-amber,
-[data-theme="ramadan"] .alert-bg-blue,
-[data-theme="ramadan"] .alert-bg-green,
-[data-theme="ramadan"] .alert-bg-purple,
-[data-theme="ramadan"] .alert-bg-dark {
-  background: #0a2a1e;
 }
 
 /* Badge overrides — use Ramadan gold tints */

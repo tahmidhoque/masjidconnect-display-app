@@ -6,13 +6,24 @@
  */
 
 /**
- * Emergency alert data received from WebSocket
+ * Emergency alert payload received from WebSocket (v2 contract).
+ * category + urgency are the canonical fields for driving visual style.
  */
 export interface EmergencyAlertData {
   id: string;
+  action: "show" | "clear";
+
+  // Content
   title: string;
   message: string;
+
+  // Classification (v2)
+  category: "safety" | "facility" | "janazah" | "schedule" | "community" | "custom";
+  urgency: "critical" | "high" | "medium";
+  /** Only non-null when category === 'custom' */
   color: string | null;
+
+  // Timing
   createdAt: string;
   expiresAt: string;
   timing?: {
@@ -20,8 +31,6 @@ export interface EmergencyAlertData {
     remaining: number;
     autoCloseAt: string;
   };
-  action: "show" | "clear";
-  colorScheme?: string;
 }
 
 /**

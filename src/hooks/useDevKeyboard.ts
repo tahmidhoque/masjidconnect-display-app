@@ -6,13 +6,13 @@
  * stripped from production builds by Vite.
  *
  * Shortcuts (active only in dev):
- *   Ctrl + Shift + 1  — RED emergency alert      (15 s)
- *   Ctrl + Shift + 2  — ORANGE alert             (15 s)
- *   Ctrl + Shift + 3  — AMBER alert              (15 s)
- *   Ctrl + Shift + 4  — BLUE alert               (15 s)
- *   Ctrl + Shift + 5  — GREEN alert              (15 s)
- *   Ctrl + Shift + 6  — PURPLE alert             (15 s)
- *   Ctrl + Shift + 7  — DARK alert               (15 s)
+ *   Ctrl + Shift + 1  — Safety (critical) alert   (15 s)
+ *   Ctrl + Shift + 2  — Facility (high) alert      (15 s)
+ *   Ctrl + Shift + 3  — Janazah (medium) alert     (15 s)
+ *   Ctrl + Shift + 4  — Schedule (medium) alert    (15 s)
+ *   Ctrl + Shift + 5  — Community (high) alert     (15 s)
+ *   Ctrl + Shift + 6  — Custom (medium) alert      (15 s)
+ *   Ctrl + Shift + 7  — Safety (medium) alert      (15 s)
  *   Ctrl + Shift + 0  — Clear current alert
  *   Ctrl + Shift + R  — Toggle Ramadan mode
  *   Ctrl + Shift + J  — Cycle prayer phase (jamaat-soon → in-prayer → auto)
@@ -47,18 +47,19 @@ declare global {
 }
 
 /**
- * Alert colour keyed by the character produced by Shift+digit.
+ * Alert type keyed by the character produced by Shift+digit.
  * Shift+1 = '!', Shift+2 = '@', etc. on standard US/UK layouts.
  * We also match the raw digit in case the browser sends it.
+ * Values correspond to the numeric key index used in createTestAlert.
  */
 const ALERT_MAP: Record<string, string> = {
-  '!': 'RED',    '1': 'RED',
-  '@': 'ORANGE', '2': 'ORANGE',
-  '#': 'AMBER',  '3': 'AMBER',  '£': 'AMBER',
-  '$': 'BLUE',   '4': 'BLUE',
-  '%': 'GREEN',  '5': 'GREEN',
-  '^': 'PURPLE', '6': 'PURPLE',
-  '&': 'DARK',   '7': 'DARK',
+  '!': '1', '1': '1',
+  '@': '2', '2': '2',
+  '#': '3', '3': '3', '£': '3',
+  '$': '4', '4': '4',
+  '%': '5', '5': '5',
+  '^': '6', '6': '6',
+  '&': '7', '7': '7',
 };
 
 /** Characters that mean "clear" (Shift+0 = ')' on US layout) */
@@ -154,13 +155,13 @@ const useDevKeyboard = (): void => {
     );
     // eslint-disable-next-line no-console
     console.table({
-      'Ctrl+Shift+1': 'RED emergency alert (15 s)',
-      'Ctrl+Shift+2': 'ORANGE alert (15 s)',
-      'Ctrl+Shift+3': 'AMBER alert (15 s)',
-      'Ctrl+Shift+4': 'BLUE alert (15 s)',
-      'Ctrl+Shift+5': 'GREEN alert (15 s)',
-      'Ctrl+Shift+6': 'PURPLE alert (15 s)',
-      'Ctrl+Shift+7': 'DARK alert (15 s)',
+      'Ctrl+Shift+1': 'Safety CRITICAL alert (15 s)',
+      'Ctrl+Shift+2': 'Facility HIGH alert (15 s)',
+      'Ctrl+Shift+3': 'Janazah MEDIUM alert (15 s)',
+      'Ctrl+Shift+4': 'Schedule MEDIUM alert (15 s)',
+      'Ctrl+Shift+5': 'Community HIGH alert (15 s)',
+      'Ctrl+Shift+6': 'Custom MEDIUM alert (15 s)',
+      'Ctrl+Shift+7': 'Safety MEDIUM alert (15 s)',
       'Ctrl+Shift+0': 'Clear current alert',
       'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
       'Ctrl+Shift+J': 'Cycle prayer phase (jamaat-soon → in-prayer → auto)',
@@ -196,7 +197,7 @@ const useDevKeyboard = (): void => {
 
         if (alertType) {
           e.preventDefault();
-          logger.info(`[DevKeyboard] Triggering ${alertType} test alert`);
+          logger.info(`[DevKeyboard] Triggering test alert type ${alertType}`);
           dispatch(createTestAlert({ type: alertType, duration: TEST_ALERT_DURATION }));
           return;
         }

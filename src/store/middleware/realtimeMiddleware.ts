@@ -74,19 +74,26 @@ export const realtimeMiddleware: Middleware = (api: any) => {
       }),
     );
 
-    // Emergency alerts
+    // Emergency alerts — pass through v2 category/urgency/color fields
     unsubs.push(
-      realtimeService.on<any>('emergency:alert', (alert) => {
-        const reduxAlert = {
-          id: alert.id || `alert-${Date.now()}`,
-          title: alert.title,
-          message: alert.message,
-          color: alert.type === 'emergency' ? '#f44336' : alert.type === 'warning' ? '#ff9800' : '#2196f3',
-          createdAt: alert.createdAt,
-          expiresAt: alert.expiresAt,
+      realtimeService.on<any>('emergency:alert', (payload) => {
+        if (payload.action === 'clear') {
+          emergencyAlertService.clearAlert();
+          return;
+        }
+        emergencyAlertService.setAlert({
+          id: payload.id || `alert-${Date.now()}`,
+          title: payload.title,
+          message: payload.message,
+          category: payload.category ?? 'community',
+          urgency: payload.urgency ?? 'high',
+          color: payload.color ?? null,
+          createdAt: payload.createdAt,
+          expiresAt: payload.expiresAt,
           masjidId: credentialService.getMasjidId() || '',
-        };
-        emergencyAlertService.setAlert(reduxAlert as any);
+          timing: payload.timing,
+          action: payload.action,
+        });
       }),
     );
 

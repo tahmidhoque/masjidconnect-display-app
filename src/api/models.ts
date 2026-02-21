@@ -487,26 +487,28 @@ export interface ApiResponse<T> {
   status?: number;
 }
 
-// Predefined alert color values matching ALERT_COLOR_SCHEMES
-export type AlertColorType =
-  | "#f44336" // RED
-  | "#ff9800" // ORANGE
-  | "#ffb74d" // AMBER
-  | "#2196f3" // BLUE
-  | "#4caf50" // GREEN
-  | "#9c27b0" // PURPLE
-  | "#263238" // DARK
-  | string; // Allow for custom colors
+/** Category of an emergency alert — drives background colour and icon */
+export type AlertCategory =
+  | "safety"
+  | "facility"
+  | "janazah"
+  | "schedule"
+  | "community"
+  | "custom";
 
-/** Alert colour scheme keys (previously imported from EmergencyAlertOverlay component) */
-export type AlertColorSchemeKey = 'RED' | 'ORANGE' | 'AMBER' | 'BLUE' | 'GREEN' | 'PURPLE' | 'DARK' | string;
+/** Urgency level — drives animation intensity and typography weight */
+export type AlertUrgency = "critical" | "high" | "medium";
 
 export interface EmergencyAlert {
   id: string;
   title: string;
   message: string;
-  color: AlertColorType;
-  colorScheme?: AlertColorSchemeKey;
+  /** Category drives background colour and icon (v2 field) */
+  category: AlertCategory;
+  /** Urgency drives animation and font weight (v2 field) */
+  urgency: AlertUrgency;
+  /** Only non-null when category === 'custom'; hex e.g. '#6A1B9A' */
+  color: string | null;
   expiresAt: string; // ISO date string when alert expires
   createdAt: string; // ISO date string when alert was created
   masjidId: string; // ID of the masjid that created the alert
@@ -515,5 +517,7 @@ export interface EmergencyAlert {
     remaining: number; // Remaining time in milliseconds (calculated by server)
     autoCloseAt: string; // ISO date string when alert should auto-close
   };
-  action?: "show" | "hide" | "update" | "clear"; // Action to perform with this alert
+  action?: "show" | "clear"; // Action to perform with this alert
+  /** Kept for backward compatibility with old-format alerts during migration */
+  colorScheme?: string;
 }

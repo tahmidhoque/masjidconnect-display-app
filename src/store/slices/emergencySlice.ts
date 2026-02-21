@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { EmergencyAlert } from "../../api/models";
+import { EmergencyAlert, AlertCategory, AlertUrgency } from "../../api/models";
 import emergencyAlertService from "../../services/emergencyAlertService";
 import logger from "../../utils/logger";
 
@@ -214,67 +214,89 @@ const emergencySlice = createSlice({
     // Test emergency alert action for development
     createTestAlert: (
       state,
-      action: PayloadAction<{ type?: string; duration?: number }>,
+      action: PayloadAction<{ type?: string; category?: AlertCategory; urgency?: AlertUrgency; duration?: number }>,
     ) => {
-      const { type = "RED", duration = 15 } = action.payload || {};
+      const { type = "1", duration = 15 } = action.payload || {};
 
-      // Mock alert data
-      const testAlerts = {
-        RED: {
-          title: "Emergency Alert Test",
+      interface TestAlertTemplate {
+        title: string;
+        message: string;
+        category: AlertCategory;
+        urgency: AlertUrgency;
+        color: string | null;
+      }
+
+      // Keyed by dev shortcut number (1–7)
+      const testAlerts: Record<string, TestAlertTemplate> = {
+        "1": {
+          title: "Fire Evacuation Alert",
           message:
-            "This is a critical emergency alert test. All congregants should remain calm and follow emergency procedures.",
-          colorScheme: "RED" as const,
+            "Please evacuate the building immediately via the nearest emergency exit. Do not use lifts. Assemble at the designated meeting point.",
+          category: "safety",
+          urgency: "critical",
+          color: null,
         },
-        ORANGE: {
-          title: "Important Notice",
+        "2": {
+          title: "Facility Maintenance Notice",
           message:
-            "An important announcement requires your immediate attention. Please be aware of current safety protocols.",
-          colorScheme: "ORANGE" as const,
+            "The main ablution area is temporarily closed for urgent maintenance. Please use the alternative facilities on the lower ground floor.",
+          category: "facility",
+          urgency: "high",
+          color: null,
         },
-        AMBER: {
-          title: "Weather Advisory",
+        "3": {
+          title: "Janazah Announcement",
           message:
-            "Severe weather conditions detected in the area. Exercise caution when traveling to and from the masjid.",
-          colorScheme: "AMBER" as const,
+            "The janazah prayer for our dear brother will take place after Asr today. May Allah grant him Jannatul Firdaus. Ameen.",
+          category: "janazah",
+          urgency: "medium",
+          color: null,
         },
-        BLUE: {
-          title: "Information Update",
+        "4": {
+          title: "Prayer Time Change",
           message:
-            "Prayer schedule has been updated due to special circumstances. Please check with masjid administration for details.",
-          colorScheme: "BLUE" as const,
+            "Due to a special programme, Maghrib Jamaat tonight will be delayed by 15 minutes. Jazakumullahu khayran for your patience.",
+          category: "schedule",
+          urgency: "medium",
+          color: null,
         },
-        GREEN: {
-          title: "All Clear",
+        "5": {
+          title: "Please Move Your Vehicle",
           message:
-            "Previous emergency conditions have been resolved. Normal operations have resumed. Alhamdulillah.",
-          colorScheme: "GREEN" as const,
+            "A vehicle is blocking access and needs to be moved immediately. Registration: AB12 CDE. Please return to your vehicle as soon as possible.",
+          category: "community",
+          urgency: "high",
+          color: null,
         },
-        PURPLE: {
-          title: "Special Announcement",
+        "6": {
+          title: "Special Community Event",
           message:
-            "Join us for a special community gathering this Friday after Jumu'ah prayer. Light refreshments will be served.",
-          colorScheme: "PURPLE" as const,
+            "Join us this Saturday for a special lecture by a distinguished scholar. Doors open at 7 PM. Light refreshments will be served.",
+          category: "custom",
+          urgency: "medium",
+          color: "#6A1B9A",
         },
-        DARK: {
-          title: "Security Alert",
+        "7": {
+          title: "Security Notice",
           message:
             "Enhanced security measures are currently in effect. Please report any suspicious activity to masjid staff immediately.",
-          colorScheme: "DARK" as const,
+          category: "safety",
+          urgency: "medium",
+          color: null,
         },
       };
 
-      const alertTemplate =
-        testAlerts[type as keyof typeof testAlerts] || testAlerts.RED;
+      const alertTemplate = testAlerts[type] ?? testAlerts["1"];
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + duration * 1000);
+      const expiresAt = new Date(now.getTime() + duration * 1_000);
 
       const testAlert: EmergencyAlert = {
         id: `test-alert-${Date.now()}`,
         title: alertTemplate.title,
         message: alertTemplate.message,
-        color: "#f44336", // Will be overridden by colorScheme
-        colorScheme: alertTemplate.colorScheme,
+        category: action.payload.category ?? alertTemplate.category,
+        urgency: action.payload.urgency ?? alertTemplate.urgency,
+        color: alertTemplate.color,
         expiresAt: expiresAt.toISOString(),
         createdAt: now.toISOString(),
         masjidId: "test-masjid",
@@ -300,14 +322,10 @@ const emergencySlice = createSlice({
       logger.info("[Emergency] Test alert created", {
         alertId: testAlert.id,
         title: testAlert.title,
-        type: alertTemplate.colorScheme,
+        category: testAlert.category,
+        urgency: testAlert.urgency,
         duration,
       });
-
-      // Auto-clear after duration
-      setTimeout(() => {
-        // This will be handled by the display component
-      }, duration * 1000);
     },
 
     clearCurrentAlert: (state) => {
