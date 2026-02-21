@@ -7,6 +7,12 @@
  *
  * Uses ResizeObserver to measure the container and compute scale = min(w/refW, h/refH).
  * Inner stage has fontSize: 16px so 1rem is fixed and layout is purely 720p.
+ *
+ * IMPORTANT: Uses CSS `zoom` rather than `transform: scale()` for scaling.
+ * `transform: scale()` rasterises the content at 720p layout pixels then GPU-upscales
+ * the bitmap — producing blurry text and graphics on high-res displays. `zoom` causes
+ * the browser to re-lay out and re-rasterise at the final zoomed pixel density, so
+ * content is always rendered at native screen resolution and remains crisp.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -59,8 +65,7 @@ const ReferenceViewport: React.FC<ReferenceViewportProps> = ({
         style={{
           width: refSize.width,
           height: refSize.height,
-          transformOrigin: 'center center',
-          transform: `scale(${scale})`,
+          zoom: scale,
           fontSize: '16px',
         }}
       >
