@@ -50,6 +50,9 @@ export interface UIState {
   isKioskMode: boolean;
   preventContextMenu: boolean;
   preventKeyboardShortcuts: boolean;
+
+  // Pending restart/reload (from remote command with countdown) — show on-screen countdown
+  pendingRestart: { at: number; label: string } | null;
 }
 
 // Initial state
@@ -76,6 +79,7 @@ const initialState: UIState = {
   isKioskMode: true,
   preventContextMenu: true,
   preventKeyboardShortcuts: true,
+  pendingRestart: null,
 };
 
 // Slice
@@ -224,6 +228,17 @@ const uiSlice = createSlice({
       state.preventKeyboardShortcuts = action.payload;
     },
 
+    setPendingRestart: (
+      state,
+      action: PayloadAction<{ at: number; label: string } | null>,
+    ) => {
+      state.pendingRestart = action.payload;
+    },
+
+    clearPendingRestart: (state) => {
+      state.pendingRestart = null;
+    },
+
     // Reset UI state (useful for logout)
     resetUIState: (state) => {
       // Reset most UI state but keep kiosk settings
@@ -245,6 +260,7 @@ const uiSlice = createSlice({
       state.notifications = [];
       state.renderCount = 0;
       state.lastRenderTime = null;
+      state.pendingRestart = null;
     },
   },
 });
@@ -273,6 +289,8 @@ export const {
   setKioskMode,
   setPreventContextMenu,
   setPreventKeyboardShortcuts,
+  setPendingRestart,
+  clearPendingRestart,
   resetUIState,
 } = uiSlice.actions;
 
@@ -315,6 +333,8 @@ export const selectPreventContextMenu = (state: { ui: UIState }) =>
   state.ui.preventContextMenu;
 export const selectPreventKeyboardShortcuts = (state: { ui: UIState }) =>
   state.ui.preventKeyboardShortcuts;
+export const selectPendingRestart = (state: { ui: UIState }) =>
+  state.ui.pendingRestart;
 
 // Computed selectors
 export const selectOfflineDuration = (state: { ui: UIState }) => {

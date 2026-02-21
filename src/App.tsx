@@ -109,8 +109,9 @@ const EmergencyOverlay: React.FC = () => {
     return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
   }, []);
 
-  const storeOrientation = useSelector(
-    (s: RootState) => s.content.screenContent?.screen?.orientation,
+  /** Prefer ui.orientation (WebSocket) so real-time orientation changes are reflected in overlay. */
+  const storeOrientation = useSelector((s: RootState) =>
+    s.ui.orientation ?? s.content.screenContent?.screen?.orientation,
   );
   const orientation: 'LANDSCAPE' | 'PORTRAIT' =
     orientationOverride ?? storeOrientation ?? 'LANDSCAPE';
@@ -219,8 +220,9 @@ const EmergencyOverlay: React.FC = () => {
 /* ------------------------------------------------------------------
    AppRoutes — manages screen transitions
    ------------------------------------------------------------------ */
-/** Orientation for loading overlay: match display (from content or stored at pairing). */
+/** Orientation for loading overlay: prefer ui (WebSocket), then content, then stored at pairing. */
 function useLoadingOrientation(): 'LANDSCAPE' | 'PORTRAIT' {
+  const fromUi = useSelector((s: RootState) => s.ui.orientation);
   const fromContent = useSelector(
     (s: RootState) => s.content.screenContent?.screen?.orientation,
   );
@@ -228,7 +230,7 @@ function useLoadingOrientation(): 'LANDSCAPE' | 'PORTRAIT' {
     typeof localStorage !== 'undefined'
       ? (localStorage.getItem('screen_orientation') as 'LANDSCAPE' | 'PORTRAIT' | null)
       : null;
-  return fromContent ?? fromStorage ?? 'LANDSCAPE';
+  return fromUi ?? fromContent ?? fromStorage ?? 'LANDSCAPE';
 }
 
 const AppRoutes: React.FC = () => {

@@ -202,8 +202,10 @@ const DisplayScreen: React.FC = () => {
     return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
   }, []);
 
+  /** Prefer ui.orientation (updated by WebSocket) so real-time orientation changes from admin are reflected. */
+  const uiOrientation = useSelector((s: RootState) => s.ui.orientation);
   const orientation: 'LANDSCAPE' | 'PORTRAIT' =
-    orientationOverride ?? screenContent?.screen?.orientation ?? 'LANDSCAPE';
+    orientationOverride ?? uiOrientation ?? screenContent?.screen?.orientation ?? 'LANDSCAPE';
 
   const masjidName =
     screenContent?.masjid?.name ??

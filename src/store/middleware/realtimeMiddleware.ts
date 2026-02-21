@@ -18,7 +18,7 @@ import {
   resetReconnectAttempts,
   clearError,
 } from '../slices/emergencySlice';
-import { setOrientation } from '../slices/uiSlice';
+import { setOrientation, setPendingRestart, clearPendingRestart } from '../slices/uiSlice';
 import logger from '../../utils/logger';
 
 interface AuthShape {
@@ -36,6 +36,11 @@ export const realtimeMiddleware: Middleware = (api: any) => {
 
     initialised = true;
     logger.info('[RealtimeMW] Starting WebSocket and sync');
+
+    // Show on-screen countdown when a delayed restart/reload is scheduled
+    remoteControlService.setOnScheduledRestart((delaySeconds, label) => {
+      api.dispatch(setPendingRestart({ at: Date.now() + delaySeconds * 1_000, label }));
+    });
 
     // WebSocket event listeners
     unsubs.push(
@@ -91,10 +96,11 @@ export const realtimeMiddleware: Middleware = (api: any) => {
       }),
     );
 
-    // Remote commands
+    // Remote commands (command object includes type from screen:command / screen:command:${type})
     unsubs.push(
       realtimeService.on<any>('command', async (cmd) => {
         const commandId = cmd.commandId || cmd.id || `cmd-${Date.now()}`;
+        const commandType = cmd.type;
         try {
           await remoteControlService.handleCommand({
             commandId,
@@ -102,9 +108,14 @@ export const realtimeMiddleware: Middleware = (api: any) => {
             payload: cmd.payload,
             timestamp: cmd.timestamp || new Date().toISOString(),
           });
-          realtimeService.acknowledgeCommand(commandId, true);
+          realtimeService.acknowledgeCommand(commandId, true, undefined, commandType);
+          if (commandType === 'CLEAR_CACHE') {
+            import('../slices/contentSlice').then(({ refreshAllContent }) => {
+              (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
+            });
+          }
         } catch (err) {
-          realtimeService.acknowledgeCommand(commandId, false, String(err));
+          realtimeService.acknowledgeCommand(commandId, false, String(err), commandType);
         }
       }),
     );
@@ -146,6 +157,8 @@ export const realtimeMiddleware: Middleware = (api: any) => {
   const cleanup = () => {
     unsubs.forEach((fn) => fn());
     unsubs.length = 0;
+    api.dispatch(clearPendingRestart());
+    remoteControlService.clearScheduledRestart();
     realtimeService.disconnect();
     syncService.stop();
     initialised = false;
@@ -169,6 +182,7 @@ export const realtimeMiddleware: Middleware = (api: any) => {
 export const cleanupRealtimeMiddleware = () => {
   unsubs.forEach((fn) => fn());
   unsubs.length = 0;
+  remoteControlService.clearScheduledRestart();
   realtimeService.disconnect();
   syncService.stop();
   initialised = false;
