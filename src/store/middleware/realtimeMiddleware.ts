@@ -48,18 +48,29 @@ export const realtimeMiddleware: Middleware = (api: any) => {
         api.dispatch(setConnectionStatus({ isConnected: true, isConnecting: false }));
         api.dispatch(resetReconnectAttempts());
         api.dispatch(clearError());
+        // WebSocket is up — suppress HTTP heartbeat fallback
+        syncService.setHttpHeartbeatEnabled(false);
       }),
     );
 
     unsubs.push(
       realtimeService.on('disconnect', () => {
         api.dispatch(setConnectionStatus({ isConnected: false, isConnecting: false }));
+        // WebSocket lost — resume HTTP heartbeat so the display stays visible in admin
+        syncService.setHttpHeartbeatEnabled(true);
       }),
     );
 
     unsubs.push(
       realtimeService.on('reconnect', () => {
         api.dispatch(incrementReconnectAttempts());
+      }),
+    );
+
+    // Log heartbeat acks for RTT visibility (no Redux action needed)
+    unsubs.push(
+      realtimeService.on<{ serverTime?: string }>('heartbeat:ack', (ack) => {
+        logger.debug('[RealtimeMW] Heartbeat ack', { serverTime: ack?.serverTime });
       }),
     );
 

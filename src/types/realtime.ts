@@ -45,7 +45,7 @@ export interface RemoteCommandData {
 }
 
 /**
- * Heartbeat metrics sent to the server
+ * Heartbeat metrics sent to the server (legacy — prefer HeartbeatPayload)
  */
 export interface HeartbeatMetrics {
   cpuUsage?: number;
@@ -62,6 +62,47 @@ export interface HeartbeatMetrics {
   connectionType?: string;
   signalStrength?: number;
   updateProgress?: number;
+}
+
+/**
+ * Full heartbeat payload sent over WebSocket via display:heartbeat.
+ * All fields except timestamp are optional — send only what the device can collect.
+ */
+export interface HeartbeatPayload {
+  /** ISO 8601 timestamp of when the heartbeat was generated */
+  timestamp: string;
+  status?: 'ONLINE' | 'OFFLINE' | 'PAIRING';
+  version?: string;
+  cpuUsage?: number;
+  /** JS heap usage as a percentage (0–100) */
+  memoryUsage?: number;
+  /** Persistent storage used in GB */
+  storageUsed?: number;
+  networkLatency?: number;
+  bandwidthUsage?: number;
+  frameRate?: number;
+  displayBrightness?: number;
+  /** e.g. "1920x1080" */
+  resolution?: string;
+  /** Device temperature in °C */
+  temperature?: number;
+  /** ID of content currently being displayed */
+  currentContent?: string;
+  contentLoadTime?: number;
+  contentErrors?: number;
+  signalStrength?: number;
+  /** e.g. "WIFI" | "ETHERNET" | "CELLULAR" */
+  connectionType?: string;
+  powerConsumption?: number;
+  ambientLight?: number;
+}
+
+/**
+ * Acknowledgement payload returned by the server after display:heartbeat
+ */
+export interface HeartbeatAck {
+  timestamp: string;
+  serverTime: string;
 }
 
 /**

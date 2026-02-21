@@ -102,6 +102,13 @@ class SyncService {
   private isStarted: boolean = false;
   private isPaused: boolean = false;
 
+  /**
+   * Controls whether the HTTP heartbeat fallback is active.
+   * Disabled when the WebSocket is connected (heartbeats go via WS instead).
+   * Enabled when the WebSocket disconnects so the display stays visible in the admin.
+   */
+  private httpHeartbeatEnabled: boolean = true;
+
   constructor() {
     logger.info('[SyncService] Created');
   }
@@ -160,6 +167,19 @@ class SyncService {
     if (this.isPaused) return;
     logger.info('[SyncService] Pausing sync');
     this.isPaused = true;
+  }
+
+  /**
+   * Enable or disable the HTTP heartbeat fallback.
+   *
+   * Call with `false` when the WebSocket connects (heartbeats travel over WS).
+   * Call with `true` when the WebSocket disconnects so the display remains visible
+   * in the admin and can still receive queued commands via HTTP.
+   */
+  public setHttpHeartbeatEnabled(enabled: boolean): void {
+    if (this.httpHeartbeatEnabled === enabled) return;
+    this.httpHeartbeatEnabled = enabled;
+    logger.info('[SyncService] HTTP heartbeat fallback', { enabled });
   }
 
   /**
@@ -414,9 +434,18 @@ class SyncService {
   }
 
   /**
-   * Send heartbeat to server
+   * Send heartbeat to server via HTTP.
+   *
+   * This is the fallback path — only active when the WebSocket is disconnected.
+   * When the WebSocket is connected, `httpHeartbeatEnabled` is false and this
+   * method returns immediately without making any network request.
    */
   public async sendHeartbeat(): Promise<SyncResult<HeartbeatResponse>> {
+    if (!this.httpHeartbeatEnabled) {
+      logger.debug('[SyncService] HTTP heartbeat skipped — WebSocket connected');
+      return { success: true };
+    }
+
     if (this.state.heartbeat.isLoading) {
       return { success: false, error: 'Heartbeat in progress' };
     }

@@ -7,12 +7,20 @@
  *
  * Uses server contract: screen:command / screen:command:${type}, display:command:ack.
  * Single-socket guard and manual reconnection to avoid multiple connections.
+ *
+ * Heartbeat strategy (PRD §5):
+ * - Primary: display:heartbeat over WebSocket, every 30 s (or 5 s in fast mode)
+ * - Payload: timestamp (required) + all available device metrics (optional)
+ * - Fast mode: activated when there are pending command acknowledgements;
+ *   reverts to normal after pendingAcks reaches 0
  */
 
 import { io, Socket } from 'socket.io-client';
 import credentialService from './credentialService';
-import { realtimeUrl, heartbeatInterval } from '../config/environment';
+import { realtimeUrl, heartbeatInterval, heartbeatFastInterval } from '../config/environment';
 import logger from '../utils/logger';
+import { collectMetrics } from '../utils/metricsCollector';
+import type { HeartbeatPayload, HeartbeatAck } from '../types/realtime';
 
 type EventCallback<T = unknown> = (data: T) => void;
 
@@ -42,6 +50,21 @@ class RealtimeService {
   private readonly reconnectDelayMin = 1_000;
   private readonly reconnectDelayMax = 30_000;
 
+  /**
+   * Tracks the number of acknowledged commands that have been sent but not yet
+   * confirmed by the server. When > 0, heartbeat interval switches to fast mode.
+   */
+  private pendingAcks = 0;
+
+  /** Whether heartbeat is currently running at the fast (5 s) interval */
+  private isHeartbeatFast = false;
+
+  /**
+   * Optional callback to retrieve the current content ID from outside this service
+   * (e.g. from the Redux store). Set via setCurrentContentProvider().
+   */
+  private currentContentProvider: (() => string | undefined) | null = null;
+
   /** Connect to the realtime server. No-op if a socket already exists (connecting or connected). */
   connect(): void {
     if (this.socket !== null) {
@@ -57,7 +80,6 @@ class RealtimeService {
 
     this.isIntentionalDisconnect = false;
     const url = realtimeUrl;
-    // Use apiKey from paired-credentials (POST /api/screens/paired-credentials). Ids must be strings or server rejects.
     const screenId = String(credentials.screenId);
     const masjidId = String(credentials.masjidId ?? credentialService.getMasjidId() ?? '');
     const token = credentials.apiKey;
@@ -109,8 +131,17 @@ class RealtimeService {
   }
 
   /**
+   * Register a function that returns the currently displayed content ID.
+   * Called on each heartbeat tick so metrics include the live content ID.
+   */
+  setCurrentContentProvider(provider: () => string | undefined): void {
+    this.currentContentProvider = provider;
+  }
+
+  /**
    * Acknowledge a command to the server.
    * Emits display:command:ack with { commandId, commandType, success, error } per server contract.
+   * Decrements pendingAcks and reverts heartbeat to normal interval if no acks remain.
    */
   acknowledgeCommand(
     commandId: string,
@@ -124,11 +155,32 @@ class RealtimeService {
       success,
       error: error ?? null,
     });
+
+    this.pendingAcks = Math.max(0, this.pendingAcks - 1);
+    if (this.pendingAcks === 0 && this.isHeartbeatFast) {
+      logger.debug('[Realtime] No pending acks — reverting heartbeat to normal interval');
+      this.startHeartbeat();
+    }
   }
 
-  /** Send heartbeat metrics */
-  sendHeartbeat(metrics: Record<string, unknown>): void {
-    this.socket?.emit('display:heartbeat', { timestamp: new Date().toISOString(), ...metrics });
+  /**
+   * Signal that a new command has been received and is being processed.
+   * Switches heartbeat to fast mode so the ack reaches the server quickly.
+   */
+  notifyCommandReceived(): void {
+    this.pendingAcks += 1;
+    if (!this.isHeartbeatFast) {
+      logger.debug('[Realtime] Pending ack — switching heartbeat to fast interval');
+      this.startHeartbeat(true);
+    }
+  }
+
+  /** Send a heartbeat with optional extra metrics merged in. */
+  sendHeartbeat(extra: Partial<HeartbeatPayload> = {}): void {
+    this.socket?.emit('display:heartbeat', {
+      timestamp: new Date().toISOString(),
+      ...extra,
+    });
   }
 
   /** Check connection status */
@@ -140,18 +192,43 @@ class RealtimeService {
   /*  Heartbeat                                                          */
   /* ------------------------------------------------------------------ */
 
-  private startHeartbeat(): void {
+  /**
+   * Start (or restart) the periodic heartbeat interval.
+   * @param fast - When true, uses the fast (5 s) interval; otherwise the normal (30 s) interval.
+   */
+  private startHeartbeat(fast = false): void {
     this.stopHeartbeat();
+    this.isHeartbeatFast = fast;
+    const interval = fast ? heartbeatFastInterval : heartbeatInterval;
+
     this.heartbeatTimer = setInterval(() => {
-      this.sendHeartbeat({ status: 'online', uptime: performance.now() });
-    }, heartbeatInterval);
-    this.sendHeartbeat({ status: 'online', uptime: performance.now() });
+      void this.emitHeartbeatWithMetrics();
+    }, interval);
+
+    // Send initial heartbeat immediately
+    void this.emitHeartbeatWithMetrics();
   }
 
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    this.isHeartbeatFast = false;
+  }
+
+  /** Collect metrics then emit display:heartbeat. Fire-and-forget async. */
+  private async emitHeartbeatWithMetrics(): Promise<void> {
+    try {
+      const currentContentId = this.currentContentProvider?.();
+      const metrics = await collectMetrics(currentContentId);
+      this.sendHeartbeat(metrics);
+    } catch (err) {
+      // Always send at minimum a timestamp-only heartbeat even if metrics fail
+      logger.warn('[Realtime] Metrics collection failed, sending minimal heartbeat', {
+        error: String(err),
+      });
+      this.sendHeartbeat();
     }
   }
 
@@ -193,6 +270,7 @@ class RealtimeService {
     this.socket.on('connect', () => {
       this.isConnected = true;
       this.reconnectAttempts = 0;
+      this.pendingAcks = 0;
       logger.info('[Realtime] Connected');
       this.startHeartbeat();
       this.emit('connect', {});
@@ -212,6 +290,12 @@ class RealtimeService {
       this.scheduleReconnect();
     });
 
+    // Server acknowledges the heartbeat — forward for RTT logging / debugging
+    this.socket.on('display:heartbeat:ack', (data: HeartbeatAck) => {
+      logger.debug('[Realtime] Heartbeat ack received', { serverTime: data?.serverTime });
+      this.emit('heartbeat:ack', data);
+    });
+
     // Emergency alerts
     this.socket.on('emergency:alert', (data: unknown) => this.emit('emergency:alert', data));
     this.socket.on('emergency:clear', (data: unknown) => this.emit('emergency:clear', data));
@@ -222,6 +306,7 @@ class RealtimeService {
     // Commands: server sends screen:command (generic) and screen:command:${type}
     const forwardCommand = (data: unknown, type?: string) => {
       const payload = data && typeof data === 'object' ? { ...(data as object), type } : { type };
+      this.notifyCommandReceived();
       this.emit('command', payload);
     };
     this.socket.on('screen:command', (data: unknown) => forwardCommand(data));

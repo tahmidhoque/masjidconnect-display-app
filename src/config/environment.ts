@@ -13,6 +13,8 @@ export interface EnvironmentConfig {
 
   // Sync intervals (ms)
   heartbeatInterval: number;
+  /** Fast heartbeat interval used when there are pending command acknowledgements */
+  heartbeatFastInterval: number;
   contentSyncInterval: number;
   prayerTimesSyncInterval: number;
   eventsSyncInterval: number;
@@ -31,6 +33,8 @@ const DEFAULTS = {
   DEV_REALTIME_URL: 'http://localhost:3002',
 
   HEARTBEAT_INTERVAL: 30_000,
+  /** Used when pending command acks need to reach the server quickly */
+  HEARTBEAT_FAST_INTERVAL: 5_000,
   CONTENT_SYNC_INTERVAL: 5 * 60_000,
   PRAYER_TIMES_SYNC_INTERVAL: 24 * 60 * 60_000,
   EVENTS_SYNC_INTERVAL: 30 * 60_000,
@@ -65,6 +69,7 @@ function buildConfig(): EnvironmentConfig {
     isDevelopment: isDev,
     isProduction: import.meta.env.PROD,
     heartbeatInterval: DEFAULTS.HEARTBEAT_INTERVAL,
+    heartbeatFastInterval: DEFAULTS.HEARTBEAT_FAST_INTERVAL,
     contentSyncInterval: DEFAULTS.CONTENT_SYNC_INTERVAL,
     prayerTimesSyncInterval: DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL,
     eventsSyncInterval: DEFAULTS.EVENTS_SYNC_INTERVAL,
@@ -84,6 +89,7 @@ export const {
   isDevelopment: isDevMode,
   isProduction,
   heartbeatInterval,
+  heartbeatFastInterval,
   contentSyncInterval,
   prayerTimesSyncInterval,
   eventsSyncInterval,
