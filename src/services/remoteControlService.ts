@@ -9,6 +9,7 @@
 import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
+import { checkAndApplyUpdate } from '../pwa';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
 export interface RemoteCommand {
@@ -158,8 +159,8 @@ class RemoteControlService {
         logger.info('[RemoteControl] Display content cache cleared; refetch is triggered by middleware');
         break;
       case 'FORCE_UPDATE':
-        // Forward to companion service (if available)
-        logger.info('[RemoteControl] FORCE_UPDATE requested', { payload: String(payload) });
+        logger.info('[RemoteControl] FORCE_UPDATE: checking for app update');
+        await checkAndApplyUpdate();
         break;
       case 'FACTORY_RESET':
         localStorage.clear();
