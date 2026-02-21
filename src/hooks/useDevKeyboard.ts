@@ -17,6 +17,7 @@
  *   Ctrl + Shift + R  — Toggle Ramadan mode
  *   Ctrl + Shift + J  — Cycle prayer phase (jamaat-soon → in-prayer → auto)
  *   Ctrl + Shift + O  — Cycle orientation (landscape → portrait → auto)
+ *   Ctrl + Shift + N  — Advance carousel to next slide immediately
  *   Escape            — Clear current alert
  */
 
@@ -29,6 +30,7 @@ import {
 import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
 import type { PrayerPhase } from './usePrayerPhase';
+import { CAROUSEL_ADVANCE_EVENT } from '../components/display/ContentCarousel';
 import logger from '../utils/logger';
 
 /* ------------------------------------------------------------------ */
@@ -166,6 +168,7 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
       'Ctrl+Shift+J': 'Cycle prayer phase (jamaat-soon → in-prayer → auto)',
       'Ctrl+Shift+O': 'Cycle orientation (landscape → portrait → auto)',
+      'Ctrl+Shift+N': 'Advance carousel to next slide',
       'Escape': 'Clear current alert',
     });
 
@@ -190,6 +193,14 @@ const useDevKeyboard = (): void => {
         if (e.key === 'O' || e.key === 'o') {
           e.preventDefault();
           toggleOrientationForce();
+          return;
+        }
+
+        // Carousel next slide (N or n)
+        if (e.key === 'N' || e.key === 'n') {
+          e.preventDefault();
+          logger.info('[DevKeyboard] Advancing carousel to next slide');
+          window.dispatchEvent(new Event(CAROUSEL_ADVANCE_EVENT));
           return;
         }
 

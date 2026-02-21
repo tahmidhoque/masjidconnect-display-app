@@ -43,21 +43,82 @@ import usePrayerPhase from '../../hooks/usePrayerPhase';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
- * Map a single schedule item (normalized or raw) to a CarouselItem.
+ * Resolve the per-item duration (seconds) from wherever the API sends it.
+ * Returns undefined when no valid duration is found (carousel uses its default interval).
+ */
+function resolveItemDuration(item: any, content: any): number | undefined {
+  const raw = item.duration ?? item.contentItem?.duration ?? content.duration;
+  if (typeof raw !== 'number' || raw <= 0) return undefined;
+  // API sometimes sends milliseconds (>300) — convert to seconds
+  return raw <= 300 ? raw : raw / 1000;
+}
+
+/**
+ * Map a single schedule item (normalized or raw) to one or more CarouselItems.
+ *
+ * Returns an ARRAY so that ASMA_AL_HUSNA items can be expanded into one slide
+ * per divine name. All other item types return a single-element array.
+ *
  * Normalized items have type, title, content (with body/description/arabicText/source/imageUrl).
- * Raw items may have contentItem wrapper — we read from both top-level and contentItem.
+ * Raw items may have a contentItem wrapper — we read from both top-level and contentItem.
  * Supports common API shapes: body, description, message, text, and string content.
  */
-function scheduleItemToCarouselItem(item: any, index: number): CarouselItem {
+function scheduleItemToCarouselItems(item: any, index: number): CarouselItem[] {
   const content = item.content ?? item.contentItem?.content ?? {};
-  const title =
+  const type = item.type ?? item.contentItem?.type ?? 'Content';
+  const isAsmaAlHusna =
+    typeof type === 'string' && type.toUpperCase() === 'ASMA_AL_HUSNA';
+
+  // --- ASMA_AL_HUSNA: single slot with random name selection ---
+  // Keep one carousel slot for the whole set. The ContentCarousel component
+  // picks a random name from `names` each time this slide becomes active,
+  // so a different name is shown every time the carousel cycles to this slot.
+  if (isAsmaAlHusna) {
+    const namesArray: any[] | undefined =
+      content.names ??
+      content.items ??
+      content.asmaAlHusna ??
+      content.asma;
+
+    if (Array.isArray(namesArray) && namesArray.length > 0) {
+      return [{
+        id: item.id ?? `sched-${index}`,
+        type,
+        duration: resolveItemDuration(item, content),
+        names: namesArray.map((name: any) => ({
+          arabic:
+            name.arabic ?? name.arabicName ?? name.arabic_name,
+          transliteration:
+            name.transliteration ?? name.romanized ?? name.name ??
+            name.englishName ?? name.english_name,
+          meaning:
+            name.meaning ?? name.englishMeaning ?? name.english_meaning ??
+            name.translation,
+          number:
+            typeof (name.number ?? name.id ?? name.index) === 'number'
+              ? (name.number ?? name.id ?? name.index)
+              : undefined,
+        })),
+      }];
+    }
+  }
+
+  // --- Single-item fallback (all other types, or ASMA_AL_HUSNA without a names array) ---
+
+  // Title: for Asma ul Husna with a flat single-name payload, prefer meaning as heading
+  const rawTitle =
     item.title ??
     item.contentItem?.title ??
-    content.title ??
-    'No Title';
-  const type = item.type ?? item.contentItem?.type ?? 'Content';
+    content.title;
+  const title =
+    rawTitle && rawTitle !== 'No Title'
+      ? rawTitle
+      : isAsmaAlHusna
+        ? (content.meaning ?? content.englishMeaning ?? rawTitle ?? 'No Title')
+        : (rawTitle ?? 'No Title');
 
-  // Body: try all common API field names (announcements often use message or text)
+  // Body: try all common API field names. For Asma ul Husna the backend may
+  // send `meaning` or `englishMeaning` as the English translation.
   const body =
     (typeof content === 'string' ? content : null) ??
     content.body ??
@@ -65,6 +126,8 @@ function scheduleItemToCarouselItem(item: any, index: number): CarouselItem {
     content.message ??
     content.text ??
     content.translation ??
+    content.meaning ??
+    content.englishMeaning ??
     content.shortDescription ??
     (item as any).body ??
     (item as any).description ??
@@ -72,6 +135,14 @@ function scheduleItemToCarouselItem(item: any, index: number): CarouselItem {
     (item.contentItem && typeof item.contentItem === 'object'
       ? (item.contentItem as any).body ?? (item.contentItem as any).message ?? (item.contentItem as any).description
       : undefined);
+
+  // Arabic body: for Asma ul Husna the backend may use `arabicName` or `name`
+  // (the Arabic script of the divine name) rather than the generic `arabicText`.
+  const arabicBody =
+    content.arabicText ??
+    content.arabic ??
+    content.arabicName ??
+    (isAsmaAlHusna ? content.name : undefined);
 
   // Image: try common field names
   const imageUrl =
@@ -83,25 +154,16 @@ function scheduleItemToCarouselItem(item: any, index: number): CarouselItem {
     (item as any).imageUrl ??
     (item as any).bannerUrl;
 
-  // Duration: per-item display time in seconds (API/contentItem use seconds, e.g. 20, 30)
-  const rawDuration = item.duration ?? item.contentItem?.duration ?? content.duration;
-  const duration =
-    typeof rawDuration === 'number' && rawDuration > 0
-      ? rawDuration <= 300
-        ? rawDuration
-        : rawDuration / 1000
-      : undefined;
-
-  return {
+  return [{
     id: item.id ?? `sched-${index}`,
     type: typeof type === 'string' ? type : 'Content',
     title: typeof title === 'string' ? title : undefined,
     body: typeof body === 'string' ? body : undefined,
-    arabicBody: content.arabicText ?? content.arabic,
+    arabicBody: typeof arabicBody === 'string' ? arabicBody : undefined,
     source: content.source ?? content.reference,
     imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
-    duration: duration,
-  };
+    duration: resolveItemDuration(item, content),
+  }];
 }
 
 /**
@@ -154,18 +216,18 @@ function buildCarouselItems(
   // Prefer normalized schedule from state when it has items
   const scheduleItems = schedule?.items;
   if (Array.isArray(scheduleItems) && scheduleItems.length > 0) {
-    scheduleItems.forEach((item, i) => {
+    scheduleItems.forEach((item) => {
       if (!item) return;
-      items.push(scheduleItemToCarouselItem(item, items.length));
+      scheduleItemToCarouselItems(item, items.length).forEach((ci) => items.push(ci));
     });
   } else {
     // Fallback: build from raw screenContent schedule
     const rawSchedule = screenContent?.schedule ?? screenContent?.data?.schedule;
     const rawItems = Array.isArray(rawSchedule) ? rawSchedule : rawSchedule?.items;
     if (Array.isArray(rawItems)) {
-      rawItems.forEach((item: any, i: number) => {
+      rawItems.forEach((item: any) => {
         if (!item) return;
-        items.push(scheduleItemToCarouselItem(item, items.length));
+        scheduleItemToCarouselItems(item, items.length).forEach((ci) => items.push(ci));
       });
     }
   }

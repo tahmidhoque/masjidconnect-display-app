@@ -14,6 +14,17 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
+/** Custom event fired by the dev keyboard shortcut (Ctrl+Shift+N) to skip to the next slide instantly. */
+export const CAROUSEL_ADVANCE_EVENT = 'carousel-advance';
+
+/** A single divine name entry used by ASMA_AL_HUSNA slides. */
+export interface AsmaName {
+  arabic?: string;
+  transliteration?: string;
+  meaning?: string;
+  number?: number;
+}
+
 export interface CarouselItem {
   id: string;
   type: string;
@@ -25,6 +36,11 @@ export interface CarouselItem {
   imageUrl?: string;
   /** Display duration in seconds for this slide (overrides default interval when set) */
   duration?: number;
+  /**
+   * For ASMA_AL_HUSNA items: the full list of divine names from the API.
+   * The carousel picks one at random each time this slide becomes active.
+   */
+  names?: AsmaName[];
 }
 
 interface ContentCarouselProps {
@@ -48,6 +64,7 @@ function getContentTypeLabel(type: string): string {
     event: 'Event',
     content: 'Content',
     custom: 'Content',
+    asma_al_husna: 'Names of Allah',
   };
   return labels[type.toLowerCase()] ?? type;
 }
@@ -56,6 +73,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   const [activeIdx, setActiveIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const [contentScale, setContentScale] = useState(1);
+  /** Index into the current item's `names` array; re-randomised whenever the active slide changes. */
+  const [selectedNameIdx, setSelectedNameIdx] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -94,6 +113,26 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
     setActiveIdx(0);
     setPhase('in');
   }, [items]);
+
+  /**
+   * When the active slide changes, pick a new random name if the slide is an
+   * ASMA_AL_HUSNA item with a `names` array. This ensures a different name is
+   * shown each time the carousel cycles back to that slot.
+   */
+  useEffect(() => {
+    const activeItem = safeItems[activeIdx];
+    if (activeItem?.names && activeItem.names.length > 0) {
+      setSelectedNameIdx(Math.floor(Math.random() * activeItem.names.length));
+    }
+  }, [activeIdx, safeItems]);
+
+  /** Dev-only: listen for the carousel-advance event to skip slides instantly. */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const handler = () => advance();
+    window.addEventListener(CAROUSEL_ADVANCE_EVENT, handler);
+    return () => window.removeEventListener(CAROUSEL_ADVANCE_EVENT, handler);
+  }, [advance]);
 
   /**
    * Auto-scale: measure the content's natural height (scrollHeight is
@@ -144,6 +183,16 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   const item = safeItems[activeIdx] ?? safeItems[0];
   const isScaled = contentScale < 1;
 
+  // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
+  // from the randomly selected entry rather than from the item-level fields.
+  const selectedName = item.names?.[selectedNameIdx];
+  const displayTitle    = selectedName?.transliteration ?? item.title;
+  const displayArabic   = selectedName?.arabic           ?? item.arabicBody;
+  const displayBody     = selectedName?.meaning          ?? item.body;
+  const displaySource   = selectedName
+    ? (typeof selectedName.number === 'number' ? `Name ${selectedName.number} of 99` : undefined)
+    : item.source;
+
   return (
     <div className="panel flex flex-col h-full overflow-hidden relative">
       {/* Measurement container — defines the available height for content */}
@@ -181,23 +230,23 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
             )}
 
             {/* Title */}
-            {item.title && (
-              <h2 className="text-heading text-text-primary">{item.title}</h2>
+            {displayTitle && (
+              <h2 className="text-heading text-text-primary">{displayTitle}</h2>
             )}
 
             {/* Arabic text */}
-            {item.arabicBody && (
-              <p className="arabic-text text-2xl text-gold leading-relaxed">{item.arabicBody}</p>
+            {displayArabic && (
+              <p className="arabic-text text-2xl text-gold leading-relaxed">{displayArabic}</p>
             )}
 
             {/* English body */}
-            {item.body && (
-              <p className="text-body text-text-secondary leading-relaxed">{item.body}</p>
+            {displayBody && (
+              <p className="text-body text-text-secondary leading-relaxed">{displayBody}</p>
             )}
 
             {/* Source */}
-            {item.source && (
-              <p className="text-caption text-text-muted italic">— {item.source}</p>
+            {displaySource && (
+              <p className="text-caption text-text-muted italic">— {displaySource}</p>
             )}
           </div>
         </div>
