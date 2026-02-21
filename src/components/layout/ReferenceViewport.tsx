@@ -55,7 +55,7 @@ const ReferenceViewport: React.FC<ReferenceViewportProps> = ({
       className="w-full h-full flex items-center justify-center overflow-hidden"
     >
       <div
-        className="gpu-accelerated shrink-0"
+        className="shrink-0"
         style={{
           width: refSize.width,
           height: refSize.height,

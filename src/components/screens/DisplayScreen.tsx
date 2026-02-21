@@ -21,6 +21,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import { useAppSelector } from '../../store/hooks';
+import { selectMasjidName } from '../../store/slices/contentSlice';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
 import { LandscapeLayout, PortraitLayout, OrientationWrapper, ReferenceViewport } from '../layout';
@@ -205,10 +207,19 @@ const DisplayScreen: React.FC = () => {
   const orientation: 'LANDSCAPE' | 'PORTRAIT' =
     orientationOverride ?? uiOrientation ?? screenContent?.screen?.orientation ?? 'LANDSCAPE';
 
-  const masjidName =
+  // Primary: canonical name extracted by contentSlice (covers all API path variants)
+  // Secondary: inline screenContent extraction for any path not yet covered
+  // Fallback: localStorage set during the pairing handshake
+  const masjidNameFromRedux = useAppSelector(selectMasjidName);
+  const masjidNameFromContent =
     screenContent?.masjid?.name ??
     screenContent?.screen?.masjid?.name ??
     screenContent?.data?.masjid?.name ??
+    null;
+  const masjidName =
+    masjidNameFromRedux ||
+    masjidNameFromContent ||
+    localStorage.getItem('masjid_name') ||
     null;
 
   const carouselInterval =
