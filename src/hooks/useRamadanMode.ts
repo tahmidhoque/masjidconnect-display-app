@@ -193,13 +193,13 @@ export const useRamadanMode = (): RamadanModeData => {
   }, [isRamadan, isFastingHours, iftarTime, currentTime]);
 
   const timeToSuhoorEnd = useMemo(() => {
-    if (!isRamadan || !suhoorEndTime) return null;
+    if (!isRamadan || !imsakTime) return null;
 
     const nowHHmm = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
-    // Only show suhoor countdown between midnight and Fajr
-    if (nowHHmm >= suhoorEndTime) return null;
-    return getTimeUntilNextPrayer(suhoorEndTime, false);
-  }, [isRamadan, suhoorEndTime, currentTime]);
+    // Only show countdown between midnight and Imsak — after Imsak, Suhoor is over
+    if (nowHHmm >= imsakTime) return null;
+    return getTimeUntilNextPrayer(imsakTime, false);
+  }, [isRamadan, imsakTime, currentTime]);
 
   /* ---- Theme attribute side effect ---- */
   const applyTheme = useCallback((active: boolean) => {

@@ -283,7 +283,7 @@ const DisplayScreen: React.FC = () => {
   const countdownSlot = ramadan.isRamadan ? (
     <RamadanCountdownBar
       iftarTime={ramadan.iftarTime}
-      suhoorEndTime={ramadan.suhoorEndTime}
+      suhoorEndTime={ramadan.imsakTime}
       isFastingHours={ramadan.isFastingHours}
       compact={isPortrait}
     />
