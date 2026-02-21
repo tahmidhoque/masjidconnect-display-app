@@ -279,6 +279,30 @@ const AppRoutes: React.FC = () => {
           logger.info('[App] Transition complete', { to: targetScreen });
         }, TRANSITION_MS);
       }, wait);
+    } else if (activeScreen === 'pairing' && targetScreen === 'loading') {
+      // Premium pairing-complete transition: fade the loading overlay IN over
+      // the pairing screen, then silently swap the underlying content once the
+      // overlay is fully opaque (so the swap is invisible to the viewer).
+      clearTimers();
+      setIsTransitioning(true);
+      loadStartRef.current = Date.now(); // MIN_LOADING_MS measured from pairing completion
+
+      // Mount the overlay at opacity 0 first, then trigger the CSS fade via rAF
+      // so the browser has a rendered frame at opacity 0 to transition from.
+      setOverlayMounted(true);
+      setOverlayVisible(false);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setOverlayVisible(true));
+      });
+
+      timerRef.current = setTimeout(() => {
+        // Overlay is now fully opaque — swap the underlying screen invisibly
+        setActiveScreen('loading');
+        setIsTransitioning(false);
+        logger.info('[App] Transition complete', { to: 'loading' });
+      }, TRANSITION_MS);
+
     } else {
       clearTimers();
       setIsTransitioning(true);
@@ -286,7 +310,7 @@ const AppRoutes: React.FC = () => {
         setActiveScreen(targetScreen);
         setIsTransitioning(false);
         if (targetScreen === 'loading') {
-          loadStartRef.current = Date.now(); // Ensures MIN_LOADING_MS applies to initial and post-pairing load
+          loadStartRef.current = Date.now();
           setOverlayMounted(true);
           setOverlayVisible(true);
         }
@@ -302,7 +326,11 @@ const AppRoutes: React.FC = () => {
   /* ---- Content screen ---- */
   const renderContent = () => {
     if (activeScreen === 'loading' && !isTransitioning) return null;
-    const screen = isTransitioning ? targetScreen : activeScreen;
+    // When transitioning TO loading (overlay fading in), keep the current screen
+    // visible underneath so pairing never flashes to black.
+    const screen = (isTransitioning && targetScreen === 'loading')
+      ? activeScreen
+      : (isTransitioning ? targetScreen : activeScreen);
     if (screen === 'loading') return null;
 
     return (
