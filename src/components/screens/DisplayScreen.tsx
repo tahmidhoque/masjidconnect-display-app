@@ -247,7 +247,12 @@ const DisplayScreen: React.FC = () => {
   );
 
   const footerSlot = <Footer />;
-  const prayerPanel = <PrayerTimesPanel isRamadan={ramadan.isRamadan} />;
+  const prayerPanel = (
+    <PrayerTimesPanel
+      isRamadan={ramadan.isRamadan}
+      imsakTime={ramadan.imsakDisplayTime}
+    />
+  );
   const countdown = <PrayerCountdown phase={prayerPhase} />;
 
   /**

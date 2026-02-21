@@ -12,7 +12,6 @@
 import React, { useMemo } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { calculateApproximateHijriDate } from '../../utils/dateUtils';
-import logoGold from '../../assets/logos/logo-gold.svg';
 
 interface HeaderProps {
   masjidName?: string | null;
@@ -68,39 +67,32 @@ const Header: React.FC<HeaderProps> = ({ masjidName, isRamadan = false, ramadanD
         }}
       />
 
-      {/* Left — Logo + Masjid name + Hijri/Ramadan subtitle */}
-      <div className="flex items-center gap-3 min-w-0">
-        <img
-          src={logoGold}
-          alt="MasjidConnect"
-          className="h-8 w-auto shrink-0"
-        />
-        <div className="flex flex-col min-w-0">
-          {masjidName && (
-            <h1
-              className="text-lg font-bold truncate leading-tight"
-              style={{
-                background: 'linear-gradient(90deg, var(--color-gold), var(--color-gold-light))',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              {masjidName}
-            </h1>
-          )}
-          <p
-            className={`text-xs truncate ${
-              isRamadan ? 'text-gold/70 font-medium' : 'text-text-muted'
-            }`}
+      {/* Left — Masjid name + Hijri/Ramadan subtitle */}
+      <div className="flex flex-col min-w-0">
+        {masjidName && (
+          <h1
+            className="text-lg font-bold truncate leading-tight"
+            style={{
+              background: 'linear-gradient(90deg, var(--color-gold), var(--color-gold-light))',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
           >
-            {subtitleContent}
-          </p>
-        </div>
+            {masjidName}
+          </h1>
+        )}
+        <p
+          className={`text-xs truncate ${
+            isRamadan ? 'text-gold/70 font-medium' : 'text-text-muted'
+          }`}
+        >
+          {subtitleContent}
+        </p>
       </div>
 
-      {/* Centre — Gregorian date */}
-      <div className="hidden md:flex flex-col items-center px-4">
+      {/* Centre — Gregorian date (absolutely centred so it never shifts as clock ticks) */}
+      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center pointer-events-none">
         <p className="text-sm text-text-secondary whitespace-nowrap">{dateStr}</p>
       </div>
 

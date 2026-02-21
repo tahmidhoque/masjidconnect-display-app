@@ -17,10 +17,19 @@
  */
 
 import { useMemo, useEffect, useCallback, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { usePrayerTimes } from './usePrayerTimes';
 import { useCurrentTime } from './useCurrentTime';
-import { calculateApproximateHijriDate, getTimeUntilNextPrayer } from '../utils/dateUtils';
+import { calculateApproximateHijriDate, getTimeUntilNextPrayer, formatTimeToDisplay } from '../utils/dateUtils';
+import { selectTimeFormat } from '../store/slices/contentSlice';
 import logger from '../utils/logger';
+
+/**
+ * Default number of minutes before Fajr that Imsak begins.
+ * This will be superseded by `imsakOffsetMinutes` from the API
+ * (`ScreenContentConfig`) once that field is available.
+ */
+const IMSAK_OFFSET_MINUTES = 5;
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -41,6 +50,10 @@ export interface RamadanModeData {
   timeToIftar: string | null;
   /** Live countdown string to Suhoor end (between midnight and Fajr only) */
   timeToSuhoorEnd: string | null;
+  /** Imsak time in HH:mm — IMSAK_OFFSET_MINUTES before Fajr (null outside Ramadan) */
+  imsakTime: string | null;
+  /** Imsak time formatted for display in the screen's configured time format */
+  imsakDisplayTime: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,6 +108,7 @@ function parseHijriString(hijri: string): ParsedHijri | null {
 export const useRamadanMode = (): RamadanModeData => {
   const currentTime = useCurrentTime();
   const { todaysPrayerTimes } = usePrayerTimes();
+  const timeFormat = useSelector(selectTimeFormat);
 
   /* ---- Dev force flag as reactive state ---- */
   const [forceFlag, setForceFlag] = useState<boolean | undefined>(
@@ -142,6 +156,27 @@ export const useRamadanMode = (): RamadanModeData => {
     const maghrib = todaysPrayerTimes.find((p) => p.name === 'Maghrib');
     return maghrib?.time ?? null;
   }, [isRamadan, todaysPrayerTimes]);
+
+  /* ---- Imsak time (IMSAK_OFFSET_MINUTES before Fajr) ---- */
+  const imsakTime = useMemo(() => {
+    if (!isRamadan || !suhoorEndTime) return null;
+
+    const [fajrHours, fajrMinutes] = suhoorEndTime.split(':').map(Number);
+    if (isNaN(fajrHours) || isNaN(fajrMinutes)) return null;
+
+    // Subtract the offset, wrapping around midnight if necessary
+    const totalMinutes = fajrHours * 60 + fajrMinutes - IMSAK_OFFSET_MINUTES;
+    const wrappedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+    const h = Math.floor(wrappedMinutes / 60);
+    const m = wrappedMinutes % 60;
+
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }, [isRamadan, suhoorEndTime]);
+
+  const imsakDisplayTime = useMemo(
+    () => (imsakTime ? formatTimeToDisplay(imsakTime, timeFormat) : null),
+    [imsakTime, timeFormat],
+  );
 
   /* ---- Fasting state ---- */
   const isFastingHours = useMemo(() => {
@@ -195,6 +230,8 @@ export const useRamadanMode = (): RamadanModeData => {
     isFastingHours,
     timeToIftar,
     timeToSuhoorEnd,
+    imsakTime,
+    imsakDisplayTime,
   };
 };
 
