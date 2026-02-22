@@ -20,6 +20,7 @@
     "version:bump:patch": "npm version patch --no-git-tag-version"
   },
   "dependencies": {
+    "@fontsource/amiri": "^5.2.8",
     "@reduxjs/toolkit": "^2.8.2",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
@@ -36,12 +37,12 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.6",
     "@types/react-dom": "^18.2.4",
     "@vitejs/plugin-react": "^5.1.4",
-    "@eslint/js": "^9.15.0",
     "eslint": "^9.15.0",
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Amiri Arabic subset (includes U+FDFA ﷺ) — self-hosted via @fontsource */
+@import "@fontsource/amiri/arabic-400.css";
+@import "@fontsource/amiri/arabic-700.css";
+
 /* ============================================================
    MasjidConnect Design Tokens
    ============================================================ */
@@ -36,8 +40,8 @@
   --color-alert-orange: #F4A261;
   --color-alert-green: #2A9D8F;
 
-  /* Fonts */
-  --font-sans: 'Poppins', system-ui, -apple-system, sans-serif;
+  /* Fonts — Amiri as fallback so ﷺ (U+FDFA) and other Arabic glyphs render on RPi when text uses Poppins */
+  --font-sans: 'Poppins', 'Amiri', system-ui, -apple-system, sans-serif;
   --font-arabic: 'Amiri', 'Traditional Arabic', serif;
 
   /* Animation durations */
@@ -129,25 +133,7 @@ html, body {
        url('/fonts/poppins-bold.woff2') format('woff2');
 }
 
-@font-face {
-  font-family: 'Amiri';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: local('Amiri Regular'), local('Amiri-Regular'),
-       url('/fonts/amiri-regular.woff2') format('woff2');
-  unicode-range: U+0600-06FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE80-FEFC;
-}
-
-@font-face {
-  font-family: 'Amiri';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: local('Amiri Bold'), local('Amiri-Bold'),
-       url('/fonts/amiri-bold.woff2') format('woff2');
-  unicode-range: U+0600-06FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE80-FEFC;
-}
+/* Amiri: loaded via @fontsource/amiri (Arabic subset) above for full Arabic + U+FDFA ﷺ support on RPi */
 
 /* ============================================================
    Utility Classes for GPU-friendly animations

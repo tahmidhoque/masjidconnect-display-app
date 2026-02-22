@@ -1,0 +1,6 @@
+# PAM stack for Cage kiosk (auto-login as the service user).
+# Used by masjidconnect-kiosk.service so Cage/wlroots can register a logind session.
+auth           required        pam_unix.so nullok
+account        required        pam_unix.so
+session        required        pam_unix.so
+session        required        pam_systemd.so

@@ -55,3 +55,6 @@ yarn-error.log*
 
 # Release archives
 *.tar.gz
+
+# Docker-built RPi image output
+rpi-image/out/

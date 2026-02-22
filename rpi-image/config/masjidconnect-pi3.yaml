@@ -1,0 +1,21 @@
+# MasjidConnect Display — rpi-image-gen config for Raspberry Pi 3
+# Same as masjidconnect.yaml but targets Pi 3 (arm64) instead of Pi 5.
+# Builds a bootable image with the app pre-installed; flash SD and boot.
+# Requires: rpi-image-gen (https://github.com/raspberrypi/rpi-image-gen)
+
+include:
+  file: bookworm-minbase.yaml
+
+# Override device from default (rpi5) to Pi 3
+device:
+  layer: rpi3
+
+image:
+  name: masjidconnect-display
+  root_part_size: 250%
+
+layer:
+  app: masjidconnect-display
+
+masjidconnect:
+  app_archive: app/masjidconnect-display.tar.gz

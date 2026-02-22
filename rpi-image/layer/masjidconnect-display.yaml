@@ -15,8 +15,14 @@ mmdebstrap:
   packages:
     - chromium
     - cage
+    - dbus
+    - libseat1
+    - libgl1-mesa-dri
+    - openssh-server
     - curl
     - ca-certificates
+    - plymouth
+    - initramfs-tools
   customize-hooks:
     # Install Node.js 20 from NodeSource (build host needs network)
     - |
@@ -26,8 +32,34 @@ mmdebstrap:
       ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"; [ -z "$ARCHIVE" ] && { echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"; exit 1; }; [ ! -f "$ARCHIVE" ] && { echo "MasjidConnect app archive not found: $ARCHIVE"; exit 1; }; mkdir -p "$1/opt/masjidconnect"; cp "$ARCHIVE" "$1/tmp/masjidconnect-app.tar.gz"; chroot "$1" /bin/bash -c "tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect && rm /tmp/masjidconnect-app.tar.gz"
     # Ownership (pi user is typically 1000:1000)
     - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
-    # Install display server systemd unit
-    - cp $1/opt/masjidconnect/deploy/masjidconnect-display.service $1/etc/systemd/system/
-    # Install cage-based kiosk unit (no X11 required). SRCROOT is set by rpi-image-gen to our layer source dir.
-    - env KIOSK_USER="$IGconf_device_user1" envsubst '${KIOSK_USER}' < "${SRCROOT}/layer/kiosk-cage.service.tpl" > "$1/etc/systemd/system/masjidconnect-kiosk.service"
-    - $BDEBSTRAP_HOOKS/enable-units "$1" masjidconnect-display masjidconnect-kiosk
+    # Kiosk user needs render/video for DRM (Cage/Chromium GPU). Base layer creates user pi (rpi-user-credentials).
+    - chroot $1 /bin/bash -c 'getent group render >/dev/null || groupadd -r render; getent group video >/dev/null || groupadd -r video; usermod -aG render,video pi'
+    # Ensure KMS (vc4) and GPU memory for Cage/Chromium on RPi 3/4
+    - |
+      CFG="$1/boot/firmware/config.txt"
+      [ -f "$CFG" ] || CFG="$1/boot/config.txt"
+      if [ -f "$CFG" ]; then
+        grep -q "^dtoverlay=vc4-kms-v3d" "$CFG" || echo "dtoverlay=vc4-kms-v3d" >> "$CFG"
+        grep -q "^gpu_mem=" "$CFG" && sed -i 's/^gpu_mem=.*/gpu_mem=128/' "$CFG" || echo "gpu_mem=128" >> "$CFG"
+      fi
+    # Install display server systemd unit (run as UID 1000 so Pi Imager custom user e.g. mcadmin works)
+    - cp $1/opt/masjidconnect/deploy/masjidconnect-display.service $1/etc/systemd/system/ && sed -i 's/^User=pi$/User=1000/' "$1/etc/systemd/system/masjidconnect-display.service" && sed -i 's/^Group=pi$/Group=1000/' "$1/etc/systemd/system/masjidconnect-display.service"
+    # Install kiosk setup (adds UID 1000 to render/video at boot) and cage-based kiosk unit
+    - cp "${SRCROOT}/layer/masjidconnect-kiosk-setup.service" "$1/etc/systemd/system/"
+    - cp "${SRCROOT}/layer/kiosk-cage.service.tpl" "$1/etc/systemd/system/masjidconnect-kiosk.service"
+    # PAM config for Cage (required for logind session when replacing getty on tty1)
+    - cp "${SRCROOT}/layer/pam.d/cage" "$1/etc/pam.d/cage"
+    - $BDEBSTRAP_HOOKS/enable-units "$1" masjidconnect-kiosk-setup masjidconnect-display masjidconnect-kiosk
+    # Custom boot splash: copy rpi-image/assets/splash.png into Plymouth pix theme if present
+    - |
+      if [ -f "${SRCROOT}/assets/splash.png" ]; then
+        mkdir -p "$1/usr/share/plymouth/themes/pix"
+        cp "${SRCROOT}/assets/splash.png" "$1/usr/share/plymouth/themes/pix/splash.png"
+        chroot "$1" /bin/bash -c 'update-initramfs -u' || true
+      fi
+    # Optional background image (e.g. for in-app or loading); copy to /opt/masjidconnect for app use
+    - |
+      if [ -f "${SRCROOT}/assets/background.png" ]; then
+        cp "${SRCROOT}/assets/background.png" "$1/opt/masjidconnect/background.png"
+        chroot "$1" chown 1000:1000 /opt/masjidconnect/background.png
+      fi
