@@ -123,9 +123,26 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       prayerName: nextPrayer?.name ?? null,
     };
 
+    const now = nowMinutes(currentTime);
+
+    // === In-prayer window: past current prayer's jamaat but within IN_PRAYER_DURATION_MIN ===
+    // Use currentPrayer so we stay on "Jamaat in progress" for the full duration even after
+    // nextPrayer has already advanced to the next salaat (avoids carousel flashing back after ~0.5s).
+    if (currentPrayer?.jamaat) {
+      const currentJamaatMin = toMinutes(currentPrayer.jamaat);
+      if (currentJamaatMin >= 0 && now >= currentJamaatMin) {
+        const minutesSinceJamaat = now - currentJamaatMin;
+        if (minutesSinceJamaat <= IN_PRAYER_DURATION_MIN) {
+          logger.debug(
+            `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${currentPrayer.name} jamaat`,
+          );
+          return { phase: 'in-prayer', prayerName: currentPrayer.name };
+        }
+      }
+    }
+
     if (!nextPrayer) return defaultResult;
 
-    const now = nowMinutes(currentTime);
     const adhanMin = toMinutes(nextPrayer.time);
     const jamaatMin = toMinutes(nextPrayer.jamaat);
 
@@ -162,17 +179,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       return { phase: 'countdown-jamaat', prayerName };
     }
 
-    // === Past jamaat time ===
-    const minutesSinceJamaat = now - jamaatMin;
-
-    if (minutesSinceJamaat <= IN_PRAYER_DURATION_MIN) {
-      logger.debug(
-        `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since jamaat`,
-      );
-      return { phase: 'in-prayer', prayerName };
-    }
-
-    // Past the in-prayer window — back to normal countdown for next salaat
+    // Past jamaat and past in-prayer window — back to normal countdown for next salaat
     return { phase: 'countdown-adhan', prayerName: nextPrayer.name };
   }, [nextPrayer, currentPrayer, currentTime, forceFlag]);
 

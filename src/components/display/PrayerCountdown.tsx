@@ -23,11 +23,12 @@ interface PrayerCountdownProps {
 
 /**
  * Map a prayer phase to its top label text.
+ * For countdown-jamaat, includes the prayer name e.g. "Zuhr Jamaat in".
  */
-function phaseLabel(phase: PrayerPhase | undefined): string {
+function phaseLabel(phase: PrayerPhase | undefined, prayerName: string | null | undefined): string {
   switch (phase) {
     case 'countdown-jamaat':
-      return 'Jamaat in';
+      return prayerName ? `${prayerName} Jamaat in` : 'Jamaat in';
     case 'jamaat-soon':
       return 'Jamaat starts in';
     case 'in-prayer':
@@ -61,6 +62,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
       return { time: nextPrayer.jamaat, forceTomorrow: false };
     }
 
+    // Past this prayer's jamaat — don't count down to tomorrow's jamaat (avoids "loop").
+    // Show 0s until nextPrayer updates to the next salaat.
+    if (
+      nextPrayer.jamaat &&
+      nextPrayer.time <= nowHHmm &&
+      nowHHmm >= nextPrayer.jamaat
+    ) {
+      return null;
+    }
+
     // If adhan has passed today (and jamaat too, or no jamaat), this is tomorrow's prayer
     if (nextPrayer.time <= nowHHmm) {
       return { time: nextPrayer.time, forceTomorrow: true };
@@ -74,9 +85,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
    * Live countdown string, recomputed every second via currentTime.
    */
   const liveCountdown = useMemo(() => {
-    if (!targetTime) return '';
+    if (!targetTime) return nextPrayer ? '0s' : '';
     return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow);
-  }, [targetTime, currentTime]);
+  }, [targetTime, currentTime, nextPrayer]);
 
   if (!nextPrayer) {
     return null;
@@ -87,7 +98,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     return (
       <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
         <p className="text-caption text-text-muted uppercase tracking-wider">
-          {phaseLabel(phase)}
+          {phaseLabel(phase, nextPrayer?.name)}
         </p>
         <h3 className="text-heading text-gold font-bold">{nextPrayer.name}</h3>
         <p className="text-body text-text-muted">
@@ -101,7 +112,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   return (
     <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
       <p className="text-caption text-text-muted uppercase tracking-wider">
-        {phaseLabel(phase)}
+        {phaseLabel(phase, nextPrayer?.name)}
       </p>
       <h3 className="text-heading text-emerald-light font-bold">{nextPrayer.name}</h3>
 
