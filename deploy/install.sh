@@ -14,6 +14,10 @@
 
 set -euo pipefail
 
+# Resolve app source dir from script location so this works when run as
+# sudo /opt/masjidconnect/deploy/install.sh (e.g. after extracting a tarball).
+DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="$(dirname "${DEPLOY_DIR}")"
 APP_DIR="/opt/masjidconnect"
 # Use the user who ran sudo (e.g. mcadmin); fall back to pi for classic Raspberry Pi OS
 SERVICE_USER="${SUDO_USER:-pi}"
@@ -63,15 +67,26 @@ if ! getent passwd "${SERVICE_USER}" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Ensure systemd service files exist in source (required for install)
+DISPLAY_SVC="${SOURCE_DIR}/deploy/masjidconnect-display.service"
+KIOSK_SVC="${SOURCE_DIR}/deploy/masjidconnect-kiosk.service"
+if [ ! -f "${DISPLAY_SVC}" ] || [ ! -f "${KIOSK_SVC}" ]; then
+  echo "ERROR: Systemd service files not found."
+  echo "  Expected: ${DISPLAY_SVC}"
+  echo "  Expected: ${KIOSK_SVC}"
+  echo "Run this script from the project root or from /opt/masjidconnect after extracting the release tarball."
+  exit 1
+fi
+
 # Create app directory
 echo "Setting up ${APP_DIR}..."
 mkdir -p "${APP_DIR}"
 
-# Copy application files
-echo "Copying application files..."
-cp -r dist/ "${APP_DIR}/dist/"
-cp -r deploy/ "${APP_DIR}/deploy/"
-cp package.json "${APP_DIR}/"
+# Copy application files from source (works whether run from repo or from /opt/masjidconnect)
+echo "Copying application files from ${SOURCE_DIR}..."
+cp -r "${SOURCE_DIR}/dist/" "${APP_DIR}/dist/"
+cp -r "${SOURCE_DIR}/deploy/" "${APP_DIR}/deploy/"
+cp "${SOURCE_DIR}/package.json" "${APP_DIR}/"
 
 # Make scripts executable
 chmod +x "${APP_DIR}/deploy/kiosk.sh"
@@ -80,22 +95,23 @@ chmod +x "${APP_DIR}/deploy/server.mjs"
 # Set ownership
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}"
 
-# Install systemd services (substitute SERVICE_USER into unit files)
+# Install systemd services (substitute SERVICE_USER into unit files) and enable for boot
 echo "Installing systemd services (running as ${SERVICE_USER})..."
 sed -e "s/^User=.*/User=${SERVICE_USER}/" \
     -e "s/^Group=.*/Group=${SERVICE_USER}/" \
-    deploy/masjidconnect-display.service > /etc/systemd/system/masjidconnect-display.service
+    "${DISPLAY_SVC}" > /etc/systemd/system/masjidconnect-display.service
 sed -e "s/^User=.*/User=${SERVICE_USER}/" \
     -e "s/^Group=.*/Group=${SERVICE_USER}/" \
     -e "s|/home/pi/|/home/${SERVICE_USER}/|g" \
-    deploy/masjidconnect-kiosk.service > /etc/systemd/system/masjidconnect-kiosk.service
+    "${KIOSK_SVC}" > /etc/systemd/system/masjidconnect-kiosk.service
 systemctl daemon-reload
 
-# Enable services
+# Enable services to start on boot
+echo "Enabling services to start on boot..."
 systemctl enable masjidconnect-display.service
 systemctl enable masjidconnect-kiosk.service
 
-# Start services
+# Start services now
 echo "Starting services..."
 systemctl start masjidconnect-display.service
 sleep 3
@@ -108,6 +124,9 @@ echo "============================================"
 echo ""
 echo "  Display server: http://localhost:3001"
 echo "  Chromium kiosk will launch automatically."
+echo ""
+echo "  Services are enabled for boot (start automatically on reboot)."
+echo "  Verify with: systemctl is-enabled masjidconnect-display masjidconnect-kiosk"
 echo ""
 echo "  Manage with:"
 echo "    systemctl status masjidconnect-display"

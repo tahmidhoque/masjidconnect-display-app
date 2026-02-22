@@ -12,7 +12,7 @@
 
 [Unit]
 Description=MasjidConnect Kiosk (Chromium)
-After=masjidconnect-display.service graphical-session.target
+After=graphical.target masjidconnect-display.service
 Requires=masjidconnect-display.service
 
 [Service]
@@ -27,5 +27,6 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
+# graphical.target = start when GUI is up (RPi with autologin has DISPLAY=:0)
 [Install]
-WantedBy=graphical-session.target
+WantedBy=graphical.target
