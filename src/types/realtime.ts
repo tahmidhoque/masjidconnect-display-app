@@ -201,5 +201,18 @@ export interface ContentChangeNotification {
   contentType: string;
 }
 
+/**
+ * Payload for content:invalidate WebSocket event.
+ * Do not assume additional fields are present (FR-2).
+ */
+export interface ContentInvalidationPayload {
+  type: "prayer_times" | "schedule" | "content_item" | "schedule_assignment" | "events";
+  masjidId: string;
+  entityId?: string;
+  screenId?: string;
+  action: "created" | "updated" | "deleted";
+  timestamp: string; // ISO 8601
+}
+
 
 

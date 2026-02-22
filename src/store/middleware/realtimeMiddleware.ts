@@ -20,6 +20,7 @@ import {
 } from '../slices/emergencySlice';
 import { setOrientation, setPendingRestart, clearPendingRestart } from '../slices/uiSlice';
 import logger from '../../utils/logger';
+import type { ContentInvalidationPayload } from '../../types/realtime';
 
 interface AuthShape {
   auth: { isAuthenticated: boolean };
@@ -27,6 +28,20 @@ interface AuthShape {
 
 let initialised = false;
 const unsubs: Array<() => void> = [];
+
+/** Coalesce window for content:invalidate (ms). Multiple events per type result in one refetch. */
+const CONTENT_INVALIDATE_COALESCE_MS = 3000;
+
+/** Pending coalesce timeouts per invalidation type. Cleared on cleanup. */
+const invalidationCoalesceMap = new Map<string, ReturnType<typeof setTimeout>>();
+
+const VALID_INVALIDATION_TYPES: Array<ContentInvalidationPayload['type']> = [
+  'prayer_times',
+  'schedule',
+  'content_item',
+  'schedule_assignment',
+  'events',
+];
 
 export const realtimeMiddleware: Middleware = (api: any) => {
   const init = () => {
@@ -138,20 +153,64 @@ export const realtimeMiddleware: Middleware = (api: any) => {
       }),
     );
 
-    // Content update notifications -> dispatch Redux refresh
+    // Content invalidation (content:invalidate) — granular refetch, no full screen reload
     unsubs.push(
-      realtimeService.on('content:update', () => {
-        import('../slices/contentSlice').then(({ refreshAllContent }) => {
-          (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
-        });
-      }),
-    );
+      realtimeService.on<ContentInvalidationPayload>('content:invalidate', (payload) => {
+        if (!payload || typeof payload !== 'object' || typeof payload.type !== 'string') {
+          logger.debug('[RealtimeMW] content:invalidate ignored (invalid payload)', { payload });
+          return;
+        }
+        const invalidationType = payload.type as ContentInvalidationPayload['type'];
+        if (!VALID_INVALIDATION_TYPES.includes(invalidationType)) {
+          logger.debug('[RealtimeMW] content:invalidate ignored (unknown type)', { type: payload.type });
+          return;
+        }
+        const screenId = credentialService.getCredentials()?.screenId;
+        if (payload.screenId != null && payload.screenId !== '' && payload.screenId !== screenId) {
+          logger.debug('[RealtimeMW] content:invalidate ignored (screenId mismatch)', {
+            payloadScreenId: payload.screenId,
+            thisScreenId: screenId,
+          });
+          return;
+        }
 
-    unsubs.push(
-      realtimeService.on('prayer-times:update', () => {
-        import('../slices/contentSlice').then(({ refreshPrayerTimes }) => {
-          (api.dispatch as AppDispatch)(refreshPrayerTimes({ forceRefresh: true }));
+        logger.info('[RealtimeMW] content:invalidate received, scheduling refetch', {
+          type: payload.type,
+          action: payload.action,
+          coalesceMs: CONTENT_INVALIDATE_COALESCE_MS,
         });
+
+        const runRefetch = () => {
+          invalidationCoalesceMap.delete(payload.type);
+          logger.info('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
+          import('../slices/contentSlice').then((mod) => {
+            const dispatch = api.dispatch as AppDispatch;
+            switch (payload.type) {
+              case 'prayer_times':
+                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
+                break;
+              case 'schedule':
+              case 'schedule_assignment':
+                // schedule_assignment: screen's assigned schedule changed — refreshSchedule clears
+                // content cache and fetches fresh content so Redux state.schedule updates correctly.
+                dispatch(mod.refreshSchedule({ forceRefresh: true }));
+                break;
+              case 'content_item':
+                dispatch(mod.refreshContent({ forceRefresh: true }));
+                break;
+              case 'events':
+                dispatch(mod.refreshEvents({ forceRefresh: true }));
+                break;
+              default:
+                break;
+            }
+          });
+        };
+
+        const existing = invalidationCoalesceMap.get(payload.type);
+        if (existing) clearTimeout(existing);
+        const timeoutId = setTimeout(runRefetch, CONTENT_INVALIDATE_COALESCE_MS);
+        invalidationCoalesceMap.set(payload.type, timeoutId);
       }),
     );
 
@@ -175,6 +234,8 @@ export const realtimeMiddleware: Middleware = (api: any) => {
   const cleanup = () => {
     unsubs.forEach((fn) => fn());
     unsubs.length = 0;
+    invalidationCoalesceMap.forEach((id) => clearTimeout(id));
+    invalidationCoalesceMap.clear();
     api.dispatch(clearPendingRestart());
     remoteControlService.clearScheduledRestart();
     realtimeService.disconnect();
@@ -200,6 +261,8 @@ export const realtimeMiddleware: Middleware = (api: any) => {
 export const cleanupRealtimeMiddleware = () => {
   unsubs.forEach((fn) => fn());
   unsubs.length = 0;
+  invalidationCoalesceMap.forEach((id) => clearTimeout(id));
+  invalidationCoalesceMap.clear();
   remoteControlService.clearScheduledRestart();
   realtimeService.disconnect();
   syncService.stop();

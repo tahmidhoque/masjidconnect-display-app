@@ -294,26 +294,33 @@ class SyncService {
   }
 
   /**
-   * Sync content from server
+   * Sync content from server.
+   * @param options.forceRefresh - When true, bypass "content changed" check and clear content cache so we always fetch (e.g. after content:invalidate).
    */
-  public async syncContent(): Promise<SyncResult<ContentResponse>> {
+  public async syncContent(options?: { forceRefresh?: boolean }): Promise<SyncResult<ContentResponse>> {
     if (this.state.content.isLoading) {
       logger.debug('[SyncService] Content sync already in progress');
       return { success: false, error: 'Sync already in progress' };
     }
 
+    const forceRefresh = options?.forceRefresh === true;
+    if (forceRefresh) {
+      await apiClient.clearContentCache();
+      this.lastKnownTimestamps = null;
+    }
+
     this.updateState('content', { isLoading: true, error: null });
 
     try {
-      // Check if content has changed using sync endpoint
-      const shouldSync = await this.checkIfContentChanged();
+      // Check if content has changed using sync endpoint (skip when forceRefresh)
+      const shouldSync = forceRefresh || (await this.checkIfContentChanged());
       if (!shouldSync) {
         logger.debug('[SyncService] Content unchanged, skipping sync');
         this.updateState('content', { isLoading: false });
         return { success: true, fromCache: true };
       }
 
-      const response = await apiClient.getContent();
+      const response = await apiClient.getContent(forceRefresh ? { cacheBust: true } : undefined);
 
       if (response.success && response.data) {
         this.updateState('content', {

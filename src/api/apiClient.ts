@@ -422,7 +422,7 @@ class ApiClient {
         
         // Unwrap the response to get actual content - handle both wrapped and unwrapped formats
         const contentResponse = wrappedResponse.data || wrappedResponse;
-        
+
         // Save the actual content (not the wrapper)
         await storageService.set('screenContent', contentResponse);
         logger.debug('[ApiClient] Saved screen content to storageService');
@@ -619,9 +619,10 @@ class ApiClient {
   }
 
   /**
-   * Get screen content
+   * Get screen content.
+   * @param options.cacheBust - When true, append a unique query param so server/HTTP cache returns fresh data (e.g. after content:invalidate).
    */
-  public async getContent(): Promise<ApiResponse<ContentResponse>> {
+  public async getContent(options?: { cacheBust?: boolean }): Promise<ApiResponse<ContentResponse>> {
     if (!credentialService.hasCredentials()) {
       return {
         success: false,
@@ -629,10 +630,12 @@ class ApiClient {
       };
     }
 
+    const params = options?.cacheBust ? { _t: Date.now() } : undefined;
     return this.getWithCache<ContentResponse>(
       SCREEN_ENDPOINTS.GET_CONTENT,
       CACHE_KEYS.CONTENT,
-      CACHE_TTL.CONTENT
+      CACHE_TTL.CONTENT,
+      params
     );
   }
 
@@ -728,6 +731,22 @@ class ApiClient {
       logger.info('[ApiClient] Cache cleared');
     } catch (error) {
       logger.error('[ApiClient] Failed to clear cache', { error });
+    }
+  }
+
+  /**
+   * Clear only content and sync-status cache so the next getContent() fetches fresh.
+   * Used when content:invalidate forces a schedule/content refetch.
+   */
+  public async clearContentCache(): Promise<void> {
+    try {
+      await Promise.all([
+        localforage.removeItem(CACHE_KEYS.CONTENT),
+        localforage.removeItem(CACHE_KEYS.SYNC_STATUS),
+      ]);
+      logger.debug('[ApiClient] Content cache cleared');
+    } catch (error) {
+      logger.error('[ApiClient] Failed to clear content cache', { error });
     }
   }
 

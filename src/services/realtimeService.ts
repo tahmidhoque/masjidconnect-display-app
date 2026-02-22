@@ -317,6 +317,8 @@ class RealtimeService {
     // Content update notifications
     this.socket.on('content:update', (data: unknown) => this.emit('content:update', data));
     this.socket.on('prayer-times:update', (data: unknown) => this.emit('prayer-times:update', data));
+    // Content invalidation (typed payload; backend may send per-type invalidations)
+    this.socket.on('content:invalidate', (data: unknown) => this.emit('content:invalidate', data));
   }
 
   /** Emit to internal listeners (not to the socket) */

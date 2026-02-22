@@ -252,6 +252,7 @@ const DisplayScreen: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
   const schedule = useSelector((s: RootState) => s.content.schedule);
   const events = useSelector((s: RootState) => s.content.events);
+  const lastScheduleUpdate = useSelector((s: RootState) => s.content.lastScheduleUpdate);
 
   /* Dev-mode orientation override (Ctrl+Shift+O) */
   const [orientationOverride, setOrientationOverride] = useState<
@@ -330,9 +331,15 @@ const DisplayScreen: React.FC = () => {
       case 'in-prayer':
         return <InPrayerScreen prayerName={phasePrayerName} />;
       default:
-        return <ContentCarousel items={carouselItems} interval={carouselInterval} />;
+        return (
+          <ContentCarousel
+            key={lastScheduleUpdate ?? schedule?.id ?? 'default'}
+            items={carouselItems}
+            interval={carouselInterval}
+          />
+        );
     }
-  }, [prayerPhase, phasePrayerName, carouselItems, carouselInterval]);
+  }, [prayerPhase, phasePrayerName, carouselItems, carouselInterval, lastScheduleUpdate, schedule?.id]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;

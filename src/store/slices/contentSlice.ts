@@ -289,19 +289,30 @@ export const refreshContent = createAsyncThunk(
         return { skipped: true, reason: "rate_limited" };
       }
 
-      // Use sync service for robust data fetching
+      // Use sync service for robust data fetching.
+      // When forceRefresh: call syncContent with forceRefresh so we clear content cache and
+      // fetch once; avoid forceRefresh() which runs syncAll() and can race with other syncs.
       if (forceRefresh) {
-        await syncService.forceRefresh();
+        await syncService.syncContent({ forceRefresh: true });
       } else {
         await syncService.syncContent();
       }
 
-      // Get the content from storage after sync
+      // Get the content from storage after sync (schedule/events may be in content or separate keys)
       const content = await storageService.get<ScreenContent>('screenContent');
-
       if (!content) {
         throw new Error("No content received from server");
       }
+
+      // Prefer schedule from the content we just synced (API may embed it); fall back to separate key
+      const contentAny = content as unknown as { schedule?: unknown; data?: { schedule?: unknown } };
+      const scheduleFromContent = contentAny?.schedule ?? contentAny?.data?.schedule;
+      const scheduleFromStorage = await storageService.get<any>('schedule');
+      const scheduleData = scheduleFromContent ?? scheduleFromStorage;
+      const schedule = scheduleData ? normalizeScheduleData(scheduleData) : null;
+
+      const eventsData = await storageService.get<any>('events');
+      const events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
 
       // Extract masjid information
       const masjidName = extractMasjidName(content);
@@ -343,6 +354,8 @@ export const refreshContent = createAsyncThunk(
         carouselTime: carouselTime || 30,
         timeFormat,
         timestamp: new Date().toISOString(),
+        schedule: schedule ?? undefined,
+        events: events ?? undefined,
       };
     } catch (error: any) {
       logger.error("[Content] Error refreshing content", { error });
@@ -467,9 +480,9 @@ export const refreshSchedule = createAsyncThunk(
         return { skipped: true };
       }
 
-      // Schedule is synced as part of content sync
-      logger.info("[Content] Calling syncService.syncContent()...");
-      await syncService.syncContent();
+      // Schedule is synced as part of content sync (force refresh bypasses "unchanged" skip)
+      logger.info("[Content] Calling syncService.syncContent()...", { forceRefresh });
+      await syncService.syncContent({ forceRefresh });
       logger.info("[Content] syncContent() completed");
 
       // Get the schedule from storage after sync
@@ -510,11 +523,26 @@ export const refreshSchedule = createAsyncThunk(
 
 export const refreshEvents = createAsyncThunk(
   "content/refreshEvents",
-  async (_, { rejectWithValue }) => {
+  async (
+    options: { forceRefresh?: boolean } = {},
+    { rejectWithValue },
+  ) => {
     try {
-      logger.debug("[Content] Refreshing events...");
+      const { forceRefresh = false } = options;
+      logger.debug("[Content] Refreshing events...", { forceRefresh });
 
-      // Get existing events from storage for now
+      if (forceRefresh) {
+        try {
+          await syncService.syncEvents();
+          logger.debug("[Content] Events sync completed successfully");
+        } catch (syncError) {
+          logger.warn(
+            "[Content] Events sync failed, falling back to cached data",
+            { error: syncError },
+          );
+        }
+      }
+
       const events = await storageService.get<any>('events');
 
       return {
@@ -598,7 +626,7 @@ export const refreshAllContent = createAsyncThunk(
         dispatch(refreshContent({ forceRefresh })),
         dispatch(refreshPrayerTimes({ forceRefresh: true })),
         dispatch(refreshSchedule({ forceRefresh })),
-        dispatch(refreshEvents()),
+        dispatch(refreshEvents({})),
       ]);
 
       // Log any failures
@@ -706,6 +734,13 @@ const contentSlice = createSlice({
           state.timeFormat = action.payload.timeFormat || "24h";
           state.lastContentUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
+          if (action.payload.schedule !== undefined) {
+            state.schedule = action.payload.schedule ?? null;
+            state.lastScheduleUpdate = action.payload.timestamp || null;
+          }
+          if (action.payload.events !== undefined) {
+            state.events = action.payload.events ?? null;
+          }
         }
 
         // Update general loading state - only stay loading if others are still loading
