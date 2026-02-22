@@ -1,12 +1,15 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import type { RotationDegrees, ScreenOrientation } from "@/types/realtime";
+import { ORIENTATION_TO_DEGREES } from "@/utils/orientation";
 
-// Define Orientation type locally instead of importing from context
-export type Orientation = "LANDSCAPE" | "PORTRAIT";
+/** Display orientation (four values). For layout, use isPortrait = PORTRAIT | PORTRAIT_INVERTED. */
+export type Orientation = ScreenOrientation;
 
 // State interface
 export interface UIState {
-  // Orientation
+  // Orientation (four values) and rotation in degrees (0, 90, 180, 270)
   orientation: Orientation;
+  rotationDegrees: RotationDegrees;
 
   // Offline status
   isOffline: boolean;
@@ -58,6 +61,7 @@ export interface UIState {
 // Initial state
 const initialState: UIState = {
   orientation: "LANDSCAPE",
+  rotationDegrees: 0,
   isOffline: false,
   wasOffline: false,
   offlineStartTime: null,
@@ -87,9 +91,18 @@ const uiSlice = createSlice({
   name: "ui",
   initialState,
   reducers: {
-    // Orientation
+    // Orientation (four values); rotationDegrees derived from mapping when not provided
     setOrientation: (state, action: PayloadAction<Orientation>) => {
       state.orientation = action.payload;
+      state.rotationDegrees = ORIENTATION_TO_DEGREES[action.payload];
+    },
+    // Full screen orientation from WebSocket: orientation + optional rotation (use when rotationDegrees in payload)
+    setScreenOrientation: (
+      state,
+      action: PayloadAction<{ orientation: Orientation; rotationDegrees: RotationDegrees }>,
+    ) => {
+      state.orientation = action.payload.orientation;
+      state.rotationDegrees = action.payload.rotationDegrees;
     },
 
     // Offline status
@@ -242,6 +255,8 @@ const uiSlice = createSlice({
     // Reset UI state (useful for logout)
     resetUIState: (state) => {
       // Reset most UI state but keep kiosk settings
+      state.orientation = "LANDSCAPE";
+      state.rotationDegrees = 0;
       state.isOffline = false;
       state.wasOffline = false;
       state.offlineStartTime = null;
@@ -268,6 +283,7 @@ const uiSlice = createSlice({
 // Export actions
 export const {
   setOrientation,
+  setScreenOrientation,
   setOffline,
   resetOfflineStatus,
   setInitializing,
@@ -297,6 +313,8 @@ export const {
 // Selectors
 export const selectOrientation = (state: { ui: UIState }) =>
   state.ui.orientation;
+export const selectRotationDegrees = (state: { ui: UIState }) =>
+  state.ui.rotationDegrees;
 export const selectIsOffline = (state: { ui: UIState }) => state.ui.isOffline;
 export const selectWasOffline = (state: { ui: UIState }) => state.ui.wasOffline;
 export const selectOfflineStartTime = (state: { ui: UIState }) =>

@@ -18,8 +18,13 @@ import {
   resetReconnectAttempts,
   clearError,
 } from '../slices/emergencySlice';
-import { setOrientation, setPendingRestart, clearPendingRestart } from '../slices/uiSlice';
+import { setScreenOrientation, setPendingRestart, clearPendingRestart } from '../slices/uiSlice';
 import logger from '../../utils/logger';
+import {
+  parseScreenOrientation,
+  parseRotationDegrees,
+  orientationToRotationDegrees,
+} from '../../utils/orientation';
 import type { ContentInvalidationPayload } from '../../types/realtime';
 
 interface AuthShape {
@@ -51,6 +56,22 @@ export const realtimeMiddleware: Middleware = (api: any) => {
 
     initialised = true;
     logger.info('[RealtimeMW] Starting WebSocket and sync');
+
+    // Hydrate orientation from localStorage so rotation is correct before first screen:orientation
+    try {
+      const storedOrientation =
+        typeof localStorage !== 'undefined' ? localStorage.getItem('screen_orientation') : null;
+      const storedDegrees =
+        typeof localStorage !== 'undefined' ? localStorage.getItem('screen_rotation_degrees') : null;
+      if (storedOrientation) {
+        const orientation = parseScreenOrientation(storedOrientation);
+        const parsed = parseRotationDegrees(storedDegrees != null ? parseInt(storedDegrees, 10) : undefined);
+        const rotationDegrees = parsed ?? orientationToRotationDegrees(orientation);
+        api.dispatch(setScreenOrientation({ orientation, rotationDegrees }));
+      }
+    } catch {
+      // ignore
+    }
 
     // Show on-screen countdown when a delayed restart/reload is scheduled
     remoteControlService.setOnScheduledRestart((delaySeconds, label) => {
@@ -118,14 +139,19 @@ export const realtimeMiddleware: Middleware = (api: any) => {
       }),
     );
 
-    // Orientation changes
+    // Orientation changes (four values + optional rotationDegrees; FR-1–FR-8)
     unsubs.push(
       realtimeService.on<any>('orientation:change', (data) => {
-        const o = String(data?.orientation ?? '').toUpperCase() as 'LANDSCAPE' | 'PORTRAIT';
-        if (o === 'LANDSCAPE' || o === 'PORTRAIT') {
-          localStorage.setItem('screen_orientation', o);
-          api.dispatch(setOrientation(o));
+        const orientation = parseScreenOrientation(data?.orientation);
+        const rotationDegrees =
+          parseRotationDegrees(data?.rotationDegrees) ?? orientationToRotationDegrees(orientation);
+        try {
+          localStorage.setItem('screen_orientation', orientation);
+          localStorage.setItem('screen_rotation_degrees', String(rotationDegrees));
+        } catch {
+          // ignore storage errors
         }
+        api.dispatch(setScreenOrientation({ orientation, rotationDegrees }));
       }),
     );
 

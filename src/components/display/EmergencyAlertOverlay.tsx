@@ -24,10 +24,10 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearCurrentAlert } from '@/store/slices/emergencySlice';
-import { useRotationHandling } from '@/hooks/useRotationHandling';
 import type { RootState } from '@/store';
 import type { AlertCategory, AlertUrgency, EmergencyAlert } from '@/api/models';
 import { ORIENTATION_FORCE_EVENT } from '@/hooks/useDevKeyboard';
+import type { RotationDegrees } from '@/types/realtime';
 import logger from '@/utils/logger';
 
 /* ------------------------------------------------------------------ */
@@ -278,13 +278,13 @@ const EmergencyAlertOverlay: React.FC = () => {
     return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
   }, []);
 
-  const storeOrientation = useAppSelector((s: RootState) =>
-    s.ui.orientation ?? s.content.screenContent?.screen?.orientation,
-  );
-  const orientation: 'LANDSCAPE' | 'PORTRAIT' =
-    orientationOverride ?? storeOrientation ?? 'LANDSCAPE';
-
-  const { shouldRotate } = useRotationHandling(orientation);
+  const uiRotationDegrees = useAppSelector((s: RootState) => s.ui.rotationDegrees);
+  const rotationDegrees: RotationDegrees =
+    orientationOverride !== undefined
+      ? orientationOverride === 'PORTRAIT'
+        ? 90
+        : 0
+      : uiRotationDegrees;
 
   /* Animation states: mount → entering → visible → exiting → unmount */
   const [mounted, setMounted] = useState(false);
@@ -378,7 +378,8 @@ const EmergencyAlertOverlay: React.FC = () => {
     />
   );
 
-  if (shouldRotate) {
+  if (rotationDegrees !== 0) {
+    const swapDimensions = rotationDegrees === 90 || rotationDegrees === 270;
     return (
       <div
         className="fixed inset-0 gpu-accelerated"
@@ -386,9 +387,9 @@ const EmergencyAlertOverlay: React.FC = () => {
           zIndex: 9999,
           top: '50%',
           left: '50%',
-          width: '100vh',
-          height: '100vw',
-          transform: 'translate(-50%, -50%) rotate(90deg)',
+          width: swapDimensions ? '100vh' : '100vw',
+          height: swapDimensions ? '100vw' : '100vh',
+          transform: `translate(-50%, -50%) rotate(${rotationDegrees}deg)`,
           transformOrigin: 'center center',
           overflow: 'hidden',
           backfaceVisibility: 'hidden',

@@ -25,6 +25,7 @@ import { useAppSelector } from '../../store/hooks';
 import { selectMasjidName } from '../../store/slices/contentSlice';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
+import { orientationToLayoutMode, isPortraitLayout, parseScreenOrientation } from '../../utils/orientation';
 import { LandscapeLayout, PortraitLayout, OrientationWrapper, ReferenceViewport } from '../layout';
 import {
   Header,
@@ -265,10 +266,18 @@ const DisplayScreen: React.FC = () => {
     return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
   }, []);
 
-  /** Prefer ui.orientation (updated by WebSocket) so real-time orientation changes from admin are reflected. */
-  const uiOrientation = useSelector((s: RootState) => s.ui.orientation);
-  const orientation: 'LANDSCAPE' | 'PORTRAIT' =
-    orientationOverride ?? uiOrientation ?? screenContent?.screen?.orientation ?? 'LANDSCAPE';
+  /** Prefer ui (WebSocket); fallback to content or default. Four-value orientation + rotationDegrees. */
+  const uiOrientation = useAppSelector((s: RootState) => s.ui.orientation);
+  const uiRotationDegrees = useAppSelector((s: RootState) => s.ui.rotationDegrees);
+  const contentOrientation = screenContent?.screen?.orientation;
+  const orientation =
+    orientationOverride ?? uiOrientation ?? parseScreenOrientation(contentOrientation);
+  const rotationDegrees =
+    orientationOverride !== undefined
+      ? orientationOverride === 'PORTRAIT'
+        ? 90
+        : 0
+      : uiRotationDegrees;
 
   // Primary: canonical name extracted by contentSlice (covers all API path variants)
   // Secondary: inline screenContent extraction for any path not yet covered
@@ -295,7 +304,7 @@ const DisplayScreen: React.FC = () => {
 
   /* ---- Ramadan mode (auto-detected from Hijri calendar) ---- */
   const ramadan = useRamadanMode();
-  const isPortrait = orientation === 'PORTRAIT';
+  const isPortrait = isPortraitLayout(orientation);
 
   /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
   const { phase: prayerPhase, prayerName: phasePrayerName } = usePrayerPhase();
@@ -360,9 +369,11 @@ const DisplayScreen: React.FC = () => {
     countdown
   );
 
+  const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
+
   return (
-    <OrientationWrapper orientation={orientation}>
-      <ReferenceViewport orientation={orientation}>
+    <OrientationWrapper rotationDegrees={rotationDegrees}>
+      <ReferenceViewport orientation={layoutMode}>
         {isPortrait ? (
           <PortraitLayout
             header={headerSlot}

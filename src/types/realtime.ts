@@ -34,12 +34,28 @@ export interface EmergencyAlertData {
 }
 
 /**
- * Screen orientation data received from WebSocket
+ * Four supported screen orientations (admin-configured).
+ * LANDSCAPE / LANDSCAPE_INVERTED = landscape layout; PORTRAIT / PORTRAIT_INVERTED = portrait layout.
+ */
+export type ScreenOrientation =
+  | "LANDSCAPE"
+  | "LANDSCAPE_INVERTED"
+  | "PORTRAIT"
+  | "PORTRAIT_INVERTED";
+
+/** Rotation in degrees applied to the display (0, 90, 180, 270). */
+export type RotationDegrees = 0 | 90 | 180 | 270;
+
+/**
+ * Screen orientation payload from WebSocket event `screen:orientation`.
+ * When rotationDegrees is present it MUST be used; when absent, derive from orientation (§3.3).
  */
 export interface ScreenOrientationData {
   id: string;
-  orientation: "LANDSCAPE" | "PORTRAIT";
+  orientation: ScreenOrientation;
   updatedAt: string;
+  /** Optional: rotation in degrees. When present, use this instead of deriving from orientation. */
+  rotationDegrees?: RotationDegrees;
 }
 
 /**

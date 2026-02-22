@@ -63,22 +63,21 @@ const ErrorFallback: React.FC<{ error: Error; resetErrorBoundary: () => void }> 
 /* ------------------------------------------------------------------
    AppRoutes — manages screen transitions
    ------------------------------------------------------------------ */
-/** Orientation for loading overlay: prefer ui (WebSocket), then content, then stored at pairing. */
-function useLoadingOrientation(): 'LANDSCAPE' | 'PORTRAIT' {
-  const fromUi = useSelector((s: RootState) => s.ui.orientation);
-  const fromContent = useSelector(
-    (s: RootState) => s.content.screenContent?.screen?.orientation,
-  );
-  const fromStorage =
-    typeof localStorage !== 'undefined'
-      ? (localStorage.getItem('screen_orientation') as 'LANDSCAPE' | 'PORTRAIT' | null)
-      : null;
-  return fromUi ?? fromContent ?? fromStorage ?? 'LANDSCAPE';
+/** Rotation degrees for loading overlay: ui state or localStorage fallback. */
+function useLoadingRotationDegrees(): 0 | 90 | 180 | 270 {
+  const fromUi = useSelector((s: RootState) => s.ui.rotationDegrees);
+  if (fromUi !== undefined && [0, 90, 180, 270].includes(fromUi)) return fromUi as 0 | 90 | 180 | 270;
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('screen_rotation_degrees');
+    const n = stored != null ? parseInt(stored, 10) : NaN;
+    if (Number.isInteger(n) && [0, 90, 180, 270].includes(n)) return n as 0 | 90 | 180 | 270;
+  }
+  return 0;
 }
 
 const AppRoutes: React.FC = () => {
   const { phase, overallProgress, currentTask, tasks, hasPairingCode } = useAppLoader();
-  const loadingOrientation = useLoadingOrientation();
+  const loadingRotationDegrees = useLoadingRotationDegrees();
 
   const [activeScreen, setActiveScreen] = useState<ScreenType>('loading');
   const [overlayVisible, setOverlayVisible] = useState(true);
@@ -199,7 +198,7 @@ const AppRoutes: React.FC = () => {
           pointerEvents: overlayVisible ? 'auto' : 'none',
         }}
       >
-        <OrientationWrapper orientation={loadingOrientation}>
+        <OrientationWrapper rotationDegrees={loadingRotationDegrees}>
           <Suspense fallback={null}>
             <LoadingScreen progress={overallProgress} message={currentTask} tasks={tasks} />
           </Suspense>
