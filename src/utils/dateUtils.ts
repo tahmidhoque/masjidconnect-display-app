@@ -4,6 +4,7 @@ import customParseFormat from "dayjs/plugin/customParseFormat"; // For parsing s
 import duration from "dayjs/plugin/duration"; // For diff calculations
 import relativeTime from "dayjs/plugin/relativeTime"; // For human-readable durations
 import { TimeFormat } from "../api/models";
+import logger from "./logger";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(duration);
@@ -202,17 +203,28 @@ export const getNextPrayerTime = (
   return { name: "", time: "" };
 };
 
-// Calculate time until next prayer using dayjs
+/** Options for countdown display. Seconds omitted by default for a calmer display. */
+export interface GetTimeUntilNextPrayerOptions {
+  /** When true, include seconds (e.g. 07h 05m 12s). Default false. */
+  includeSeconds?: boolean;
+}
+
+/**
+ * Calculate time until next prayer using dayjs.
+ * Returns minutes-only by default (e.g. 07h 05m) for a calmer display; hours are zero-padded for alignment.
+ */
 export const getTimeUntilNextPrayer = (
   nextPrayerTime: string,
   forceTomorrow: boolean = false,
+  options: GetTimeUntilNextPrayerOptions = {},
 ): string => {
   if (!nextPrayerTime) return "";
+
+  const { includeSeconds = false } = options;
 
   try {
     const now = dayjs();
 
-    // Create the prayer time for today using dayjs
     const [prayerHours, prayerMinutes] = nextPrayerTime.split(":").map(Number);
 
     if (
@@ -223,7 +235,7 @@ export const getTimeUntilNextPrayer = (
       prayerMinutes < 0 ||
       prayerMinutes > 59
     ) {
-      console.error(`Invalid prayer time format received: ${nextPrayerTime}`);
+      logger.error("[dateUtils] Invalid prayer time format", { nextPrayerTime });
       return "";
     }
 
@@ -233,38 +245,38 @@ export const getTimeUntilNextPrayer = (
       .second(0)
       .millisecond(0);
 
-    // If next prayer time is earlier than current time or forceTomorrow is true,
-    // it means it's for tomorrow
     if (prayerDayjs.isBefore(now) || forceTomorrow) {
       prayerDayjs = prayerDayjs.add(1, "day");
     }
 
-    // Calculate diff in seconds
     const diffSeconds = prayerDayjs.diff(now, "second");
 
     if (diffSeconds <= 0) {
-      return "0s";
+      return includeSeconds ? "0s" : "0m";
     }
 
-    // Format time using custom logic for display consistency
     const diffHours = Math.floor(diffSeconds / 3600);
     const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
     const diffSecondsRemainder = diffSeconds % 60;
+    const pad2 = (n: number) => String(n).padStart(2, "0");
 
-    // Always include seconds so the countdown visibly ticks on the display.
-    // Minutes are always shown (even when 0) to prevent layout width jumps.
-    // All digit groups are zero-padded for stable tabular-nums rendering.
-    if (diffHours > 0) {
-      return `${diffHours}h ${String(diffMinutes).padStart(2, '0')}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
-    } else {
-      return `${String(diffMinutes).padStart(2, '0')}m ${String(diffSecondsRemainder).padStart(2, '0')}s`;
+    if (includeSeconds) {
+      if (diffHours > 0) {
+        return `${pad2(diffHours)}h ${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
+      }
+      return `${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
     }
+
+    // Minutes-only: zero-padded hours for consistent width and alignment
+    if (diffHours > 0) {
+      return `${pad2(diffHours)}h ${pad2(diffMinutes)}m`;
+    }
+    return `${pad2(diffMinutes)}m`;
   } catch (error) {
-    console.error(
-      "Error calculating time until next prayer:",
-      error,
+    logger.error("[dateUtils] Error calculating time until next prayer", {
+      error: error instanceof Error ? error.message : String(error),
       nextPrayerTime,
-    );
+    });
     return "";
   }
 };

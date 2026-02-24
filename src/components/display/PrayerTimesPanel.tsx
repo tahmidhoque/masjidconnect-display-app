@@ -2,7 +2,7 @@
  * PrayerTimesPanel
  *
  * Displays today's prayer times in a vertical list.
- * Highlights the current/next prayer. Uses the usePrayerTimes hook.
+ * Highlights only the next prayer; current/previous are not highlighted.
  *
  * During Ramadan mode, shows:
  *  - An Imsak row before Fajr (informational only, never highlighted)
@@ -64,7 +64,6 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
       <div className="flex-1 min-h-0 flex flex-col gap-1 justify-center">
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
-          const isCurrent = prayer.isCurrent;
           const ramadanLabel = isRamadan ? RAMADAN_LABELS[prayer.name] : undefined;
 
           return (
@@ -97,14 +96,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 </div>
               )}
 
-              {/* Standard prayer row */}
+              {/* Standard prayer row — only next prayer is highlighted */}
               <div
                 className={`
                   flex items-center justify-between px-3 py-1.5 rounded-lg
                   transition-colors duration-normal
-                  ${isNext ? 'bg-emerald/15 border border-emerald/30' : ''}
-                  ${isCurrent ? 'animate-subtle-pulse bg-gold/10 border border-gold/20' : ''}
-                  ${!isNext && !isCurrent ? 'border border-transparent' : ''}
+                  ${isNext ? 'bg-emerald/15 border border-emerald/30' : 'border border-transparent'}
                 `}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -112,10 +109,10 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   <span
                     className={`
                       w-2 h-2 rounded-full shrink-0
-                      ${isNext ? 'bg-emerald' : isCurrent ? 'bg-gold' : 'bg-text-muted/30'}
+                      ${isNext ? 'bg-emerald' : 'bg-text-muted/30'}
                     `}
                   />
-                  <span className={`text-body font-medium ${isNext ? 'text-emerald-light' : isCurrent ? 'text-gold' : 'text-text-primary'}`}>
+                  <span className={`text-body font-medium ${isNext ? 'text-emerald-light' : 'text-text-primary'}`}>
                     {prayer.name}
                   </span>
 
