@@ -609,39 +609,66 @@ export const usePrayerTimes = (): PrayerTimesHook => {
               // If this is the last prayer of the day, or if we haven't reached the next prayer time yet
               if (isLastPrayerOfDay || currentTimeStr < nextSortedPrayer.time) {
                 // We are in this prayer's period
-                currentIndex = currentPrayerIndex;
                 foundCurrentPrayer = true;
 
-                // Determine what should be "next"
-                if (prayer.jamaat && currentTimeStr < prayer.jamaat) {
-                  // Between adhan and jamaat time - next is the jamaat of this same prayer
-                  nextIndex = currentPrayerIndex;
+                // If current period is a skipped prayer (e.g. Sunrise), treat "current" as the previous
+                // actual prayer (Fajr) and "next" as the next in timeline (Zuhr), not sortedPrayersForNext[0].
+                const isSkippedPrayer = SKIP_PRAYERS.includes(currentSortedPrayer.name);
+                if (isSkippedPrayer) {
+                  currentIndex = prayers.findIndex(
+                    (p) => p.name === sortedPrayers[i - 1]?.name,
+                  );
+                  let nextPrayerInTimeline = nextSortedPrayer;
+                  let j = i + 1;
+                  while (
+                    nextPrayerInTimeline &&
+                    SKIP_PRAYERS.includes(nextPrayerInTimeline.name) &&
+                    j < sortedPrayers.length
+                  ) {
+                    nextPrayerInTimeline = sortedPrayers[j];
+                    j += 1;
+                  }
+                  nextIndex =
+                    nextPrayerInTimeline != null
+                      ? prayers.findIndex((p) => p.name === nextPrayerInTimeline.name)
+                      : -1;
                   logger.info(
-                    `Between ${prayer.name} adhan (${prayer.time}) and jamaat (${prayer.jamaat}) - counting down to jamaat`,
+                    `In skipped prayer period (${currentSortedPrayer.name}) - current: ${currentIndex >= 0 ? prayers[currentIndex].name : "none"}, next: ${nextIndex >= 0 ? prayers[nextIndex].name : "none"}`,
                   );
                 } else {
-                  // Past jamaat time or no jamaat - next is the next prayer (skip Sunrise)
-                  if (isLastPrayerOfDay) {
-                    nextIndex = prayers.findIndex(
-                      (p) => p.name === sortedPrayersForNext[0].name,
+                  currentIndex = currentPrayerIndex;
+
+                  // Determine what should be "next"
+                  if (prayer.jamaat && currentTimeStr < prayer.jamaat) {
+                    // Between adhan and jamaat time - next is the jamaat of this same prayer
+                    nextIndex = currentPrayerIndex;
+                    logger.info(
+                      `Between ${prayer.name} adhan (${prayer.time}) and jamaat (${prayer.jamaat}) - counting down to jamaat`,
                     );
                   } else {
-                    const idxInForNext = sortedPrayersForNext.findIndex(
-                      (p) => p.name === currentSortedPrayer.name,
+                    // Past jamaat time or no jamaat - next is the next prayer (skip Sunrise)
+                    if (isLastPrayerOfDay) {
+                      nextIndex = prayers.findIndex(
+                        (p) => p.name === sortedPrayersForNext[0].name,
+                      );
+                    } else {
+                      const idxInForNext = sortedPrayersForNext.findIndex(
+                        (p) => p.name === currentSortedPrayer.name,
+                      );
+                      const nextInForNext =
+                        idxInForNext >= 0 && idxInForNext < sortedPrayersForNext.length - 1
+                          ? sortedPrayersForNext[idxInForNext + 1]
+                          : null;
+                      nextIndex = nextInForNext
+                        ? prayers.findIndex((p) => p.name === nextInForNext.name)
+                        : prayers.findIndex(
+                            (p) => p.name === sortedPrayersForNext[0].name,
+                          );
+                    }
+                    logger.info(
+                      `Past ${prayer.name} jamaat time or no jamaat - next prayer is ${nextIndex >= 0 ? prayers[nextIndex].name : "unknown"}`,
                     );
-                    const nextInForNext =
-                      idxInForNext >= 0 && idxInForNext < sortedPrayersForNext.length - 1
-                        ? sortedPrayersForNext[idxInForNext + 1]
-                        : null;
-                    nextIndex = nextInForNext
-                      ? prayers.findIndex((p) => p.name === nextInForNext.name)
-                      : prayers.findIndex(
-                          (p) => p.name === sortedPrayersForNext[0].name,
-                        );
                   }
-                  logger.info(
-                    `Past ${prayer.name} jamaat time or no jamaat - next prayer is ${nextIndex >= 0 ? prayers[nextIndex].name : "unknown"}`,
-                  );
                 }
                 break;
               }
