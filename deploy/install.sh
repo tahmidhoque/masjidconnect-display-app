@@ -91,7 +91,7 @@ cp "${SOURCE_DIR}/package.json" "${APP_DIR}/"
 # Make scripts executable
 chmod +x "${APP_DIR}/deploy/kiosk.sh"
 chmod +x "${APP_DIR}/deploy/server.mjs"
-chmod +x "${APP_DIR}/deploy/update-from-github.sh" 2>/dev/null || true
+chmod +x "${APP_DIR}/deploy/update-from-github.sh" "${APP_DIR}/deploy/install-release.sh" 2>/dev/null || true
 
 # Allow SERVICE_USER to run self-update script without password (FORCE_UPDATE from admin portal)
 echo "${SERVICE_USER} ALL=(ALL) NOPASSWD: ${APP_DIR}/deploy/update-from-github.sh" > /etc/sudoers.d/99-masjidconnect-update

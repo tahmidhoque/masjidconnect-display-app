@@ -36,13 +36,14 @@ write_status() {
   chown "${SUDO_UID:-1000}:${SUDO_GID:-1000}" "$STATUS_FILE" 2>/dev/null || true
 }
 
-# Fetch latest release from GitHub API (script is only run on explicit Force update, so we always apply latest)
+# Fetch releases and pick the one with highest semver (so v1.0.2 is used over v1.0.1).
+# /releases/latest only returns the most recently **published** full release and excludes pre-releases.
 write_status "checking" "Checking for update…"
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
-resp_file="${tmp_dir}/release.json"
-curl -sS -f -L -o "$resp_file" "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest" 2>/dev/null || {
+resp_file="${tmp_dir}/releases.json"
+curl -sS -f -L -o "$resp_file" "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=30" 2>/dev/null || {
   write_status "no_update" "Up to date"
   exit 0
 }
@@ -51,12 +52,39 @@ curl -sS -f -L -o "$resp_file" "https://api.github.com/repos/${GITHUB_OWNER}/${G
   exit 0
 }
 
-# Parse tag_name and tarball asset URL
+# Parse releases: find those with tarball asset, sort by semver desc, output first tag + asset URL
 parsed=$(RESP_FILE="$resp_file" node -e "
-const j = JSON.parse(require('fs').readFileSync(process.env.RESP_FILE, 'utf8'));
-console.log(j.tag_name || '');
-const a = (j.assets || []).find(x => x.name && x.name.startsWith('masjidconnect-display-') && x.name.endsWith('.tar.gz'));
-if (a) console.log(a.browser_download_url);
+const fs = require('fs');
+const j = JSON.parse(fs.readFileSync(process.env.RESP_FILE, 'utf8'));
+if (!Array.isArray(j) || j.length === 0) process.exit(0);
+const withAsset = j.filter(r => {
+  const tag = (r.tag_name || '').trim();
+  if (!tag) return false;
+  const a = (r.assets || []).find(x => x.name && x.name.startsWith('masjidconnect-display-') && x.name.endsWith('.tar.gz'));
+  return !!a;
+}).map(r => {
+  const tag = (r.tag_name || '').replace(/^v/, '');
+  const a = (r.assets || []).find(x => x.name && x.name.startsWith('masjidconnect-display-') && x.name.endsWith('.tar.gz'));
+  return { tag, version: tag, url: a ? a.browser_download_url : '' };
+}).filter(x => x.url);
+
+const semver = (v) => {
+  const m = (v + '').match(/^(\\d+)\\.(\\d+)\\.(\\d+)(?:-(.+))?$/);
+  if (!m) return [0,0,0,0];
+  return [parseInt(m[1],10), parseInt(m[2],10), parseInt(m[3],10), (m[4] || '').localeCompare('')];
+};
+withAsset.sort((a, b) => {
+  const va = semver(a.version), vb = semver(b.version);
+  for (let i = 0; i < 4; i++) {
+    if (va[i] !== vb[i]) return (typeof vb[i] === 'number' ? vb[i] - va[i] : va[i] - vb[i]);
+  }
+  return 0;
+});
+const best = withAsset[0];
+if (best) {
+  console.log(best.tag);
+  console.log(best.url);
+}
 " 2>/dev/null) || true
 latest_tag=$(echo "$parsed" | sed -n '1p')
 asset_url=$(echo "$parsed" | sed -n '2p')
@@ -98,16 +126,16 @@ if [ -f "${src_root}/package.json" ]; then
   cp "${src_root}/package.json" "${APP_DIR}/"
 fi
 chown -R "${SUDO_UID:-1000}:${SUDO_GID:-1000}" "${APP_DIR}/dist" "${APP_DIR}/deploy" "${APP_DIR}/package.json" 2>/dev/null || true
+# Tarball may not have +x on deploy scripts; set so kiosk and xinit can run them
+chmod +x "${APP_DIR}/deploy/"*.sh "${APP_DIR}/deploy/xinitrc-kiosk" 2>/dev/null || true
 
-# Restart server a few seconds before countdown ends so the new process is up
-# before the frontend reloads at 0 — avoids double reload / stale content.
-RESTART_AT_SECONDS=5
+# No server restart: the Node process serves from disk, so after replacing dist/ the next
+# request (the frontend reload at countdown 0) gets the new app. Restarting caused a double
+# reload (connection drop + intentional reload) and the first load sometimes showed old version.
 restart_at=$(($(date +%s) * 1000 + COUNTDOWN_SECONDS * 1000))
 write_status "countdown" "Restarting in ${COUNTDOWN_SECONDS}s" "$restart_at"
 
-sleep $((COUNTDOWN_SECONDS - RESTART_AT_SECONDS))
-systemctl restart masjidconnect-display.service 2>/dev/null || true
-sleep "$RESTART_AT_SECONDS"
+sleep "$COUNTDOWN_SECONDS"
 
 write_status "done" ""
 rm -f "$STATUS_FILE"

@@ -14,7 +14,7 @@
  */
 
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -94,6 +94,8 @@ const server = createServer((req, res) => {
         return;
       }
       try {
+        // Write "checking" immediately so the first poll never sees a stale "no_update" from a previous run
+        writeFileSync(STATUS_FILE, JSON.stringify({ phase: 'checking', message: 'Checking for update…' }), 'utf8');
         const child = spawn('sudo', [UPDATE_SCRIPT], {
           detached: true,
           stdio: 'ignore',
