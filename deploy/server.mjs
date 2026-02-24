@@ -96,7 +96,8 @@ const server = createServer((req, res) => {
       try {
         // Write "checking" immediately so the first poll never sees a stale "no_update" from a previous run
         writeFileSync(STATUS_FILE, JSON.stringify({ phase: 'checking', message: 'Checking for update…' }), 'utf8');
-        const child = spawn('sudo', [UPDATE_SCRIPT], {
+        // Run with bash explicitly so the script runs even if execute bit is missing after tarball extract
+        const child = spawn('sudo', ['bash', UPDATE_SCRIPT], {
           detached: true,
           stdio: 'ignore',
           cwd: APP_DIR,

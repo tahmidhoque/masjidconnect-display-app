@@ -9,7 +9,6 @@
 import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
-import { checkAndApplyUpdate } from '../pwa';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
 export interface RemoteCommand {
@@ -261,8 +260,10 @@ class RemoteControlService {
         logger.info('[RemoteControl] CAPTURE_SCREENSHOT not implemented');
         break;
       case 'FORCE_UPDATE':
-        logger.info('[RemoteControl] FORCE_UPDATE: triggering device update and PWA check');
-        await checkAndApplyUpdate();
+        // Device update only: backend script downloads tarball, replaces dist/, then countdown + reload.
+        // Do NOT call checkAndApplyUpdate() here — it triggers an immediate PWA reload and prevents
+        // the user from seeing the proper flow (checking → downloading → installing → countdown).
+        logger.info('[RemoteControl] FORCE_UPDATE: triggering device update');
         void this.triggerDeviceUpdateAndPoll();
         break;
       case 'FACTORY_RESET':
