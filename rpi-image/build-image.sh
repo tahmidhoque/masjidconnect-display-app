@@ -19,6 +19,7 @@ SKIP_PACKAGE=false
 
 for arg in "$@"; do
   case "$arg" in
+    # Pi 4/5 image (including Raspberry Pi 5); uses masjidconnect.yaml
     pi4|pi5) CONFIG="masjidconnect.yaml" ;;
     pi3)     CONFIG="masjidconnect-pi3.yaml" ;;
     --skip-package) SKIP_PACKAGE=true ;;
@@ -49,6 +50,14 @@ if [ ! -f "$APP_ARCHIVE" ]; then
 else
   echo "Using existing app archive: $APP_ARCHIVE"
 fi
+
+# Ensure deploy scripts used by the layer are present in rpi-image (archive may be from an older tree).
+mkdir -p "${SCRIPT_DIR}/deploy-overlay"
+for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk; do
+  if [ -f "${REPO_ROOT}/deploy/${f}" ]; then
+    cp "${REPO_ROOT}/deploy/${f}" "${SCRIPT_DIR}/deploy-overlay/"
+  fi
+done
 
 mkdir -p "$OUT_DIR"
 

@@ -1,0 +1,106 @@
+pi@pi5-unekzj:~$ journalctl -u masjidconnect-kiosk -n 100 --no-pager
+Feb 23 19:26:41 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:26:41 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:26:41 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:26:41 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:26:51 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 4.
+Feb 23 19:26:51 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:26:51 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:26:51 pi5-unekzj (chvt)[508]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:26:51 pi5-unekzj (chvt)[508]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:26:51 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:26:51 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:26:51 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:02 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 5.
+Feb 23 19:27:02 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:02 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:27:02 pi5-unekzj (chvt)[512]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:27:02 pi5-unekzj (chvt)[512]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:27:02 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:27:02 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:27:02 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:12 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 6.
+Feb 23 19:27:12 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:12 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:27:12 pi5-unekzj (chvt)[516]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:27:12 pi5-unekzj (chvt)[516]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:27:12 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:27:12 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:27:12 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:22 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 7.
+Feb 23 19:27:22 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:22 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:27:22 pi5-unekzj (chvt)[520]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:27:22 pi5-unekzj (chvt)[520]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:27:22 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:27:22 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:27:22 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:32 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 8.
+Feb 23 19:27:32 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:32 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:27:32 pi5-unekzj (chvt)[524]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:27:32 pi5-unekzj (chvt)[524]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:27:32 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:27:32 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:27:32 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:42 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 9.
+Feb 23 19:27:42 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:42 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:27:43 pi5-unekzj (chvt)[530]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:27:43 pi5-unekzj (chvt)[530]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:27:43 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:27:43 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:27:43 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:53 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 10.
+Feb 23 19:27:53 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:27:53 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:27:53 pi5-unekzj (chvt)[534]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:27:53 pi5-unekzj (chvt)[534]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:27:53 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:27:53 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:27:53 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:03 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 11.
+Feb 23 19:28:03 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:03 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:28:03 pi5-unekzj (chvt)[538]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:28:03 pi5-unekzj (chvt)[538]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:28:03 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:28:03 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:28:03 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:13 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 12.
+Feb 23 19:28:13 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:13 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:28:13 pi5-unekzj (chvt)[544]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:28:13 pi5-unekzj (chvt)[544]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:28:13 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:28:13 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:28:13 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:23 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 13.
+Feb 23 19:28:23 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:23 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:28:23 pi5-unekzj (chvt)[574]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:28:23 pi5-unekzj (chvt)[574]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:28:23 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:28:23 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:28:23 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:34 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 14.
+Feb 23 19:28:34 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:34 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:28:34 pi5-unekzj (chvt)[578]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:28:34 pi5-unekzj (chvt)[578]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:28:34 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:28:34 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:28:34 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:44 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Scheduled restart job, restart counter is at 15.
+Feb 23 19:28:44 pi5-unekzj systemd[1]: Stopped masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+Feb 23 19:28:44 pi5-unekzj systemd[1]: Starting masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium)...
+Feb 23 19:28:44 pi5-unekzj (chvt)[582]: masjidconnect-kiosk.service: Failed to locate executable /bin/chvt: No such file or directory
+Feb 23 19:28:44 pi5-unekzj (chvt)[582]: masjidconnect-kiosk.service: Failed at step EXEC spawning /bin/chvt: No such file or directory
+Feb 23 19:28:44 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Control process exited, code=exited, status=203/EXEC
+Feb 23 19:28:44 pi5-unekzj systemd[1]: masjidconnect-kiosk.service: Failed with result 'exit-code'.
+Feb 23 19:28:44 pi5-unekzj systemd[1]: Failed to start masjidconnect-kiosk.service - MasjidConnect Kiosk (X11 + Chromium).
+
+pi@pi5-unekzj:~$ journalctl -u masjidconnect-display -n 50 --no-pager
+Feb 23 19:26:08 pi5-unekzj systemd[1]: Started masjidconnect-display.service - MasjidConnect Display App.
+Feb 23 19:26:10 pi5-unekzj node[386]: [MasjidConnect] Display server running at http://0.0.0.0:3001
+pi@pi5-unekzj:~$

@@ -22,6 +22,8 @@ if [ ! -f work/keys/debian-archive-keyring.gpg ] && [ -f /usr/share/keyrings/deb
 fi
 
 echo "Building image: -S $SOURCE_DIR -c $CONFIG_PATH"
+# Hooks in the layer use SRCROOT to find templates (e.g. getty autologin). rpi-image-gen may not set it.
+export SRCROOT="${SOURCE_DIR}"
 # Disable SBOM generation to avoid syft/curl SSL errors in Docker build env (IGconf_sbom_enable=n).
 ./rpi-image-gen build -S "$SOURCE_DIR" -c "$CONFIG_PATH" -- IGconf_sbom_enable=n
 

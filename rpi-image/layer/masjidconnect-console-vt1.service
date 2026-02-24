@@ -1,0 +1,13 @@
+[Unit]
+Description=Switch display to VT 1 (kiosk) so the screen shows getty/X instead of kernel console
+After=plymouth-quit-wait.service
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+# chvt 1 makes the display show tty1 (getty autologin → kiosk); kernel log stays on tty2
+ExecStart=/usr/bin/chvt 1
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

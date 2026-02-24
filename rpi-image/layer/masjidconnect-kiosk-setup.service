@@ -1,12 +1,12 @@
 [Unit]
-Description=Add console user (UID 1000) to render/video for Cage/Chromium DRM
+Description=Add console user (UID 1000) to render/video/tty for X11/Chromium
 Before=masjidconnect-kiosk.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-# Ensure whoever has UID 1000 (pi or Pi Imager custom user e.g. mcadmin) can use GPU.
-ExecStart=/bin/bash -c 'U=$(getent passwd 1000 | cut -d: -f1); [ -n "$U" ] && usermod -aG render,video "$U" || true'
+# Ensure whoever has UID 1000 (pi or Pi Imager custom user e.g. mcadmin) can use GPU and TTY (for xinit on vt1).
+ExecStart=/bin/bash -c 'U=$(getent passwd 1000 | cut -d: -f1); [ -n "$U" ] && for g in render video tty; do getent group "$g" >/dev/null && usermod -aG "$g" "$U"; done; true'
 
 [Install]
 WantedBy=default.target
