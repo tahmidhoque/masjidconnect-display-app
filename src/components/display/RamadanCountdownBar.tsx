@@ -99,9 +99,12 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
     return { time: nextPrayer.time, forceTomorrow: false };
   }, [nextPrayer, currentTime]);
 
+  /** Prayer-side countdown: show seconds only in the last 5 mins before jamaat (Ramadan mode). */
   const nextPrayerCountdown = useMemo(() => {
     if (!nextPrayerTarget) return '';
-    return getTimeUntilNextPrayer(nextPrayerTarget.time, nextPrayerTarget.forceTomorrow);
+    return getTimeUntilNextPrayer(nextPrayerTarget.time, nextPrayerTarget.forceTomorrow, {
+      includeSecondsWhenUnderMinutes: 5,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextPrayerTarget, currentTime]);
 
@@ -167,14 +170,14 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           {nextPrayer.name}
         </h3>
 
-        {/* Countdown */}
+        {/* Countdown — use prayer-side countdown so last-5-mins seconds apply */}
         <p
           className={`
             text-gold font-bold countdown-stable
             ${compact ? 'text-subheading' : 'text-heading'}
           `}
         >
-          {ramadanCountdown}
+          {nextPrayerCountdown || ramadanCountdown}
         </p>
 
         {/* Time — show jamaat when counting to jamaat */}

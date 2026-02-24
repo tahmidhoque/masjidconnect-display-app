@@ -207,6 +207,8 @@ export const getNextPrayerTime = (
 export interface GetTimeUntilNextPrayerOptions {
   /** When true, include seconds (e.g. 07h 05m 12s). Default false. */
   includeSeconds?: boolean;
+  /** When set, include seconds only when remaining time is ≤ this many minutes (e.g. 5 for last 5 mins). */
+  includeSecondsWhenUnderMinutes?: number;
 }
 
 /**
@@ -220,7 +222,7 @@ export const getTimeUntilNextPrayer = (
 ): string => {
   if (!nextPrayerTime) return "";
 
-  const { includeSeconds = false } = options;
+  const { includeSeconds = false, includeSecondsWhenUnderMinutes } = options;
 
   try {
     const now = dayjs();
@@ -251,8 +253,13 @@ export const getTimeUntilNextPrayer = (
 
     const diffSeconds = prayerDayjs.diff(now, "second");
 
+    const showSeconds =
+      includeSeconds ||
+      (includeSecondsWhenUnderMinutes != null &&
+        diffSeconds <= includeSecondsWhenUnderMinutes * 60);
+
     if (diffSeconds <= 0) {
-      return includeSeconds ? "0s" : "0m";
+      return showSeconds ? "0s" : "0m";
     }
 
     const diffHours = Math.floor(diffSeconds / 3600);
@@ -260,7 +267,7 @@ export const getTimeUntilNextPrayer = (
     const diffSecondsRemainder = diffSeconds % 60;
     const pad2 = (n: number) => String(n).padStart(2, "0");
 
-    if (includeSeconds) {
+    if (showSeconds) {
       if (diffHours > 0) {
         return `${pad2(diffHours)}h ${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
       }
