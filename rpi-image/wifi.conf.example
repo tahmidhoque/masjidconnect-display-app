@@ -1,0 +1,6 @@
+# Copy this file to wifi.conf and fill in your network details.
+# wifi.conf is gitignored; do not commit real credentials.
+#
+# SSID=YourNetworkName
+# PASSWORD=YourWiFiPassword
+# COUNTRY=GB

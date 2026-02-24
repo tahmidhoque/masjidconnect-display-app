@@ -2,6 +2,7 @@
 # =============================================================================
 # MasjidConnect Kiosk — xinit client script for minimal X11 image.
 # Run by xinit as the client after the X server starts (e.g. xinit this-file -- :0 vt1).
+# If no internet is detected, shows a WiFi setup GUI before launching the kiosk.
 # Disables screen sleep, hides cursor, waits for display server, then launches Chromium.
 # =============================================================================
 
@@ -9,6 +10,9 @@ set -euo pipefail
 
 PORT="${PORT:-3001}"
 URL="http://localhost:${PORT}"
+WIFI_SETUP_PORT="${WIFI_SETUP_PORT:-3002}"
+WIFI_SETUP_URL="http://127.0.0.1:${WIFI_SETUP_PORT}"
+WIFI_FLAG="/tmp/masjidconnect-wifi-done"
 
 # Log for debugging after reboot: ssh in and run  cat /tmp/kiosk.log
 KIOSK_LOG="/tmp/kiosk.log"
@@ -23,6 +27,50 @@ xset s noblank 2>/dev/null || true
 # Hide the mouse cursor after 0.5s of inactivity
 if command -v unclutter &>/dev/null; then
   unclutter -idle 0.5 -root &
+fi
+
+# ----- Pre-kiosk: if no internet, show WiFi setup GUI (for end users who only have the image) -----
+have_connectivity() {
+  curl -sf --connect-timeout 4 -o /dev/null "https://portal.masjidconnect.co.uk" 2>/dev/null || \
+    ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1
+}
+
+if ! have_connectivity; then
+  log "No internet detected — starting WiFi setup"
+  rm -f "$WIFI_FLAG"
+  WIFI_SERVER_PID=""
+  if [ -x "/opt/masjidconnect/deploy/wifi-setup-server.mjs" ] || [ -f "/opt/masjidconnect/deploy/wifi-setup-server.mjs" ]; then
+    sudo /opt/masjidconnect/deploy/wifi-setup-server.mjs &
+    WIFI_SERVER_PID=$!
+    for i in $(seq 1 30); do
+      if curl -sf -o /dev/null "${WIFI_SETUP_URL}/api/status" 2>/dev/null; then break; fi
+      sleep 0.5
+    done
+    if curl -sf -o /dev/null "${WIFI_SETUP_URL}/api/status" 2>/dev/null; then
+      CHROMIUM=""
+      command -v chromium-browser &>/dev/null && CHROMIUM="chromium-browser" || command -v chromium &>/dev/null && CHROMIUM="chromium"
+      if [ -n "$CHROMIUM" ]; then
+        export DISPLAY="${DISPLAY:-:0}"
+        export XAUTHORITY="${HOME:-/tmp}/.Xauthority"
+        CHROMIUM_USER_DATA="${HOME:-/tmp}/.config/chromium-wifi-setup"
+        mkdir -p "${CHROMIUM_USER_DATA}" 2>/dev/null || true
+        env DBUS_SESSION_BUS_ADDRESS= "$CHROMIUM" \
+          --start-fullscreen --start-maximized --window-position=0,0 --no-first-run \
+          --user-data-dir="${CHROMIUM_USER_DATA}" \
+          --noerrdialogs --disable-infobars --disable-sync --password-store=basic \
+          "${WIFI_SETUP_URL}" 2>/dev/null || true
+      fi
+      [ -n "$WIFI_SERVER_PID" ] && kill "$WIFI_SERVER_PID" 2>/dev/null || true
+    fi
+  fi
+  if [ -f "$WIFI_FLAG" ]; then
+    log "WiFi setup completed (flag set), waiting for network..."
+    for i in $(seq 1 20); do
+      sleep 1
+      have_connectivity && break
+    done
+    rm -f "$WIFI_FLAG"
+  fi
 fi
 
 # Wait for the display server to be ready

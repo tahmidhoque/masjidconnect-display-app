@@ -37,7 +37,7 @@ echo ""
 # 1. Ensure deploy dir exists on the Pi and copy missing scripts
 echo "Copying deploy scripts to Pi..."
 ssh "$PI_HOST" "sudo mkdir -p /opt/masjidconnect/deploy"
-for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk; do
+for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk wifi-setup-server.mjs; do
   if [ -f "${DEPLOY}/${f}" ]; then
     scp -q "${DEPLOY}/${f}" "${PI_HOST}:/tmp/${f}"
     ssh "$PI_HOST" "sudo mv /tmp/${f} /opt/masjidconnect/deploy/ && sudo chmod +x /opt/masjidconnect/deploy/${f}"

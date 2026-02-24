@@ -16,7 +16,7 @@
  * shortcuts can force any phase for testing (same pattern as Ramadan toggle).
  */
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { usePrayerTimes } from './usePrayerTimes';
 import { useCurrentTime } from './useCurrentTime';
 import logger from '../utils/logger';
@@ -107,6 +107,22 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     window.addEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
     return () => window.removeEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
   }, []);
+
+  /* ---- Defensive debug: log when current prayer has no jamaat (helps diagnose production) ---- */
+  const lastLoggedMissingJamaatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentPrayer?.name && currentPrayer.jamaat == null) {
+      if (lastLoggedMissingJamaatRef.current !== currentPrayer.name) {
+        lastLoggedMissingJamaatRef.current = currentPrayer.name;
+        logger.debug(
+          '[PrayerPhase] currentPrayer has no jamaat time — in-prayer phase will not trigger',
+          { prayerName: currentPrayer.name },
+        );
+      }
+    } else if (currentPrayer?.jamaat) {
+      lastLoggedMissingJamaatRef.current = null;
+    }
+  }, [currentPrayer?.name, currentPrayer?.jamaat]);
 
   /* ---- Phase calculation ---- */
   const phaseData = useMemo((): PrayerPhaseData => {

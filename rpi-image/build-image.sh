@@ -53,7 +53,7 @@ fi
 
 # Ensure deploy scripts used by the layer are present in rpi-image (archive may be from an older tree).
 mkdir -p "${SCRIPT_DIR}/deploy-overlay"
-for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk; do
+for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk wifi-setup-server.mjs; do
   if [ -f "${REPO_ROOT}/deploy/${f}" ]; then
     cp "${REPO_ROOT}/deploy/${f}" "${SCRIPT_DIR}/deploy-overlay/"
   fi

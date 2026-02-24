@@ -58,3 +58,5 @@ yarn-error.log*
 
 # Docker-built RPi image output
 rpi-image/out/
+# WiFi credentials (optional build-time config)
+rpi-image/wifi.conf

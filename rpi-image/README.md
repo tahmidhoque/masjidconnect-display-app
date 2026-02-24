@@ -61,6 +61,34 @@ Use the Pi 3 config so the image targets Pi 3 (arm64) instead of Pi 5.
 
 ---
 
+## Configuring WiFi (for non-technical users)
+
+You can bake your mosque’s WiFi into the image so the Pi connects automatically on first boot (no Ethernet or manual setup).
+
+**Easiest workflow:**
+
+1. **Configure WiFi** (one-time, before building the image):
+   ```bash
+   chmod +x rpi-image/configure-wifi.sh
+   ./rpi-image/configure-wifi.sh
+   ```
+   Enter your **network name (SSID)**, **password**, and **country code** (e.g. `GB`) when prompted. This creates `rpi-image/wifi.conf` (gitignored; your password is not committed).
+
+2. **Build the image** (same as usual):
+   ```bash
+   ./rpi-image/build-image.sh pi4
+   ```
+
+3. **Flash the SD card** with the generated image and boot. The Pi will join your WiFi automatically.
+
+**Alternative:** Create `rpi-image/wifi.conf` manually (see `rpi-image/wifi.conf.example`) with three lines: `SSID=...`, `PASSWORD=...`, `COUNTRY=GB`. Then run the build.
+
+**Without WiFi:** If you do not create `wifi.conf` or run `configure-wifi.sh`, the image is unchanged — use Ethernet or configure WiFi on the Pi after boot (e.g. via SSH and `raspi-config` or `nmtui`).
+
+**End users who only have the image (no repo):** Pi Imager’s OS customisation (gear icon) is **greyed out for custom images** (it only works with official Raspberry Pi OS). So when you distribute the pre-built `.img` to a mosque, they cannot set WiFi in the Imager. Instead, the image includes an **on-device WiFi setup screen**: if the Pi boots with **no internet** (e.g. no Ethernet, no WiFi configured), a full-screen GUI appears **before** the display app loads. The user can scan for networks, enter the password, connect, then click “Start display”. No SSH or terminal needed. If they have Ethernet or already have WiFi baked in, the setup screen is skipped and the kiosk starts as usual.
+
+---
+
 ## Quick start (local build)
 
 ### 1. Build the app and create the archive
@@ -116,7 +144,7 @@ The image will be under `./work/` (exact path depends on image name; look for a 
 Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/):
 
 - **“Use custom”** and select the generated `.img` file.
-- **Note:** When flashing a **custom image** (our `.img`), Pi Imager does **not** offer OS customisation (gear icon); that only applies to official Raspberry Pi OS images. The MasjidConnect image is built with **default SSH credentials** so you can always log in: username is the first user (usually **`pi`**), password **`masjidconnect`**. Change the password after first login: `ssh pi@<rpi-ip>`, then run `passwd`.
+- **Note:** When flashing a **custom image** (our `.img`), Pi Imager does **not** offer OS customisation (gear icon); that only applies to official Raspberry Pi OS images. **To set WiFi, end users boot the Pi and use the on-device WiFi setup screen** that appears when no internet is detected (see **Configuring WiFi** above). The image has default SSH credentials so you can log in if needed: username **`pi`**, password **`masjidconnect`**. Change the password after first login: `ssh pi@<rpi-ip>`, then run `passwd`.
 - If you flash an **official** Raspberry Pi OS image and then install the app manually, you can use OS customisation to set a user and password before writing.
 - Alternatively, flash from the command line:
 
@@ -157,6 +185,9 @@ If the tar.gz is not at `rpi-image/app/masjidconnect-display.tar.gz`, pass the p
 ```bash
 ./rpi-image-gen build -S /path/to/masjidconnect-display-app/rpi-image -c config/masjidconnect.yaml -- IGconf_masjidconnect_app_archive=/abs/path/to/masjidconnect-display-1.0.0.tar.gz
 ```
+
+You can also set WiFi at build time via env vars instead of `wifi.conf`:  
+`IGconf_masjidconnect_wifi_ssid=MySSID` `IGconf_masjidconnect_wifi_password=secret` `IGconf_masjidconnect_wifi_country=GB`
 
 ---
 
@@ -310,6 +341,10 @@ If you get **"Cannot open virtual console 1 (Permission denied)"** in the X log,
 | `layer/masjidconnect-console-vt1.service` | Oneshot: runs `chvt 1` after Plymouth so the display shows tty1 (kiosk) not kernel log (tty2). |
 | `assets/splash.png` | Default black boot splash (Plymouth); replace for custom splash. |
 | `assets/background.png` | Optional background image (copied to `/opt/masjidconnect/background.png`). |
+| `wifi.conf` | Optional: SSID, PASSWORD, COUNTRY (one per line) to bake WiFi into the image; use `configure-wifi.sh` or copy from `wifi.conf.example`. Gitignored. |
+| `wifi.conf.example` | Template for manual WiFi config. |
+| `configure-wifi.sh` | Interactive script to create `wifi.conf` before building. |
+| `deploy/wifi-setup-server.mjs` | On-device WiFi setup server (runs when no internet at boot); served from app archive and deploy-overlay. |
 | `app/` | Put `masjidconnect-display.tar.gz` here (or set `IGconf_masjidconnect_app_archive`). |
 | `Dockerfile` | Docker image with rpi-image-gen + deps for local image builds. |
 | `build-image.sh` | Script to build the RPi image via Docker (Pi 3 or Pi 4/5). |

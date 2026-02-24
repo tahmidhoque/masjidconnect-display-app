@@ -33,8 +33,10 @@ import { selectTimeFormat } from '../../store/slices/contentSlice';
 interface RamadanCountdownBarProps {
   /** Maghrib adhan time in HH:mm format */
   iftarTime: string | null;
-  /** Fajr adhan time in HH:mm format (end of Suhoor) */
+  /** Fajr adhan time in HH:mm format (used for display when imsakTime not provided) */
   suhoorEndTime: string | null;
+  /** Imsak time in HH:mm (suhoor ends); when provided, post-Iftar countdown targets this instead of Fajr */
+  imsakTime?: string | null;
   /** Whether we are currently in fasting hours (Fajr → Maghrib) */
   isFastingHours: boolean;
   /** Compact layout for portrait orientation */
@@ -44,12 +46,16 @@ interface RamadanCountdownBarProps {
 const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
   iftarTime,
   suhoorEndTime,
+  imsakTime: imsakTimeProp = null,
   isFastingHours,
   compact = false,
 }) => {
   const currentTime = useCurrentTime();
   const timeFormat = useSelector(selectTimeFormat);
   const { nextPrayer } = usePrayerTimes();
+
+  /* ---- Post-Iftar: count down to Imsak (suhoor ends) when available, else Fajr ---- */
+  const suhoorCountdownTarget = imsakTimeProp ?? suhoorEndTime;
 
   /* ---- Formatted display times ---- */
   const displayIftarTime = useMemo(
@@ -60,21 +66,24 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
     () => (suhoorEndTime ? formatTimeToDisplay(suhoorEndTime, timeFormat) : null),
     [suhoorEndTime, timeFormat],
   );
+  const displayImsakTime = useMemo(
+    () => (suhoorCountdownTarget ? formatTimeToDisplay(suhoorCountdownTarget, timeFormat) : null),
+    [suhoorCountdownTarget, timeFormat],
+  );
 
   /* ---- Live Ramadan countdown ---- */
   const ramadanCountdown = useMemo(() => {
     if (isFastingHours && iftarTime) {
       return getTimeUntilNextPrayer(iftarTime, false);
     }
-    if (!isFastingHours && suhoorEndTime) {
+    if (!isFastingHours && suhoorCountdownTarget) {
       const nowHHmm = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
-      if (nowHHmm < suhoorEndTime) {
-        return getTimeUntilNextPrayer(suhoorEndTime, false);
+      if (nowHHmm < suhoorCountdownTarget) {
+        return getTimeUntilNextPrayer(suhoorCountdownTarget, false);
       }
     }
     return null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFastingHours, iftarTime, suhoorEndTime, currentTime]);
+  }, [isFastingHours, iftarTime, suhoorCountdownTarget, currentTime]);
 
   /* ---- Next prayer countdown ---- */
   const nextPrayerTarget = useMemo(() => {
@@ -98,8 +107,8 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
 
   /* ---- Determine Ramadan column label and prayer name ---- */
   const ramadanLabel = isFastingHours ? 'Iftar in' : 'Suhoor ends in';
-  const ramadanPrayerName = isFastingHours ? 'Maghrib' : 'Fajr';
-  const ramadanDisplayTime = isFastingHours ? displayIftarTime : displaySuhoorTime;
+  const ramadanPrayerName = isFastingHours ? 'Maghrib' : (imsakTimeProp ? 'Imsak' : 'Fajr');
+  const ramadanDisplayTime = isFastingHours ? displayIftarTime : (imsakTimeProp ? displayImsakTime : displaySuhoorTime);
 
   /* ---- Check if both columns would count to the same prayer ---- */
   const isMerged = useMemo(() => {
@@ -209,14 +218,14 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
             </>
           ) : (
             /* Static Suhoor time when there's no active countdown */
-            displaySuhoorTime && (
+            (ramadanDisplayTime ?? displaySuhoorTime) && (
               <p
                 className={`
                   text-gold font-semibold countdown-stable
                   ${compact ? 'text-body' : 'text-subheading'}
                 `}
               >
-                {displaySuhoorTime}
+                {ramadanDisplayTime ?? displaySuhoorTime}
               </p>
             )
           )}

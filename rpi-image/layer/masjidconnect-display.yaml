@@ -9,6 +9,9 @@
 # X-Env-Var-app_archive-Desc: Path to masjidconnect-display-*.tar.gz (relative to -S or absolute)
 # X-Env-Var-app_archive-Required: n
 # X-Env-Var-app_archive-Set: y
+# X-Env-Var-wifi_ssid: Optional. WiFi SSID to bake into image (or use wifi.conf in source root).
+# X-Env-Var-wifi_password: Optional. WiFi passphrase (or use wifi.conf).
+# X-Env-Var-wifi_country: Optional. Two-letter country code (e.g. GB). Default GB.
 # METAEND
 ---
 mmdebstrap:
@@ -27,6 +30,8 @@ mmdebstrap:
     - x11-xserver-utils
     - unclutter
     - kbd
+    - wpasupplicant
+    - iw
   customize-hooks:
     # Install Node.js 20 from NodeSource (build host needs network)
     - |
@@ -36,7 +41,7 @@ mmdebstrap:
       ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"; [ -z "$ARCHIVE" ] && { echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"; exit 1; }; [ ! -f "$ARCHIVE" ] && { echo "MasjidConnect app archive not found: $ARCHIVE"; exit 1; }; mkdir -p "$1/opt/masjidconnect"; cp "$ARCHIVE" "$1/tmp/masjidconnect-app.tar.gz"; chroot "$1" /bin/bash -c "tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect && rm /tmp/masjidconnect-app.tar.gz"
     # Ownership (pi user is typically 1000:1000)
     - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
-    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/xinitrc-kiosk /opt/masjidconnect/deploy/start-kiosk-x11.sh /opt/masjidconnect/deploy/start-kiosk-now.sh 2>/dev/null || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/xinitrc-kiosk /opt/masjidconnect/deploy/start-kiosk-x11.sh /opt/masjidconnect/deploy/start-kiosk-now.sh /opt/masjidconnect/deploy/wifi-setup-server.mjs 2>/dev/null || true'
     # Deploy overlay: copy kiosk scripts from repo so image has them even if the app archive was built before they were added.
     - |
       if [ -d "${SRCROOT}/deploy-overlay" ]; then
@@ -107,4 +112,38 @@ mmdebstrap:
       if [ -f "${SRCROOT}/assets/background.png" ]; then
         cp "${SRCROOT}/assets/background.png" "$1/opt/masjidconnect/background.png"
         chroot "$1" chown 1000:1000 /opt/masjidconnect/background.png
+      fi
+    # Optional WiFi: if wifi.conf exists in source root (or IGconf vars set), configure wpa_supplicant for wlan0.
+    # wifi.conf format: one line each of SSID=..., PASSWORD=..., COUNTRY=... (COUNTRY default GB).
+    - |
+      WIFI_SSID=""
+      WIFI_PASSWORD=""
+      WIFI_COUNTRY="GB"
+      if [ -f "${SRCROOT}/wifi.conf" ]; then
+        while IFS= read -r line; do
+          case "$line" in
+            SSID=*)    WIFI_SSID="${line#SSID=}" ;;
+            PASSWORD=*) WIFI_PASSWORD="${line#PASSWORD=}" ;;
+            COUNTRY=*) WIFI_COUNTRY="${line#COUNTRY=}" ;;
+          esac
+        done < "${SRCROOT}/wifi.conf"
+      fi
+      [ -n "${IGconf_masjidconnect_wifi_ssid:-}" ] && WIFI_SSID="${IGconf_masjidconnect_wifi_ssid}"
+      [ -n "${IGconf_masjidconnect_wifi_password:-}" ] && WIFI_PASSWORD="${IGconf_masjidconnect_wifi_password}"
+      [ -n "${IGconf_masjidconnect_wifi_country:-}" ] && WIFI_COUNTRY="${IGconf_masjidconnect_wifi_country}"
+      if [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASSWORD" ]; then
+        mkdir -p "$1/etc/wpa_supplicant"
+        printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=%s\n' "$WIFI_COUNTRY" > "$1/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+        printf '%s' "$WIFI_PASSWORD" | chroot "$1" wpa_passphrase "$WIFI_SSID" - >> "$1/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+        chroot "$1" chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+        mkdir -p "$1/etc/systemd/network"
+        printf '[Match]\nName=wlan0\n\n[Network]\nDHCP=yes\n' > "$1/etc/systemd/network/25-wlan0.network"
+        chroot "$1" systemctl enable wpa_supplicant@wlan0.service
+      fi
+    # Allow first user (pi) to run WiFi setup server as root without password (for on-device WiFi GUI when no internet).
+    - |
+      U=$(chroot "$1" getent passwd 1000 | cut -d: -f1)
+      if [ -n "$U" ]; then
+        echo "${U} ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/wifi-setup-server.mjs" > "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
+        chmod 440 "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
       fi

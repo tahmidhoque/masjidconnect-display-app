@@ -373,7 +373,8 @@ export interface ScreenContent {
   screen: {
     id: string;
     name: string;
-    orientation: "LANDSCAPE" | "PORTRAIT";
+    /** Four values supported (see types/realtime); API may send LANDSCAPE | PORTRAIT only. */
+    orientation: "LANDSCAPE" | "LANDSCAPE_INVERTED" | "PORTRAIT" | "PORTRAIT_INVERTED";
     contentConfig: ScreenContentConfig;
     masjid?: {
       name: string;
@@ -403,7 +404,7 @@ export interface ScreenContent {
     screen?: {
       id: string;
       name: string;
-      orientation: "LANDSCAPE" | "PORTRAIT";
+      orientation: "LANDSCAPE" | "LANDSCAPE_INVERTED" | "PORTRAIT" | "PORTRAIT_INVERTED";
       contentConfig?: ScreenContentConfig;
       masjid?: {
         name: string;

@@ -523,6 +523,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           return a.time.localeCompare(b.time);
         });
 
+      // For "next prayer" / countdown we must skip Sunrise (not a prayer)
+      const sortedPrayersForNext = sortedPrayers.filter(
+        (p) => !SKIP_PRAYERS.includes(p.name),
+      );
+
       // Log sorted prayers for debugging
       logger.debug(
         "[calculatePrayersAccurately] Sorted prayers:",
@@ -615,16 +620,24 @@ export const usePrayerTimes = (): PrayerTimesHook => {
                     `Between ${prayer.name} adhan (${prayer.time}) and jamaat (${prayer.jamaat}) - counting down to jamaat`,
                   );
                 } else {
-                  // Past jamaat time or no jamaat - next is the next prayer
+                  // Past jamaat time or no jamaat - next is the next prayer (skip Sunrise)
                   if (isLastPrayerOfDay) {
-                    // Next prayer is first prayer of tomorrow
                     nextIndex = prayers.findIndex(
-                      (p) => p.name === sortedPrayers[0].name,
+                      (p) => p.name === sortedPrayersForNext[0].name,
                     );
                   } else {
-                    nextIndex = prayers.findIndex(
-                      (p) => p.name === nextSortedPrayer.name,
+                    const idxInForNext = sortedPrayersForNext.findIndex(
+                      (p) => p.name === currentSortedPrayer.name,
                     );
+                    const nextInForNext =
+                      idxInForNext >= 0 && idxInForNext < sortedPrayersForNext.length - 1
+                        ? sortedPrayersForNext[idxInForNext + 1]
+                        : null;
+                    nextIndex = nextInForNext
+                      ? prayers.findIndex((p) => p.name === nextInForNext.name)
+                      : prayers.findIndex(
+                          (p) => p.name === sortedPrayersForNext[0].name,
+                        );
                   }
                   logger.info(
                     `Past ${prayer.name} jamaat time or no jamaat - next prayer is ${nextIndex >= 0 ? prayers[nextIndex].name : "unknown"}`,
@@ -638,11 +651,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
         // If no current prayer found, all prayers are in the future
         if (!foundCurrentPrayer) {
-          // Next prayer is the first one that hasn't passed yet
-          for (let i = 0; i < sortedPrayers.length; i++) {
-            if (sortedPrayers[i].time > currentTimeStr) {
+          // Next prayer is the first (non-Skip) one that hasn't passed yet
+          for (let i = 0; i < sortedPrayersForNext.length; i++) {
+            if (sortedPrayersForNext[i].time > currentTimeStr) {
               nextIndex = prayers.findIndex(
-                (p) => p.name === sortedPrayers[i].name,
+                (p) => p.name === sortedPrayersForNext[i].name,
               );
               logger.info(
                 `All prayers are in future - next prayer is ${prayers[nextIndex].name}`,
@@ -651,10 +664,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             }
           }
 
-          // If still no next prayer found, use first prayer of tomorrow
-          if (nextIndex === -1 && sortedPrayers.length > 0) {
+          // If still no next prayer found, use first (non-Skip) prayer of tomorrow
+          if (nextIndex === -1 && sortedPrayersForNext.length > 0) {
             nextIndex = prayers.findIndex(
-              (p) => p.name === sortedPrayers[0].name,
+              (p) => p.name === sortedPrayersForNext[0].name,
             );
             logger.info(
               `All prayers have passed today - next prayer is tomorrow's ${prayers[nextIndex].name}`,
@@ -767,9 +780,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             : "";
         const jamaat =
           typeof todayData === "object" && todayData !== null
-            ? (todayData[`${lowerName}Jamaat` as keyof PrayerTimes] as
-                | string
-                | undefined)
+            ? (() => {
+                const base = (todayData[`${lowerName}Jamaat` as keyof PrayerTimes] as string | undefined);
+                if (base) return base;
+                const data = todayData as unknown as Record<string, unknown>;
+                return (data[`${lowerName}_jamaat`] ?? data[`jamaat_${lowerName}`]) as string | undefined;
+              })()
             : undefined;
 
         // Initialize with default values - we'll update these flags later

@@ -4,6 +4,8 @@ import apiClient from "../../api/apiClient";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
+import { parseScreenOrientation, parseRotationDegrees, orientationToRotationDegrees } from "../../utils/orientation";
+import { setScreenOrientation } from "./uiSlice";
 
 // Constants
 const MIN_REFRESH_INTERVAL = 30 * 1000; // Increased from 10 to 30 seconds to prevent rapid firing
@@ -259,7 +261,7 @@ export const refreshContent = createAsyncThunk(
   "content/refreshContent",
   async (
     { forceRefresh = false }: { forceRefresh?: boolean } = {},
-    { rejectWithValue, getState },
+    { rejectWithValue, getState, dispatch },
   ) => {
     try {
       const debounceKey = "refreshContent";
@@ -346,6 +348,16 @@ export const refreshContent = createAsyncThunk(
         content.screen?.contentConfig?.timeFormat ||
         content.data?.screen?.contentConfig?.timeFormat ||
         "24h";
+
+      // Apply orientation from screen content so production gets correct rotation even without WebSocket
+      const screen = content.screen ?? content.data?.screen;
+      if (screen?.orientation) {
+        const orientation = parseScreenOrientation(screen.orientation);
+        const rotationDegrees =
+          parseRotationDegrees((screen as { rotationDegrees?: unknown }).rotationDegrees) ??
+          orientationToRotationDegrees(orientation);
+        dispatch(setScreenOrientation({ orientation, rotationDegrees }));
+      }
 
       return {
         content: content || null,
