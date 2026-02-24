@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# =============================================================================
+# MasjidConnect Kiosk — xinit client script for minimal X11 image.
+# Run by xinit as the client after the X server starts (e.g. xinit this-file -- :0 vt1).
+# Disables screen sleep, hides cursor, waits for display server, then launches Chromium.
+# =============================================================================
+
+set -euo pipefail
+
+PORT="${PORT:-3001}"
+URL="http://localhost:${PORT}"
+
+# Log for debugging after reboot: ssh in and run  cat /tmp/kiosk.log
+KIOSK_LOG="/tmp/kiosk.log"
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$KIOSK_LOG" 2>/dev/null || true; }
+log "xinitrc-kiosk started (user=$(whoami) DISPLAY=${DISPLAY:-:0})"
+
+# Disable DPMS (screen sleep) and screen saver
+xset s off 2>/dev/null || true
+xset -dpms 2>/dev/null || true
+xset s noblank 2>/dev/null || true
+
+# Hide the mouse cursor after 0.5s of inactivity
+if command -v unclutter &>/dev/null; then
+  unclutter -idle 0.5 -root &
+fi
+
+# Wait for the display server to be ready
+for i in $(seq 1 90); do
+  if curl -sf "${URL}/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+# Use chromium-browser (Bookworm) or chromium (Trixie)
+CHROMIUM=""
+if command -v chromium-browser &>/dev/null; then
+  CHROMIUM="chromium-browser"
+elif command -v chromium &>/dev/null; then
+  CHROMIUM="chromium"
+else
+  echo "[Kiosk] ERROR: Chromium not found." >&2
+  exit 1
+fi
+
+# At boot we run as pi (xinit was started by pi from .profile). Do NOT use runuser — only root can use it.
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${HOME:-/tmp}/.Xauthority"
+
+# Detect display size dynamically (any resolution). Prefer xrandr (actual current mode), then xdpyinfo.
+WINDOW_SIZE="1920,1080"
+if command -v xrandr &>/dev/null; then
+  # "Screen 0: ... current 3840 x 2160 ..." or similar
+  DIM=$(xrandr --current 2>/dev/null | sed -n 's/.* current \([0-9]*\) x \([0-9]*\).*/\1,\2/p' | head -1)
+  if [ -n "$DIM" ] && [ "$DIM" != "," ]; then
+    WINDOW_SIZE="$DIM"
+  fi
+fi
+if [ "$WINDOW_SIZE" = "1920,1080" ] && command -v xdpyinfo &>/dev/null; then
+  DIM=$(xdpyinfo 2>/dev/null | grep 'dimensions:' | head -1 | awk '{print $2}' | tr 'x' ',')
+  [ -n "$DIM" ] && WINDOW_SIZE="$DIM"
+fi
+log "Display size: $WINDOW_SIZE (--window-size will force fullscreen)"
+
+# Dedicated profile so no sign-in prompts.
+CHROMIUM_USER_DATA="${HOME:-/tmp}/.config/chromium-kiosk"
+mkdir -p "${CHROMIUM_USER_DATA}" 2>/dev/null || true
+
+# Brief delay so X/DRM is fully ready.
+sleep 5
+
+log "Starting Chromium (DISPLAY=$DISPLAY)"
+
+# GPU flags match install.sh/kiosk.sh for better performance (avoids CPU-bound rendering and freezes).
+# Set KIOSK_DISABLE_GPU=1 in the environment if you get a black screen and need software rendering.
+CHROMIUM_GPU_FLAGS="--enable-gpu-rasterization --enable-oop-rasterization"
+[ "${KIOSK_DISABLE_GPU:-0}" = "1" ] && CHROMIUM_GPU_FLAGS="--disable-gpu"
+
+# Launch Chromium in a loop (same user as xinit — no runuser).
+while true; do
+  env DBUS_SESSION_BUS_ADDRESS= "${CHROMIUM}" \
+    --kiosk \
+    --start-fullscreen \
+    --start-maximized \
+    --window-position=0,0 \
+    --window-size="${WINDOW_SIZE}" \
+    --noerrdialogs \
+    --disable-infobars \
+    --no-first-run \
+    --disable-sync \
+    --disable-signin-profile-creation \
+    --user-data-dir="${CHROMIUM_USER_DATA}" \
+    --check-for-update-interval=31536000 \
+    --disable-features=TranslateUI \
+    --disable-pinch \
+    --overscroll-history-navigation=0 \
+    $CHROMIUM_GPU_FLAGS \
+    --disable-dev-shm-usage \
+    --force-device-scale-factor=1 \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-session-crashed-bubble \
+    --disable-component-update \
+    --password-store=basic \
+    --renderer-process-limit=1 \
+    --disable-background-networking \
+    --disable-backgrounding-occluded-windows \
+    "${URL}" || true
+  log "Chromium exited, restarting in 5s"
+  sleep 5
+done

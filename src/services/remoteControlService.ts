@@ -158,6 +158,27 @@ class RemoteControlService {
         await apiClient.clearCache();
         logger.info('[RemoteControl] Display content cache cleared; refetch is triggered by middleware');
         break;
+      case 'UPDATE_ORIENTATION':
+        // Orientation is applied by realtimeMiddleware from command payload (WebSocket + heartbeat).
+        break;
+      case 'REFRESH_PRAYER_TIMES':
+        // Refetch is dispatched by realtimeMiddleware (WebSocket + heartbeat).
+        logger.info('[RemoteControl] REFRESH_PRAYER_TIMES: refetch triggered by middleware');
+        break;
+      case 'UPDATE_SETTINGS':
+        // Full content/settings refetch is dispatched by realtimeMiddleware (WebSocket + heartbeat).
+        logger.info('[RemoteControl] UPDATE_SETTINGS: refetch triggered by middleware');
+        break;
+      case 'DISPLAY_MESSAGE':
+        // No UI for remote display message in kiosk; acknowledge only.
+        logger.info('[RemoteControl] DISPLAY_MESSAGE received (no-op)', { payload });
+        break;
+      case 'REBOOT_DEVICE':
+        logger.warn('[RemoteControl] REBOOT_DEVICE not supported in browser');
+        break;
+      case 'CAPTURE_SCREENSHOT':
+        logger.info('[RemoteControl] CAPTURE_SCREENSHOT not implemented');
+        break;
       case 'FORCE_UPDATE':
         logger.info('[RemoteControl] FORCE_UPDATE: checking for app update');
         await checkAndApplyUpdate();

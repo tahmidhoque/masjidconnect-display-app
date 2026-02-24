@@ -173,6 +173,31 @@ export const realtimeMiddleware: Middleware = (api: any) => {
               (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
             });
           }
+          if (commandType === 'UPDATE_SETTINGS') {
+            import('../slices/contentSlice').then(({ refreshAllContent }) => {
+              (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
+            });
+          }
+          if (commandType === 'REFRESH_PRAYER_TIMES') {
+            import('../slices/contentSlice').then(({ refreshPrayerTimes }) => {
+              (api.dispatch as AppDispatch)(refreshPrayerTimes({ forceRefresh: true }));
+            });
+          }
+          if (commandType === 'UPDATE_ORIENTATION' && cmd.payload && typeof cmd.payload === 'object') {
+            const data = cmd.payload as { orientation?: unknown; rotationDegrees?: unknown };
+            const orientation = parseScreenOrientation(data?.orientation);
+            const rotationDegrees =
+              parseRotationDegrees(data?.rotationDegrees) ?? orientationToRotationDegrees(orientation);
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('screen_orientation', orientation);
+                localStorage.setItem('screen_rotation_degrees', String(rotationDegrees));
+              }
+            } catch {
+              // ignore storage errors
+            }
+            api.dispatch(setScreenOrientation({ orientation, rotationDegrees }));
+          }
         } catch (err) {
           realtimeService.acknowledgeCommand(commandId, false, String(err), commandType);
         }
@@ -249,6 +274,39 @@ export const realtimeMiddleware: Middleware = (api: any) => {
           payload: cmd.payload,
           timestamp: cmd.timestamp || new Date().toISOString(),
         });
+        // When commands arrive via HTTP heartbeat (no WebSocket), we must still trigger
+        // refetch and orientation updates — only the WebSocket listener did this before.
+        const commandType = cmd.type;
+        if (commandType === 'CLEAR_CACHE') {
+          import('../slices/contentSlice').then(({ refreshAllContent }) => {
+            (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
+          });
+        }
+        if (commandType === 'UPDATE_SETTINGS') {
+          import('../slices/contentSlice').then(({ refreshAllContent }) => {
+            (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
+          });
+        }
+        if (commandType === 'REFRESH_PRAYER_TIMES') {
+          import('../slices/contentSlice').then(({ refreshPrayerTimes }) => {
+            (api.dispatch as AppDispatch)(refreshPrayerTimes({ forceRefresh: true }));
+          });
+        }
+        if (commandType === 'UPDATE_ORIENTATION' && cmd.payload && typeof cmd.payload === 'object') {
+          const data = cmd.payload as { orientation?: unknown; rotationDegrees?: unknown };
+          const orientation = parseScreenOrientation(data?.orientation);
+          const rotationDegrees =
+            parseRotationDegrees(data?.rotationDegrees) ?? orientationToRotationDegrees(orientation);
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('screen_orientation', orientation);
+              localStorage.setItem('screen_rotation_degrees', String(rotationDegrees));
+            }
+          } catch {
+            // ignore storage errors
+          }
+          api.dispatch(setScreenOrientation({ orientation, rotationDegrees }));
+        }
       }),
     );
 
