@@ -52,7 +52,13 @@ else
   fi
   npm run package
   mkdir -p "${SCRIPT_DIR}/app"
-  cp masjidconnect-display-*.tar.gz "$APP_ARCHIVE"
+  # Copy exactly one archive (newest if multiple from prior builds) so cp never treats dest as a directory
+  LATEST="$(ls -t masjidconnect-display-*.tar.gz 2>/dev/null | head -1)"
+  if [ -z "$LATEST" ]; then
+    echo "ERROR: no masjidconnect-display-*.tar.gz found after package"
+    exit 1
+  fi
+  cp "$LATEST" "$APP_ARCHIVE"
   echo "  -> $APP_ARCHIVE"
 fi
 
