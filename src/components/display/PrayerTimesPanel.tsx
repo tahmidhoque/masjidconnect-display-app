@@ -8,11 +8,17 @@
  *  - An Imsak row before Fajr (informational only, never highlighted)
  *  - "Iftar" label next to Maghrib
  *
+ * When in a makruh (forbidden) time for voluntary prayer, shows a notice in the
+ * Start/Jamaat footer row so layout does not shift.
+ *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
 
 import React from 'react';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
+import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
+import type { TimeFormat } from '../../api/models';
 
 /** Ramadan-specific labels mapped to prayer names */
 const RAMADAN_LABELS: Record<string, string> = {
@@ -27,11 +33,17 @@ interface PrayerTimesPanelProps {
    * Only used when `isRamadan` is true.
    */
   imsakTime?: string | null;
+  /** When set, show makruh notice in the footer (from usePrayerTimes). */
+  forbiddenPrayer?: CurrentForbiddenState | null;
+  /** Time format for the forbidden notice endsAt (from store). */
+  timeFormat?: TimeFormat;
 }
 
 const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   isRamadan = false,
   imsakTime = null,
+  forbiddenPrayer = null,
+  timeFormat = '24h',
 }) => {
   const { todaysPrayerTimes } = usePrayerTimes();
 
@@ -134,10 +146,19 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         })}
       </div>
 
-      {/* Legend — right-aligned to sit under the time columns */}
-      <div className="shrink-0 flex items-center justify-end gap-4 mt-1 pt-1 border-t border-border">
-        <span className="text-caption text-text-muted">Start</span>
-        <span className="text-caption text-gold/60">Jamaat</span>
+      {/* Legend — notice on left when in makruh time, Start/Jamaat on right */}
+      <div className="shrink-0 flex items-center justify-between gap-2 mt-1 pt-1 border-t border-border">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <ForbiddenPrayerNotice
+            forbiddenPrayer={forbiddenPrayer}
+            timeFormat={timeFormat}
+            compact
+          />
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          <span className="text-caption text-text-muted">Start</span>
+          <span className="text-caption text-gold/60">Jamaat</span>
+        </div>
       </div>
     </div>
   );

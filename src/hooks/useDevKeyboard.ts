@@ -18,6 +18,7 @@
  *   Ctrl + Shift + J  — Cycle prayer phase (jamaat-soon → in-prayer → auto)
  *   Ctrl + Shift + O  — Cycle orientation (landscape → portrait → auto)
  *   Ctrl + Shift + N  — Advance carousel to next slide immediately
+ *   Ctrl + Shift + F  — Toggle forbidden-prayer notice (show fake / auto)
  *   Escape            — Clear current alert
  */
 
@@ -30,8 +31,10 @@ import {
 import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
 import type { PrayerPhase } from './usePrayerPhase';
+import { FORBIDDEN_PRAYER_FORCE_EVENT } from './usePrayerTimes';
 import { CAROUSEL_ADVANCE_EVENT } from '../components/display/ContentCarousel';
 import logger from '../utils/logger';
+import dayjs from 'dayjs';
 
 /* ------------------------------------------------------------------ */
 /*  Orientation dev override                                           */
@@ -143,6 +146,27 @@ function toggleOrientationForce(): void {
   window.dispatchEvent(new Event(ORIENTATION_FORCE_EVENT));
 }
 
+/**
+ * Toggle the forbidden-prayer (makruh) notice for dev testing.
+ * Show: sets a fake "forbidden until [now+5min]" state so the notice appears without changing system time.
+ * Auto: clears override so the real computed value is used.
+ */
+function toggleForbiddenPrayerForce(): void {
+  if (window.__FORBIDDEN_PRAYER_FORCE !== undefined && window.__FORBIDDEN_PRAYER_FORCE !== null) {
+    window.__FORBIDDEN_PRAYER_FORCE = undefined;
+    logger.info('[DevKeyboard] Forbidden-prayer notice: auto (computed from time)');
+  } else {
+    const endsAt = dayjs().add(5, 'minute').format('HH:mm');
+    window.__FORBIDDEN_PRAYER_FORCE = {
+      isForbidden: true,
+      reason: 'After dawn until sun up',
+      endsAt,
+    };
+    logger.info('[DevKeyboard] Forbidden-prayer notice: showing fake', { endsAt });
+  }
+  window.dispatchEvent(new Event(FORBIDDEN_PRAYER_FORCE_EVENT));
+}
+
 const useDevKeyboard = (): void => {
   const dispatch = useDispatch();
 
@@ -169,6 +193,7 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+J': 'Cycle prayer phase (jamaat-soon → in-prayer → auto)',
       'Ctrl+Shift+O': 'Cycle orientation (landscape → portrait → auto)',
       'Ctrl+Shift+N': 'Advance carousel to next slide',
+      'Ctrl+Shift+F': 'Toggle forbidden-prayer notice (show fake / auto)',
       'Escape': 'Clear current alert',
     });
 
@@ -201,6 +226,13 @@ const useDevKeyboard = (): void => {
           e.preventDefault();
           logger.info('[DevKeyboard] Advancing carousel to next slide');
           window.dispatchEvent(new Event(CAROUSEL_ADVANCE_EVENT));
+          return;
+        }
+
+        // Forbidden-prayer notice toggle (F or f) — for testing without changing system time
+        if (e.key === 'F' || e.key === 'f') {
+          e.preventDefault();
+          toggleForbiddenPrayerForce();
           return;
         }
 

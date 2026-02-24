@@ -41,6 +41,8 @@ import {
 
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
+import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { selectTimeFormat } from '../../store/slices/contentSlice';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -309,6 +311,10 @@ const DisplayScreen: React.FC = () => {
   /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
   const { phase: prayerPhase, prayerName: phasePrayerName } = usePrayerPhase();
 
+  /* ---- Forbidden (makruh) time for voluntary prayer ---- */
+  const { forbiddenPrayer } = usePrayerTimes();
+  const timeFormat = useAppSelector(selectTimeFormat);
+
   /* ---- Compose slots ---- */
   const headerSlot = (
     <Header
@@ -323,6 +329,8 @@ const DisplayScreen: React.FC = () => {
     <PrayerTimesPanel
       isRamadan={ramadan.isRamadan}
       imsakTime={ramadan.imsakDisplayTime}
+      forbiddenPrayer={forbiddenPrayer}
+      timeFormat={timeFormat}
     />
   );
   const countdown = <PrayerCountdown phase={prayerPhase} />;

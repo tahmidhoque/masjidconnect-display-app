@@ -11,9 +11,21 @@ import {
   fetchHijriDate,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
+import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
+import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import apiClient from "../api/apiClient";
 import logger from "../utils/logger";
 import dayjs from "dayjs";
+
+/** Dev-only: when set, overrides computed forbiddenPrayer (see useDevKeyboard Ctrl+Shift+F). */
+export const FORBIDDEN_PRAYER_FORCE_EVENT = "forbidden-prayer-force-change";
+
+declare global {
+  interface Window {
+    /** Dev: force show/hide forbidden-prayer notice. undefined = use computed; null = hide; object = show with this state. */
+    __FORBIDDEN_PRAYER_FORCE?: CurrentForbiddenState | null;
+  }
+}
 
 interface FormattedPrayerTime {
   name: string;
@@ -37,6 +49,8 @@ interface PrayerTimesHook {
   jumuahTime: string | null;
   jumuahDisplayTime: string | null;
   jumuahKhutbahTime: string | null;
+  /** When voluntary (nafl) prayer is discouraged (makruh times). */
+  forbiddenPrayer: CurrentForbiddenState | null;
 }
 
 const PRAYER_NAMES = ["Fajr", "Sunrise", "Zuhr", "Asr", "Maghrib", "Isha"];
@@ -81,6 +95,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [jumuahKhutbahTime, setJumuahKhutbahTime] = useState<string | null>(
     null,
   );
+  const [forbiddenPrayer, setForbiddenPrayer] =
+    useState<CurrentForbiddenState | null>(null);
+  /** Dev override: when set (not undefined), use this instead of computed forbiddenPrayer. */
+  const [devForbiddenOverride, setDevForbiddenOverride] = useState<
+    CurrentForbiddenState | null | undefined
+  >(() => (import.meta.env.DEV ? window.__FORBIDDEN_PRAYER_FORCE : undefined));
 
   // Use refs to track internal state without causing rerenders
   const initializedRef = useRef<boolean>(false);
@@ -922,6 +942,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // Update the prayers array in state to trigger render
     setTodaysPrayerTimes(prayers);
 
+    // Compute forbidden (makruh) window for voluntary prayer
+    setForbiddenPrayer(
+      getCurrentForbiddenWindow(todayData as PrayerTimes, new Date()) ?? null,
+    );
+
     // Set Jumuah time if it's Friday
     if (isJumuahToday && todayData && todayData.jummahJamaat) {
       setJumuahTime(todayData.jummahJamaat);
@@ -1019,6 +1044,18 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeFormat]); // Only re-process when timeFormat changes
 
+  // Dev: listen for forbidden-prayer force toggle (Ctrl+Shift+F)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const handler = () =>
+      setDevForbiddenOverride(window.__FORBIDDEN_PRAYER_FORCE);
+    window.addEventListener(FORBIDDEN_PRAYER_FORCE_EVENT, handler);
+    return () => window.removeEventListener(FORBIDDEN_PRAYER_FORCE_EVENT, handler);
+  }, []);
+
+  const effectiveForbiddenPrayer =
+    devForbiddenOverride !== undefined ? devForbiddenOverride : forbiddenPrayer;
+
   return {
     todaysPrayerTimes,
     nextPrayer,
@@ -1029,5 +1066,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahTime,
     jumuahDisplayTime,
     jumuahKhutbahTime,
+    forbiddenPrayer: effectiveForbiddenPrayer,
   };
 };
