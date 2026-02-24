@@ -15,12 +15,22 @@
  * content is always rendered at native screen resolution and remains crisp.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 
 const REF_LANDSCAPE = { width: 1280, height: 720 };
 const REF_PORTRAIT = { width: 720, height: 1280 };
 
 type Orientation = 'LANDSCAPE' | 'PORTRAIT';
+
+/** Initial scale from window so first paint is already scaled (avoids flash on RPi). */
+function getInitialScale(orientation: Orientation): number {
+  if (typeof window === 'undefined') return 1;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (w <= 0 || h <= 0) return 1;
+  const refSize = orientation === 'PORTRAIT' ? REF_PORTRAIT : REF_LANDSCAPE;
+  return Math.min(w / refSize.width, h / refSize.height);
+}
 
 interface ReferenceViewportProps {
   orientation: Orientation;
@@ -32,12 +42,12 @@ const ReferenceViewport: React.FC<ReferenceViewportProps> = ({
   children,
 }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(() => getInitialScale(orientation));
 
   const refSize =
     orientation === 'PORTRAIT' ? REF_PORTRAIT : REF_LANDSCAPE;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
 
