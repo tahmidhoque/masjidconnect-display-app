@@ -11,6 +11,8 @@
  * When in a makruh (forbidden) time for voluntary prayer, shows a notice in the
  * Start/Jamaat footer row so layout does not shift.
  *
+ * 12h format: time shown as "5:39" with small "PM" subtext so alignment matches 24h.
+ *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
 
@@ -18,6 +20,7 @@ import React from 'react';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
 import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
+import { getTimeDisplayParts } from '../../utils/dateUtils';
 import type { TimeFormat } from '../../api/models';
 
 /** Ramadan-specific labels mapped to prayer names */
@@ -39,11 +42,34 @@ interface PrayerTimesPanelProps {
   timeFormat?: TimeFormat;
 }
 
+/** Fixed width for each time column so Start/Jamaat align vertically. Block so text-right takes effect. */
+const TIME_COL_CLASS = 'block w-[5.5rem] text-right';
+/** Grid for right-side times: two columns + gap so single-time can span both and sit in the middle. */
+const TIME_GRID_CLASS = 'grid grid-cols-[5.5rem_5.5rem] gap-x-4 w-[12rem] shrink-0';
+
+/** Renders time as main (e.g. "5:39") with optional small AM/PM subtext. Use inside a right-aligned column. */
+const TimeWithPeriod: React.FC<{
+  timeString: string;
+  timeFormat: TimeFormat;
+  className?: string;
+}> = ({ timeString, timeFormat, className = '' }) => {
+  if (!timeString) return <span className={className}>—</span>;
+  const { main, period } = getTimeDisplayParts(timeString, timeFormat);
+  return (
+    <span className={className}>
+      {main}
+      {period != null && (
+        <span className="text-caption opacity-80 font-normal ml-0.5 align-baseline">{period}</span>
+      )}
+    </span>
+  );
+};
+
 const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   isRamadan = false,
   imsakTime = null,
   forbiddenPrayer = null,
-  timeFormat = '24h',
+  timeFormat = '12h',
 }) => {
   const { todaysPrayerTimes } = usePrayerTimes();
 
@@ -74,24 +100,19 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-transparent"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    {/* Crescent indicator */}
                     <span className="w-2 h-2 rounded-full shrink-0 bg-gold/40" />
-                    <span className="text-body font-medium text-gold/70 italic">
-                      Imsak
-                    </span>
-                    <span className="text-xs text-gold/50 font-normal italic">
-                      Suhoor ends
-                    </span>
+                    <span className="text-body font-medium text-gold/70 italic">Imsak</span>
+                    <span className="text-xs text-gold/50 font-normal italic">Suhoor ends</span>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <span className="text-body tabular-nums text-gold/70">
-                      {imsakTime}
-                    </span>
-                    {/* Spacer to align with Jamaat column width */}
-                    <span className="text-body tabular-nums opacity-0 select-none" aria-hidden>
-                      —
-                    </span>
+                  <div className={TIME_GRID_CLASS}>
+                    <div className="col-span-2 w-full min-w-0 flex justify-center items-center">
+                      <TimeWithPeriod
+                        timeString={imsakTime ?? ''}
+                        timeFormat={timeFormat}
+                        className="text-body tabular-nums text-gold/70"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -105,7 +126,6 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 `}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Indicator dot */}
                   <span
                     className={`
                       w-2 h-2 rounded-full shrink-0
@@ -116,25 +136,38 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     {prayer.name}
                   </span>
 
-                  {/* Ramadan contextual label (e.g. "Iftar") */}
                   {ramadanLabel && (
-                    <span className="text-xs text-gold/60 font-normal italic">
-                      {ramadanLabel}
-                    </span>
+                    <span className="text-xs text-gold/60 font-normal italic">{ramadanLabel}</span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                  {/* Adhan time */}
-                  <span className={`text-body tabular-nums ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}>
-                    {prayer.displayTime || '—'}
-                  </span>
-
-                  {/* Jamaat time (if available) */}
-                  {prayer.displayJamaat && (
-                    <span className="text-body tabular-nums text-gold/80">
-                      {prayer.displayJamaat}
-                    </span>
+                <div className={TIME_GRID_CLASS}>
+                  {prayer.jamaat ? (
+                    <>
+                      <span className={TIME_COL_CLASS}>
+                        <TimeWithPeriod
+                          timeString={prayer.time}
+                          timeFormat={timeFormat}
+                          className={`text-body tabular-nums ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
+                        />
+                      </span>
+                      <span className={TIME_COL_CLASS}>
+                        <TimeWithPeriod
+                          timeString={prayer.jamaat}
+                          timeFormat={timeFormat}
+                          className="text-body tabular-nums text-gold/80"
+                        />
+                      </span>
+                    </>
+                  ) : (
+                    /* Single time (e.g. Sunrise) — span both columns, centered in the gap */
+                    <div className="col-span-2 w-full min-w-0 flex justify-center items-center">
+                      <TimeWithPeriod
+                        timeString={prayer.time}
+                        timeFormat={timeFormat}
+                        className={`text-body tabular-nums ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
@@ -143,8 +176,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         })}
       </div>
 
-      {/* Legend — notice on left when in makruh time, Start/Jamaat on right */}
-      <div className="shrink-0 flex items-center justify-between gap-2 mt-1 pt-1 border-t border-border">
+      {/* Legend — same px-3 as rows so Start/Jamaat align with time columns above */}
+      <div className="shrink-0 flex items-center justify-between gap-2 px-3 mt-1 pt-1 border-t border-border">
         <div className="min-w-0 flex-1 overflow-hidden">
           <ForbiddenPrayerNotice
             forbiddenPrayer={forbiddenPrayer}
@@ -153,8 +186,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
           />
         </div>
         <div className="flex items-center gap-4 shrink-0">
-          <span className="text-caption text-text-muted">Start</span>
-          <span className="text-caption text-gold/60">Jamaat</span>
+          <span className={`text-caption text-text-muted ${TIME_COL_CLASS}`}>Start</span>
+          <span className={`text-caption text-gold/60 ${TIME_COL_CLASS}`}>Jamaat</span>
         </div>
       </div>
     </div>

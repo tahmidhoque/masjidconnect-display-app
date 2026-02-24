@@ -66,7 +66,7 @@ const initialState: ContentState = {
   masjidName: DEFAULT_MASJID_NAME,
   masjidTimezone: null,
   carouselTime: 30,
-  timeFormat: "24h", // Default to 24-hour format
+  timeFormat: "12h", // Default to 12-hour format (admin portal can override via contentConfig.timeFormat)
   showPrayerAnnouncement: false,
   prayerAnnouncementName: "",
   isPrayerJamaat: false,
@@ -343,11 +343,11 @@ export const refreshContent = createAsyncThunk(
       }
 
       // Extract time format preference from content config
-      // Default to '24h' if not specified for backward compatibility
+      // Default to '12h' if not specified (admin portal can override)
       const timeFormat: TimeFormat =
         content.screen?.contentConfig?.timeFormat ||
         content.data?.screen?.contentConfig?.timeFormat ||
-        "24h";
+        "12h";
 
       // Apply orientation from screen content so production gets correct rotation even without WebSocket
       const screen = content.screen ?? content.data?.screen;
@@ -743,7 +743,7 @@ const contentSlice = createSlice({
           state.masjidName = action.payload.masjidName || null;
           state.masjidTimezone = action.payload.masjidTimezone || null;
           state.carouselTime = action.payload.carouselTime || 30;
-          state.timeFormat = action.payload.timeFormat || "24h";
+          state.timeFormat = action.payload.timeFormat || "12h";
           state.lastContentUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
           if (action.payload.schedule !== undefined) {

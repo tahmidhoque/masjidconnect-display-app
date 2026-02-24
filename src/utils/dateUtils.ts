@@ -30,20 +30,46 @@ export const formatTimeTo12Hour = (timeString: string): string => {
 };
 
 /**
- * Format time string to display format based on the specified format preference
- * 
+ * Parts for rendering time with optional small AM/PM subtext (keeps numeric column aligned like 24h).
+ *
  * @param timeString - Time in 24-hour format (e.g., "16:30")
- * @param format - Time format preference ('12h' or '24h'), defaults to '24h'
+ * @param format - Time format preference ('12h' or '24h')
+ * @returns { main: "5:39" | "17:39", period: "PM" | "AM" | null }
+ */
+export const getTimeDisplayParts = (
+  timeString: string,
+  format: TimeFormat,
+): { main: string; period: string | null } => {
+  if (!timeString) return { main: "", period: null };
+
+  const [hours, minutes] = timeString.split(":").map(Number);
+  if (isNaN(hours) || isNaN(minutes)) return { main: timeString, period: null };
+
+  if (format === "12h") {
+    const period = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    const main = `${displayHours}:${minutes.toString().padStart(2, "0")}`;
+    return { main, period };
+  }
+
+  const main = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  return { main, period: null };
+};
+
+/**
+ * Format time string to display format based on the specified format preference
+ *
+ * @param timeString - Time in 24-hour format (e.g., "16:30")
+ * @param format - Time format preference ('12h' or '24h'), defaults to '12h'
  * @returns Formatted time string based on the format preference
- * 
+ *
  * @example
  * formatTimeToDisplay("16:30", "24h") // Returns "16:30"
  * formatTimeToDisplay("16:30", "12h") // Returns "4:30 PM"
- * formatTimeToDisplay("09:00", "12h") // Returns "9:00 AM"
  */
 export const formatTimeToDisplay = (
   timeString: string,
-  format: TimeFormat = "24h",
+  format: TimeFormat = "12h",
 ): string => {
   if (!timeString) return "";
 
@@ -55,7 +81,6 @@ export const formatTimeToDisplay = (
     return formatTimeTo12Hour(timeString);
   }
 
-  // Default: 24-hour format
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 };
 

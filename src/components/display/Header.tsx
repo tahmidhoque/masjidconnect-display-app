@@ -10,8 +10,9 @@
  */
 
 import React, { useMemo } from 'react';
+import type { TimeFormat } from '@/api/models';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
-import { calculateApproximateHijriDate } from '../../utils/dateUtils';
+import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 
 interface HeaderProps {
   masjidName?: string | null;
@@ -19,6 +20,8 @@ interface HeaderProps {
   isRamadan?: boolean;
   /** Current day of Ramadan (1-30) */
   ramadanDay?: number | null;
+  /** Time display format (12h or 24h); defaults to 12h */
+  timeFormat?: TimeFormat;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -27,14 +30,20 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const Header: React.FC<HeaderProps> = ({ masjidName, isRamadan = false, ramadanDay = null }) => {
+const Header: React.FC<HeaderProps> = ({
+  masjidName,
+  isRamadan = false,
+  ramadanDay = null,
+  timeFormat = '12h',
+}) => {
   const currentTime = useCurrentTime();
 
   const hours = currentTime.getHours();
   const minutes = currentTime.getMinutes();
   const seconds = currentTime.getSeconds();
 
-  const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const timeStr24h = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
   const secStr = String(seconds).padStart(2, '0');
   const dateStr = `${DAYS[currentTime.getDay()]}, ${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
 
@@ -96,10 +105,15 @@ const Header: React.FC<HeaderProps> = ({ masjidName, isRamadan = false, ramadanD
         <p className="text-sm text-text-secondary whitespace-nowrap">{dateStr}</p>
       </div>
 
-      {/* Right — Clock */}
+      {/* Right — Clock (12h: main + small AM/PM; 24h: main + seconds) */}
       <div className="flex items-baseline gap-1 shrink-0">
-        <span className="text-2xl font-semibold text-gold tabular-nums">{timeStr}</span>
-        <span className="text-xs text-gold/60 tabular-nums">{secStr}</span>
+        <span className="text-2xl font-semibold text-gold tabular-nums">{timeMain}</span>
+        {timePeriod != null && (
+          <span className="text-sm text-gold/70 font-normal align-baseline">{timePeriod}</span>
+        )}
+        {timeFormat === '24h' && (
+          <span className="text-xs text-gold/60 tabular-nums">{secStr}</span>
+        )}
       </div>
     </div>
   );

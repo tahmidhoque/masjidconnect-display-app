@@ -12,7 +12,7 @@
 import React from 'react';
 import { Info } from 'lucide-react';
 import type { CurrentForbiddenState } from '@/utils/forbiddenPrayerTimes';
-import { formatTimeToDisplay } from '@/utils/dateUtils';
+import { getTimeDisplayParts } from '@/utils/dateUtils';
 import type { TimeFormat } from '@/api/models';
 
 interface ForbiddenPrayerNoticeProps {
@@ -31,7 +31,8 @@ const ForbiddenPrayerNotice: React.FC<ForbiddenPrayerNoticeProps> = ({
 }) => {
   if (!forbiddenPrayer) return null;
 
-  const displayEndsAt = formatTimeToDisplay(forbiddenPrayer.endsAt, timeFormat);
+  const { main, period } = getTimeDisplayParts(forbiddenPrayer.endsAt, timeFormat);
+  const displayEndsAtAria = period ? `${main} ${period}` : main;
 
   return (
     <div
@@ -44,9 +45,10 @@ const ForbiddenPrayerNotice: React.FC<ForbiddenPrayerNoticeProps> = ({
       )}
       <p
         className={`text-caption text-text-muted ${compact ? 'truncate' : ''}`}
-        title={compact ? `Voluntary prayer not recommended until ${displayEndsAt}` : undefined}
+        title={compact ? `Voluntary prayer not recommended until ${displayEndsAtAria}` : undefined}
       >
-        Voluntary prayer not recommended until {displayEndsAt}
+        Voluntary prayer not recommended until {main}
+        {period != null && <span className="opacity-80 font-normal"> {period}</span>}
       </p>
     </div>
   );

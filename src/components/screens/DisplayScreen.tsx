@@ -321,6 +321,7 @@ const DisplayScreen: React.FC = () => {
       masjidName={masjidName}
       isRamadan={ramadan.isRamadan}
       ramadanDay={ramadan.ramadanDay}
+      timeFormat={timeFormat}
     />
   );
 
