@@ -4,7 +4,44 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
-  { ignores: ["build/", "dist/", "node_modules/", "*.config.js", "*.config.ts", "deploy/", "scripts/"] },
+  {
+    ignores: [
+      "build/",
+      "dist/",
+      "node_modules/",
+      "*.config.js",
+      "*.config.ts",
+      "deploy/",
+      "scripts/",
+    ],
+  },
+  {
+    files: ["rpi-image/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        Buffer: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        console: "readonly",
+        module: "readonly",
+        require: "readonly",
+        exports: "writable",
+        global: "readonly",
+        setInterval: "readonly",
+        setTimeout: "readonly",
+        clearInterval: "readonly",
+        clearTimeout: "readonly",
+      },
+      parserOptions: { ecmaVersion: "latest", sourceType: "module" },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    },
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
