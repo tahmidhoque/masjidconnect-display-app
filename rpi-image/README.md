@@ -193,6 +193,59 @@ You can also set WiFi at build time via env vars instead of `wifi.conf`:
 
 ## Troubleshooting
 
+- **“localhost refused to connect” / connection refused on the display**  
+  Chromium is trying to load `http://localhost:3001` but the Node display server is not running or not listening. **Diagnose over SSH:**
+
+  1. **Is the display service running?**
+     ```bash
+     sudo systemctl status masjidconnect-display
+     ```
+     If it is `inactive` or `failed`, start it and watch logs:
+     ```bash
+     sudo systemctl start masjidconnect-display
+     journalctl -u masjidconnect-display -f --no-pager
+     ```
+
+  2. **Is anything listening on port 3001?**
+     ```bash
+     ss -tlnp | grep 3001
+     # or
+     sudo lsof -i :3001
+     ```
+     If nothing is listed, the server did not bind (see step 3).
+
+  3. **Why might the service fail?**
+     - **Missing or bad app files:** Check that the app is present and the server script exists:
+       ```bash
+       ls -la /opt/masjidconnect/dist/index.html /opt/masjidconnect/deploy/server.mjs
+       ```
+     - **Node not found:** The image installs Node from NodeSource at build time. Check:
+       ```bash
+       which node
+       node -v
+       ```
+     - **Service logs:** Always read the service log for the actual error:
+       ```bash
+       journalctl -u masjidconnect-display -n 80 --no-pager
+       ```
+
+  4. **Test the server manually (as the same user as the service, usually pi):**
+     ```bash
+     cd /opt/masjidconnect && node deploy/server.mjs
+     ```
+     Leave it running in the foreground; you should see it listening. In another SSH session run `curl -s http://localhost:3001/health`. If that works, the app is fine and the issue is systemd (e.g. wrong WorkingDirectory, User, or PATH). Stop the manual run with Ctrl+C and fix the service.
+
+  5. **Kiosk log:** The kiosk script logs to `/tmp/kiosk.log`. If the server was not ready in time, Chromium may have started anyway:
+     ```bash
+     cat /tmp/kiosk.log
+     ```
+
+  After fixing the display service, reload and restart it, then refresh the browser or reboot:
+  ```bash
+  sudo systemctl daemon-reload
+  sudo systemctl restart masjidconnect-display
+  ```
+
 - **Default SSH credentials (custom image)**  
   When you flash the **MasjidConnect custom .img** with Pi Imager, OS customisation is not available (it only applies to official RPi OS images). The image is built with a known default so you can always SSH in: username **`pi`** (the first user from the base), password **`masjidconnect`**. Run `ssh pi@<rpi-ip>` and change the password after first login with `passwd`.
 

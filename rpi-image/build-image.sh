@@ -36,24 +36,29 @@ echo "  MasjidConnect Display — Docker image build"
 echo "  Config: $CONFIG"
 echo "============================================"
 
-# Ensure app archive exists
-if [ ! -f "$APP_ARCHIVE" ]; then
-  if [ "$SKIP_PACKAGE" = true ]; then
+# Build or reuse app archive (always rebuild when not --skip-package so image gets latest code)
+if [ "$SKIP_PACKAGE" = true ]; then
+  if [ ! -f "$APP_ARCHIVE" ]; then
     echo "ERROR: $APP_ARCHIVE not found. Run without --skip-package first."
     exit 1
   fi
-  echo "Building app archive..."
+  echo "Using existing app archive: $APP_ARCHIVE"
+else
+  echo "Building app archive (VITE_* from .env if present)..."
+  if [ -f "${REPO_ROOT}/.env" ]; then
+    set -a
+    source "${REPO_ROOT}/.env"
+    set +a
+  fi
   npm run package
   mkdir -p "${SCRIPT_DIR}/app"
   cp masjidconnect-display-*.tar.gz "$APP_ARCHIVE"
   echo "  -> $APP_ARCHIVE"
-else
-  echo "Using existing app archive: $APP_ARCHIVE"
 fi
 
 # Ensure deploy scripts used by the layer are present in rpi-image (archive may be from an older tree).
 mkdir -p "${SCRIPT_DIR}/deploy-overlay"
-for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk wifi-setup-server.mjs; do
+for f in start-kiosk-x11.sh start-kiosk-now.sh xinitrc-kiosk wifi-setup-server.mjs update-from-github.sh; do
   if [ -f "${REPO_ROOT}/deploy/${f}" ]; then
     cp "${REPO_ROOT}/deploy/${f}" "${SCRIPT_DIR}/deploy-overlay/"
   fi

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Lightweight Express static server for the MasjidConnect display app.
+ * Lightweight static server for the MasjidConnect display app.
  *
  * Serves the Vite production build (dist/) with:
- *  - gzip compression
  *  - SPA fallback (all routes -> index.html)
  *  - Cache headers for hashed assets
  *  - Health check endpoint at /health
+ *  - Internal (localhost-only) endpoints: POST /internal/trigger-update, GET /internal/update-status
  *
  * Usage:
  *   PORT=3001 node deploy/server.mjs
@@ -17,11 +17,21 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const DIST_DIR = resolve(__dirname, '..', 'dist');
+const APP_DIR = resolve(__dirname, '..');
+const DIST_DIR = resolve(APP_DIR, 'dist');
+const STATUS_FILE = join(APP_DIR, '.update-status.json');
+const UPDATE_SCRIPT = join(__dirname, 'update-from-github.sh');
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
+
+/** True if the request is from localhost (only these get internal routes). */
+function isLocalhost(socket) {
+  const addr = socket?.remoteAddress || '';
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
 
 // MIME type map
 const MIME = {
@@ -73,6 +83,49 @@ const server = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
     return;
+  }
+
+  // Internal routes (localhost-only) for self-update
+  if (isLocalhost(req.socket)) {
+    if (pathname === '/internal/trigger-update' && req.method === 'POST') {
+      if (!existsSync(UPDATE_SCRIPT)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Update script not found' }));
+        return;
+      }
+      try {
+        const child = spawn('sudo', [UPDATE_SCRIPT], {
+          detached: true,
+          stdio: 'ignore',
+          cwd: APP_DIR,
+        });
+        child.unref();
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: String(err.message) }));
+        return;
+      }
+      res.writeHead(202, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: 'Update started' }));
+      return;
+    }
+    if (pathname === '/internal/update-status' && req.method === 'GET') {
+      if (!existsSync(STATUS_FILE)) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      try {
+        const raw = readFileSync(STATUS_FILE, 'utf8');
+        const data = JSON.parse(raw);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      } catch {
+        res.writeHead(204);
+        res.end();
+      }
+      return;
+    }
   }
 
   // Try to serve the exact file

@@ -70,14 +70,15 @@ function handleScan() {
 
 /** POST /api/connect — write wpa_supplicant and restart */
 function handleConnect(body) {
-  const { ssid, password, country = 'GB' } = body;
-  if (!ssid || !password) {
-    return { ok: false, error: 'SSID and password required' };
+  const { ssid, password = '', country = 'GB' } = body;
+  if (!ssid || typeof ssid !== 'string' || !ssid.trim()) {
+    return { ok: false, error: 'Please select a network' };
   }
+  const pass = typeof password === 'string' ? password : String(password || '');
   try {
     const header = `ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=${String(country).toUpperCase().slice(0, 2)}\n`;
-    const pskOut = spawnSync('wpa_passphrase', [ssid, '-'], {
-      input: password,
+    const pskOut = spawnSync('wpa_passphrase', [ssid.trim(), '-'], {
+      input: pass,
       encoding: 'utf8',
       maxBuffer: 4096,
     });
@@ -182,7 +183,6 @@ const HTML = `<!DOCTYPE html>
       const password = passwordEl.value;
       const country = (countryEl.value || 'GB').toUpperCase().slice(0, 2);
       if (!ssid) { showMsg('Please select a network (or scan first).', 'error'); return; }
-      if (!password) { showMsg('Please enter the WiFi password.', 'error'); return; }
       clearMsg();
       showMsg('Connecting…', 'info');
       try {

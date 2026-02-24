@@ -56,6 +56,18 @@ export interface UIState {
 
   // Pending restart/reload (from remote command with countdown) — show on-screen countdown
   pendingRestart: { at: number; label: string } | null;
+
+  // Self-update status (from FORCE_UPDATE + /internal/update-status). Not persisted.
+  updatePhase:
+    | "idle"
+    | "checking"
+    | "no_update"
+    | "downloading"
+    | "installing"
+    | "countdown"
+    | "done";
+  updateMessage: string;
+  updateRestartAt: number | null;
 }
 
 // Initial state
@@ -84,6 +96,9 @@ const initialState: UIState = {
   preventContextMenu: true,
   preventKeyboardShortcuts: true,
   pendingRestart: null,
+  updatePhase: "idle",
+  updateMessage: "",
+  updateRestartAt: null,
 };
 
 // Slice
@@ -252,6 +267,26 @@ const uiSlice = createSlice({
       state.pendingRestart = null;
     },
 
+    // Self-update status (FORCE_UPDATE flow)
+    setUpdateStatus: (
+      state,
+      action: PayloadAction<{
+        phase: UIState["updatePhase"];
+        message?: string;
+        restartAt?: number | null;
+      }>,
+    ) => {
+      state.updatePhase = action.payload.phase;
+      state.updateMessage = action.payload.message ?? "";
+      state.updateRestartAt = action.payload.restartAt ?? null;
+    },
+
+    clearUpdateStatus: (state) => {
+      state.updatePhase = "idle";
+      state.updateMessage = "";
+      state.updateRestartAt = null;
+    },
+
     // Reset UI state (useful for logout)
     resetUIState: (state) => {
       // Reset most UI state but keep kiosk settings
@@ -276,6 +311,9 @@ const uiSlice = createSlice({
       state.renderCount = 0;
       state.lastRenderTime = null;
       state.pendingRestart = null;
+      state.updatePhase = "idle";
+      state.updateMessage = "";
+      state.updateRestartAt = null;
     },
   },
 });
@@ -307,6 +345,8 @@ export const {
   setPreventKeyboardShortcuts,
   setPendingRestart,
   clearPendingRestart,
+  setUpdateStatus,
+  clearUpdateStatus,
   resetUIState,
 } = uiSlice.actions;
 
@@ -353,6 +393,12 @@ export const selectPreventKeyboardShortcuts = (state: { ui: UIState }) =>
   state.ui.preventKeyboardShortcuts;
 export const selectPendingRestart = (state: { ui: UIState }) =>
   state.ui.pendingRestart;
+export const selectUpdatePhase = (state: { ui: UIState }) =>
+  state.ui.updatePhase;
+export const selectUpdateMessage = (state: { ui: UIState }) =>
+  state.ui.updateMessage;
+export const selectUpdateRestartAt = (state: { ui: UIState }) =>
+  state.ui.updateRestartAt;
 
 // Computed selectors
 export const selectOfflineDuration = (state: { ui: UIState }) => {

@@ -86,6 +86,8 @@ jobs:
     name: Build RPi image
     needs: build
     runs-on: ubuntu-latest
+    # Skip on tag push: image is >3GB and exceeds GitHub free-tier artifact limits. Build locally with rpi-image/build-image.sh.
+    if: "!startsWith(github.ref, 'refs/tags/')"
     # rpi-image-gen builds arm64 rootfs; QEMU user emulation is used on x86 runners.
     # For faster builds, use a self-hosted arm64 runner and remove setup-qemu.
 
@@ -162,16 +164,18 @@ jobs:
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: masjidconnect-display-image
           path: |
             masjidconnect-display.img
             masjidconnect-display.img.sha256
           retention-days: 5
+        # May fail on free tier (artifact size limit). Build image locally: ./rpi-image/build-image.sh pi4
 
   release:
     name: Create GitHub Release
-    needs: [build, build-image]
+    needs: [build]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
 
@@ -192,28 +196,29 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Release version: $VERSION"
 
+      - name: Verify tag matches package.json (tag runs only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION). Bump package.json and commit before tagging."
+            exit 1
+          fi
+          echo "Version match OK: $PKG_VERSION"
+
       - name: Download app artifact
         uses: actions/download-artifact@v4
         with:
           name: masjidconnect-display
           path: ./artifacts
 
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: masjidconnect-display-image
-          path: ./artifacts/image
-
-      - name: Generate checksums and prepare release files
+      - name: Generate checksums for release
         run: |
           cd artifacts
           for file in *.tar.gz; do
             sha256sum "$file" > "$file.sha256"
           done
-          if [ -d image ]; then
-            mv image/masjidconnect-display.img image/masjidconnect-display.img.sha256 . 2>/dev/null || true
-            rm -rf image
-          fi
 
       - name: Generate release notes
         id: release-notes
@@ -249,11 +254,7 @@ jobs:
 
           $CHANGES
 
-          ### Option A: Pre-built image (easiest)
-
-          Download \`masjidconnect-display.img\`, flash to an SD card with [Etcher](https://etcher.balena.io/) or Raspberry Pi Imager ("Use custom"), then boot the Pi. No manual install needed.
-
-          ### Option B: Manual install (tar.gz)
+          ### Install (tar.gz)
 
           \`\`\`bash
           VERSION="${VERSION}"
@@ -263,7 +264,9 @@ jobs:
           sudo /opt/masjidconnect/deploy/install.sh
           \`\`\`
 
-          ### Updating an Existing Installation
+          ### Updating an existing install
+
+          Use **Force update** from the admin portal, or manually:
 
           \`\`\`bash
           VERSION="${VERSION}"
@@ -273,8 +276,12 @@ jobs:
           sudo systemctl start masjidconnect-display masjidconnect-kiosk
           \`\`\`
 
+          ### RPi image (build locally)
+
+          Pre-built images are not uploaded (size limits). Build locally: \`./rpi-image/build-image.sh pi4\` — see \`rpi-image/README.md\`.
+
           ### Checksums
-          SHA256 checksums are provided for all artifacts to verify integrity.
+          SHA256 checksums are provided for the tarball.
           EOF
 
       - name: Create Release
@@ -288,8 +295,6 @@ jobs:
           files: |
             artifacts/*.tar.gz
             artifacts/*.sha256
-            artifacts/*.img
-            artifacts/*.img.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

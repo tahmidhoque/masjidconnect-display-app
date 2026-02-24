@@ -18,7 +18,13 @@ import {
   resetReconnectAttempts,
   clearError,
 } from '../slices/emergencySlice';
-import { setScreenOrientation, setPendingRestart, clearPendingRestart } from '../slices/uiSlice';
+import {
+  setScreenOrientation,
+  setPendingRestart,
+  clearPendingRestart,
+  setUpdateStatus,
+  clearUpdateStatus,
+} from '../slices/uiSlice';
 import logger from '../../utils/logger';
 import {
   parseScreenOrientation,
@@ -76,6 +82,11 @@ export const realtimeMiddleware: Middleware = (api: any) => {
     // Show on-screen countdown when a delayed restart/reload is scheduled
     remoteControlService.setOnScheduledRestart((delaySeconds, label) => {
       api.dispatch(setPendingRestart({ at: Date.now() + delaySeconds * 1_000, label }));
+    });
+
+    // Push device update status (FORCE_UPDATE flow) to Redux for Footer
+    remoteControlService.setOnUpdateStatus((phase, message, restartAt) => {
+      api.dispatch(setUpdateStatus({ phase, message, restartAt }));
     });
 
     // WebSocket event listeners
@@ -321,7 +332,9 @@ export const realtimeMiddleware: Middleware = (api: any) => {
     invalidationCoalesceMap.forEach((id) => clearTimeout(id));
     invalidationCoalesceMap.clear();
     api.dispatch(clearPendingRestart());
+    api.dispatch(clearUpdateStatus());
     remoteControlService.clearScheduledRestart();
+    remoteControlService.clearDeviceUpdatePolling();
     realtimeService.disconnect();
     syncService.stop();
     initialised = false;
@@ -348,6 +361,7 @@ export const cleanupRealtimeMiddleware = () => {
   invalidationCoalesceMap.forEach((id) => clearTimeout(id));
   invalidationCoalesceMap.clear();
   remoteControlService.clearScheduledRestart();
+  remoteControlService.clearDeviceUpdatePolling();
   realtimeService.disconnect();
   syncService.stop();
   initialised = false;

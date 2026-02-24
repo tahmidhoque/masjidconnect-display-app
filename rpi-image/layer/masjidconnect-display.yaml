@@ -41,7 +41,7 @@ mmdebstrap:
       ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"; [ -z "$ARCHIVE" ] && { echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"; exit 1; }; [ ! -f "$ARCHIVE" ] && { echo "MasjidConnect app archive not found: $ARCHIVE"; exit 1; }; mkdir -p "$1/opt/masjidconnect"; cp "$ARCHIVE" "$1/tmp/masjidconnect-app.tar.gz"; chroot "$1" /bin/bash -c "tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect && rm /tmp/masjidconnect-app.tar.gz"
     # Ownership (pi user is typically 1000:1000)
     - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
-    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/xinitrc-kiosk /opt/masjidconnect/deploy/start-kiosk-x11.sh /opt/masjidconnect/deploy/start-kiosk-now.sh /opt/masjidconnect/deploy/wifi-setup-server.mjs 2>/dev/null || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/xinitrc-kiosk /opt/masjidconnect/deploy/start-kiosk-x11.sh /opt/masjidconnect/deploy/start-kiosk-now.sh /opt/masjidconnect/deploy/wifi-setup-server.mjs /opt/masjidconnect/deploy/update-from-github.sh 2>/dev/null || true'
     # Deploy overlay: copy kiosk scripts from repo so image has them even if the app archive was built before they were added.
     - |
       if [ -d "${SRCROOT}/deploy-overlay" ]; then
@@ -146,4 +146,11 @@ mmdebstrap:
       if [ -n "$U" ]; then
         echo "${U} ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/wifi-setup-server.mjs" > "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
         chmod 440 "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
+      fi
+    # Allow first user to run self-update script without password (FORCE_UPDATE from admin portal).
+    - |
+      U=$(chroot "$1" getent passwd 1000 | cut -d: -f1)
+      if [ -n "$U" ]; then
+        echo "${U} ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/update-from-github.sh" > "$1/etc/sudoers.d/99-masjidconnect-update"
+        chmod 440 "$1/etc/sudoers.d/99-masjidconnect-update"
       fi

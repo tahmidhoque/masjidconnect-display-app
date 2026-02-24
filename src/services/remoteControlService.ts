@@ -22,6 +22,22 @@ export interface RemoteCommand {
 /** Callback when a delayed restart/reload is scheduled (so UI can show countdown). */
 export type OnScheduledRestart = (delaySeconds: number, label: string) => void;
 
+/** Phase from /internal/update-status. */
+export type DeviceUpdatePhase =
+  | 'checking'
+  | 'no_update'
+  | 'downloading'
+  | 'installing'
+  | 'countdown'
+  | 'done';
+
+/** Callback to push device update status to Redux (phase, message, restartAt ms). */
+export type OnUpdateStatus = (
+  phase: DeviceUpdatePhase,
+  message: string,
+  restartAt: number | null,
+) => void;
+
 export interface RemoteCommandResponse {
   commandId: string;
   success: boolean;
@@ -30,6 +46,9 @@ export interface RemoteCommandResponse {
   timestamp: string;
 }
 
+const INTERNAL_BASE = 'http://localhost:3001';
+const UPDATE_STATUS_POLL_MS = 1_500;
+
 class RemoteControlService {
   private commandListeners = new Set<(cmd: RemoteCommand) => void>();
   private processedIds = new Set<string>();
@@ -37,10 +56,72 @@ class RemoteControlService {
   private lastCommandTimestamp: Record<string, number> = {};
   private onScheduledRestart: OnScheduledRestart | null = null;
   private scheduledRestartTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private onUpdateStatus: OnUpdateStatus | null = null;
+  private updatePollIntervalId: ReturnType<typeof setInterval> | null = null;
 
   /** Register callback to show on-screen countdown when a delayed restart/reload is scheduled. */
   public setOnScheduledRestart(cb: OnScheduledRestart | null): void {
     this.onScheduledRestart = cb;
+  }
+
+  /** Register callback to push device update status (FORCE_UPDATE flow) to Redux. */
+  public setOnUpdateStatus(cb: OnUpdateStatus | null): void {
+    this.onUpdateStatus = cb;
+  }
+
+  /** Stop polling /internal/update-status (e.g. on logout). */
+  public clearDeviceUpdatePolling(): void {
+    this.stopUpdatePolling();
+  }
+
+  private stopUpdatePolling(): void {
+    if (this.updatePollIntervalId) {
+      clearInterval(this.updatePollIntervalId);
+      this.updatePollIntervalId = null;
+    }
+  }
+
+  private notifyUpdateStatus(phase: DeviceUpdatePhase, message: string, restartAt: number | null): void {
+    try {
+      this.onUpdateStatus?.(phase, message, restartAt);
+    } catch (err) {
+      logger.error('[RemoteControl] onUpdateStatus error', { error: String(err) });
+    }
+  }
+
+  /** Trigger device update script and poll /internal/update-status until no_update or done. */
+  private async triggerDeviceUpdateAndPoll(): Promise<void> {
+    this.notifyUpdateStatus('checking', 'Checking for update…', null);
+    try {
+      const res = await fetch(`${INTERNAL_BASE}/internal/trigger-update`, { method: 'POST' });
+      if (res.status !== 202) {
+        this.notifyUpdateStatus('no_update', 'Up to date', null);
+        return;
+      }
+    } catch {
+      this.notifyUpdateStatus('no_update', 'Up to date', null);
+      return;
+    }
+
+    const poll = async (): Promise<void> => {
+      try {
+        const res = await fetch(`${INTERNAL_BASE}/internal/update-status`);
+        if (res.status === 204 || res.status === 404) return;
+        const data = (await res.json()) as { phase?: string; message?: string; restartAt?: number };
+        const phase = (data.phase ?? '') as DeviceUpdatePhase;
+        const message = typeof data.message === 'string' ? data.message : '';
+        const restartAt = typeof data.restartAt === 'number' ? data.restartAt : null;
+        this.notifyUpdateStatus(phase, message, restartAt);
+        if (phase === 'no_update' || phase === 'done') {
+          this.stopUpdatePolling();
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    await poll();
+    this.updatePollIntervalId = setInterval(poll, UPDATE_STATUS_POLL_MS);
   }
 
   /** Cancel any scheduled restart/reload (e.g. on logout). */
@@ -180,8 +261,9 @@ class RemoteControlService {
         logger.info('[RemoteControl] CAPTURE_SCREENSHOT not implemented');
         break;
       case 'FORCE_UPDATE':
-        logger.info('[RemoteControl] FORCE_UPDATE: checking for app update');
+        logger.info('[RemoteControl] FORCE_UPDATE: triggering device update and PWA check');
         await checkAndApplyUpdate();
+        void this.triggerDeviceUpdateAndPoll();
         break;
       case 'FACTORY_RESET':
         localStorage.clear();
