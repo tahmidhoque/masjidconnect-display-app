@@ -23,6 +23,9 @@ const STATUS_DISPLAY_DELAY_MS = 5_000;
 /** After showing "Up to date", clear the message after this delay (ms). */
 const NO_UPDATE_CLEAR_MS = 8_000;
 
+/** Injected at build time by Vite (from package.json); also available in dev. */
+const APP_VERSION = import.meta.env.VITE_APP_VERSION;
+
 const Footer: React.FC = () => {
   const dispatch = useAppDispatch();
   const { status, message } = useConnectionStatus();
@@ -128,6 +131,11 @@ const Footer: React.FC = () => {
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-text-muted">Powered by</span>
         <img src={logoGold} alt="MasjidConnect" className="h-5 w-auto" />
+        {APP_VERSION && (
+          <span className="text-text-muted/70 text-[0.65em] font-normal tabular-nums" aria-hidden="true">
+            v{APP_VERSION}
+          </span>
+        )}
       </div>
     </div>
   );
