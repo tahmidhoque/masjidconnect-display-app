@@ -56,6 +56,7 @@ jobs:
         run: npm run package
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://portal.masjidconnect.co.uk' }}
+          VITE_REALTIME_URL: ${{ secrets.VITE_REALTIME_URL || 'https://websocket.masjidconnect.co.uk' }}
 
       - name: Validate archive
         run: |

@@ -104,7 +104,7 @@ if [ "$DEPLOY_SCRIPTS" = true ]; then
   rsync -avz \
     deploy/ \
     "${PI_HOST}:/tmp/masjidconnect-deploy/"
-  ssh "$PI_HOST" "sudo cp -r /tmp/masjidconnect-deploy/* ${APP_DIR}/deploy/ 2>/dev/null || sudo mkdir -p ${APP_DIR}/deploy && sudo cp -r /tmp/masjidconnect-deploy/* ${APP_DIR}/deploy/; sudo chmod +x ${APP_DIR}/deploy/*.sh 2>/dev/null || true; sudo chown -R ${REMOTE_USER}:${REMOTE_USER} ${APP_DIR}/deploy 2>/dev/null || true"
+  ssh "$PI_HOST" "sudo mkdir -p ${APP_DIR}/deploy && sudo cp -r /tmp/masjidconnect-deploy/* ${APP_DIR}/deploy/ && sudo chmod +x ${APP_DIR}/deploy/*.sh ${APP_DIR}/deploy/xinitrc-kiosk 2>/dev/null; sudo chown -R ${REMOTE_USER}:${REMOTE_USER} ${APP_DIR}/deploy"
   echo "  deploy/ updated."
   echo ""
 else

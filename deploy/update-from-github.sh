@@ -15,9 +15,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${APP_DIR}/.update-status.json"
-GITHUB_OWNER="masjidSolutions"
+DEBUG_LOG="/tmp/masjidconnect-update-debug.log"
+GITHUB_OWNER="tahmidhoque"
 GITHUB_REPO="masjidconnect-display-app"
 COUNTDOWN_SECONDS=30
+
+debug() { echo "$(date -Iseconds) $*" >> "$DEBUG_LOG" 2>/dev/null || true; }
 
 write_status() {
   local phase="$1"
@@ -33,37 +36,9 @@ write_status() {
   chown "${SUDO_UID:-1000}:${SUDO_GID:-1000}" "$STATUS_FILE" 2>/dev/null || true
 }
 
-# Get current version from dist/version.json or package.json
-get_current_version() {
-  local v=""
-  if [ -f "${APP_DIR}/dist/version.json" ]; then
-    v=$(node -p "try { require('${APP_DIR}/dist/version.json').version } catch(e) { '' }" 2>/dev/null) || true
-  fi
-  if [ -z "$v" ] && [ -f "${APP_DIR}/package.json" ]; then
-    v=$(node -p "require('${APP_DIR}/package.json').version" 2>/dev/null) || true
-  fi
-  echo "$v"
-}
-
-# Compare two semver strings: true if $2 > $1
-version_newer() {
-  local current="$1"
-  local latest="$2"
-  current="${current#v}"
-  latest="${latest#v}"
-  [ "$current" = "$latest" ] && return 1
-  [ "$(printf '%s\n%s' "$current" "$latest" | sort -V | tail -1)" = "$latest" ]
-}
-
+# Fetch latest release from GitHub API (script is only run on explicit Force update, so we always apply latest)
 write_status "checking" "Checking for update…"
 
-current_version=$(get_current_version)
-if [ -z "$current_version" ]; then
-  write_status "no_update" "Up to date"
-  exit 0
-fi
-
-# Fetch latest release from GitHub API
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 resp_file="${tmp_dir}/release.json"
@@ -85,14 +60,8 @@ if (a) console.log(a.browser_download_url);
 " 2>/dev/null) || true
 latest_tag=$(echo "$parsed" | sed -n '1p')
 asset_url=$(echo "$parsed" | sed -n '2p')
-latest_version="${latest_tag#v}"
 
-if [ -z "$latest_tag" ] || ! version_newer "$current_version" "$latest_version"; then
-  write_status "no_update" "Up to date"
-  exit 0
-fi
-
-if [ -z "$asset_url" ]; then
+if [ -z "$latest_tag" ] || [ -z "$asset_url" ]; then
   write_status "no_update" "Up to date"
   exit 0
 fi
@@ -130,13 +99,16 @@ if [ -f "${src_root}/package.json" ]; then
 fi
 chown -R "${SUDO_UID:-1000}:${SUDO_GID:-1000}" "${APP_DIR}/dist" "${APP_DIR}/deploy" "${APP_DIR}/package.json" 2>/dev/null || true
 
+# Restart server a few seconds before countdown ends so the new process is up
+# before the frontend reloads at 0 — avoids double reload / stale content.
+RESTART_AT_SECONDS=5
 restart_at=$(($(date +%s) * 1000 + COUNTDOWN_SECONDS * 1000))
 write_status "countdown" "Restarting in ${COUNTDOWN_SECONDS}s" "$restart_at"
 
-sleep "$COUNTDOWN_SECONDS"
-
+sleep $((COUNTDOWN_SECONDS - RESTART_AT_SECONDS))
 systemctl restart masjidconnect-display.service 2>/dev/null || true
-write_status "done" ""
+sleep "$RESTART_AT_SECONDS"
 
+write_status "done" ""
 rm -f "$STATUS_FILE"
 exit 0
