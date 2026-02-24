@@ -39,6 +39,16 @@ function phaseLabel(phase: PrayerPhase | undefined, prayerName: string | null | 
   }
 }
 
+/**
+ * Whether we are currently counting down to jamaat (between adhan and jamaat).
+ */
+function isCountingToJamaat(
+  targetTime: { time: string } | null,
+  jamaat: string | undefined,
+): boolean {
+  return Boolean(targetTime && jamaat && targetTime.time === jamaat);
+}
+
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   const { nextPrayer } = usePrayerTimes();
   const currentTime = useCurrentTime();
@@ -89,6 +99,18 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow);
   }, [targetTime, currentTime, nextPrayer]);
 
+  /** When counting to jamaat, label and bottom time must reflect jamaat, not adhan. */
+  const countingToJamaat = isCountingToJamaat(targetTime, nextPrayer?.jamaat);
+  const countdownLabel = useMemo(() => {
+    if (countingToJamaat) {
+      return phase === 'jamaat-soon' ? 'Jamaat starts in' : 'Jamaat in';
+    }
+    return phaseLabel(phase, nextPrayer?.name);
+  }, [countingToJamaat, phase, nextPrayer?.name]);
+  const bottomTimeLabel = countingToJamaat
+    ? nextPrayer?.displayJamaat
+    : nextPrayer?.displayTime;
+
   if (!nextPrayer) {
     return null;
   }
@@ -98,7 +120,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     return (
       <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
         <p className="text-caption text-text-muted uppercase tracking-wider">
-          {phaseLabel(phase, nextPrayer?.name)}
+          {phaseLabel(phase, nextPrayer.name)}
         </p>
         <h3 className="text-heading text-gold font-bold">{nextPrayer.name}</h3>
         <p className="text-body text-text-muted">
@@ -112,7 +134,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   return (
     <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
       <p className="text-caption text-text-muted uppercase tracking-wider">
-        {phaseLabel(phase, nextPrayer?.name)}
+        {countdownLabel}
       </p>
       <h3 className="text-heading text-emerald-light font-bold">{nextPrayer.name}</h3>
 
@@ -122,8 +144,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
         </p>
       )}
 
-      {nextPrayer.displayTime && (
-        <p className="text-caption text-text-secondary countdown-stable">{nextPrayer.displayTime}</p>
+      {bottomTimeLabel && (
+        <p className="text-caption text-text-secondary countdown-stable">{bottomTimeLabel}</p>
       )}
     </div>
   );

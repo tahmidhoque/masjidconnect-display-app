@@ -105,6 +105,17 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextPrayerTarget, currentTime]);
 
+  /** When counting to jamaat (between adhan and jamaat), show jamaat label and time. */
+  const countingToJamaat = Boolean(
+    nextPrayerTarget &&
+      nextPrayer?.jamaat &&
+      nextPrayerTarget.time === nextPrayer.jamaat,
+  );
+  const nextPrayerColumnLabel = countingToJamaat ? 'Jamaat in' : 'Next Prayer';
+  const nextPrayerBottomTime = countingToJamaat
+    ? nextPrayer?.displayJamaat
+    : nextPrayer?.displayTime;
+
   /* ---- Determine Ramadan column label and prayer name ---- */
   const ramadanLabel = isFastingHours ? 'Iftar in' : 'Suhoor ends in';
   const ramadanPrayerName = isFastingHours ? 'Maghrib' : (imsakTimeProp ? 'Imsak' : 'Fajr');
@@ -166,10 +177,10 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           {ramadanCountdown}
         </p>
 
-        {/* Time */}
-        {nextPrayer.displayTime && (
+        {/* Time — show jamaat when counting to jamaat */}
+        {(countingToJamaat ? nextPrayer.displayJamaat : nextPrayer.displayTime) && (
           <p className="text-caption text-text-secondary countdown-stable">
-            {nextPrayer.displayTime}
+            {countingToJamaat ? nextPrayer.displayJamaat : nextPrayer.displayTime}
           </p>
         )}
       </div>
@@ -239,7 +250,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           `}
         >
           <p className="text-caption text-text-muted uppercase tracking-wider font-medium">
-            Next Prayer
+            {nextPrayerColumnLabel}
           </p>
 
           <h3
@@ -262,9 +273,9 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
             </p>
           )}
 
-          {nextPrayer.displayTime && (
+          {nextPrayerBottomTime && (
             <p className="text-caption text-text-secondary countdown-stable">
-              {nextPrayer.displayTime}
+              {nextPrayerBottomTime}
             </p>
           )}
         </div>
