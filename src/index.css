@@ -437,6 +437,13 @@ html, body {
   line-height: 1.3;
 }
 
+/* Denser prayer times for landscape so full list + legend fit without overflow */
+.text-prayer-dense {
+  font-size: clamp(1rem, 1.35rem, 1.6rem);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
 /* Carousel title — scales between heading and clock for proportion */
 .text-carousel-title {
   font-size: clamp(1.5rem, 2.25rem, 2.75rem);
@@ -481,6 +488,10 @@ html, body {
   font-size: clamp(0.9rem, 1.05rem, 1.15rem);
   font-weight: 400;
   line-height: 1.6;
+}
+
+.text-body.font-semibold {
+  font-weight: 600;
 }
 
 .text-caption {

@@ -20,10 +20,15 @@ import dayjs from "dayjs";
 /** Dev-only: when set, overrides computed forbiddenPrayer (see useDevKeyboard Ctrl+Shift+F). */
 export const FORBIDDEN_PRAYER_FORCE_EVENT = "forbidden-prayer-force-change";
 
+/** Dev-only: dispatched when user cycles highlighted prayer (Ctrl+Shift+P). */
+export const NEXT_PRAYER_CYCLE_EVENT = "next-prayer-cycle";
+
 declare global {
   interface Window {
     /** Dev: force show/hide forbidden-prayer notice. undefined = use computed; null = hide; object = show with this state. */
     __FORBIDDEN_PRAYER_FORCE?: CurrentForbiddenState | null;
+    /** Dev: when set (0-based index), overrides which prayer is shown as "next" / highlighted. undefined = auto. */
+    __NEXT_PRAYER_INDEX?: number;
   }
 }
 
@@ -67,6 +72,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Use refs to prevent unnecessary re-processing
   const lastProcessedTimes = useRef<PrayerTimes | null>(null);
   const lastProcessedDate = useRef<string>("");
+  /** Dev: number of displayed prayers, set when list is built (for cycle shortcut). */
+  const prayersCountRef = useRef(PRAYER_NAMES.length);
 
   // Create refresh function wrapper
   const refreshPrayerTimesHandler = useCallback(
@@ -854,8 +861,18 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       }
     });
 
+    prayersCountRef.current = prayers.length;
+
     // Use the accurate calculation function to determine current and next prayers
-    const { currentIndex, nextIndex } = calculatePrayersAccurately(prayers);
+    let { currentIndex, nextIndex } = calculatePrayersAccurately(prayers);
+
+    // Dev: override next highlighted prayer (cycle via Ctrl+Shift+P)
+    if (import.meta.env.DEV && typeof window.__NEXT_PRAYER_INDEX === "number") {
+      const override = window.__NEXT_PRAYER_INDEX;
+      if (override >= 0 && override < prayers.length) {
+        nextIndex = override;
+      }
+    }
 
     // Apply the calculated flags
     if (currentIndex >= 0) {
@@ -1051,6 +1068,27 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       setDevForbiddenOverride(window.__FORBIDDEN_PRAYER_FORCE);
     window.addEventListener(FORBIDDEN_PRAYER_FORCE_EVENT, handler);
     return () => window.removeEventListener(FORBIDDEN_PRAYER_FORCE_EVENT, handler);
+  }, []);
+
+  // Dev: listen for cycle highlighted prayer (Ctrl+Shift+P)
+  const processPrayerTimesRef = useRef(processPrayerTimes);
+  processPrayerTimesRef.current = processPrayerTimes;
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const handler = () => {
+      const len = prayersCountRef.current;
+      if (len === 0) return;
+      const cur = window.__NEXT_PRAYER_INDEX;
+      const next =
+        cur === undefined ? 0 : cur + 1 >= len ? undefined : cur + 1;
+      window.__NEXT_PRAYER_INDEX = next;
+      logger.info(
+        `[DevKeyboard] Highlighted prayer: ${next !== undefined ? `index ${next}` : "auto"}`,
+      );
+      processPrayerTimesRef.current(true);
+    };
+    window.addEventListener(NEXT_PRAYER_CYCLE_EVENT, handler);
+    return () => window.removeEventListener(NEXT_PRAYER_CYCLE_EVENT, handler);
   }, []);
 
   const effectiveForbiddenPrayer =

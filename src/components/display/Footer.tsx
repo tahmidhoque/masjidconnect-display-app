@@ -1,9 +1,10 @@
 /**
  * Footer
  *
- * Shows the gold MasjidConnect logo, branding text, and a connection
- * status indicator. Also shows device update progress (FORCE_UPDATE) or
- * pending restart countdown when either is active. Same dot + message style.
+ * Shows "MasjidConnect" in gold (Masjid bold, Connect regular), connection
+ * status, and version. Also shows device update progress (FORCE_UPDATE) or
+ * pending restart countdown when active. Uses larger, heavier text for
+ * readability at low resolutions.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +17,6 @@ import {
   clearUpdateStatus,
 } from '../../store/slices/uiSlice';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import logoGold from '../../assets/logos/logo-gold.svg';
 
 /** Delay before showing connection status to prevent startup flash */
 const STATUS_DISPLAY_DELAY_MS = 5_000;
@@ -114,13 +114,13 @@ const Footer: React.FC = () => {
   const showStatusArea = canShowStatus || showPendingRestart || showUpdate;
 
   return (
-    <div className="flex items-center justify-between text-caption">
+    <div className="flex items-center justify-between text-body font-medium">
       <div className="flex items-center gap-2 min-w-0">
         {showStatusArea && (
           <>
-            <span className={`w-2 h-2 rounded-full shrink-0 ${dotColour}`} />
+            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColour}`} />
             {statusMessage && (
-              <span className="text-text-muted truncate" role="status" aria-live="polite">
+              <span className="text-text-muted truncate font-medium" role="status" aria-live="polite">
                 {statusMessage}
               </span>
             )}
@@ -129,10 +129,12 @@ const Footer: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-text-muted">Powered by</span>
-        <img src={logoGold} alt="MasjidConnect" className="h-5 w-auto" />
+        <span className="text-text-muted font-medium">Powered by</span>
+        <span className="text-gold font-medium" aria-label="MasjidConnect">
+          <span className="font-bold">Masjid</span>Connect
+        </span>
         {APP_VERSION && (
-          <span className="text-text-muted/70 text-[0.65em] font-normal tabular-nums" aria-hidden="true">
+          <span className="text-text-muted/70 text-[0.85em] font-medium tabular-nums" aria-hidden="true">
             v{APP_VERSION}
           </span>
         )}

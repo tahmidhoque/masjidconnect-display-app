@@ -23,19 +23,18 @@ interface PrayerCountdownProps {
 
 /**
  * Map a prayer phase to its top label text.
- * For countdown-jamaat, includes the prayer name e.g. "Zuhr Jamaat in".
+ * Single dynamic line: "{prayerName} prayer in" or "{prayerName} Jamaat in".
  */
 function phaseLabel(phase: PrayerPhase | undefined, prayerName: string | null | undefined): string {
   switch (phase) {
     case 'countdown-jamaat':
-      return prayerName ? `${prayerName} Jamaat in` : 'Jamaat in';
     case 'jamaat-soon':
-      return 'Jamaat starts in';
+      return prayerName ? `${prayerName} Jamaat in` : 'Jamaat in';
     case 'in-prayer':
       return 'In Progress';
     case 'countdown-adhan':
     default:
-      return 'Next Prayer';
+      return prayerName ? `${prayerName} prayer in` : 'Next prayer in';
   }
 }
 
@@ -99,17 +98,15 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow);
   }, [targetTime, currentTime, nextPrayer]);
 
-  /** When counting to jamaat, label and bottom time must reflect jamaat, not adhan. */
+  /** When counting to jamaat: "{name} Jamaat in"; otherwise "{name} prayer in". */
   const countingToJamaat = isCountingToJamaat(targetTime, nextPrayer?.jamaat);
-  const countdownLabel = useMemo(() => {
-    if (countingToJamaat) {
-      return phase === 'jamaat-soon' ? 'Jamaat starts in' : 'Jamaat in';
-    }
-    return phaseLabel(phase, nextPrayer?.name);
-  }, [countingToJamaat, phase, nextPrayer?.name]);
-  const bottomTimeLabel = countingToJamaat
-    ? nextPrayer?.displayJamaat
-    : nextPrayer?.displayTime;
+  const countdownLabel = useMemo(
+    () =>
+      countingToJamaat
+        ? (nextPrayer?.name ? `${nextPrayer.name} Jamaat in` : 'Jamaat in')
+        : (nextPrayer?.name ? `${nextPrayer.name} prayer in` : 'Next prayer in'),
+    [countingToJamaat, nextPrayer?.name],
+  );
 
   if (!nextPrayer) {
     return null;
@@ -130,22 +127,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     );
   }
 
-  /* ---- Normal / jamaat countdown display ---- */
+  /* ---- Normal / jamaat countdown display — single label line + countdown (prayer highlighted above) ---- */
   return (
     <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
       <p className="text-body text-text-muted uppercase tracking-wider">
         {countdownLabel}
       </p>
-      <h3 className="text-prayer text-emerald-light font-bold">{nextPrayer.name}</h3>
-
       {liveCountdown && (
         <p className="text-prayer text-gold countdown-stable font-semibold">
           {liveCountdown}
         </p>
-      )}
-
-      {bottomTimeLabel && (
-        <p className="text-body text-text-secondary countdown-stable">{bottomTimeLabel}</p>
       )}
     </div>
   );

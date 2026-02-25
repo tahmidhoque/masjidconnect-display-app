@@ -228,7 +228,7 @@ export const getNextPrayerTime = (
   return { name: "", time: "" };
 };
 
-/** Options for countdown display. Seconds omitted by default for a calmer display. */
+/** Options for countdown display. */
 export interface GetTimeUntilNextPrayerOptions {
   /** When true, include seconds (e.g. 07h 05m 12s). Default false. */
   includeSeconds?: boolean;
@@ -238,7 +238,8 @@ export interface GetTimeUntilNextPrayerOptions {
 
 /**
  * Calculate time until next prayer using dayjs.
- * Returns minutes-only by default (e.g. 07h 05m) for a calmer display; hours are zero-padded for alignment.
+ * Default (no options): always shows 2 units — hours+minutes when ≥1h, minutes+seconds when <1h.
+ * Zero-padded for consistent width and alignment.
  */
 export const getTimeUntilNextPrayer = (
   nextPrayerTime: string,
@@ -248,6 +249,8 @@ export const getTimeUntilNextPrayer = (
   if (!nextPrayerTime) return "";
 
   const { includeSeconds = false, includeSecondsWhenUnderMinutes } = options;
+  const hasExplicitOptions =
+    includeSeconds || includeSecondsWhenUnderMinutes != null;
 
   try {
     const now = dayjs();
@@ -277,20 +280,31 @@ export const getTimeUntilNextPrayer = (
     }
 
     const diffSeconds = prayerDayjs.diff(now, "second");
+    const diffHours = Math.floor(diffSeconds / 3600);
+    const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
+    const diffSecondsRemainder = diffSeconds % 60;
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+
+    if (diffSeconds <= 0) {
+      if (!hasExplicitOptions) return "00m 00s";
+      const showSeconds =
+        includeSeconds ||
+        (includeSecondsWhenUnderMinutes != null && diffSeconds <= includeSecondsWhenUnderMinutes * 60);
+      return showSeconds ? "0s" : "0m";
+    }
+
+    /** Default: always 2 units — hours+minutes when ≥1h, minutes+seconds when <1h. */
+    if (!hasExplicitOptions) {
+      if (diffHours >= 1) {
+        return `${pad2(diffHours)}h ${pad2(diffMinutes)}m`;
+      }
+      return `${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
+    }
 
     const showSeconds =
       includeSeconds ||
       (includeSecondsWhenUnderMinutes != null &&
         diffSeconds <= includeSecondsWhenUnderMinutes * 60);
-
-    if (diffSeconds <= 0) {
-      return showSeconds ? "0s" : "0m";
-    }
-
-    const diffHours = Math.floor(diffSeconds / 3600);
-    const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
-    const diffSecondsRemainder = diffSeconds % 60;
-    const pad2 = (n: number) => String(n).padStart(2, "0");
 
     if (showSeconds) {
       if (diffHours > 0) {
@@ -299,7 +313,6 @@ export const getTimeUntilNextPrayer = (
       return `${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
     }
 
-    // Minutes-only: zero-padded hours for consistent width and alignment
     if (diffHours > 0) {
       return `${pad2(diffHours)}h ${pad2(diffMinutes)}m`;
     }

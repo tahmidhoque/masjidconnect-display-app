@@ -13,7 +13,7 @@
 import React from 'react';
 import type { LoadingTask } from '../../hooks/useAppLoader';
 import { IslamicPattern } from '../display';
-import logoGold from '../../assets/logos/logo-gold.svg';
+import logoNotextGold from '../../assets/logos/logo-notext-gold.svg';
 
 interface LoadingScreenProps {
   progress: number;
@@ -33,14 +33,17 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, message, tasks 
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-8 animate-fade-in">
-        {/* Logo area — MasjidConnect branding */}
+        {/* Logo area — MasjidConnect branding (notext icon + wordmark matching footer) */}
         <div className="flex flex-col items-center gap-3">
           <img
-            src={logoGold}
-            alt="MasjidConnect"
-            className="h-14 w-auto max-w-[12rem]"
+            src={logoNotextGold}
+            alt=""
+            className="h-14 w-auto"
+            aria-hidden="true"
           />
-          <h1 className="text-heading text-gold font-bold tracking-tight">MasjidConnect</h1>
+          <h1 className="text-heading text-gold font-medium tracking-tight" aria-label="MasjidConnect">
+            <span className="font-bold">Masjid</span>Connect
+          </h1>
           <p className="text-caption text-text-muted">Digital Display System</p>
         </div>
 

@@ -114,10 +114,9 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
       nextPrayer?.jamaat &&
       nextPrayerTarget.time === nextPrayer.jamaat,
   );
-  const nextPrayerColumnLabel = countingToJamaat ? 'Jamaat in' : 'Next Prayer';
-  const nextPrayerBottomTime = countingToJamaat
-    ? nextPrayer?.displayJamaat
-    : nextPrayer?.displayTime;
+  const nextPrayerColumnLabel = nextPrayer
+    ? (countingToJamaat ? `${nextPrayer.name} Jamaat in` : `${nextPrayer.name} prayer in`)
+    : '';
 
   /* ---- Determine Ramadan column label and prayer name ---- */
   const ramadanLabel = isFastingHours ? 'Iftar in' : 'Suhoor ends in';
@@ -149,33 +148,21 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           ${compact ? 'px-3' : 'px-4'}
         `}
       >
-        {/* Dual label */}
+        {/* Dual label: Ramadan countdown | "{prayerName} prayer in" or "Jamaat in" */}
         <div className="flex items-center gap-3">
           <span className="text-body text-gold/70 uppercase tracking-wider font-medium">
             {ramadanLabel}
           </span>
           <span className="text-text-muted/30">|</span>
           <span className="text-body text-text-muted uppercase tracking-wider font-medium">
-            Next Prayer
+            {nextPrayerColumnLabel}
           </span>
         </div>
-
-        {/* Prayer name */}
-        <h3 className="text-prayer text-emerald-light font-bold">
-          {nextPrayer.name}
-        </h3>
 
         {/* Countdown — use prayer-side countdown so last-5-mins seconds apply */}
         <p className="text-prayer text-gold font-bold countdown-stable">
           {nextPrayerCountdown || ramadanCountdown}
         </p>
-
-        {/* Time — show jamaat when counting to jamaat */}
-        {(countingToJamaat ? nextPrayer.displayJamaat : nextPrayer.displayTime) && (
-          <p className="text-body text-text-secondary countdown-stable">
-            {countingToJamaat ? nextPrayer.displayJamaat : nextPrayer.displayTime}
-          </p>
-        )}
       </div>
     );
   }
@@ -201,16 +188,9 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           </p>
 
           {ramadanCountdown ? (
-            <>
-              <h3 className="text-prayer text-gold font-bold countdown-stable">
-                {ramadanCountdown}
-              </h3>
-              {ramadanDisplayTime && (
-                <p className="text-body text-text-secondary countdown-stable">
-                  {ramadanPrayerName} &middot; {ramadanDisplayTime}
-                </p>
-              )}
-            </>
+            <h3 className="text-prayer text-gold font-bold countdown-stable">
+              {ramadanCountdown}
+            </h3>
           ) : (
             /* Static Suhoor time when there's no active countdown */
             (ramadanDisplayTime ?? displaySuhoorTime) && (
@@ -221,25 +201,15 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           )}
         </div>
 
-        {/* RIGHT: Next Prayer countdown */}
+        {/* RIGHT: Next Prayer countdown — label is "{prayerName} prayer in" or "Jamaat in" */}
         <div className="flex flex-col items-center justify-center text-center gap-0.5">
           <p className="text-body text-text-muted uppercase tracking-wider font-medium">
             {nextPrayerColumnLabel}
           </p>
 
-          <h3 className="text-prayer text-emerald-light font-bold">
-            {nextPrayer.name}
-          </h3>
-
           {nextPrayerCountdown && (
             <p className="text-prayer text-gold font-semibold countdown-stable">
               {nextPrayerCountdown}
-            </p>
-          )}
-
-          {nextPrayerBottomTime && (
-            <p className="text-body text-text-secondary countdown-stable">
-              {nextPrayerBottomTime}
             </p>
           )}
         </div>

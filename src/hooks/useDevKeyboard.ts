@@ -19,6 +19,7 @@
  *   Ctrl + Shift + O  — Cycle orientation (landscape → portrait → auto)
  *   Ctrl + Shift + N  — Advance carousel to next slide immediately
  *   Ctrl + Shift + F  — Toggle forbidden-prayer notice (show fake / auto)
+ *   Ctrl + Shift + P  — Cycle highlighted prayer (Fajr → … → Isha → auto)
  *   Escape            — Clear current alert
  */
 
@@ -31,7 +32,7 @@ import {
 import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
 import type { PrayerPhase } from './usePrayerPhase';
-import { FORBIDDEN_PRAYER_FORCE_EVENT } from './usePrayerTimes';
+import { FORBIDDEN_PRAYER_FORCE_EVENT, NEXT_PRAYER_CYCLE_EVENT } from './usePrayerTimes';
 import { CAROUSEL_ADVANCE_EVENT } from '../components/display/ContentCarousel';
 import logger from '../utils/logger';
 import dayjs from 'dayjs';
@@ -194,6 +195,7 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+O': 'Cycle orientation (landscape → portrait → auto)',
       'Ctrl+Shift+N': 'Advance carousel to next slide',
       'Ctrl+Shift+F': 'Toggle forbidden-prayer notice (show fake / auto)',
+      'Ctrl+Shift+P': 'Cycle highlighted prayer (Fajr → … → auto)',
       'Escape': 'Clear current alert',
     });
 
@@ -233,6 +235,13 @@ const useDevKeyboard = (): void => {
         if (e.key === 'F' || e.key === 'f') {
           e.preventDefault();
           toggleForbiddenPrayerForce();
+          return;
+        }
+
+        // Cycle highlighted prayer (P or p) — for testing countdown/highlight per prayer
+        if (e.key === 'P' || e.key === 'p') {
+          e.preventDefault();
+          window.dispatchEvent(new Event(NEXT_PRAYER_CYCLE_EVENT));
           return;
         }
 

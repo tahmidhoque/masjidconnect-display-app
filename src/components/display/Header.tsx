@@ -21,6 +21,8 @@ interface HeaderProps {
   isRamadan?: boolean;
   /** Current day of Ramadan (1-30) */
   ramadanDay?: number | null;
+  /** When true (e.g. portrait), show Ramadan as two lines: "Day X" then "Ramadan Mubarak" */
+  ramadanTwoLines?: boolean;
   /** Time display format (12h or 24h); defaults to 12h */
   timeFormat?: TimeFormat;
 }
@@ -34,6 +36,7 @@ const MONTHS = [
 const Header: React.FC<HeaderProps> = ({
   isRamadan = false,
   ramadanDay = null,
+  ramadanTwoLines = false,
   timeFormat = '12h',
 }) => {
   const currentTime = useCurrentTime();
@@ -53,10 +56,10 @@ const Header: React.FC<HeaderProps> = ({
 
   const rightDateContent = useMemo(() => {
     if (isRamadan && ramadanDay != null) {
-      return `Ramadan Mubarak — Day ${ramadanDay}`;
+      return ramadanTwoLines ? null : `Ramadan Mubarak — Day ${ramadanDay}`;
     }
     return hijriDate;
-  }, [isRamadan, ramadanDay, hijriDate]);
+  }, [isRamadan, ramadanDay, ramadanTwoLines, hijriDate]);
 
   return (
     <div
@@ -75,8 +78,8 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* Left — Gregorian date (day on first line, rest on second) */}
       <div className="min-w-0 flex flex-col">
-        <p className="text-body text-text-secondary truncate leading-tight">{dateLine1}</p>
-        <p className="text-body text-text-secondary truncate leading-tight">{dateLine2}</p>
+        <p className="text-body text-text-secondary font-semibold truncate leading-tight">{dateLine1}</p>
+        <p className="text-body text-text-secondary font-semibold truncate leading-tight">{dateLine2}</p>
       </div>
 
       {/* Centre — Clock (main focus); time and period scale together; no glow */}
@@ -90,15 +93,26 @@ const Header: React.FC<HeaderProps> = ({
         )}
       </div>
 
-      {/* Right — Hijri or Ramadan badge */}
+      {/* Right — Hijri or Ramadan badge (portrait: Ramadan as "Day X" / "Ramadan Mubarak") */}
       <div className="min-w-0 flex flex-col items-end">
-        <p
-          className={`text-body truncate text-right ${
-            isRamadan ? 'text-gold/80 font-medium' : 'text-text-muted'
-          }`}
-        >
-          {rightDateContent}
-        </p>
+        {isRamadan && ramadanDay != null && ramadanTwoLines ? (
+          <>
+            <p className="text-body font-semibold truncate text-right text-gold/80">
+              Day {ramadanDay}
+            </p>
+            <p className="text-body font-semibold truncate text-right text-gold/80 leading-tight">
+              Ramadan Mubarak
+            </p>
+          </>
+        ) : (
+          <p
+            className={`text-body font-semibold truncate text-right ${
+              isRamadan ? 'text-gold/80' : 'text-text-muted'
+            }`}
+          >
+            {rightDateContent}
+          </p>
+        )}
       </div>
     </div>
   );

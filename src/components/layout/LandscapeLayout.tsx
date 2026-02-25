@@ -50,8 +50,8 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
 
     {/* Content grid — sits above frosted layer */}
     <div className="relative z-10 flex flex-col w-full h-full">
-      {/* Header */}
-      <header className="shrink-0 px-6 py-2">
+      {/* Header — reduced py for more vertical room in main area */}
+      <header className="shrink-0 px-6 py-1.5">
         {header}
       </header>
 
@@ -68,8 +68,8 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
         </aside>
       </main>
 
-      {/* Footer */}
-      <footer className="shrink-0 px-6 py-1.5">
+      {/* Footer — reduced py for more vertical room in main area */}
+      <footer className="shrink-0 px-6 py-2">
         {footer}
       </footer>
     </div>

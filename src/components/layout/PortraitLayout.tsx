@@ -70,7 +70,7 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="shrink-0 px-5 py-1.5">
+      <footer className="shrink-0 px-5 py-2.5">
         {footer}
       </footer>
     </div>

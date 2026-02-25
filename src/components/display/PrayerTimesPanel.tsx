@@ -89,7 +89,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   return (
     <div
       className={`flex flex-col flex-1 min-h-0 overflow-hidden px-4 ${
-        compact ? 'py-3' : 'pt-4 pb-3'
+        compact ? 'py-3' : 'pt-4 pb-1'
       }`}
     >
       <div className="flex-1 min-h-0 flex flex-col gap-0.5 justify-center">
@@ -172,9 +172,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         })}
       </div>
 
-      {/* Legend — border sits closer to Start/Jamaat (pt-0); space above line from mt so line sits lower */}
+      {/* Legend — distinct block so row highlight never bleeds; border sits below last row */}
       <div
-        className={`${ROW_GRID_CLASS} shrink-0 gap-2 px-3 pt-0 border-t border-white/10 ${
+        className={`${ROW_GRID_CLASS} shrink-0 gap-2 px-3 pt-2 border-t border-white/10 bg-midnight/90 ${
           compact ? 'mt-0.5' : 'mt-4'
         }`}
       >
