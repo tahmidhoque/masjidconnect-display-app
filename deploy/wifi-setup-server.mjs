@@ -10,16 +10,20 @@
  */
 
 import { createServer } from 'node:http';
-import { execSync, spawnSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { pbkdf2Sync } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.WIFI_SETUP_PORT || '3002', 10);
 const HOST = '127.0.0.1';
 const FLAG_FILE = '/tmp/masjidconnect-wifi-done';
 const WPA_CONF = '/etc/wpa_supplicant/wpa_supplicant-wlan0.conf';
+
+/** Dev mode: no root, no real WiFi — mock scan/connect for local UI testing */
+const DEV = process.env.WIFI_SETUP_DEV === '1' || process.env.WIFI_SETUP_DEV === 'true';
 
 function send(res, status, body, contentType = 'application/json') {
   res.writeHead(status, { 'Content-Type': contentType });
@@ -50,8 +54,11 @@ function run(cmd, opts = {}) {
   }
 }
 
-/** GET /api/scan — list SSIDs from iw wlan0 scan */
+/** GET /api/scan — list SSIDs from iw wlan0 scan (or mock in dev) */
 function handleScan() {
+  if (DEV) {
+    return { ssids: ['TestNetwork1', 'TestNetwork2', 'MyWiFi-5G'], _dev: true };
+  }
   try {
     const out = run('iw dev wlan0 scan 2>/dev/null', { allowFail: true });
     const ssids = new Set();
@@ -68,25 +75,45 @@ function handleScan() {
   }
 }
 
-/** POST /api/connect — write wpa_supplicant and restart */
+/**
+ * Derive WPA-PSK (PMK) from passphrase and SSID (same as wpa_passphrase).
+ * Uses PBKDF2-HMAC-SHA1, 4096 iterations, 32-byte key — no 8–63 character passphrase limit.
+ */
+function derivePskHex(passphrase, ssid) {
+  const key = pbkdf2Sync(
+    passphrase,
+    ssid,
+    4096,
+    32,
+    'sha1'
+  );
+  return key.toString('hex');
+}
+
+/** POST /api/connect — write wpa_supplicant and restart (no passphrase length validation) */
 function handleConnect(body) {
   const { ssid, password = '', country = 'GB' } = body;
   if (!ssid || typeof ssid !== 'string' || !ssid.trim()) {
     return { ok: false, error: 'Please select a network' };
   }
-  const pass = typeof password === 'string' ? password : String(password || '');
+  if (DEV) {
+    return { ok: true, _dev: true };
+  }
+  const pass = typeof password === 'string' ? password : String(password || '').trim();
+  const ssidTrimmed = ssid.trim();
+  const countryCode = String(country || 'GB').toUpperCase().slice(0, 2);
   try {
-    const header = `ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=${String(country).toUpperCase().slice(0, 2)}\n`;
-    const pskOut = spawnSync('wpa_passphrase', [ssid.trim(), '-'], {
-      input: pass,
-      encoding: 'utf8',
-      maxBuffer: 4096,
-    });
-    if (pskOut.status !== 0) {
-      return { ok: false, error: (pskOut.stderr || pskOut.error?.message || 'wpa_passphrase failed').slice(0, 200) };
+    const header = `ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=${countryCode}\n\n`;
+    let networkBlock = `network={\n\tssid="${ssidTrimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`;
+    if (pass.length > 0) {
+      const pskHex = derivePskHex(pass, ssidTrimmed);
+      networkBlock += `\tpsk=${pskHex}\n`;
+    } else {
+      networkBlock += '\tkey_mgmt=NONE\n';
     }
+    networkBlock += '}\n';
     mkdirSync('/etc/wpa_supplicant', { recursive: true });
-    writeFileSync(WPA_CONF, header + (pskOut.stdout || ''), { mode: 0o600 });
+    writeFileSync(WPA_CONF, header + networkBlock, { mode: 0o600 });
     run('systemctl restart wpa_supplicant@wlan0.service');
     return { ok: true };
   } catch (e) {
@@ -96,6 +123,9 @@ function handleConnect(body) {
 
 /** GET /api/status — do we have internet? */
 function handleStatus() {
+  if (DEV) {
+    return { connected: true, _dev: true };
+  }
   try {
     execSync('curl -sf --connect-timeout 3 -o /dev/null https://portal.masjidconnect.co.uk 2>/dev/null', { stdio: 'ignore' });
     return { connected: true };
@@ -111,6 +141,7 @@ function handleStatus() {
 
 /** POST /api/start-display — set flag so xinitrc continues to kiosk */
 function handleStartDisplay() {
+  if (DEV) return { ok: true, _dev: true };
   try {
     writeFileSync(FLAG_FILE, '1');
     return { ok: true };
@@ -263,7 +294,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  process.stderr.write(`[MasjidConnect] WiFi setup server at http://${HOST}:${PORT}\n`);
+  process.stderr.write(`[MasjidConnect] WiFi setup server at http://${HOST}:${PORT}${DEV ? ' (dev mode — no root, mock scan/connect)' : ''}\n`);
 });
 
 process.on('SIGTERM', () => { server.close(); process.exit(0); });
