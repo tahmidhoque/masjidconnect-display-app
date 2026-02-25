@@ -2,7 +2,7 @@
  * ForbiddenPrayerNotice
  *
  * Shows a short caption when the current time falls within a makruh (discouraged)
- * period for voluntary (nafl) prayer. Displays "Voluntary prayer not recommended
+ * period for voluntary (nafl) prayer. Displays "Nafl prayer not recommended
  * until [time]" with the end of the current forbidden window.
  *
  * Uses caption styling and muted colour so it does not distract from the main
@@ -45,9 +45,9 @@ const ForbiddenPrayerNotice: React.FC<ForbiddenPrayerNoticeProps> = ({
       )}
       <p
         className={`text-caption text-text-muted ${compact ? 'truncate' : ''}`}
-        title={compact ? `Voluntary prayer not recommended until ${displayEndsAtAria}` : undefined}
+        title={compact ? `Nafl prayer not recommended until ${displayEndsAtAria}` : undefined}
       >
-        Voluntary prayer not recommended until {main}
+        Nafl prayer not recommended until {main}
         {period != null && <span className="opacity-80 font-normal"> {period}</span>}
       </p>
     </div>
