@@ -61,6 +61,18 @@ Use the Pi 3 config so the image targets Pi 3 (arm64) instead of Pi 5.
 
 ---
 
+## Display and TV setup
+
+The image disables **overscan** on the Pi (`disable_overscan=1` in config.txt and KMS underscan disabled via `raspi-config`), so the output is full-resolution and not cropped by the Pi. If the picture is still cut off on a TV, set the TV to a 1:1 / full-pixel mode so it does not crop the image:
+
+- **Just Scan** / **Screen Fit** / **Full Pixel** / **PC mode** (exact name depends on brand — check the TV’s picture or aspect-ratio settings).
+
+For an **already-flashed** Pi that still shows a cut-off picture, SSH in and run:  
+`sudo raspi-config nonint do_overscan_kms 1 1` then `sudo reboot`.  
+If `raspi-config` is not installed: `sudo apt-get update && sudo apt-get install -y raspi-config`, then run the same command.
+
+---
+
 ## Configuring WiFi (for non-technical users)
 
 You can bake your mosque’s WiFi into the image so the Pi connects automatically on first boot (no Ethernet or manual setup).

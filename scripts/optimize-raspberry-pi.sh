@@ -87,7 +87,21 @@ if [ -f /boot/config.txt ] || [ -f /boot/firmware/config.txt ]; then
   else
     echo " - HDMI already configured"
   fi
-  
+
+  # Disable overscan so the display is not cut off on TVs
+  if ! grep -q "^disable_overscan=" $CONFIG_FILE; then
+    echo "disable_overscan=1" >> $CONFIG_FILE
+    echo " - Disabled overscan for TV display"
+  else
+    grep -q "^disable_overscan=1" $CONFIG_FILE || sed -i 's/^disable_overscan=.*/disable_overscan=1/' $CONFIG_FILE
+    echo " - Overscan already disabled or set to disabled"
+  fi
+
+  # Disable overscan via KMS (Bookworm) if raspi-config is available
+  if command -v raspi-config >/dev/null 2>&1; then
+    raspi-config nonint do_overscan_kms 1 1 && echo " - Set KMS overscan to disabled (HDMI-1)" || true
+  fi
+
   echo " - Raspberry Pi specific optimizations applied"
 else
   echo " - No Raspberry Pi config file found, skipping specific optimizations"

@@ -32,6 +32,7 @@ mmdebstrap:
     - kbd
     - wpasupplicant
     - iw
+    - raspi-config
   customize-hooks:
     # Install Node.js 20 from NodeSource (build host needs network)
     - |
@@ -63,7 +64,10 @@ mmdebstrap:
         grep -q "^dtoverlay=vc4-kms-v3d" "$CFG" || echo "dtoverlay=vc4-kms-v3d" >> "$CFG"
         grep -q "^gpu_mem=" "$CFG" && sed -i 's/^gpu_mem=.*/gpu_mem=128/' "$CFG" || echo "gpu_mem=128" >> "$CFG"
         grep -q "^disable_splash=" "$CFG" || echo "disable_splash=1" >> "$CFG"
+        grep -q "^disable_overscan=" "$CFG" && sed -i 's/^disable_overscan=.*/disable_overscan=1/' "$CFG" || echo "disable_overscan=1" >> "$CFG"
       fi
+    # Disable HDMI overscan (KMS) so display is not cut off on TVs
+    - chroot $1 raspi-config nonint do_overscan_kms 1 1 || true
     # Silent boot: redirect console to tty2 so no kernel/init text on tty1 (X11 kiosk uses tty1)
     - |
       CMDLINE="$1/boot/firmware/cmdline.txt"
