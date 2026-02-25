@@ -48,7 +48,7 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
     {/* Unified frosted overlay — one continuous layer over content area */}
     <div
       className="absolute inset-0 z-[5] pointer-events-none"
-      style={{ background: 'rgba(255, 255, 255, 0.06)' }}
+      style={{ background: 'rgba(13, 59, 46, 0.35)' }}
       aria-hidden
     />
 

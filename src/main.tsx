@@ -6,7 +6,7 @@ import { store, persistor } from './store';
 import App from './App';
 import './index.css';
 import './pwa';
-import logger from './utils/logger';
+import logger, { setLastError } from './utils/logger';
 
 /**
  * PersistGate error recovery.
@@ -22,8 +22,16 @@ const handlePersistError = async () => {
   }
 };
 
+/** Capture uncaught errors so they can be shown via ?debug=1 on next load. */
+window.addEventListener('error', (event) => {
+  const msg = event.message || String(event.error);
+  const detail = event.error?.stack ? `${msg}\n${event.error.stack}` : msg;
+  setLastError(detail);
+});
+
 window.addEventListener('unhandledrejection', (event) => {
-  const msg = event.reason?.message ?? '';
+  const msg = event.reason?.message ?? String(event.reason ?? 'Unknown rejection');
+  setLastError(msg);
   if (msg.includes('persist') || msg.includes('localStorage')) {
     event.preventDefault();
     handlePersistError();

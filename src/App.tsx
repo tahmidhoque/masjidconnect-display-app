@@ -14,6 +14,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import type { RootState } from './store';
+import { getLastError, getLogHistory } from './utils/logger';
 import { setOffline } from './store/slices/uiSlice';
 import useAppLoader from './hooks/useAppLoader';
 import useDevKeyboard from './hooks/useDevKeyboard';
@@ -245,6 +246,11 @@ const App: React.FC = () => {
     };
   }, [dispatch]);
 
+  /** Debug overlay: show last error and recent logs when ?debug=1 (e.g. on Pi without DevTools). */
+  const showDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+  const lastError = showDebug ? getLastError() : null;
+  const logHistory = showDebug ? getLogHistory() : [];
+
   return (
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
@@ -254,6 +260,22 @@ const App: React.FC = () => {
       <div className="fullscreen bg-midnight gpu-accelerated">
         <AppRoutes />
         <EmergencyAlertOverlay />
+        {showDebug && (
+          <div className="fixed bottom-0 left-0 right-0 z-[9998] max-h-[40vh] overflow-auto bg-black/90 text-white p-3 font-mono text-xs border-t border-white/20">
+            <div className="font-semibold mb-1">Debug (?debug=1)</div>
+            {lastError ? (
+              <pre className="whitespace-pre-wrap break-all text-red-300 mb-2">{lastError}</pre>
+            ) : (
+              <p className="text-gray-400 mb-2">No last error stored.</p>
+            )}
+            <details>
+              <summary className="cursor-pointer">Recent logs ({logHistory.length})</summary>
+              <pre className="whitespace-pre-wrap mt-1 text-gray-400">
+                {logHistory.slice(-15).map((e, i) => `${e.timestamp} [${e.level}] ${e.message}`).join('\n')}
+              </pre>
+            </details>
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );

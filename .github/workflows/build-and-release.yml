@@ -58,6 +58,31 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://portal.masjidconnect.co.uk' }}
           VITE_REALTIME_URL: ${{ secrets.VITE_REALTIME_URL || 'https://websocket.masjidconnect.co.uk' }}
 
+      - name: Verify env baked into build
+        run: |
+          echo "Checking dist/version.json buildEnv..."
+          node -e "
+            const v = require('./dist/version.json');
+            const env = v.buildEnv || {};
+            const api = (env.apiUrl || '').trim();
+            const realtime = (env.realtimeUrl || '').trim();
+            const expectApi = 'https://portal.masjidconnect.co.uk';
+            const expectRealtime = 'https://websocket.masjidconnect.co.uk';
+            if (!api) throw new Error('buildEnv.apiUrl is empty');
+            if (!realtime) throw new Error('buildEnv.realtimeUrl is empty');
+            if (!api.startsWith('http')) throw new Error('buildEnv.apiUrl does not look like a URL: ' + api);
+            if (!realtime.startsWith('http')) throw new Error('buildEnv.realtimeUrl does not look like a URL: ' + realtime);
+            console.log('  apiUrl:', api === expectApi ? '(default)' : '(custom)');
+            console.log('  realtimeUrl:', realtime === expectRealtime ? '(default)' : '(custom)');
+            console.log('OK: env vars baked into build');
+          "
+          echo "Checking built JS contains production API host..."
+          if ! grep -q 'portal.masjidconnect.co.uk\|websocket.masjidconnect.co.uk' dist/assets/*.js 2>/dev/null; then
+            echo "::warning::Built assets do not contain expected production hostnames (might be using custom secrets)"
+          else
+            echo "OK: production hostnames found in built assets"
+          fi
+
       - name: Validate archive
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"

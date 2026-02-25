@@ -129,6 +129,20 @@ const server = createServer((req, res) => {
       }
       return;
     }
+    // Debug page: open in same origin (e.g. from Pi) to see last JS error from localStorage
+    if (pathname === '/internal/debug' && req.method === 'GET') {
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Display debug</title></head><body style="margin:0;padding:1rem;font-family:monospace;background:#0A2647;color:#eee;white-space:pre-wrap;word-break:break-all;">Loading...</body><script>
+try {
+  var msg = localStorage.getItem('masjid_last_error');
+  document.body.textContent = msg || 'No last error stored. Open the app first; after a crash, reload and visit this page again.';
+} catch (e) {
+  document.body.textContent = 'Error reading storage: ' + e.message;
+}
+</script></html>`;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
   }
 
   // Try to serve the exact file

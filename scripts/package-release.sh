@@ -60,6 +60,9 @@ GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 NODE_VERSION=$(node -v)
+# Capture build-time env so CI and humans can verify what was baked in (Vite replaces import.meta.env at build time)
+BAKED_API_URL="${VITE_API_URL:-}"
+BAKED_REALTIME_URL="${VITE_REALTIME_URL:-}"
 
 cat > dist/version.json << EOF
 {
@@ -67,7 +70,11 @@ cat > dist/version.json << EOF
   "gitHash": "${GIT_HASH}",
   "gitBranch": "${GIT_BRANCH}",
   "buildTime": "${BUILD_TIME}",
-  "nodeVersion": "${NODE_VERSION}"
+  "nodeVersion": "${NODE_VERSION}",
+  "buildEnv": {
+    "apiUrl": "${BAKED_API_URL}",
+    "realtimeUrl": "${BAKED_REALTIME_URL}"
+  }
 }
 EOF
 
