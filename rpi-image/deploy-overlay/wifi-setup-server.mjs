@@ -12,10 +12,7 @@
 import { createServer } from 'node:http';
 import { execSync, spawnSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.WIFI_SETUP_PORT || '3002', 10);
 const HOST = '127.0.0.1';
 const FLAG_FILE = '/tmp/masjidconnect-wifi-done';
@@ -63,7 +60,7 @@ function handleScan() {
       }
     }
     return { ssids: [...ssids].sort() };
-  } catch (_) {
+  } catch {
     return { ssids: [], error: 'Could not scan (is wlan0 present?)' };
   }
 }
@@ -99,11 +96,11 @@ function handleStatus() {
   try {
     execSync('curl -sf --connect-timeout 3 -o /dev/null https://portal.masjidconnect.co.uk 2>/dev/null', { stdio: 'ignore' });
     return { connected: true };
-  } catch (_) {
+  } catch {
     try {
       execSync('ping -c 1 -W 2 8.8.8.8 2>/dev/null', { stdio: 'ignore' });
       return { connected: true };
-    } catch (_) {
+    } catch {
       return { connected: false };
     }
   }
@@ -243,7 +240,7 @@ const server = createServer(async (req, res) => {
     try {
       const body = await parseJsonBody(req);
       send(res, 200, handleConnect(body));
-    } catch (e) {
+    } catch {
       send(res, 400, { ok: false, error: 'Invalid JSON' });
     }
     return;
