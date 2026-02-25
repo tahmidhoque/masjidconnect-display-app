@@ -34,3 +34,4 @@ All development rules are in `.cursor/rules/`:
 5. **Tailwind utilities only**: No MUI, no CSS-in-JS, no `tailwind.config.js`
 6. **Service singletons**: Import default exports, never re-instantiate
 7. **Typed hooks**: Use `useAppDispatch`/`useAppSelector` from `src/store/hooks.ts`
+8. **Lint before done**: Do not claim a change is complete or good until `npm run lint` has been run and passes. Fix any lint errors (including in `rpi-image/`, `deploy/`, and other linted paths) before finishing.
