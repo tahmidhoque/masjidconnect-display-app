@@ -34,7 +34,7 @@ export const formatTimeTo12Hour = (timeString: string): string => {
  *
  * @param timeString - Time in 24-hour format (e.g., "16:30")
  * @param format - Time format preference ('12h' or '24h')
- * @returns { main: "5:39" | "17:39", period: "PM" | "AM" | null }
+ * @returns { main: "5:39" | "17:39", period: "pm" | "am" | null }
  */
 export const getTimeDisplayParts = (
   timeString: string,
@@ -46,7 +46,7 @@ export const getTimeDisplayParts = (
   if (isNaN(hours) || isNaN(minutes)) return { main: timeString, period: null };
 
   if (format === "12h") {
-    const period = hours >= 12 ? "PM" : "AM";
+    const period = hours >= 12 ? "pm" : "am";
     const displayHours = hours % 12 || 12;
     const main = `${displayHours}:${minutes.toString().padStart(2, "0")}`;
     return { main, period };

@@ -74,37 +74,26 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
     return (
       <div
         className={`
-          card-elevated iftar-countdown-card gpu-accelerated
+          iftar-countdown-card gpu-accelerated
           flex flex-col items-center justify-center text-center
-          border border-gold/20
           ${compact ? 'gap-1 py-3' : 'gap-2 py-4'}
         `}
       >
-        <p
-          className={`
-            text-text-muted uppercase tracking-wider font-medium
-            ${compact ? 'text-caption' : 'text-caption'}
-          `}
-        >
+        <p className="text-body text-text-muted uppercase tracking-wider font-medium">
           Time until Iftar
         </p>
 
         <h3
           className={`
             text-gold font-bold tabular-nums
-            ${compact ? 'text-heading' : 'text-display'}
+            ${compact ? 'text-prayer' : 'text-display'}
           `}
         >
           {liveIftarCountdown}
         </h3>
 
         {displayIftarTime && (
-          <p
-            className={`
-              text-text-secondary tabular-nums
-              ${compact ? 'text-caption' : 'text-body'}
-            `}
-          >
+          <p className="text-body text-text-secondary tabular-nums">
             Maghrib &middot; {displayIftarTime}
           </p>
         )}
@@ -117,25 +106,20 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
     return (
       <div
         className={`
-          card-elevated gpu-accelerated
+          gpu-accelerated
           flex flex-col items-center justify-center text-center
           ${compact ? 'gap-1 py-2' : 'gap-1.5 py-3'}
         `}
       >
-        <p className="text-caption text-text-muted uppercase tracking-wider">
+        <p className="text-body text-text-muted uppercase tracking-wider">
           Suhoor ends in
         </p>
 
-        <h3
-          className={`
-            text-gold font-semibold tabular-nums
-            ${compact ? 'text-subheading' : 'text-heading'}
-          `}
-        >
+        <h3 className="text-prayer text-gold font-semibold tabular-nums">
           {liveSuhoorCountdown}
         </h3>
 
-        <p className="text-caption text-text-secondary tabular-nums">
+        <p className="text-body text-text-secondary tabular-nums">
           {displaySuhoorLabel} &middot; {displaySuhoorTime}
         </p>
       </div>
@@ -147,11 +131,11 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
     return (
       <div
         className={`
-          card-elevated gpu-accelerated flex items-center justify-center text-center
+          gpu-accelerated flex items-center justify-center text-center
           ${compact ? 'py-2' : 'py-3'}
         `}
       >
-        <p className="text-caption text-text-secondary">
+        <p className="text-body text-text-secondary">
           Suhoor ends at <span className="text-gold font-medium tabular-nums">{displaySuhoorTime}</span>
         </p>
       </div>

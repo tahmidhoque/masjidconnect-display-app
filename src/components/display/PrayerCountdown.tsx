@@ -118,12 +118,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   /* ---- In-prayer: calm static display, no ticking countdown ---- */
   if (phase === 'in-prayer') {
     return (
-      <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
-        <p className="text-caption text-text-muted uppercase tracking-wider">
+      <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
+        <p className="text-subheading text-text-muted uppercase tracking-wider font-medium">
           {phaseLabel(phase, nextPrayer.name)}
         </p>
-        <h3 className="text-heading text-gold font-bold">{nextPrayer.name}</h3>
-        <p className="text-body text-text-muted">
+        <h3 className="text-prayer text-gold font-bold">{nextPrayer.name}</h3>
+        <p className="text-heading font-bold text-text-primary">
           Jamaat in progress
         </p>
       </div>
@@ -132,20 +132,20 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
 
   /* ---- Normal / jamaat countdown display ---- */
   return (
-    <div className="card-elevated flex flex-col items-center justify-center gap-2 py-4 text-center">
-      <p className="text-caption text-text-muted uppercase tracking-wider">
+    <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
+      <p className="text-body text-text-muted uppercase tracking-wider">
         {countdownLabel}
       </p>
-      <h3 className="text-heading text-emerald-light font-bold">{nextPrayer.name}</h3>
+      <h3 className="text-prayer text-emerald-light font-bold">{nextPrayer.name}</h3>
 
       {liveCountdown && (
-        <p className="text-subheading text-gold countdown-stable font-semibold">
+        <p className="text-prayer text-gold countdown-stable font-semibold">
           {liveCountdown}
         </p>
       )}
 
       {bottomTimeLabel && (
-        <p className="text-caption text-text-secondary countdown-stable">{bottomTimeLabel}</p>
+        <p className="text-body text-text-secondary countdown-stable">{bottomTimeLabel}</p>
       )}
     </div>
   );

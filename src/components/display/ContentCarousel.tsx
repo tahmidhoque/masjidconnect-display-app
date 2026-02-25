@@ -4,9 +4,9 @@
  * Cycles through schedule items (announcements, hadith, events, etc.)
  * with a GPU-friendly crossfade transition.
  *
- * Content is automatically scaled down (via CSS transform) when it would
- * overflow the available container height. This ensures long Arabic text
- * or verbose announcements never clip, regardless of the carousel's size.
+ * Content is automatically scaled (via CSS transform) to fit the available area:
+ * long content (e.g. long Hadith) is scaled down so it all fits on screen;
+ * short content may be scaled up within a cap. No scrolling — display-only.
  *
  * The carousel interval is configurable via props (from screen config).
  * Falls back to 30s if not specified.
@@ -50,10 +50,11 @@ interface ContentCarouselProps {
 }
 
 /**
- * Minimum scale factor to prevent text becoming unreadably small.
- * At 0.45 a heading at 3 rem becomes ~1.35 rem — still legible on a TV.
+ * Minimum scale factor when scaling down (content overflows).
+ * Maximum scale factor when scaling up — kept conservative to avoid overflow.
  */
 const MIN_SCALE = 0.45;
+const MAX_SCALE_UP = 1.35;
 
 /** Map API content types to user-friendly labels for the carousel badge */
 function getContentTypeLabel(type: string): string {
@@ -73,7 +74,6 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   const [activeIdx, setActiveIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const [contentScale, setContentScale] = useState(1);
-  /** Index into the current item's `names` array; re-randomised whenever the active slide changes. */
   const [selectedNameIdx, setSelectedNameIdx] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,10 +135,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   }, [advance]);
 
   /**
-   * Auto-scale: measure the content's natural height (scrollHeight is
-   * unaffected by CSS transforms) against the container's available height.
-   * If the content would overflow, apply a proportional scale-down.
-   * A ResizeObserver recalculates on container resize (orientation change, etc.).
+   * Scale content to fit the container. Long content (e.g. long Hadith) is scaled
+   * down so it all fits on screen; short content may scale up to fill. No scrolling.
    */
   useEffect(() => {
     const container = containerRef.current;
@@ -149,39 +147,50 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
     }
 
     const recalc = () => {
+      const availableW = container.clientWidth;
       const availableH = container.clientHeight;
+      const naturalW = content.scrollWidth;
       const naturalH = content.scrollHeight;
 
-      if (naturalH > availableH && naturalH > 0 && availableH > 0) {
-        setContentScale(Math.max(availableH / naturalH, MIN_SCALE));
-      } else {
+      if (naturalH <= 0 || availableH <= 0 || naturalW <= 0 || availableW <= 0) {
         setContentScale(1);
+        return;
+      }
+
+      const scaleH = availableH / naturalH;
+      const scaleW = availableW / naturalW;
+      const scaleToFit = Math.min(scaleH, scaleW);
+
+      if (scaleToFit < 1) {
+        setContentScale(Math.max(scaleToFit, MIN_SCALE));
+      } else {
+        setContentScale(Math.min(scaleToFit, MAX_SCALE_UP));
       }
     };
 
-    // Measure once layout has settled after the slide mount
     const raf = requestAnimationFrame(recalc);
-
-    // Re-measure whenever the container is resized
-    const observer = new ResizeObserver(() => requestAnimationFrame(recalc));
-    observer.observe(container);
+    const containerObserver = new ResizeObserver(() => requestAnimationFrame(recalc));
+    containerObserver.observe(container);
+    const contentObserver = new ResizeObserver(() => requestAnimationFrame(recalc));
+    contentObserver.observe(content);
 
     return () => {
       cancelAnimationFrame(raf);
-      observer.disconnect();
+      containerObserver.disconnect();
+      contentObserver.disconnect();
     };
   }, [activeIdx, items]);
 
   if (safeItems.length === 0) {
     return (
-      <div className="panel flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full">
         <p className="text-text-muted text-body">No content to display</p>
       </div>
     );
   }
 
   const item = safeItems[activeIdx] ?? safeItems[0];
-  const isScaled = contentScale < 1;
+  const isScaled = contentScale !== 1;
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
   // from the randomly selected entry rather than from the item-level fields.
@@ -194,26 +203,29 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
     : item.source;
 
   return (
-    <div className="panel flex flex-col h-full overflow-hidden relative">
-      {/* Measurement container — defines the available height for content */}
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative w-full">
+      {/* Measurement container — always clip; content is scaled to fit */}
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 w-full overflow-hidden"
+      >
         {/* Animated crossfade wrapper */}
         <div
           key={item.id}
           className={`
-            h-full gpu-accelerated
+            w-full min-w-0 h-full gpu-accelerated
             ${!isScaled ? 'flex flex-col justify-center' : ''}
             ${phase === 'in' ? 'animate-fade-in' : 'animate-fade-out'}
           `}
         >
-          {/* Content wrapper — scales down when it would overflow */}
+          {/* Content wrapper — scaled to fit so long content (e.g. Hadith) fits on screen */}
           <div
             ref={contentRef}
-            className="flex flex-col gap-3"
-            style={isScaled ? {
+            className="flex flex-col gap-3 w-full min-w-0 max-w-full"
+            style={{
               transform: `scale(${contentScale})`,
               transformOrigin: 'top center',
-            } : undefined}
+            }}
           >
             {/* Type badge */}
             <span className="badge badge-emerald self-start">{getContentTypeLabel(item.type)}</span>
@@ -229,32 +241,32 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
               </div>
             )}
 
-            {/* Title */}
+            {/* Title — scaled to match display readability */}
             {displayTitle && (
-              <h2 className="text-heading text-text-primary">{displayTitle}</h2>
+              <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>
             )}
 
-            {/* Arabic text */}
+            {/* Arabic text — larger for prominence (verse/hadith, Asma al Husna) */}
             {displayArabic && (
-              <p className="arabic-text text-2xl text-gold leading-relaxed">{displayArabic}</p>
+              <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
             )}
 
-            {/* English body */}
+            {/* English body — larger for readability from a distance */}
             {displayBody && (
-              <p className="text-body text-text-secondary leading-relaxed">{displayBody}</p>
+              <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
             )}
 
-            {/* Source */}
+            {/* Source — slightly smaller than body but still legible */}
             {displaySource && (
-              <p className="text-caption text-text-muted italic">— {displaySource}</p>
+              <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Pagination dots — always visible */}
+      {/* Pagination dots */}
       {safeItems.length > 1 && (
-        <div className="shrink-0 flex items-center justify-center gap-2 pt-2">
+        <div className="shrink-0 flex items-center justify-center gap-2 pt-1.5">
           {safeItems.map((_, i) => (
             <span
               key={i}

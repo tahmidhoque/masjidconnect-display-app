@@ -329,9 +329,10 @@ const DisplayScreen: React.FC = () => {
   const prayerPanel = (
     <PrayerTimesPanel
       isRamadan={ramadan.isRamadan}
-      imsakTime={ramadan.imsakDisplayTime}
+      imsakTime={ramadan.imsakTime}
       forbiddenPrayer={forbiddenPrayer}
       timeFormat={timeFormat}
+      compact={isPortrait}
     />
   );
   const countdown = <PrayerCountdown phase={prayerPhase} />;

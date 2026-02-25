@@ -45,25 +45,32 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
       </div>
     )}
 
+    {/* Unified frosted overlay — one continuous layer over content area */}
+    <div
+      className="absolute inset-0 z-[5] pointer-events-none"
+      style={{ background: 'rgba(255, 255, 255, 0.06)' }}
+      aria-hidden
+    />
+
     {/* Content stack */}
     <div className="relative z-10 flex flex-col w-full h-full">
       {/* Header */}
-      <header className="shrink-0 px-5 py-3">
+      <header className="shrink-0 px-5 py-2">
         {header}
       </header>
 
-      {/* Prayer times + countdown — sizes to content, no wasted space */}
-      <section className="shrink-0 px-5 pb-2">
+      {/* Prayer times + countdown */}
+      <section className="shrink-0 px-5 pb-1.5">
         {prayerSection}
       </section>
 
       {/* Content carousel — fills all remaining space */}
-      <main className="flex-1 min-h-0 px-5 py-2">
+      <main className="flex-1 min-h-0 px-5 py-1.5">
         {content}
       </main>
 
       {/* Footer */}
-      <footer className="shrink-0 px-5 py-2">
+      <footer className="shrink-0 px-5 py-1.5">
         {footer}
       </footer>
     </div>

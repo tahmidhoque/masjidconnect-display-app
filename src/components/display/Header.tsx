@@ -1,12 +1,12 @@
 /**
  * Header
  *
- * Displays the current date/time, Hijri date, and masjid name.
- * Features a subtle semi-transparent panel with a gold accent line
- * and a gold gradient on the masjid name.
+ * Displays dates on either side and the current time in the centre.
+ * Left: Gregorian date. Right: Hijri date (or "Ramadan Mubarak — Day X" in Ramadan).
+ * Centre: Large clock for readability from a distance.
  *
- * During Ramadan mode, the Hijri date line is replaced with a
- * "Ramadan Mubarak — Day X" badge to reinforce the seasonal context.
+ * No masjid name — display is assumed to be in a single known location.
+ * Borderless; optional gold accent line at bottom for branding.
  */
 
 import React, { useMemo } from 'react';
@@ -15,6 +15,7 @@ import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 
 interface HeaderProps {
+  /** Unused — kept for API compatibility; masjid name is no longer displayed */
   masjidName?: string | null;
   /** Whether Ramadan mode is active */
   isRamadan?: boolean;
@@ -31,7 +32,6 @@ const MONTHS = [
 ];
 
 const Header: React.FC<HeaderProps> = ({
-  masjidName,
   isRamadan = false,
   ramadanDay = null,
   timeFormat = '12h',
@@ -45,14 +45,13 @@ const Header: React.FC<HeaderProps> = ({
   const timeStr24h = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
   const secStr = String(seconds).padStart(2, '0');
-  const dateStr = `${DAYS[currentTime.getDay()]}, ${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
+  const dateLine1 = DAYS[currentTime.getDay()];
+  const dateLine2 = `${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
 
-  // Recalculate Hijri date once per calendar day
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const hijriDate = useMemo(() => calculateApproximateHijriDate(), [currentTime.getDate()]);
+  const calendarDate = currentTime.getDate();
+  const hijriDate = useMemo(() => calculateApproximateHijriDate(), [calendarDate]);
 
-  /** Subtitle line: Ramadan badge or standard Hijri date */
-  const subtitleContent = useMemo(() => {
+  const rightDateContent = useMemo(() => {
     if (isRamadan && ramadanDay != null) {
       return `Ramadan Mubarak — Day ${ramadanDay}`;
     }
@@ -61,11 +60,9 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <div
-      className="relative flex items-center justify-between rounded-lg px-5 py-3 overflow-hidden"
+      className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-lg px-4 py-4 overflow-hidden"
       style={{
         background: 'linear-gradient(90deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%)',
-        border: '1px solid rgba(255,255,255,0.15)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
       }}
     >
       {/* Gold accent line at the bottom */}
@@ -76,44 +73,32 @@ const Header: React.FC<HeaderProps> = ({
         }}
       />
 
-      {/* Left — Masjid name + Hijri/Ramadan subtitle */}
-      <div className="flex flex-col min-w-0">
-        {masjidName && (
-          <h1
-            className="text-lg font-bold truncate leading-tight"
-            style={{
-              background: 'linear-gradient(90deg, var(--color-gold), var(--color-gold-light))',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            {masjidName}
-          </h1>
-        )}
-        <p
-          className={`text-xs truncate ${
-            isRamadan ? 'text-gold/70 font-medium' : 'text-text-muted'
-          }`}
-        >
-          {subtitleContent}
-        </p>
+      {/* Left — Gregorian date (day on first line, rest on second) */}
+      <div className="min-w-0 flex flex-col">
+        <p className="text-body text-text-secondary truncate leading-tight">{dateLine1}</p>
+        <p className="text-body text-text-secondary truncate leading-tight">{dateLine2}</p>
       </div>
 
-      {/* Centre — Gregorian date (absolutely centred so it never shifts as clock ticks) */}
-      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center pointer-events-none">
-        <p className="text-sm text-text-secondary whitespace-nowrap">{dateStr}</p>
-      </div>
-
-      {/* Right — Clock (12h: main + small AM/PM; 24h: main + seconds) */}
-      <div className="flex items-baseline gap-1 shrink-0">
-        <span className="text-2xl font-semibold text-gold tabular-nums">{timeMain}</span>
+      {/* Centre — Clock (main focus); time and period scale together; no glow */}
+      <div className="flex items-baseline gap-1.5 justify-center shrink-0 pointer-events-none">
+        <span className="text-clock text-gold">{timeMain}</span>
         {timePeriod != null && (
-          <span className="text-sm text-gold/70 font-normal align-baseline">{timePeriod}</span>
+          <span className="text-subheading text-gold/90 font-normal align-baseline">{timePeriod}</span>
         )}
         {timeFormat === '24h' && (
-          <span className="text-xs text-gold/60 tabular-nums">{secStr}</span>
+          <span className="text-caption text-gold/70 tabular-nums">{secStr}</span>
         )}
+      </div>
+
+      {/* Right — Hijri or Ramadan badge */}
+      <div className="min-w-0 flex flex-col items-end">
+        <p
+          className={`text-body truncate text-right ${
+            isRamadan ? 'text-gold/80 font-medium' : 'text-text-muted'
+          }`}
+        >
+          {rightDateContent}
+        </p>
       </div>
     </div>
   );
