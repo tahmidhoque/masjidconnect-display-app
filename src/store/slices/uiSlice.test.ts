@@ -22,6 +22,8 @@ import {
   resetUIState,
   addNotification,
   removeNotification,
+  selectOfflineDuration,
+  selectActiveNotifications,
 } from './uiSlice';
 
 describe('uiSlice', () => {
@@ -191,6 +193,57 @@ describe('uiSlice', () => {
       expect(state.isOffline).toBe(false);
       expect(state.hasError).toBe(false);
       expect(state.showLoadingScreen).toBe(true);
+    });
+  });
+
+  describe('selectOfflineDuration', () => {
+    it('returns null when not offline', () => {
+      const state = { ui: uiReducer(undefined, { type: 'init' }) };
+      expect(selectOfflineDuration(state)).toBeNull();
+    });
+
+    it('returns null when offline but no offlineStartTime', () => {
+      const state = {
+        ui: { ...uiReducer(undefined, setOffline(true)), offlineStartTime: null },
+      };
+      expect(selectOfflineDuration(state)).toBeNull();
+    });
+
+    it('returns duration in ms when offline with start time', () => {
+      const state = { ui: uiReducer(undefined, setOffline(true)) };
+      expect(state.ui.offlineStartTime).toBeTruthy();
+      const duration = selectOfflineDuration(state);
+      expect(typeof duration).toBe('number');
+      expect(duration).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('selectActiveNotifications', () => {
+    it('returns notifications without duration as permanent', () => {
+      const state = { ui: uiReducer(undefined, addNotification({ type: 'info', message: 'Hi' })) };
+      const active = selectActiveNotifications(state);
+      expect(active).toHaveLength(1);
+      expect(active[0].message).toBe('Hi');
+    });
+
+    it('filters out expired notifications by duration', () => {
+      const oldTime = new Date(Date.now() - 60000).toISOString();
+      const state = {
+        ui: {
+          ...uiReducer(undefined, { type: 'init' }),
+          notifications: [
+            {
+              id: 'n1',
+              type: 'info' as const,
+              message: 'Old',
+              timestamp: oldTime,
+              duration: 30_000,
+            },
+          ],
+        },
+      };
+      const active = selectActiveNotifications(state);
+      expect(active).toHaveLength(0);
     });
   });
 });

@@ -23,13 +23,16 @@ export default mergeConfig(
           '**/*.spec.*',
           'src/main.tsx',
           'src/test-utils/**',
+          'src/types/**',
+          'src/api/models.ts',
+          'src/pwa.ts',
         ],
-        // Target 90%+ as tests are added. Set to 0 so CI does not fail until coverage is raised.
+        // Target 90%+ as more tests are added. Current baseline ~41%; thresholds prevent regression.
         thresholds: {
-          lines: 0,
-          functions: 0,
-          branches: 0,
-          statements: 0,
+          lines: 40,
+          functions: 40,
+          branches: 65,
+          statements: 40,
         },
       },
     },

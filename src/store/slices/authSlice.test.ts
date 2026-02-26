@@ -1,5 +1,5 @@
 /**
- * Redux auth slice tests — reducers and extraReducers.
+ * Redux auth slice tests — reducers, extraReducers, and thunk integration.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,9 +12,23 @@ import {
 import {
   setIsPaired,
   setPairingCodeExpired,
+  setPolling,
   logout,
   clearPairingError,
 } from './authSlice';
+import { createTestStore } from '@/test-utils/mock-store';
+
+const mockRequestPairingCode = vi.fn();
+const mockCheckPairingStatus = vi.fn();
+const mockGetPairedCredentials = vi.fn();
+
+vi.mock('@/api/apiClient', () => ({
+  default: {
+    requestPairingCode: (...args: unknown[]) => mockRequestPairingCode(...args),
+    checkPairingStatus: (...args: unknown[]) => mockCheckPairingStatus(...args),
+    getPairedCredentials: (...args: unknown[]) => mockGetPairedCredentials(...args),
+  },
+}));
 
 vi.mock('@/services/credentialService', () => ({
   default: {
@@ -218,6 +232,125 @@ describe('authSlice', () => {
       expect(state.apiKey).toBeNull();
       expect(state.masjidId).toBeNull();
       expect(state.pairingCode).toBeNull();
+    });
+
+    it('setPolling sets isPolling', () => {
+      const state = authReducer(undefined, setPolling(true));
+      expect(state.isPolling).toBe(true);
+    });
+  });
+
+  describe('thunk integration', () => {
+    beforeEach(() => {
+      mockRequestPairingCode.mockReset();
+      mockCheckPairingStatus.mockReset();
+      mockGetPairedCredentials.mockReset();
+    });
+
+    it('requestPairingCode thunk succeeds and updates state', async () => {
+      mockRequestPairingCode.mockResolvedValue({
+        success: true,
+        data: { pairingCode: 'ABC', expiresAt: '2025-12-31T12:00:00Z' },
+      });
+      const store = createTestStore();
+      await store.dispatch(requestPairingCode('LANDSCAPE'));
+      const state = store.getState().auth;
+      expect(state.pairingCode).toBe('ABC');
+      expect(state.pairingCodeExpiresAt).toBe('2025-12-31T12:00:00Z');
+      expect(state.isRequestingPairingCode).toBe(false);
+    });
+
+    it('requestPairingCode thunk rejects when response not success', async () => {
+      mockRequestPairingCode.mockResolvedValue({
+        success: false,
+        error: 'Server error',
+      });
+      const store = createTestStore();
+      await store.dispatch(requestPairingCode('LANDSCAPE'));
+      const state = store.getState().auth;
+      expect(state.pairingError).toBe('Server error');
+    });
+
+    it('requestPairingCode thunk rejects on throw', async () => {
+      mockRequestPairingCode.mockRejectedValue(new Error('Network error'));
+      const store = createTestStore();
+      await store.dispatch(requestPairingCode('LANDSCAPE'));
+      const state = store.getState().auth;
+      expect(state.pairingError).toBe('Network error');
+    });
+
+    it('checkPairingStatus thunk returns isPaired false', async () => {
+      mockCheckPairingStatus.mockResolvedValue({
+        success: true,
+        data: { isPaired: false },
+      });
+      const store = createTestStore();
+      await store.dispatch(checkPairingStatus('CODE'));
+      const state = store.getState().auth;
+      expect(state.isPaired).toBe(false);
+      expect(state.isAuthenticated).toBe(false);
+    });
+
+    it('checkPairingStatus thunk fetches credentials when paired', async () => {
+      mockCheckPairingStatus.mockResolvedValue({
+        success: true,
+        data: { isPaired: true },
+      });
+      mockGetPairedCredentials.mockResolvedValue({
+        success: true,
+        data: {
+          apiKey: 'key',
+          screenId: 'sid',
+          masjidId: 'mid',
+          masjidName: 'Masjid',
+          screenName: 'Screen 1',
+          orientation: 'LANDSCAPE',
+        },
+      });
+      const store = createTestStore();
+      await store.dispatch(checkPairingStatus('CODE'));
+      const state = store.getState().auth;
+      expect(state.isPaired).toBe(true);
+      expect(state.isAuthenticated).toBe(true);
+      expect(state.screenId).toBe('sid');
+      expect(state.apiKey).toBe('key');
+      expect(state.masjidId).toBe('mid');
+    });
+
+    it('initializeFromStorage thunk with credentials sets authenticated', async () => {
+      const { default: credentialService } = await import('@/services/credentialService');
+      (credentialService.getCredentials as ReturnType<typeof vi.fn>).mockReturnValue({
+        apiKey: 'k',
+        screenId: 's',
+        masjidId: 'm',
+      });
+      const store = createTestStore();
+      await store.dispatch(initializeFromStorage());
+      const state = store.getState().auth;
+      expect(state.isAuthenticated).toBe(true);
+      expect(state.screenId).toBe('s');
+    });
+
+    it('initializeFromStorage thunk with valid pairing code in localStorage', async () => {
+      const { default: credentialService } = await import('@/services/credentialService');
+      (credentialService.getCredentials as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      localStorage.setItem('pairingCode', 'XYZ');
+      localStorage.setItem('pairingCodeExpiresAt', new Date(Date.now() + 60000).toISOString());
+      const store = createTestStore();
+      await store.dispatch(initializeFromStorage());
+      const state = store.getState().auth;
+      expect(state.isPairing).toBe(true);
+      expect(state.pairingCode).toBe('XYZ');
+    });
+
+    it('initializeFromStorage thunk with expired pairing code clears storage', async () => {
+      const { default: credentialService } = await import('@/services/credentialService');
+      (credentialService.getCredentials as ReturnType<typeof vi.fn>).mockReturnValue(null);
+      localStorage.setItem('pairingCode', 'OLD');
+      localStorage.setItem('pairingCodeExpiresAt', '2020-01-01T00:00:00Z');
+      const store = createTestStore();
+      await store.dispatch(initializeFromStorage());
+      expect(localStorage.getItem('pairingCode')).toBeNull();
     });
   });
 });

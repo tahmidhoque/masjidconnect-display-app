@@ -10,8 +10,16 @@ import {
   refreshSchedule,
   refreshEvents,
   loadCachedContent,
+  refreshAllContent,
 } from './contentSlice';
-import { setCarouselTime, setPrayerAnnouncement, clearAllErrors } from './contentSlice';
+import {
+  setCarouselTime,
+  setPrayerAnnouncement,
+  setShowPrayerAnnouncement,
+  setPrayerAnnouncementName,
+  setIsPrayerJamaat,
+  clearAllErrors,
+} from './contentSlice';
 import { mockScreenContent, mockPrayerTimesArray } from '@/test-utils/mocks';
 
 /** Minimal prayer times shape for reducer payloads */
@@ -181,6 +189,33 @@ describe('contentSlice', () => {
     });
   });
 
+  describe('refreshAllContent', () => {
+    it('sets loading on pending', () => {
+      const state = contentReducer(undefined, refreshAllContent.pending('', {}));
+      expect(state.isLoading).toBe(true);
+    });
+
+    it('sets lastUpdated and clears loading on fulfilled', () => {
+      const payload = {
+        timestamp: new Date().toISOString(),
+        results: ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled'] as const,
+      };
+      const prev = contentReducer(undefined, refreshAllContent.pending('', {}));
+      const state = contentReducer(prev, refreshAllContent.fulfilled(payload, '', {}));
+      expect(state.isLoading).toBe(false);
+      expect(state.lastUpdated).toBe(payload.timestamp);
+    });
+
+    it('clears loading on rejected', () => {
+      const prev = contentReducer(undefined, refreshAllContent.pending('', {}));
+      const state = contentReducer(
+        prev,
+        refreshAllContent.rejected(null, '', {}, 'Refresh failed'),
+      );
+      expect(state.isLoading).toBe(false);
+    });
+  });
+
   describe('reducers', () => {
     it('setCarouselTime clamps between 5 and 300', () => {
       let state = contentReducer(undefined, setCarouselTime(10));
@@ -199,6 +234,24 @@ describe('contentSlice', () => {
       expect(state.showPrayerAnnouncement).toBe(true);
       expect(state.prayerAnnouncementName).toBe('Fajr');
       expect(state.isPrayerJamaat).toBe(false);
+    });
+
+    it('setPrayerAnnouncement with undefined prayerName does not overwrite', () => {
+      let state = contentReducer(
+        undefined,
+        setPrayerAnnouncement({ show: true, prayerName: 'Fajr' }),
+      );
+      state = contentReducer(state, setPrayerAnnouncement({ show: false }));
+      expect(state.prayerAnnouncementName).toBe('Fajr');
+    });
+
+    it('setShowPrayerAnnouncement and setPrayerAnnouncementName update single fields', () => {
+      let state = contentReducer(undefined, setShowPrayerAnnouncement(true));
+      expect(state.showPrayerAnnouncement).toBe(true);
+      state = contentReducer(state, setPrayerAnnouncementName('Dhuhr'));
+      expect(state.prayerAnnouncementName).toBe('Dhuhr');
+      state = contentReducer(state, setIsPrayerJamaat(true));
+      expect(state.isPrayerJamaat).toBe(true);
     });
 
     it('clearAllErrors clears all error fields', () => {
