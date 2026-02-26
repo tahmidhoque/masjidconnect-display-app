@@ -48,15 +48,14 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
       aria-hidden
     />
 
-    {/* Content grid — sits above frosted layer */}
-    <div className="relative z-10 flex flex-col w-full h-full">
-      {/* Header — reduced py for more vertical room in main area */}
-      <header className="shrink-0 px-6 py-1.5">
+    {/* Content grid — uniform padding (same on all sides) so edges look consistent */}
+    <div className="relative z-10 flex flex-col w-full h-full p-4 gap-1">
+      <header className="shrink-0">
         {header}
       </header>
 
       {/* Main area — two columns: content gets more width to reduce text wrapping */}
-      <main className="flex-1 flex min-h-0 px-6 gap-3">
+      <main className="flex-1 flex min-h-0 gap-3">
         {/* Left column — content carousel (wider so hadith/announcements don't overflow vertically) */}
         <section className="flex-[58] min-w-0 flex flex-col">
           {content}
@@ -68,8 +67,7 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
         </aside>
       </main>
 
-      {/* Footer — reduced py for more vertical room in main area */}
-      <footer className="shrink-0 px-6 py-2">
+      <footer className="shrink-0">
         {footer}
       </footer>
     </div>
