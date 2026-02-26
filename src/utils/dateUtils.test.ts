@@ -226,19 +226,21 @@ describe('getTimeUntilNextPrayer', () => {
     expect(getTimeUntilNextPrayer('')).toBe('');
   });
 
-  it('returns hours and minutes when next prayer is later today', () => {
+  it('returns hours and minutes when next prayer is later today (unpadded)', () => {
     const result = getTimeUntilNextPrayer('12:00'); // 2h from 10:00
-    expect(result).toMatch(/\d{2}h \d{2}m/);
+    expect(result).toMatch(/\d{1,2}h \d{1,2}m/);
+    expect(result).toBe('2h 0m');
   });
 
-  it('returns minutes and seconds when under 1 hour', () => {
+  it('returns minutes and seconds when under 1 hour (unpadded)', () => {
     const result = getTimeUntilNextPrayer('10:30'); // 30 min from 10:00
-    expect(result).toMatch(/\d{2}m \d{2}s/);
+    expect(result).toMatch(/\d{1,2}m \d{1,2}s/);
+    expect(result).toBe('30m 0s');
   });
 
-  it('respects includeSeconds option', () => {
+  it('respects includeSeconds option (unpadded)', () => {
     const result = getTimeUntilNextPrayer('10:05', false, { includeSeconds: true });
-    expect(result).toMatch(/\d{2}m \d{2}s/);
+    expect(result).toMatch(/\d{1,2}m \d{1,2}s/);
   });
 });
 

@@ -17,6 +17,7 @@ import React, { useMemo } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer, formatTimeToDisplay } from '../../utils/dateUtils';
 import { useSelector } from 'react-redux';
+import CountdownDisplay from './CountdownDisplay';
 import { selectTimeFormat } from '../../store/slices/contentSlice';
 
 interface IftarCountdownProps {
@@ -89,7 +90,10 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
             ${compact ? 'text-prayer' : 'text-display'}
           `}
         >
-          {liveIftarCountdown}
+          <CountdownDisplay
+            value={liveIftarCountdown}
+            className={`text-gold font-bold ${compact ? 'text-prayer' : 'text-display'}`}
+          />
         </h3>
 
         {displayIftarTime && (
@@ -116,7 +120,10 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
         </p>
 
         <h3 className="text-prayer text-gold font-semibold tabular-nums">
-          {liveSuhoorCountdown}
+          <CountdownDisplay
+            value={liveSuhoorCountdown}
+            className="text-prayer text-gold font-semibold"
+          />
         </h3>
 
         <p className="text-body text-text-secondary tabular-nums">

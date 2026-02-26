@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { ScreenContent, PrayerTimes, Event, Schedule, TimeFormat } from "../../api/models";
+import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat } from "../../api/models";
 import apiClient from "../../api/apiClient";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
@@ -93,8 +93,8 @@ const createFallbackSchedule = (): Schedule => ({
   items: [],
 });
 
-// Helper function to normalize schedule data
-const normalizeScheduleData = (schedule: any): Schedule => {
+// Helper function to normalize schedule data (exported for unit tests)
+export const normalizeScheduleData = (schedule: any): Schedule => {
   if (!schedule) return createFallbackSchedule();
 
   try {
@@ -116,14 +116,19 @@ const normalizeScheduleData = (schedule: any): Schedule => {
       return createFallbackSchedule();
     }
 
-    // Normalize each item
+    // Normalize each item (per-item try/catch so one bad item e.g. DUA in a different shape does not break the whole schedule)
     if (normalizedSchedule.items.length > 0) {
-      normalizedSchedule.items = normalizedSchedule.items.map(
-        (item: any, index: number) => {
+      const normalizedItems: ScheduleItem[] = [];
+      const rawItems = normalizedSchedule.items as unknown[];
+      for (let index = 0; index < rawItems.length; index++) {
+        const item = rawItems[index] as any;
+        try {
+          // Normalized items include flattened type/title/content/duration (and event fields) for DisplayScreen
+          let normalized: ScheduleItem | Record<string, unknown>;
           // Handle Events V2 from schedule items (with eventId and event properties)
           if (item.eventId && item.event) {
             const event = item.event;
-            return {
+            normalized = {
               id: item.id || `item-${index}`,
               order: typeof item.order === "number" ? item.order : index,
               eventId: item.eventId,
@@ -176,12 +181,10 @@ const normalizeScheduleData = (schedule: any): Schedule => {
                 },
                 duration: event.displayDuration || 20,
               },
-            };
-          }
-
-          // Handle wrapped format (items with contentItem property)
-          if (item.contentItem && typeof item.contentItem === "object") {
-            return {
+            } as unknown as ScheduleItem;
+          } else if (item.contentItem && typeof item.contentItem === "object") {
+            // Handle wrapped format (items with contentItem property)
+            normalized = {
               id: item.id || `item-${index}`,
               order: typeof item.order === "number" ? item.order : index,
               contentItem: {
@@ -202,27 +205,35 @@ const normalizeScheduleData = (schedule: any): Schedule => {
                 typeof item.contentItem.duration === "number"
                   ? item.contentItem.duration
                   : 30,
-            };
-          }
-
-          // Handle flattened format (items with direct properties)
-          return {
-            id: item.id || `item-${index}`,
-            order: typeof item.order === "number" ? item.order : index,
-            type: item.type || "CUSTOM",
-            title: item.title || "No Title",
-            content: item.content || {},
-            duration: typeof item.duration === "number" ? item.duration : 30,
-            contentItem: {
-              id: `${item.id || index}-content`,
+            } as unknown as ScheduleItem;
+          } else {
+            // Handle flattened format (items with direct properties)
+            normalized = {
+              id: item.id || `item-${index}`,
+              order: typeof item.order === "number" ? item.order : index,
               type: item.type || "CUSTOM",
               title: item.title || "No Title",
               content: item.content || {},
               duration: typeof item.duration === "number" ? item.duration : 30,
-            },
-          };
-        },
-      );
+              contentItem: {
+                id: `${item.id || index}-content`,
+                type: item.type || "CUSTOM",
+                title: item.title || "No Title",
+                content: item.content || {},
+                duration: typeof item.duration === "number" ? item.duration : 30,
+              },
+            } as unknown as ScheduleItem;
+          }
+          normalizedItems.push(normalized as ScheduleItem);
+        } catch (itemError) {
+          logger.warn("Error normalizing schedule item, skipping", {
+            index,
+            itemId: item?.id,
+            error: itemError,
+          });
+        }
+      }
+      normalizedSchedule.items = normalizedItems;
     }
 
     return normalizedSchedule;
@@ -306,9 +317,19 @@ export const refreshContent = createAsyncThunk(
         throw new Error("No content received from server");
       }
 
-      // Prefer schedule from the content we just synced (API may embed it); fall back to separate key
-      const contentAny = content as unknown as { schedule?: unknown; data?: { schedule?: unknown } };
-      const scheduleFromContent = contentAny?.schedule ?? contentAny?.data?.schedule;
+      // Prefer schedule from the content we just synced (API may embed it under various paths); fall back to separate key
+      const contentAny = content as unknown as {
+        schedule?: unknown;
+        data?: { schedule?: unknown; playlist?: unknown };
+        playlist?: unknown;
+        assignedSchedule?: { schedule?: unknown };
+      };
+      const scheduleFromContent =
+        contentAny?.schedule ??
+        contentAny?.data?.schedule ??
+        contentAny?.playlist ??
+        contentAny?.assignedSchedule?.schedule ??
+        contentAny?.data?.playlist;
       const scheduleFromStorage = await storageService.get<any>('schedule');
       const scheduleData = scheduleFromContent ?? scheduleFromStorage;
       const schedule = scheduleData ? normalizeScheduleData(scheduleData) : null;
@@ -837,7 +858,7 @@ const contentSlice = createSlice({
           state.schedule = action.payload.schedule || null;
           state.lastScheduleUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
-          
+
           logger.info("[ContentSlice] Schedule updated in Redux state", {
             hasSchedule: !!state.schedule,
             scheduleId: state.schedule?.id,

@@ -40,6 +40,10 @@
   --color-alert-orange: #F4A261;
   --color-alert-green: #2A9D8F;
 
+  /* Content type: Dua (calm blue per PRD) */
+  --color-dua: #1565C0;
+  --color-dua-light: #42A5F5;
+
   /* Fonts — Amiri as fallback so ﷺ (U+FDFA) and other Arabic glyphs render on RPi when text uses Poppins */
   --font-sans: 'Poppins', 'Amiri', system-ui, -apple-system, sans-serif;
   --font-arabic: 'Amiri', 'Traditional Arabic', serif;
@@ -215,6 +219,13 @@ html, body {
   text-align: center;
 }
 
+/* Countdown unit labels (h, m, s) — smaller than numbers so digits stay clear at a distance. */
+.countdown-unit {
+  font-size: 0.65em;
+  vertical-align: baseline;
+  line-height: 1;
+}
+
 /* Shimmer loading placeholder */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
@@ -298,6 +309,12 @@ html, body {
   background: rgba(230, 57, 70, 0.2);
   color: var(--color-alert-red);
   border: 1px solid rgba(230, 57, 70, 0.3);
+}
+
+.badge-dua {
+  background: rgba(21, 101, 192, 0.2);
+  color: var(--color-dua-light);
+  border: 1px solid rgba(21, 101, 192, 0.4);
 }
 
 /* Divider */
@@ -444,25 +461,25 @@ html, body {
   line-height: 1.25;
 }
 
-/* Carousel title — scales between heading and clock for proportion */
+/* Carousel title — kept smaller so long verses fit without clipping */
 .text-carousel-title {
-  font-size: clamp(1.5rem, 2.25rem, 2.75rem);
+  font-size: clamp(1rem, 1.5rem, 1.9rem);
   font-weight: 600;
   line-height: 1.2;
 }
 
-/* Carousel body — larger than default body for readability from a distance */
+/* Carousel body — smaller so Ayatul Kursi etc. fit in available space */
 .text-carousel-body {
-  font-size: clamp(1.1rem, 1.45rem, 1.75rem);
+  font-size: clamp(0.85rem, 1.05rem, 1.25rem);
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
-/* Carousel Arabic — prominent for verse/hadith and Asma al Husna */
+/* Carousel Arabic — prominent but reduced so it fits with translation */
 .text-carousel-arabic {
-  font-size: clamp(1.75rem, 2.5rem, 3.25rem);
+  font-size: clamp(1.2rem, 1.6rem, 2.1rem);
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .text-display {

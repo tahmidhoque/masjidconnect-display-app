@@ -5,8 +5,9 @@
  * with a GPU-friendly crossfade transition.
  *
  * Content is automatically scaled (via CSS transform) to fit the available area:
- * long content (e.g. long Hadith) is scaled down so it all fits on screen;
- * short content may be scaled up within a cap. No scrolling — display-only.
+ * long content is scaled down so it all fits; short content may be scaled up within a cap.
+ * No width is applied to the inner content div so every slide occupies the same layout
+ * slot and stays in the same position regardless of content amount. No scrolling — display-only.
  *
  * The carousel interval is configurable via props (from screen config).
  * Falls back to 30s if not specified.
@@ -32,6 +33,8 @@ export interface CarouselItem {
   body?: string;
   /** Arabic body text (rendered with arabic-text class) */
   arabicBody?: string;
+  /** Transliteration / Latin script (e.g. for Dua); rendered LTR between Arabic and body */
+  transliteration?: string;
   source?: string;
   imageUrl?: string;
   /** Display duration in seconds for this slide (overrides default interval when set) */
@@ -56,6 +59,10 @@ interface ContentCarouselProps {
 const MIN_SCALE = 0.45;
 const MAX_SCALE_UP = 1.35;
 
+/** Use most of the width (97%) so we don't waste space on the left; scale height more conservatively (84%) so nothing clips. */
+const FIT_WIDTH_RATIO = 0.97;
+const FIT_HEIGHT_RATIO = 0.84;
+
 /** Map API content types to user-friendly labels for the carousel badge */
 function getContentTypeLabel(type: string): string {
   const labels: Record<string, string> = {
@@ -66,6 +73,7 @@ function getContentTypeLabel(type: string): string {
     content: 'Content',
     custom: 'Content',
     asma_al_husna: 'Names of Allah',
+    dua: 'Dua',
   };
   return labels[type.toLowerCase()] ?? type;
 }
@@ -135,8 +143,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   }, [advance]);
 
   /**
-   * Scale content to fit the container. Long content (e.g. long Hadith) is scaled
-   * down so it all fits on screen; short content may scale up to fill. No scrolling.
+   * Scale content to fit the container. Long content is scaled down so it all fits.
+   * No width is set on the content div so every slide uses the same layout slot and
+   * stays in the same position regardless of content amount.
    */
   useEffect(() => {
     const container = containerRef.current;
@@ -146,38 +155,49 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
       return;
     }
 
+    let cancelled = false;
+
     const recalc = () => {
+      if (!containerRef.current || !contentRef.current || cancelled) return;
+      const container = containerRef.current;
+      const content = contentRef.current;
+
       const availableW = container.clientWidth;
       const availableH = container.clientHeight;
+      if (availableW <= 0 || availableH <= 0) return;
+
+      const fitW = availableW * FIT_WIDTH_RATIO;
+      const fitH = availableH * FIT_HEIGHT_RATIO;
+
       const naturalW = content.scrollWidth;
       const naturalH = content.scrollHeight;
 
-      if (naturalH <= 0 || availableH <= 0 || naturalW <= 0 || availableW <= 0) {
-        setContentScale(1);
+      if (naturalH <= 0 || naturalW <= 0) {
+        requestAnimationFrame(recalc);
         return;
       }
 
-      const scaleH = availableH / naturalH;
-      const scaleW = availableW / naturalW;
-      const scaleToFit = Math.min(scaleH, scaleW);
+      const scaleH = fitH / naturalH;
+      const scaleW = fitW / naturalW;
+      let scaleToFit = Math.min(scaleH, scaleW);
 
       if (scaleToFit < 1) {
-        setContentScale(Math.max(scaleToFit, MIN_SCALE));
+        scaleToFit = Math.max(scaleToFit, MIN_SCALE);
+        setContentScale(scaleToFit);
       } else {
-        setContentScale(Math.min(scaleToFit, MAX_SCALE_UP));
+        const scale = Math.min(Math.min(scaleToFit, MAX_SCALE_UP) * FIT_HEIGHT_RATIO, 1);
+        setContentScale(scale);
       }
     };
 
     const raf = requestAnimationFrame(recalc);
     const containerObserver = new ResizeObserver(() => requestAnimationFrame(recalc));
     containerObserver.observe(container);
-    const contentObserver = new ResizeObserver(() => requestAnimationFrame(recalc));
-    contentObserver.observe(content);
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
       containerObserver.disconnect();
-      contentObserver.disconnect();
     };
   }, [activeIdx, items]);
 
@@ -190,7 +210,6 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   }
 
   const item = safeItems[activeIdx] ?? safeItems[0];
-  const isScaled = contentScale !== 1;
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
   // from the randomly selected entry rather than from the item-level fields.
@@ -209,26 +228,29 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
         ref={containerRef}
         className="flex-1 min-h-0 w-full overflow-hidden"
       >
-        {/* Animated crossfade wrapper */}
+        {/* Animated crossfade wrapper — centred so content has even space from all edges */}
         <div
           key={item.id}
           className={`
-            w-full min-w-0 h-full gpu-accelerated
-            ${!isScaled ? 'flex flex-col justify-center' : ''}
+            w-full h-full gpu-accelerated flex flex-col justify-center items-stretch
             ${phase === 'in' ? 'animate-fade-in' : 'animate-fade-out'}
           `}
         >
-          {/* Content wrapper — scaled to fit so long content (e.g. Hadith) fits on screen */}
+          {/* Content wrapper — no width set so layout slot is consistent across slides; gap-4 for section separation */}
           <div
             ref={contentRef}
-            className="flex flex-col gap-3 w-full min-w-0 max-w-full"
+            className="flex flex-col gap-4 min-w-0 flex-shrink-0 w-full max-w-full"
             style={{
               transform: `scale(${contentScale})`,
-              transformOrigin: 'top center',
+              transformOrigin: 'center center',
             }}
           >
-            {/* Type badge */}
-            <span className="badge badge-emerald self-start">{getContentTypeLabel(item.type)}</span>
+            {/* Type badge — Dua uses distinct blue badge */}
+            <span
+              className={`badge self-start ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
+            >
+              {getContentTypeLabel(item.type)}
+            </span>
 
             {/* Image — constrained so it doesn't overflow; rem-based to match 720p scaling */}
             {item.imageUrl && (
@@ -246,12 +268,19 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
               <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>
             )}
 
-            {/* Arabic text — larger for prominence (verse/hadith, Asma al Husna) */}
+            {/* Arabic text — larger for prominence (verse/hadith, Dua, Asma al Husna) */}
             {displayArabic && (
               <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
             )}
 
-            {/* English body — larger for readability from a distance */}
+            {/* Transliteration — LTR (Dua and any type with transliteration) */}
+            {item.transliteration && (
+              <p className="text-carousel-body text-text-secondary leading-relaxed" dir="ltr">
+                {item.transliteration}
+              </p>
+            )}
+
+            {/* English body / translation — larger for readability from a distance */}
             {displayBody && (
               <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
             )}

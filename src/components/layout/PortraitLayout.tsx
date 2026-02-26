@@ -52,25 +52,23 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
       aria-hidden
     />
 
-    {/* Content stack */}
-    <div className="relative z-10 flex flex-col w-full h-full">
-      {/* Header */}
-      <header className="shrink-0 px-5 py-2">
+    {/* Content stack — uniform padding (same on all sides) so edges look consistent */}
+    <div className="relative z-10 flex flex-col w-full h-full p-4 gap-1">
+      <header className="shrink-0">
         {header}
       </header>
 
       {/* Prayer times + countdown */}
-      <section className="shrink-0 px-5 pb-1.5">
+      <section className="shrink-0">
         {prayerSection}
       </section>
 
       {/* Content carousel — fills all remaining space */}
-      <main className="flex-1 min-h-0 px-5 py-1.5">
+      <main className="flex-1 min-h-0">
         {content}
       </main>
 
-      {/* Footer */}
-      <footer className="shrink-0 px-5 py-2.5">
+      <footer className="shrink-0">
         {footer}
       </footer>
     </div>

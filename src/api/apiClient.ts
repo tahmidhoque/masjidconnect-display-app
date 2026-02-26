@@ -427,8 +427,14 @@ class ApiClient {
         await storageService.set('screenContent', contentResponse);
         logger.debug('[ApiClient] Saved screen content to storageService');
 
-        if (contentResponse.schedule) {
-          await storageService.set('schedule', contentResponse.schedule);
+        // Extract schedule from multiple possible paths (backend may nest under data, playlist, etc.)
+        const schedule =
+          contentResponse.schedule ??
+          (contentResponse as { data?: { schedule?: unknown } }).data?.schedule ??
+          (contentResponse as { playlist?: unknown }).playlist ??
+          (contentResponse as { assignedSchedule?: { schedule?: unknown } }).assignedSchedule?.schedule;
+        if (schedule) {
+          await storageService.set('schedule', schedule);
           logger.debug('[ApiClient] Saved schedule separately');
         }
 

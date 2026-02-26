@@ -239,7 +239,7 @@ export interface GetTimeUntilNextPrayerOptions {
 /**
  * Calculate time until next prayer using dayjs.
  * Default (no options): always shows 2 units — hours+minutes when ≥1h, minutes+seconds when <1h.
- * Zero-padded for consistent width and alignment.
+ * Numbers are unpadded (e.g. 1h 0m, 5h 19m 20s) for clarity.
  */
 export const getTimeUntilNextPrayer = (
   nextPrayerTime: string,
@@ -283,22 +283,21 @@ export const getTimeUntilNextPrayer = (
     const diffHours = Math.floor(diffSeconds / 3600);
     const diffMinutes = Math.floor((diffSeconds % 3600) / 60);
     const diffSecondsRemainder = diffSeconds % 60;
-    const pad2 = (n: number) => String(n).padStart(2, "0");
 
     if (diffSeconds <= 0) {
-      if (!hasExplicitOptions) return "00m 00s";
+      if (!hasExplicitOptions) return "0m 0s";
       const showSeconds =
         includeSeconds ||
         (includeSecondsWhenUnderMinutes != null && diffSeconds <= includeSecondsWhenUnderMinutes * 60);
       return showSeconds ? "0s" : "0m";
     }
 
-    /** Default: always 2 units — hours+minutes when ≥1h, minutes+seconds when <1h. */
+    /** Default: always 2 units — hours+minutes when ≥1h, minutes+seconds when <1h. Unpadded. */
     if (!hasExplicitOptions) {
       if (diffHours >= 1) {
-        return `${pad2(diffHours)}h ${pad2(diffMinutes)}m`;
+        return `${diffHours}h ${diffMinutes}m`;
       }
-      return `${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
+      return `${diffMinutes}m ${diffSecondsRemainder}s`;
     }
 
     const showSeconds =
@@ -308,15 +307,15 @@ export const getTimeUntilNextPrayer = (
 
     if (showSeconds) {
       if (diffHours > 0) {
-        return `${pad2(diffHours)}h ${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
+        return `${diffHours}h ${diffMinutes}m ${diffSecondsRemainder}s`;
       }
-      return `${pad2(diffMinutes)}m ${pad2(diffSecondsRemainder)}s`;
+      return `${diffMinutes}m ${diffSecondsRemainder}s`;
     }
 
     if (diffHours > 0) {
-      return `${pad2(diffHours)}h ${pad2(diffMinutes)}m`;
+      return `${diffHours}h ${diffMinutes}m`;
     }
-    return `${pad2(diffMinutes)}m`;
+    return `${diffMinutes}m`;
   } catch (error) {
     logger.error("[dateUtils] Error calculating time until next prayer", {
       error: error instanceof Error ? error.message : String(error),
