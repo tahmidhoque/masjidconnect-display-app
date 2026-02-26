@@ -24,6 +24,7 @@ All development rules are in `.cursor/rules/`:
 | `api-and-data.mdc` | API clients, response format, caching, offline-first, service singletons |
 | `component-patterns.mdc` | Phase-based routing, lazy loading, orientation, component structure |
 | `performance-raspberry-pi.mdc` | Memory, rendering, CSS constraints, PWA, logging, kiosk mode (always applied) |
+| `git-branching-and-releases.mdc` | Git branching (feature/refactor/bugfix), commit prefixes, cut-a-release-from-master workflow (always applied) |
 
 ## Non-Negotiable Principles
 
