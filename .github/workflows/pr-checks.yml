@@ -1,0 +1,45 @@
+# Run on every PR (and push to PR branches) to ensure build, tests, and lint pass
+# before merge. Does not package or release.
+
+name: PR checks
+
+on:
+  pull_request:
+    branches: ["**"]
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://portal.masjidconnect.co.uk' }}
+          VITE_REALTIME_URL: ${{ secrets.VITE_REALTIME_URL || 'https://websocket.masjidconnect.co.uk' }}

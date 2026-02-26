@@ -112,7 +112,7 @@ describe('contentSlice', () => {
             order: 0,
             contentItem: {
               id: 'c1',
-              type: 'DUA',
+              type: 'DUA' as const,
               title: 'Dua',
               content: { arabicText: 'نص', transliteration: 'nun', translation: 'Text' },
               duration: 25,
@@ -208,7 +208,7 @@ describe('contentSlice', () => {
             order: 0,
             contentItem: {
               id: 'c1',
-              type: 'DUA',
+              type: 'DUA' as const,
               title: 'Dua for guidance',
               content: { arabicText: 'اَهْدِنَا', transliteration: 'Ihdina', translation: 'Guide us' },
               duration: 30,
