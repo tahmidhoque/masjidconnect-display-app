@@ -48,6 +48,28 @@ function isCountingToJamaat(
   return Boolean(targetTime && jamaat && targetTime.time === jamaat);
 }
 
+/** Parse "H:mm" or "HH:mm" to minutes since midnight. Returns -1 if invalid. */
+function timeToMinutes(hhmm: string | undefined): number {
+  if (!hhmm) return -1;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return -1;
+  return h * 60 + m;
+}
+
+/**
+ * Effective minutes for comparison when API may send 12h format for evening prayers.
+ * For Maghrib/Isha, if parsed hour is 1–11, treat as PM (add 12h) so "7:45" → 19:45.
+ */
+function effectiveMinutes(hhmm: string | undefined, prayerName: string): number {
+  const min = timeToMinutes(hhmm);
+  if (min < 0 || !hhmm) return min;
+  const h = Number(hhmm.split(':')[0]);
+  if (Number.isNaN(h)) return min;
+  const isEveningPrayer = prayerName === 'Maghrib' || prayerName === 'Isha';
+  if (isEveningPrayer && h >= 1 && h <= 11) return min + 12 * 60; // PM
+  return min;
+}
+
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   const { nextPrayer } = usePrayerTimes();
   const currentTime = useCurrentTime();
@@ -60,29 +82,31 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   const targetTime = useMemo(() => {
     if (!nextPrayer) return null;
 
-    const nowHHmm = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
+    const nowMin = currentTime.getHours() * 60 + currentTime.getMinutes() + currentTime.getSeconds() / 60;
+    const adhanMin = effectiveMinutes(nextPrayer.time, nextPrayer.name);
+    const jamaatMin = effectiveMinutes(nextPrayer.jamaat, nextPrayer.name);
 
-    // Between adhan and jamaat — count down to jamaat
-    if (
-      nextPrayer.jamaat &&
-      nextPrayer.time <= nowHHmm &&
-      nextPrayer.jamaat > nowHHmm
-    ) {
-      return { time: nextPrayer.jamaat, forceTomorrow: false };
+    // Between adhan and jamaat — count down to jamaat (numeric comparison avoids "9:45" vs "19:45" string issues)
+    if (adhanMin >= 0 && jamaatMin >= 0 && nowMin >= adhanMin && nowMin < jamaatMin) {
+      return { time: nextPrayer.jamaat!, forceTomorrow: false };
     }
 
-    // Past this prayer's jamaat — don't count down to tomorrow's jamaat (avoids "loop").
-    // Show 0s until nextPrayer updates to the next salaat.
-    if (
-      nextPrayer.jamaat &&
-      nextPrayer.time <= nowHHmm &&
-      nowHHmm >= nextPrayer.jamaat
-    ) {
+    // Past this prayer's jamaat — show 0s until nextPrayer advances (avoids 23h loop).
+    // Only when jamaat is "today" (afternoon/evening) or we're in morning; else nextPrayer is e.g. Fajr and we're in evening → count to tomorrow's Fajr.
+    const isPastThisPrayerJamaat =
+      adhanMin >= 0 && jamaatMin >= 0 && nowMin >= adhanMin && nowMin >= jamaatMin &&
+      (jamaatMin >= 12 * 60 || nowMin < 12 * 60);
+    if (isPastThisPrayerJamaat) {
+      return null;
+    }
+
+    // Adhan has passed but no jamaat (or missing data) — show 0s until nextPrayer advances.
+    if (adhanMin >= 0 && nowMin >= adhanMin && jamaatMin < 0) {
       return null;
     }
 
     // If adhan has passed today (and jamaat too, or no jamaat), this is tomorrow's prayer
-    if (nextPrayer.time <= nowHHmm) {
+    if (adhanMin >= 0 && nowMin >= adhanMin) {
       return { time: nextPrayer.time, forceTomorrow: true };
     }
 

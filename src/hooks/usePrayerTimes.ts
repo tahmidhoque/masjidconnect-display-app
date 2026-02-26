@@ -13,7 +13,6 @@ import {
 } from "../utils/dateUtils";
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
-import apiClient from "../api/apiClient";
 import logger from "../utils/logger";
 import dayjs from "dayjs";
 
@@ -23,12 +22,17 @@ export const FORBIDDEN_PRAYER_FORCE_EVENT = "forbidden-prayer-force-change";
 /** Dev-only: dispatched when user cycles highlighted prayer (Ctrl+Shift+P). */
 export const NEXT_PRAYER_CYCLE_EVENT = "next-prayer-cycle";
 
+/** Dev-only: dispatched when user toggles "show tomorrow's list" (Ctrl+Shift+T). */
+export const SHOW_TOMORROW_LIST_FORCE_EVENT = "show-tomorrow-list-force-change";
+
 declare global {
   interface Window {
     /** Dev: force show/hide forbidden-prayer notice. undefined = use computed; null = hide; object = show with this state. */
     __FORBIDDEN_PRAYER_FORCE?: CurrentForbiddenState | null;
     /** Dev: when set (0-based index), overrides which prayer is shown as "next" / highlighted. undefined = auto. */
     __NEXT_PRAYER_INDEX?: number;
+    /** Dev: when true, force showing tomorrow's prayer list (after-Isha); when false, force today; undefined = auto from time. */
+    __SHOW_TOMORROW_LIST?: boolean;
   }
 }
 
@@ -750,8 +754,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const updateFormattedPrayerTimes = useCallback(() => {
     if (!prayerTimes) return;
 
-    // Get current date/time
-    const now = Date.now();
     const prayers: FormattedPrayerTime[] = [];
     const prayerTimesForCalculation: { name: string; time: string }[] = [];
 
@@ -760,7 +762,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     let nextPrayerName = "";
     let currentPrayerName = "";
 
-    // Check if we have the data array format and extract today's prayer times if so
+    // API returns { data: [ day0, day1, ... ] } with 5 days; use index 0 for today, 1 for tomorrow (after Isha)
+    let tomorrowData: typeof todayData = null;
     if (
       prayerTimes &&
       prayerTimes.data &&
@@ -768,6 +771,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       prayerTimes.data.length > 0
     ) {
       todayData = prayerTimes.data[0];
+      if (prayerTimes.data.length > 1) {
+        tomorrowData = prayerTimes.data[1];
+      }
     }
 
     // Helper function to safely extract time
@@ -864,7 +870,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     prayersCountRef.current = prayers.length;
 
     // Use the accurate calculation function to determine current and next prayers
-    let { currentIndex, nextIndex } = calculatePrayersAccurately(prayers);
+    const { currentIndex, nextIndex: initialNextIndex } =
+      calculatePrayersAccurately(prayers);
+    let nextIndex = initialNextIndex;
 
     // Dev: override next highlighted prayer (cycle via Ctrl+Shift+P)
     if (import.meta.env.DEV && typeof window.__NEXT_PRAYER_INDEX === "number") {
@@ -872,6 +880,115 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       if (override >= 0 && override < prayers.length) {
         nextIndex = override;
       }
+    }
+
+    // After Isha the next prayer is tomorrow's Fajr; show next day's list from API data array (data[1])
+    const nowDayjs = dayjs();
+    const ishaPrayer = prayers.find((p) => p.name === "Isha");
+    let ishaTimeToday: dayjs.Dayjs | null = null;
+    if (ishaPrayer?.time) {
+      const [h, m] = ishaPrayer.time.split(":").map(Number);
+      if (!Number.isNaN(h) && !Number.isNaN(m)) {
+        ishaTimeToday = nowDayjs.hour(h).minute(m).second(0).millisecond(0);
+      }
+    }
+    // Show tomorrow's list only when we're after Isha (evening): next Fajr is then the next calendar day
+    const needTomorrowListFromTime =
+      nextIndex === 0 &&
+      prayers[0]?.name === "Fajr" &&
+      ishaTimeToday != null &&
+      nowDayjs.isAfter(ishaTimeToday);
+    const devOverride =
+      import.meta.env.DEV ? window.__SHOW_TOMORROW_LIST : undefined;
+    const needTomorrowList =
+      devOverride === true && !!tomorrowData
+        ? true
+        : devOverride === false
+          ? false
+          : needTomorrowListFromTime;
+
+    if (!needTomorrowList) {
+      setCurrentDate(nowDayjs.format("dddd, MMMM D, YYYY"));
+      setIsJumuahToday(nowDayjs.day() === 5);
+    } else if (needTomorrowList && tomorrowData) {
+      // Build displayed list from tomorrow's day in the API data array (data[1])
+      const prayersFromTomorrow: FormattedPrayerTime[] = [];
+      PRAYER_NAMES.forEach((name) => {
+        const lowerName = name.toLowerCase();
+        const time =
+          typeof tomorrowData === "object" && tomorrowData !== null
+            ? (tomorrowData[lowerName as keyof PrayerTimes] as string) || ""
+            : "";
+        const jamaat =
+          typeof tomorrowData === "object" && tomorrowData !== null
+            ? (() => {
+                const base = (tomorrowData as Record<string, unknown>)[
+                  `${lowerName}Jamaat`
+                ];
+                if (base) return base as string;
+                const d = tomorrowData as Record<string, unknown>;
+                return (d[`${lowerName}_jamaat`] ?? d[`jamaat_${lowerName}`]) as
+                  | string
+                  | undefined;
+              })()
+            : undefined;
+        prayersFromTomorrow.push({
+          name,
+          time,
+          jamaat,
+          displayTime: formatTimeToDisplay(time, timeFormat),
+          displayJamaat: jamaat
+            ? formatTimeToDisplay(jamaat, timeFormat)
+            : undefined,
+          isNext: name === "Fajr",
+          isCurrent: false,
+          timeUntil: "",
+          jamaatTime: jamaat,
+        });
+      });
+      const fajrFromTomorrow = prayersFromTomorrow.find((p) => p.name === "Fajr");
+      if (fajrFromTomorrow) {
+        fajrFromTomorrow.timeUntil = getTimeUntilNextPrayer(
+          fajrFromTomorrow.time,
+          true,
+        );
+        setNextPrayer(fajrFromTomorrow);
+      }
+      setCurrentPrayer(null);
+      setTodaysPrayerTimes(prayersFromTomorrow);
+      setCurrentDate(
+        nowDayjs.add(1, "day").format("dddd, MMMM D, YYYY"),
+      );
+      setIsJumuahToday(nowDayjs.add(1, "day").day() === 5);
+      const tomorrowObj = tomorrowData as Record<string, unknown>;
+      if (nowDayjs.add(1, "day").day() === 5 && tomorrowObj.jummahJamaat) {
+        setJumuahTime((tomorrowObj.jummahJamaat as string) ?? null);
+        setJumuahDisplayTime(
+          formatTimeToDisplay(
+            (tomorrowObj.jummahJamaat as string) ?? "",
+            timeFormat,
+          ),
+        );
+        setJumuahKhutbahTime(
+          tomorrowObj.jummahKhutbah
+            ? formatTimeToDisplay(
+                tomorrowObj.jummahKhutbah as string,
+                timeFormat,
+              )
+            : null,
+        );
+      } else {
+        setJumuahTime(null);
+        setJumuahDisplayTime(null);
+        setJumuahKhutbahTime(null);
+      }
+      setForbiddenPrayer(
+        getCurrentForbiddenWindow(
+          tomorrowData as unknown as PrayerTimes,
+          new Date(),
+        ) ?? null,
+      );
+      return;
     }
 
     // Apply the calculated flags
@@ -1068,6 +1185,15 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       setDevForbiddenOverride(window.__FORBIDDEN_PRAYER_FORCE);
     window.addEventListener(FORBIDDEN_PRAYER_FORCE_EVENT, handler);
     return () => window.removeEventListener(FORBIDDEN_PRAYER_FORCE_EVENT, handler);
+  }, []);
+
+  // Dev: listen for show-tomorrow-list toggle (Ctrl+Shift+T) — re-process so list updates
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const handler = () => processPrayerTimesRef.current?.(true);
+    window.addEventListener(SHOW_TOMORROW_LIST_FORCE_EVENT, handler);
+    return () =>
+      window.removeEventListener(SHOW_TOMORROW_LIST_FORCE_EVENT, handler);
   }, []);
 
   // Dev: listen for cycle highlighted prayer (Ctrl+Shift+P)

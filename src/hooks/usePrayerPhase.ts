@@ -176,6 +176,18 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       return { phase: 'countdown-adhan', prayerName };
     }
 
+    // === At or just past jamaat (0–5 min): in-prayer from nextPrayer's jamaat time ===
+    // Ensures we show in-prayer as soon as we reach jamaat even if currentPrayer hasn't updated.
+    if (jamaatMin >= 0 && now >= jamaatMin) {
+      const minutesSinceJamaat = now - jamaatMin;
+      if (minutesSinceJamaat <= IN_PRAYER_DURATION_MIN) {
+        logger.debug(
+          `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based)`,
+        );
+        return { phase: 'in-prayer', prayerName: nextPrayer.name };
+      }
+    }
+
     // === Adhan has NOT yet passed ===
     if (now < adhanMin) {
       return { phase: 'countdown-adhan', prayerName };
@@ -184,6 +196,14 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     // === Between adhan and jamaat ===
     if (now >= adhanMin && now < jamaatMin) {
       const minutesToJamaat = jamaatMin - now;
+
+      // At or past jamaat (rounding / boundary): show in-prayer, not jamaat-soon
+      if (minutesToJamaat <= 0) {
+        logger.debug(
+          `[PrayerPhase] in-prayer: at or past jamaat (minutesToJamaat=${minutesToJamaat.toFixed(2)})`,
+        );
+        return { phase: 'in-prayer', prayerName };
+      }
 
       if (minutesToJamaat <= JAMAAT_SOON_THRESHOLD_MIN) {
         logger.debug(

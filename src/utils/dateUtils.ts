@@ -339,11 +339,11 @@ export const calculateApproximateHijriDate = (date?: Date): string => {
   const day = targetDate.getDate();
 
   // Calculate Julian Day Number (JDN)
-  let a = Math.floor((14 - month) / 12);
-  let y = year - a;
-  let m = month + 12 * a - 3;
+  const a = Math.floor((14 - month) / 12);
+  const y = year - a;
+  const m = month + 12 * a - 3;
 
-  let jdn =
+  const jdn =
     day +
     Math.floor((153 * m + 2) / 5) +
     365 * y +

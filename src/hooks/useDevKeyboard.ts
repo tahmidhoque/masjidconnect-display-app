@@ -20,6 +20,7 @@
  *   Ctrl + Shift + N  — Advance carousel to next slide immediately
  *   Ctrl + Shift + F  — Toggle forbidden-prayer notice (show fake / auto)
  *   Ctrl + Shift + P  — Cycle highlighted prayer (Fajr → … → Isha → auto)
+ *   Ctrl + Shift + T  — Toggle "show tomorrow's list" (simulate after Isha for testing)
  *   Escape            — Clear current alert
  */
 
@@ -32,7 +33,11 @@ import {
 import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
 import type { PrayerPhase } from './usePrayerPhase';
-import { FORBIDDEN_PRAYER_FORCE_EVENT, NEXT_PRAYER_CYCLE_EVENT } from './usePrayerTimes';
+import {
+  FORBIDDEN_PRAYER_FORCE_EVENT,
+  NEXT_PRAYER_CYCLE_EVENT,
+  SHOW_TOMORROW_LIST_FORCE_EVENT,
+} from './usePrayerTimes';
 import { CAROUSEL_ADVANCE_EVENT } from '../components/display/ContentCarousel';
 import logger from '../utils/logger';
 import dayjs from 'dayjs';
@@ -196,6 +201,7 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+N': 'Advance carousel to next slide',
       'Ctrl+Shift+F': 'Toggle forbidden-prayer notice (show fake / auto)',
       'Ctrl+Shift+P': 'Cycle highlighted prayer (Fajr → … → auto)',
+      'Ctrl+Shift+T': "Toggle show tomorrow's list (simulate after Isha)",
       'Escape': 'Clear current alert',
     });
 
@@ -242,6 +248,23 @@ const useDevKeyboard = (): void => {
         if (e.key === 'P' || e.key === 'p') {
           e.preventDefault();
           window.dispatchEvent(new Event(NEXT_PRAYER_CYCLE_EVENT));
+          return;
+        }
+
+        // Toggle show tomorrow's list (T or t) — simulate "after Isha" for testing without changing system time
+        if (e.key === 'T' || e.key === 't') {
+          e.preventDefault();
+          if (window.__SHOW_TOMORROW_LIST === true) {
+            window.__SHOW_TOMORROW_LIST = false;
+            logger.info('[DevKeyboard] Show tomorrow list: OFF (force today)');
+          } else if (window.__SHOW_TOMORROW_LIST === false) {
+            window.__SHOW_TOMORROW_LIST = undefined;
+            logger.info('[DevKeyboard] Show tomorrow list: auto (from time)');
+          } else {
+            window.__SHOW_TOMORROW_LIST = true;
+            logger.info('[DevKeyboard] Show tomorrow list: ON (force tomorrow)');
+          }
+          window.dispatchEvent(new Event(SHOW_TOMORROW_LIST_FORCE_EVENT));
           return;
         }
 
