@@ -219,6 +219,13 @@ html, body {
   text-align: center;
 }
 
+/* Countdown unit labels (h, m, s) — smaller than numbers so digits stay clear at a distance. */
+.countdown-unit {
+  font-size: 0.65em;
+  vertical-align: baseline;
+  line-height: 1;
+}
+
 /* Shimmer loading placeholder */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }

@@ -93,8 +93,8 @@ const createFallbackSchedule = (): Schedule => ({
   items: [],
 });
 
-// Helper function to normalize schedule data
-const normalizeScheduleData = (schedule: any): Schedule => {
+// Helper function to normalize schedule data (exported for unit tests)
+export const normalizeScheduleData = (schedule: any): Schedule => {
   if (!schedule) return createFallbackSchedule();
 
   try {
@@ -858,7 +858,7 @@ const contentSlice = createSlice({
           state.schedule = action.payload.schedule || null;
           state.lastScheduleUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
-          
+
           logger.info("[ContentSlice] Schedule updated in Redux state", {
             hasSchedule: !!state.schedule,
             scheduleId: state.schedule?.id,

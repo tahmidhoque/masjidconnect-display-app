@@ -15,6 +15,7 @@ import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer } from '../../utils/dateUtils';
 import type { PrayerPhase } from '../../hooks/usePrayerPhase';
+import CountdownDisplay from './CountdownDisplay';
 
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
@@ -158,8 +159,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
         {countdownLabel}
       </p>
       {liveCountdown && (
-        <p className="text-prayer text-gold countdown-stable font-semibold">
-          {liveCountdown}
+        <p className="text-prayer text-gold font-semibold">
+          <CountdownDisplay value={liveCountdown} className="text-prayer text-gold font-semibold" />
         </p>
       )}
     </div>

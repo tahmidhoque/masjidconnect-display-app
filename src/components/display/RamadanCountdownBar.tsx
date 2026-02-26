@@ -28,6 +28,7 @@ import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer, formatTimeToDisplay } from '../../utils/dateUtils';
 import { useSelector } from 'react-redux';
+import CountdownDisplay from './CountdownDisplay';
 import { selectTimeFormat } from '../../store/slices/contentSlice';
 
 interface RamadanCountdownBarProps {
@@ -99,12 +100,10 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
     return { time: nextPrayer.time, forceTomorrow: false };
   }, [nextPrayer, currentTime]);
 
-  /** Prayer-side countdown: show seconds only in the last 5 mins before jamaat (Ramadan mode). */
+  /** Prayer-side countdown: matches main countdown — seconds when under 1 hour. */
   const nextPrayerCountdown = useMemo(() => {
     if (!nextPrayerTarget) return '';
-    return getTimeUntilNextPrayer(nextPrayerTarget.time, nextPrayerTarget.forceTomorrow, {
-      includeSecondsWhenUnderMinutes: 5,
-    });
+    return getTimeUntilNextPrayer(nextPrayerTarget.time, nextPrayerTarget.forceTomorrow);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextPrayerTarget, currentTime]);
 
@@ -160,8 +159,11 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
         </div>
 
         {/* Countdown — use prayer-side countdown so last-5-mins seconds apply */}
-        <p className="text-prayer text-gold font-bold countdown-stable">
-          {nextPrayerCountdown || ramadanCountdown}
+        <p className="text-prayer text-gold font-bold">
+          <CountdownDisplay
+            value={nextPrayerCountdown || ramadanCountdown}
+            className="text-prayer text-gold font-bold"
+          />
         </p>
       </div>
     );
@@ -188,8 +190,8 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           </p>
 
           {ramadanCountdown ? (
-            <h3 className="text-prayer text-gold font-bold countdown-stable">
-              {ramadanCountdown}
+            <h3 className="text-prayer text-gold font-bold">
+              <CountdownDisplay value={ramadanCountdown} className="text-prayer text-gold font-bold" />
             </h3>
           ) : (
             /* Static Suhoor time when there's no active countdown */
@@ -208,8 +210,11 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           </p>
 
           {nextPrayerCountdown && (
-            <p className="text-prayer text-gold font-semibold countdown-stable">
-              {nextPrayerCountdown}
+            <p className="text-prayer text-gold font-semibold">
+              <CountdownDisplay
+                value={nextPrayerCountdown}
+                className="text-prayer text-gold font-semibold"
+              />
             </p>
           )}
         </div>

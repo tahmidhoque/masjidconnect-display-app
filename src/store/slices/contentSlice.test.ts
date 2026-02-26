@@ -11,6 +11,7 @@ import {
   refreshEvents,
   loadCachedContent,
   refreshAllContent,
+  normalizeScheduleData,
 } from './contentSlice';
 import {
   setCarouselTime,
@@ -100,6 +101,40 @@ describe('contentSlice', () => {
       expect(state.isLoadingContent).toBe(false);
       expect(state.contentError).toBe('Network error');
     });
+
+    it('stores schedule from payload when provided (e.g. from content.data.schedule or playlist)', () => {
+      const scheduleWithDua = {
+        id: 's1',
+        name: 'Main',
+        items: [
+          {
+            id: 'dua-1',
+            order: 0,
+            contentItem: {
+              id: 'c1',
+              type: 'DUA',
+              title: 'Dua',
+              content: { arabicText: 'نص', transliteration: 'nun', translation: 'Text' },
+              duration: 25,
+            },
+          },
+        ],
+      };
+      const payload = {
+        content: mockScreenContent as never,
+        masjidName: 'Test Masjid',
+        masjidTimezone: 'Europe/London',
+        carouselTime: 30,
+        timeFormat: '12h' as const,
+        timestamp: new Date().toISOString(),
+        schedule: scheduleWithDua,
+        events: undefined,
+      };
+      const prev = contentReducer(undefined, refreshContent.pending('', {}));
+      const state = contentReducer(prev, refreshContent.fulfilled(payload, '', {}));
+      expect(state.schedule).toEqual(scheduleWithDua);
+      expect(state.schedule?.items[0].contentItem.type).toBe('DUA');
+    });
   });
 
   describe('refreshPrayerTimes', () => {
@@ -162,6 +197,31 @@ describe('contentSlice', () => {
       );
       expect(state.scheduleError).toBe('Failed');
     });
+
+    it('stores schedule with DUA items when fulfilled', () => {
+      const scheduleWithDua = {
+        id: 's1',
+        name: 'Main',
+        items: [
+          {
+            id: 'i1',
+            order: 0,
+            contentItem: {
+              id: 'c1',
+              type: 'DUA',
+              title: 'Dua for guidance',
+              content: { arabicText: 'اَهْدِنَا', transliteration: 'Ihdina', translation: 'Guide us' },
+              duration: 30,
+            },
+          },
+        ],
+      };
+      const payload = { schedule: scheduleWithDua, timestamp: new Date().toISOString() };
+      const prev = contentReducer(undefined, refreshSchedule.pending('', {}));
+      const state = contentReducer(prev, refreshSchedule.fulfilled(payload, '', {}));
+      expect(state.schedule).toEqual(scheduleWithDua);
+      expect(state.schedule?.items[0].contentItem.type).toBe('DUA');
+    });
   });
 
   describe('refreshEvents', () => {
@@ -222,6 +282,75 @@ describe('contentSlice', () => {
         refreshAllContent.rejected(null, '', {}, 'Refresh failed'),
       );
       expect(state.isLoading).toBe(false);
+    });
+  });
+
+  describe('normalizeScheduleData', () => {
+    it('normalises flattened schedule with DUA item (type, content with arabicText, transliteration, translation)', () => {
+      const raw = {
+        id: 's1',
+        name: 'Main',
+        items: [
+          {
+            id: 'dua-1',
+            order: 0,
+            type: 'DUA',
+            title: 'Dua for guidance',
+            content: {
+              arabicText: 'اَهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ',
+              transliteration: 'Ihdina as-sirata al-mustaqim',
+              translation: 'Guide us to the straight path',
+              reference: 'Surah Al-Fatiha',
+            },
+            duration: 25,
+          },
+        ],
+      };
+      const result = normalizeScheduleData(raw);
+      expect(result.id).toBe('s1');
+      expect(result.items).toHaveLength(1);
+      const item = result.items[0];
+      expect(item.contentItem.type).toBe('DUA');
+      expect(item.contentItem.title).toBe('Dua for guidance');
+      expect(item.contentItem.content).toEqual(raw.items[0].content);
+      expect(item.contentItem.duration).toBe(25);
+    });
+
+    it('skips malformed items that throw and keeps valid ones (per-item resilience)', () => {
+      const badItem = { id: 'bad', order: 1 };
+      Object.defineProperty(badItem, 'contentItem', {
+        get() {
+          throw new Error('Invalid contentItem');
+        },
+        configurable: true,
+      });
+      const raw = {
+        id: 's1',
+        name: 'Main',
+        items: [
+          { id: 'valid-1', order: 0, type: 'CUSTOM', title: 'Valid', content: {}, duration: 30 },
+          badItem,
+          { id: 'valid-2', order: 2, type: 'DUA', title: 'Dua', content: { arabicText: 'نص' }, duration: 20 },
+        ],
+      };
+      const result = normalizeScheduleData(raw);
+      expect(result.items).toHaveLength(2);
+      const ids = result.items.map((i) => (i as { id?: string; contentItem?: { id?: string } }).contentItem?.id ?? (i as { id?: string }).id);
+      expect(ids).toContain('valid-1-content');
+      expect(ids).toContain('valid-2-content');
+    });
+
+    it('accepts schedule when items are under data array', () => {
+      const raw = {
+        id: 's1',
+        name: 'Main',
+        data: [
+          { id: 'd1', order: 0, type: 'CUSTOM', title: 'Item', content: {}, duration: 30 },
+        ],
+      };
+      const result = normalizeScheduleData(raw);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].contentItem.type).toBe('CUSTOM');
     });
   });
 

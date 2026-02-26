@@ -65,8 +65,9 @@ function resolveItemDuration(item: any, content: any): number | undefined {
  * Normalized items have type, title, content (with body/description/arabicText/source/imageUrl).
  * Raw items may have a contentItem wrapper — we read from both top-level and contentItem.
  * Supports common API shapes: body, description, message, text, and string content.
+ * Exported for unit tests (DUA and other type mapping).
  */
-function scheduleItemToCarouselItems(item: any, index: number): CarouselItem[] {
+export function scheduleItemToCarouselItems(item: any, index: number): CarouselItem[] {
   const content = item.content ?? item.contentItem?.content ?? {};
   const type = item.type ?? item.contentItem?.type ?? 'Content';
   const isAsmaAlHusna =
@@ -281,8 +282,6 @@ const DisplayScreen: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
   const schedule = useSelector((s: RootState) => s.content.schedule);
   const events = useSelector((s: RootState) => s.content.events);
-  const lastScheduleUpdate = useSelector((s: RootState) => s.content.lastScheduleUpdate);
-
   /* Dev-mode orientation override (Ctrl+Shift+O) */
   const [orientationOverride, setOrientationOverride] = useState<
     'LANDSCAPE' | 'PORTRAIT' | undefined
@@ -370,6 +369,12 @@ const DisplayScreen: React.FC = () => {
    *   in-prayer   — calm "Jamaat in progress" screen
    *   otherwise   — normal content carousel
    */
+  /** Key from schedule content so we only remount when schedule/items actually change.
+   *  Using lastScheduleUpdate caused multiple remounts when both refreshContent and
+   *  refreshSchedule set lastScheduleUpdate to different timestamps. */
+  const carouselKey = schedule
+    ? `${schedule.id}-${schedule.items?.length ?? 0}-${schedule.items?.[0]?.id ?? 'e0'}`
+    : 'no-schedule';
   const contentSlot = useMemo(() => {
     switch (prayerPhase) {
       case 'jamaat-soon':
@@ -379,13 +384,13 @@ const DisplayScreen: React.FC = () => {
       default:
         return (
           <ContentCarousel
-            key={lastScheduleUpdate ?? schedule?.id ?? 'default'}
+            key={carouselKey}
             items={carouselItems}
             interval={carouselInterval}
           />
         );
     }
-  }, [prayerPhase, phasePrayerName, carouselItems, carouselInterval, lastScheduleUpdate, schedule?.id]);
+  }, [prayerPhase, phasePrayerName, carouselItems, carouselInterval, carouselKey]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
