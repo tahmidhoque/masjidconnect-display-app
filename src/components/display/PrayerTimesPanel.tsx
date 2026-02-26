@@ -174,7 +174,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
 
       {/* Legend — distinct block so row highlight never bleeds; border sits below last row */}
       <div
-        className={`${ROW_GRID_CLASS} shrink-0 gap-2 px-3 pt-2 border-t border-white/10 bg-midnight/90 ${
+        className={`${ROW_GRID_CLASS} shrink-0 gap-2 px-3 pt-2 border-t border-white/10 ${
           compact ? 'mt-0.5' : 'mt-4'
         }`}
       >
