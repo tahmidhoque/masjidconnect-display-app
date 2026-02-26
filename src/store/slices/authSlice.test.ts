@@ -107,6 +107,9 @@ describe('authSlice', () => {
           apiKey: 'key',
           masjidId: 'mid',
         },
+        masjidName: 'Test Masjid',
+        screenName: 'Screen 1',
+        orientation: 'LANDSCAPE',
       };
       const prev = authReducer(undefined, checkPairingStatus.pending('', 'CODE'));
       const state = authReducer(prev, checkPairingStatus.fulfilled(payload, '', 'CODE'));
@@ -220,6 +223,9 @@ describe('authSlice', () => {
           {
             isPaired: true,
             credentials: { screenId: 's', apiKey: 'k', masjidId: 'm' },
+            masjidName: 'Masjid',
+            screenName: 'Screen',
+            orientation: 'LANDSCAPE',
           },
           '',
           'CODE',

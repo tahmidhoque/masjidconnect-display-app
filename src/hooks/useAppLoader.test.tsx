@@ -72,7 +72,11 @@ describe('useAppLoader', () => {
     });
     const preloaded = store.getState();
     const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(AllTheProviders, { preloadedState: preloaded }, children);
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
     const { result } = renderHook(() => useAppLoader(), { wrapper });
     await waitFor(
       () => {

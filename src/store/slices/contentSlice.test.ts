@@ -20,11 +20,13 @@ import {
   setIsPrayerJamaat,
   clearAllErrors,
 } from './contentSlice';
+import type { PrayerTimes } from '@/api/models';
 import { mockScreenContent, mockPrayerTimesArray } from '@/test-utils/mocks';
 
 /** Minimal prayer times shape for reducer payloads */
 const minimalPrayerTimes = {
   ...mockPrayerTimesArray[0],
+  zuhr: (mockPrayerTimesArray[0] as { dhuhr?: string }).dhuhr ?? '12:15',
   fajrJamaat: '05:45',
   zuhrJamaat: '12:30',
   asrJamaat: '16:00',
@@ -118,7 +120,14 @@ describe('contentSlice', () => {
         timestamp: new Date().toISOString(),
       };
       const prev = contentReducer(undefined, refreshPrayerTimes.pending('', {}));
-      const state = contentReducer(prev, refreshPrayerTimes.fulfilled(payload, '', {}));
+      const state = contentReducer(
+        prev,
+        refreshPrayerTimes.fulfilled(
+          payload as unknown as { prayerTimes: PrayerTimes; timestamp: string },
+          '',
+          {},
+        ),
+      );
       expect(state.prayerTimes).toEqual(minimalPrayerTimes);
     });
 
@@ -134,7 +143,7 @@ describe('contentSlice', () => {
 
   describe('refreshSchedule', () => {
     it('sets schedule on fulfilled', () => {
-      const schedule = { id: 's1', items: [] };
+      const schedule = { id: 's1', name: 'Main', items: [] };
       const payload = {
         schedule,
         timestamp: new Date().toISOString(),
@@ -171,7 +180,7 @@ describe('contentSlice', () => {
   describe('loadCachedContent', () => {
     it('populates state from cached payload', () => {
       const payload = {
-        schedule: { id: 's1', items: [] } as never,
+        schedule: { id: 's1', name: 'Main', items: [] } as never,
         events: [] as never[],
         prayerTimes: minimalPrayerTimes,
         screenContent: mockScreenContent as never,
@@ -198,7 +207,7 @@ describe('contentSlice', () => {
     it('sets lastUpdated and clears loading on fulfilled', () => {
       const payload = {
         timestamp: new Date().toISOString(),
-        results: ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled'] as const,
+        results: ['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled'] as ('fulfilled' | 'rejected')[],
       };
       const prev = contentReducer(undefined, refreshAllContent.pending('', {}));
       const state = contentReducer(prev, refreshAllContent.fulfilled(payload, '', {}));

@@ -19,7 +19,11 @@ describe('Emergency overlay flow', () => {
   it('shows overlay when currentAlert is set and hides when cleared', async () => {
     const store = createTestStore();
     const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(Provider, { store }, children);
+      React.createElement(
+        Provider,
+        { store } as React.ComponentProps<typeof Provider>,
+        children,
+      );
 
     render(React.createElement(EmergencyAlertOverlay), { wrapper });
     expect(screen.queryByText(mockEmergencyAlert.title)).not.toBeInTheDocument();

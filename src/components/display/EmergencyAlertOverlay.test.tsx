@@ -18,7 +18,11 @@ describe('EmergencyAlertOverlay', () => {
   it('renders nothing when no current alert', () => {
     const store = createTestStore();
     const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(AllTheProviders, { preloadedState: store.getState() }, children);
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: store.getState() } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
     render(React.createElement(EmergencyAlertOverlay), { wrapper });
     expect(screen.queryByText(mockEmergencyAlert.title)).not.toBeInTheDocument();
   });
@@ -27,7 +31,11 @@ describe('EmergencyAlertOverlay', () => {
     const store = createTestStore();
     store.dispatch(setCurrentAlert(mockEmergencyAlert));
     const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(AllTheProviders, { preloadedState: store.getState() }, children);
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: store.getState() } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
     render(React.createElement(EmergencyAlertOverlay), { wrapper });
     expect(screen.getByText(mockEmergencyAlert.title)).toBeInTheDocument();
     expect(screen.getByText(mockEmergencyAlert.message)).toBeInTheDocument();

@@ -23,7 +23,8 @@ const mockClearAlert = vi.fn();
 
 vi.mock('@/services/realtimeService', () => ({
   default: {
-    on: (...args: unknown[]) => mockOn(...args),
+    on: (event: string, handler: () => void) =>
+      (mockOn as (e: string, h: () => void) => (() => void))(event, handler),
     connect: () => mockConnect(),
     disconnect: () => mockDisconnect(),
   },

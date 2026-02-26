@@ -12,7 +12,7 @@ describe('OrientationWrapper', () => {
     render(
       React.createElement(
         OrientationWrapper,
-        { rotationDegrees: 0 },
+        { rotationDegrees: 0 } as React.ComponentProps<typeof OrientationWrapper>,
         React.createElement('span', null, 'Child content'),
       ),
     );
@@ -23,7 +23,7 @@ describe('OrientationWrapper', () => {
     const { container } = render(
       React.createElement(
         OrientationWrapper,
-        { rotationDegrees: 90 },
+        { rotationDegrees: 90 } as React.ComponentProps<typeof OrientationWrapper>,
         React.createElement('span', null, 'Portrait'),
       ),
     );

@@ -44,7 +44,7 @@ describe('getForbiddenPrayerWindows', () => {
 
   it('skips windows when times missing', () => {
     const partial = { ...mockPrayerTimes, sunrise: undefined };
-    const windows = getForbiddenPrayerWindows(partial as PrayerTimes);
+    const windows = getForbiddenPrayerWindows(partial as unknown as PrayerTimes);
     expect(windows.length).toBeLessThan(3);
   });
 });

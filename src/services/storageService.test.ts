@@ -23,11 +23,11 @@ const mockKeys = vi.fn(() => Promise.resolve([...mockStore.keys()]));
 
 vi.mock('localforage', () => ({
   default: {
-    getItem: (...args: unknown[]) => mockGetItem(...args),
-    setItem: (...args: unknown[]) => mockSetItem(...args),
-    removeItem: (...args: unknown[]) => mockRemoveItem(...args),
-    clear: (...args: unknown[]) => mockClear(...args),
-    keys: (...args: unknown[]) => mockKeys(...args),
+    getItem: (key: string) => mockGetItem(key),
+    setItem: (key: string, value: unknown) => mockSetItem(key, value),
+    removeItem: (key: string) => mockRemoveItem(key),
+    clear: () => mockClear(),
+    keys: () => mockKeys(),
     config: vi.fn(),
   },
   INDEXEDDB: 'asyncStorage',

@@ -15,6 +15,7 @@ vi.mock('@/utils/logger', () => ({
 
 const minimalPrayerTimes = {
   ...mockPrayerTimesArray[0],
+  zuhr: (mockPrayerTimesArray[0] as { dhuhr?: string }).dhuhr ?? '12:15',
   fajrJamaat: '05:45',
   zuhrJamaat: '12:30',
   asrJamaat: '16:00',
@@ -35,7 +36,11 @@ describe('usePrayerTimes', () => {
     });
     const preloaded = storeWithPrayers.getState();
     const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(AllTheProviders, { preloadedState: preloaded }, children);
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
     const { result } = renderHook(() => usePrayerTimes(), { wrapper });
     await waitFor(() => {
       expect(result.current).toHaveProperty('todaysPrayerTimes');
@@ -52,7 +57,11 @@ describe('usePrayerTimes', () => {
 
   it('returns empty arrays when no prayer times in store', async () => {
     const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(AllTheProviders, null, children);
+      React.createElement(
+        AllTheProviders,
+        {} as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
     const { result } = renderHook(() => usePrayerTimes(), { wrapper });
     await act(async () => {
       await Promise.resolve();

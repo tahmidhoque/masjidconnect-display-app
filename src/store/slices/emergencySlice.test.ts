@@ -123,7 +123,11 @@ describe('emergencySlice', () => {
     it('fulfilled sets connection state', () => {
       const state = emergencyReducer(
         undefined,
-        connectToEmergencyService.fulfilled(undefined, '', undefined),
+        connectToEmergencyService.fulfilled(
+        { timestamp: new Date().toISOString() },
+        '',
+        undefined,
+      ),
       );
       expect(state).toBeDefined();
     });

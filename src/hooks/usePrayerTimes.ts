@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PrayerTimes, TimeFormat } from "../api/models";
+import { PrayerTimes } from "../api/models";
+import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
 import { refreshPrayerTimes, selectTimeFormat } from "../store/slices/contentSlice";
@@ -763,7 +764,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     let currentPrayerName = "";
 
     // API returns { data: [ day0, day1, ... ] } with 5 days; use index 0 for today, 1 for tomorrow (after Isha)
-    let tomorrowData: typeof todayData = null;
+    let tomorrowData: PrayerTimes | null = null;
     if (
       prayerTimes &&
       prayerTimes.data &&
@@ -922,11 +923,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         const jamaat =
           typeof tomorrowData === "object" && tomorrowData !== null
             ? (() => {
-                const base = (tomorrowData as Record<string, unknown>)[
+                const base = (tomorrowData as unknown as Record<string, unknown>)[
                   `${lowerName}Jamaat`
                 ];
                 if (base) return base as string;
-                const d = tomorrowData as Record<string, unknown>;
+                const d = tomorrowData as unknown as Record<string, unknown>;
                 return (d[`${lowerName}_jamaat`] ?? d[`jamaat_${lowerName}`]) as
                   | string
                   | undefined;
@@ -960,7 +961,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         nowDayjs.add(1, "day").format("dddd, MMMM D, YYYY"),
       );
       setIsJumuahToday(nowDayjs.add(1, "day").day() === 5);
-      const tomorrowObj = tomorrowData as Record<string, unknown>;
+      const tomorrowObj = tomorrowData as unknown as Record<string, unknown>;
       if (nowDayjs.add(1, "day").day() === 5 && tomorrowObj.jummahJamaat) {
         setJumuahTime((tomorrowObj.jummahJamaat as string) ?? null);
         setJumuahDisplayTime(
