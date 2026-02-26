@@ -53,7 +53,7 @@ function checkGitClean() {
 function runTests() {
   console.log("Running tests...");
   try {
-    execSync("npm test -- --watchAll=false --passWithNoTests", {
+    execSync("npm test", {
       stdio: "inherit",
       cwd: path.join(__dirname, ".."),
     });
