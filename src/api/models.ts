@@ -314,7 +314,17 @@ export type ContentItemType =
   | "ANNOUNCEMENT"
   | "EVENT"
   | "CUSTOM"
-  | "ASMA_AL_HUSNA";
+  | "ASMA_AL_HUSNA"
+  | "DUA";
+
+/** Content payload when ContentItem.type is "DUA". */
+export interface DuaContent {
+  arabicText?: string;
+  transliteration?: string;
+  translation?: string;
+  reference?: string;
+  source?: string;
+}
 
 export interface ContentItem {
   id: string;

@@ -106,6 +106,32 @@ function scheduleItemToCarouselItems(item: any, index: number): CarouselItem[] {
     }
   }
 
+  // --- DUA: supplication with Arabic, transliteration, translation, reference ---
+  const isDua = typeof type === 'string' && type.toUpperCase() === 'DUA';
+  if (isDua) {
+    const contentObj = typeof content === 'object' && content !== null ? content : {};
+    const optStr = (v: unknown): string | undefined =>
+      (typeof v === 'string' && v.trim() !== '' ? v : undefined);
+    const arabicBody = optStr(contentObj.arabicText ?? contentObj.arabic);
+    const transliteration = optStr(contentObj.transliteration ?? contentObj.latin);
+    const body = optStr(contentObj.translation ?? contentObj.english ?? contentObj.text);
+    const source = optStr(contentObj.reference ?? contentObj.source);
+    const rawTitle =
+      item.title ?? item.contentItem?.title ?? contentObj.title;
+    const title =
+      rawTitle && rawTitle !== 'No Title' ? rawTitle : (rawTitle ?? 'No Title');
+    return [{
+      id: item.id ?? `sched-${index}`,
+      type: 'DUA',
+      title: typeof title === 'string' ? title : undefined,
+      body,
+      arabicBody,
+      transliteration,
+      source,
+      duration: resolveItemDuration(item, contentObj),
+    }];
+  }
+
   // --- Single-item fallback (all other types, or ASMA_AL_HUSNA without a names array) ---
 
   // Title: for Asma ul Husna with a flat single-name payload, prefer meaning as heading
