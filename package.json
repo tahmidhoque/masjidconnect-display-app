@@ -1,6 +1,6 @@
 {
   "name": "masjidconnect-display-app",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "MasjidConnect Display App - Lightweight digital signage for mosques",
