@@ -68,6 +68,21 @@ function resolveItemDuration(item: any, content: any): number | undefined {
  * Exported for unit tests (DUA and other type mapping).
  */
 export function scheduleItemToCarouselItems(item: any, index: number): CarouselItem[] {
+  // Events V2: schedule item carries the full event object — render via EventSlide
+  if (item.eventId && item.event && typeof item.event.startAt === 'string') {
+    const evt = item.event as import('../../api/models').EventV2;
+    const isFeatured = evt.featuredEvent === true || (typeof evt.displayPriority === 'number' && evt.displayPriority >= 8);
+    const baseDuration = evt.displayDuration > 0 ? evt.displayDuration : (item.duration ?? 20);
+    const duration = isFeatured ? Math.round(baseDuration * 1.5) : baseDuration;
+    return [{
+      id: item.id ?? `sched-${index}`,
+      type: 'EVENT',
+      title: evt.title,
+      duration,
+      event: evt,
+    }];
+  }
+
   const content = item.content ?? item.contentItem?.content ?? {};
   const type = item.type ?? item.contentItem?.type ?? 'Content';
   const isAsmaAlHusna =
@@ -198,6 +213,8 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
 
 /**
  * Map a single event (from events array) to a CarouselItem.
+ * When the object conforms to the EventV2 shape (has `startAt` field), the full
+ * event object is attached so the carousel can render a rich EventSlide.
  */
 function eventToCarouselItem(evt: any, index: number): CarouselItem {
   const desc =
@@ -213,14 +230,21 @@ function eventToCarouselItem(evt: any, index: number): CarouselItem {
     (evt.content && typeof evt.content === 'object'
       ? evt.content.imageUrl ?? evt.content.bannerUrl
       : undefined);
-  // Duration: display time in seconds (API may send displayDuration or duration)
+
+  // Duration: apply 1.5× multiplier for featured / high-priority events
   const rawDuration = evt.displayDuration ?? evt.duration ?? (evt.content && typeof evt.content === 'object' ? (evt.content as any).duration : undefined);
-  const duration =
+  let duration: number | undefined =
     typeof rawDuration === 'number' && rawDuration > 0
-      ? rawDuration <= 300
-        ? rawDuration
-        : rawDuration / 1000
+      ? rawDuration <= 300 ? rawDuration : rawDuration / 1000
       : undefined;
+
+  const isFeatured = evt.featuredEvent === true || (typeof evt.displayPriority === 'number' && evt.displayPriority >= 8);
+  if (isFeatured && duration !== undefined) {
+    duration = Math.round(duration * 1.5);
+  }
+
+  // Attach the full EventV2 object when the response includes the V2 fields
+  const isV2 = typeof evt.startAt === 'string';
 
   return {
     id: evt.id ?? `evt-${index}`,
@@ -229,6 +253,7 @@ function eventToCarouselItem(evt: any, index: number): CarouselItem {
     body: typeof desc === 'string' ? desc : undefined,
     imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
     duration,
+    event: isV2 ? (evt as import('../../api/models').EventV2) : undefined,
   };
 }
 
@@ -262,18 +287,9 @@ function buildCarouselItems(
     }
   }
 
-  // Prefer events from state when available
-  let eventsList: any[] = [];
-  if (Array.isArray(events) && events.length > 0) {
-    eventsList = events;
-  } else {
-    const rawEvents = screenContent?.events ?? screenContent?.data?.events;
-    eventsList = Array.isArray(rawEvents) ? rawEvents : (rawEvents as any)?.data ?? [];
-  }
-  eventsList.forEach((evt, i) => {
-    if (!evt) return;
-    items.push(eventToCarouselItem(evt, items.length));
-  });
+  // data.events[] is intentionally NOT added here.
+  // The PRD specifies data.schedule.items[] as the sole source for the carousel.
+  // data.events[] is supplementary (sidebar widget, future use) — not carousel content.
 
   return items;
 }
@@ -387,6 +403,7 @@ const DisplayScreen: React.FC = () => {
             key={carouselKey}
             items={carouselItems}
             interval={carouselInterval}
+            compact={isPortrait}
           />
         );
     }
