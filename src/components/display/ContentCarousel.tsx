@@ -13,7 +13,9 @@
  * Falls back to 30s if not specified.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+
+const EventSlide = lazy(() => import('./EventSlide'));
 
 /** Custom event fired by the dev keyboard shortcut (Ctrl+Shift+N) to skip to the next slide instantly. */
 export const CAROUSEL_ADVANCE_EVENT = 'carousel-advance';
@@ -44,12 +46,19 @@ export interface CarouselItem {
    * The carousel picks one at random each time this slide becomes active.
    */
   names?: AsmaName[];
+  /**
+   * Full Events V2 object. When present, the carousel renders an EventSlide
+   * instead of the generic text layout.
+   */
+  event?: import('../../api/models').EventV2;
 }
 
 interface ContentCarouselProps {
   items: CarouselItem[];
   /** Cycle interval in seconds (default 30) */
   interval?: number;
+  /** True when rendered inside a portrait layout — forwarded to EventSlide */
+  compact?: boolean;
 }
 
 /**
@@ -78,7 +87,7 @@ function getContentTypeLabel(type: string): string {
   return labels[type.toLowerCase()] ?? type;
 }
 
-const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 }) => {
+const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30, compact = false }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const [contentScale, setContentScale] = useState(1);
@@ -210,6 +219,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
   }
 
   const item = safeItems[activeIdx] ?? safeItems[0];
+  const isEventSlide = !!item.event;
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
   // from the randomly selected entry rather than from the item-level fields.
@@ -236,58 +246,67 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30 
             ${phase === 'in' ? 'animate-fade-in' : 'animate-fade-out'}
           `}
         >
-          {/* Content wrapper — no width set so layout slot is consistent across slides; gap-4 for section separation */}
+          {/* Scaled content wrapper — applies to all slide types including EventSlide */}
           <div
-            ref={contentRef}
+            ref={isEventSlide ? undefined : contentRef}
             className="flex flex-col gap-4 min-w-0 flex-shrink-0 w-full max-w-full"
-            style={{
+            style={isEventSlide ? undefined : {
               transform: `scale(${contentScale})`,
               transformOrigin: 'center center',
             }}
           >
-            {/* Type badge — Dua uses distinct blue badge */}
-            <span
-              className={`badge self-start ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
-            >
-              {getContentTypeLabel(item.type)}
-            </span>
+            {isEventSlide && item.event ? (
+              /* Events V2 — rich slide; inherits carousel's transparent background */
+              <Suspense fallback={null}>
+                <EventSlide event={item.event} compact={compact} />
+              </Suspense>
+            ) : (
+              <>
+                {/* Type badge — Dua uses distinct blue badge */}
+                <span
+                  className={`badge self-start ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
+                >
+                  {getContentTypeLabel(item.type)}
+                </span>
 
-            {/* Image — constrained so it doesn't overflow; rem-based to match 720p scaling */}
-            {item.imageUrl && (
-              <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
-                <img
-                  src={item.imageUrl}
-                  alt=""
-                  className="max-w-full max-h-full object-contain rounded-lg"
-                />
-              </div>
-            )}
+                {/* Image — constrained so it doesn't overflow; rem-based to match 720p scaling */}
+                {item.imageUrl && (
+                  <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
+                    <img
+                      src={item.imageUrl}
+                      alt=""
+                      className="max-w-full max-h-full object-contain rounded-lg"
+                    />
+                  </div>
+                )}
 
-            {/* Title — scaled to match display readability */}
-            {displayTitle && (
-              <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>
-            )}
+                {/* Title — scaled to match display readability */}
+                {displayTitle && (
+                  <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>
+                )}
 
-            {/* Arabic text — larger for prominence (verse/hadith, Dua, Asma al Husna) */}
-            {displayArabic && (
-              <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
-            )}
+                {/* Arabic text — larger for prominence (verse/hadith, Dua, Asma al Husna) */}
+                {displayArabic && (
+                  <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
+                )}
 
-            {/* Transliteration — LTR (Dua and any type with transliteration) */}
-            {item.transliteration && (
-              <p className="text-carousel-body text-text-secondary leading-relaxed" dir="ltr">
-                {item.transliteration}
-              </p>
-            )}
+                {/* Transliteration — LTR (Dua and any type with transliteration) */}
+                {item.transliteration && (
+                  <p className="text-carousel-body text-text-secondary leading-relaxed" dir="ltr">
+                    {item.transliteration}
+                  </p>
+                )}
 
-            {/* English body / translation — larger for readability from a distance */}
-            {displayBody && (
-              <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
-            )}
+                {/* English body / translation — larger for readability from a distance */}
+                {displayBody && (
+                  <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
+                )}
 
-            {/* Source — slightly smaller than body but still legible */}
-            {displaySource && (
-              <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
+                {/* Source — slightly smaller than body but still legible */}
+                {displaySource && (
+                  <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
+                )}
+              </>
             )}
           </div>
         </div>

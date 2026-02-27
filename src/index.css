@@ -414,6 +414,12 @@ html, body {
 .emergency-message {
   font-size: 2.2vw;
   line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+/* Portrait: slightly smaller message text so more fits without truncation */
+.emergency-message--portrait {
+  font-size: 1.75vw;
 }
 
 .emergency-countdown {

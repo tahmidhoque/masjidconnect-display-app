@@ -176,14 +176,24 @@ interface AlertContentProps {
   alert: EmergencyAlert;
   isExiting: boolean;
   remainingMs: number;
+  /** When 90 or 270, layout is portrait — message uses more lines and slightly smaller text. */
+  rotationDegrees: RotationDegrees;
 }
 
-const AlertContent: React.FC<AlertContentProps> = ({ alert, isExiting, remainingMs }) => {
+const AlertContent: React.FC<AlertContentProps> = ({
+  alert,
+  isExiting,
+  remainingMs,
+  rotationDegrees,
+}) => {
   const bgColor     = getAlertBackgroundColor(alert);
   const textColor   = getTextColor(bgColor);
   const urgencyClass = getUrgencyClass(alert.urgency);
   const meta        = getCategoryMeta(alert.category);
   const titleWeight = getTitleWeight(alert.urgency);
+
+  const isPortrait = rotationDegrees === 90 || rotationDegrees === 270;
+  const messageLineClamp = isPortrait ? 12 : 5;
 
   const overlayClasses = [
     'emergency-overlay',
@@ -233,10 +243,10 @@ const AlertContent: React.FC<AlertContentProps> = ({ alert, isExiting, remaining
         </h1>
 
         <p
-          className="emergency-message"
+          className={`emergency-message ${isPortrait ? 'emergency-message--portrait' : ''}`}
           style={{
             display: '-webkit-box',
-            WebkitLineClamp: 5,
+            WebkitLineClamp: messageLineClamp,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             maxWidth: '80vw',
@@ -375,6 +385,7 @@ const EmergencyAlertOverlay: React.FC = () => {
       alert={displayAlert}
       isExiting={isExiting}
       remainingMs={remainingMs}
+      rotationDegrees={rotationDegrees}
     />
   );
 

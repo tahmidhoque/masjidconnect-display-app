@@ -3,12 +3,16 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat"; // For parsing specific formats like 'h:mm A'
 import duration from "dayjs/plugin/duration"; // For diff calculations
 import relativeTime from "dayjs/plugin/relativeTime"; // For human-readable durations
+import utc from "dayjs/plugin/utc"; // UTC parsing
+import timezone from "dayjs/plugin/timezone"; // IANA timezone formatting
 import { TimeFormat } from "../api/models";
 import logger from "./logger";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 /**
  * Format a 24-hour time string to 12-hour format with AM/PM

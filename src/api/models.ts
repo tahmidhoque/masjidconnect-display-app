@@ -471,16 +471,74 @@ export interface PrayerStatus {
   error?: null | string; // New API response format
 }
 
-// Event Types
-export interface Event {
+// Event Types — Events V2
+
+export type EventType =
+  | 'PRAYER'
+  | 'PROGRAM'
+  | 'FUNDRAISER'
+  | 'SOCIAL'
+  | 'COMMUNITY'
+  | 'YOUTH'
+  | 'WOMEN'
+  | 'COURSE'
+  | 'WORKSHOP'
+  | 'CONFERENCE'
+  | 'VOLUNTEER'
+  | 'COMMITTEE'
+  | 'BOARD'
+  | 'OTHER';
+
+export type EventCategory =
+  | 'GENERAL'
+  | 'COMMUNITY'
+  | 'RELIGIOUS'
+  | 'EDUCATIONAL'
+  | 'SOCIAL'
+  | 'FUNDRAISING'
+  | 'YOUTH'
+  | 'FAMILY'
+  | 'HEALTH'
+  | 'INTERFAITH'
+  | 'CULTURAL'
+  | 'BUSINESS'
+  | 'SEASONAL';
+
+export interface EventV2 {
   id: string;
+  slug: string | null;
   title: string;
-  description: string;
-  location: string;
-  startDate: string; // ISO date string
-  endDate: string; // ISO date string
-  category: string;
+  description: string | null;
+  shortDescription: string | null;
+  type: EventType;
+  category: EventCategory;
+  status: string;
+  startAt: string;
+  endAt: string;
+  allDay: boolean;
+  timezone: string;
+  venue: string | null;
+  isVirtual: boolean;
+  isHybrid: boolean;
+  virtualUrl: string | null;
+  bannerImageUrl: string | null;
+  thumbnailImageUrl: string | null;
+  displayThumbnail: string | null;
+  color: string | null;
+  capacityTotal: number | null;
+  registeredCount: number;
+  isRegistrationOpen: boolean;
+  registrationStartAt: string | null;
+  registrationEndAt: string | null;
+  registrationUrl: string | null;
+  displayDuration: number;
+  displayPriority: number;
+  featuredEvent: boolean;
+  tags: string[];
 }
+
+/** Backward-compatible alias — EventV2 is now the canonical event type. */
+export type Event = EventV2;
 
 export interface EventsResponse {
   events: Event[];
