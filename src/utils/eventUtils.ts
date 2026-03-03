@@ -136,6 +136,29 @@ export function getEventLocation(event: EventV2): string | null {
   return event.venue || null;
 }
 
+/**
+ * Extract the event body/description text from various API shapes.
+ * The backend may return description in different formats (camelCase,
+ * snake_case, nested under content). Prefer shortDescription when both exist.
+ */
+export function getEventDescription(event: EventV2): string | null {
+  const evt = event as unknown as Record<string, unknown>;
+  const opt = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+
+  return (
+    opt(evt.shortDescription) ??
+    opt(evt.description) ??
+    opt(evt.short_description) ??
+    opt(evt.body) ??
+    (evt.content && typeof evt.content === "object" && evt.content !== null
+      ? opt((evt.content as Record<string, unknown>).shortDescription) ??
+        opt((evt.content as Record<string, unknown>).description) ??
+        opt((evt.content as Record<string, unknown>).body)
+      : null)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Date / time formatting
 // ---------------------------------------------------------------------------

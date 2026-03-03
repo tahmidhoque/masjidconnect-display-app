@@ -15,6 +15,7 @@ import {
   convertTo24Hour,
   getNextPrayerTime,
   getTimeUntilNextPrayer,
+  toMinutesFromMidnight,
   calculateApproximateHijriDate,
   fetchHijriDate,
 } from './dateUtils';
@@ -96,6 +97,31 @@ describe('parseTimeString', () => {
   it('returns empty Date for invalid string', () => {
     const result = parseTimeString('invalid');
     expect(result).toBeInstanceOf(Date);
+  });
+});
+
+describe('toMinutesFromMidnight', () => {
+  it('parses 24h format to minutes', () => {
+    expect(toMinutesFromMidnight('12:05')).toBe(12 * 60 + 5);
+    expect(toMinutesFromMidnight('19:45')).toBe(19 * 60 + 45);
+    expect(toMinutesFromMidnight('00:00')).toBe(0);
+  });
+
+  it('treats Maghrib/Isha 12h format as PM (1–11 → add 12h)', () => {
+    expect(toMinutesFromMidnight('7:45', 'Maghrib')).toBe(19 * 60 + 45);
+    expect(toMinutesFromMidnight('7:45', 'Isha')).toBe(19 * 60 + 45);
+    expect(toMinutesFromMidnight('9:30', 'Maghrib')).toBe(21 * 60 + 30);
+  });
+
+  it('does not add 12h for non-evening prayers', () => {
+    expect(toMinutesFromMidnight('7:45', 'Zuhr')).toBe(7 * 60 + 45);
+    expect(toMinutesFromMidnight('7:45', 'Fajr')).toBe(7 * 60 + 45);
+  });
+
+  it('returns -1 for invalid or empty input', () => {
+    expect(toMinutesFromMidnight(undefined)).toBe(-1);
+    expect(toMinutesFromMidnight('')).toBe(-1);
+    expect(toMinutesFromMidnight('invalid')).toBe(-1);
   });
 });
 
