@@ -4,16 +4,34 @@
  * Cycles through schedule items (announcements, hadith, events, etc.)
  * with a GPU-friendly crossfade transition.
  *
- * Content is automatically scaled (via CSS transform) to fit the available area:
- * long content is scaled down so it all fits; short content may be scaled up within a cap.
- * No width is applied to the inner content div so every slide occupies the same layout
- * slot and stays in the same position regardless of content amount. No scrolling — display-only.
+ * Content is sized using adaptive typography: a content-density classifier
+ * picks initial font sizes, then a binary-search fit loop adjusts a
+ * multiplier so text fills the available area without overflow. Short
+ * content (a single Asma al-Husna name, a brief announcement) gets large
+ * display-size fonts; long content (Ayatul Kursi, lengthy hadith) gets
+ * compact fonts. If content still overflows at the minimum readable size,
+ * a slow vertical auto-scroll kicks in as a last resort.
+ *
+ * Font sizes are applied via CSS custom properties (--carousel-title-size,
+ * --carousel-body-size, --carousel-arabic-size) so each text element sizes
+ * independently — unlike the old transform:scale() which scaled badges,
+ * spacing, and line-height uniformly.
  *
  * The carousel interval is configurable via props (from screen config).
  * Falls back to 30s if not specified.
  */
 
-import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import logger from '@/utils/logger';
+import {
+  getScalingForItem,
+  getScalingForEvent,
+  computeFontSizes,
+  AUTO_SCROLL_SPEED,
+  AUTO_SCROLL_PAUSE_TOP,
+  AUTO_SCROLL_PAUSE_BOTTOM,
+} from './contentScaling';
+import type { FontSizeConfig } from './contentScaling';
 
 const EventSlide = lazy(() => import('./EventSlide'));
 
@@ -61,16 +79,20 @@ interface ContentCarouselProps {
   compact?: boolean;
 }
 
-/**
- * Minimum scale factor when scaling down (content overflows).
- * Maximum scale factor when scaling up — kept conservative to avoid overflow.
- */
-const MIN_SCALE = 0.45;
-const MAX_SCALE_UP = 1.35;
+/** Maximum binary-search iterations to prevent infinite loops */
+const MAX_FIT_ITERATIONS = 8;
 
-/** Use most of the width (97%) so we don't waste space on the left; scale height more conservatively (84%) so nothing clips. */
-const FIT_WIDTH_RATIO = 0.97;
-const FIT_HEIGHT_RATIO = 0.84;
+/**
+ * Ratio of container used for fitting — leaves a small margin so content
+ * doesn't press against the edges.
+ */
+const FIT_RATIO = 0.92;
+
+/**
+ * If content height is below this fraction of container height after
+ * applying the tier's base multiplier, the fit loop will try to scale up.
+ */
+const HEADROOM_THRESHOLD = 0.75;
 
 /** Map API content types to user-friendly labels for the carousel badge */
 function getContentTypeLabel(type: string): string {
@@ -87,15 +109,39 @@ function getContentTypeLabel(type: string): string {
   return labels[type.toLowerCase()] ?? type;
 }
 
+/**
+ * Apply font sizes as CSS custom properties on a DOM element.
+ * The carousel typography classes (.text-carousel-title etc.) read these.
+ */
+function applyFontSizeProps(el: HTMLElement, sizes: FontSizeConfig): void {
+  el.style.setProperty('--carousel-title-size', `${sizes.titleSize}rem`);
+  el.style.setProperty('--carousel-body-size', `${sizes.bodySize}rem`);
+  el.style.setProperty('--carousel-arabic-size', `${sizes.arabicSize}rem`);
+}
+
 const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30, compact = false }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
-  const [contentScale, setContentScale] = useState(1);
   const [selectedNameIdx, setSelectedNameIdx] = useState(0);
+  const [needsScroll, setNeedsScroll] = useState(false);
+  /**
+   * Safety scale applied as a last resort when content still overflows the
+   * container at the tier's minimum font size. Preserves the original
+   * "nothing is ever clipped" guarantee from the transform:scale() approach.
+   * Value is 1 for the vast majority of content; only drops below 1 for
+   * extremely long items that hit the bottom of the fit loop.
+   */
+  const [safetyScale, setSafetyScale] = useState(1);
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const safeItems = items.length > 0 ? items : [];
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRafRef = useRef<number>(0);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fitLoopRafRef = useRef<number>(0);
+
+  const safeItems = useMemo(() => (items.length > 0 ? items : []), [items]);
 
   /** Advance to the next slide with a crossfade */
   const advance = useCallback(() => {
@@ -105,7 +151,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     timerRef.current = setTimeout(() => {
       setActiveIdx((prev) => (prev + 1) % safeItems.length);
       setPhase('in');
-    }, 700); // matches --duration-crossfade
+    }, 700);
   }, [safeItems.length]);
 
   /** Per-item auto-advance: use current slide's duration (from API) or default interval */
@@ -131,11 +177,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     setPhase('in');
   }, [items]);
 
-  /**
-   * When the active slide changes, pick a new random name if the slide is an
-   * ASMA_AL_HUSNA item with a `names` array. This ensures a different name is
-   * shown each time the carousel cycles back to that slot.
-   */
+  /** Pick a random Asma al-Husna name when slide becomes active */
   useEffect(() => {
     const activeItem = safeItems[activeIdx];
     if (activeItem?.names && activeItem.names.length > 0) {
@@ -151,64 +193,262 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     return () => window.removeEventListener(CAROUSEL_ADVANCE_EVENT, handler);
   }, [advance]);
 
+  const currentItem = safeItems[activeIdx] ?? safeItems[0];
+  const isEventSlide = !!currentItem?.event;
+
+  /** Compute the scaling result for the current item (memoised). Event slides use getScalingForEvent. */
+  const scalingResult = useMemo(() => {
+    if (!currentItem) return null;
+    if (isEventSlide && currentItem.event) return getScalingForEvent(currentItem.event);
+    return getScalingForItem(currentItem);
+  }, [currentItem, isEventSlide]);
+
   /**
-   * Scale content to fit the container. Long content is scaled down so it all fits.
-   * No width is set on the content div so every slide uses the same layout slot and
-   * stays in the same position regardless of content amount.
+   * Apply the tier's initial font sizes synchronously before the browser paints.
+   * This means the very first visible frame of a new slide already uses the
+   * content-aware sizes rather than the CSS clamp fallbacks, eliminating the
+   * "jump from small to large" flash.
+   */
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    // Reset safety scale synchronously so the new slide never briefly shows
+    // the previous slide's transform before the fit loop runs.
+    setSafetyScale(1);
+    if (!content || !scalingResult) return;
+    applyFontSizeProps(content, scalingResult.initialSizes);
+  }, [activeIdx, scalingResult]);
+
+  /**
+   * Adaptive typography fit loop.
+   *
+   * After the DOM renders with the tier's initial font sizes, this effect
+   * measures whether content fits the container. It runs a binary search
+   * on the font-size multiplier (between the tier's min and max) to find
+   * the largest sizes that fit without overflow.
+   *
+   * If content still overflows at the minimum multiplier, `needsScroll`
+   * is set to true to trigger the auto-scroll fallback.
    */
   useEffect(() => {
     const container = containerRef.current;
     const content = contentRef.current;
-    if (!container || !content) {
-      setContentScale(1);
+    if (!container || !content || !scalingResult) {
+      setNeedsScroll(false);
       return;
     }
 
     let cancelled = false;
 
-    const recalc = () => {
-      if (!containerRef.current || !contentRef.current || cancelled) return;
-      const container = containerRef.current;
-      const content = contentRef.current;
+    const runFitLoop = () => {
+      if (cancelled || !containerRef.current || !contentRef.current) return;
 
-      const availableW = container.clientWidth;
-      const availableH = container.clientHeight;
-      if (availableW <= 0 || availableH <= 0) return;
+      const ctr = containerRef.current;
+      const cnt = contentRef.current;
 
-      const fitW = availableW * FIT_WIDTH_RATIO;
-      const fitH = availableH * FIT_HEIGHT_RATIO;
+      // Only constrain height — text elements are w-full, so scrollWidth always
+      // equals clientWidth regardless of font size. Checking width would always
+      // report "overflow" and force sizes down to tier minimum.
+      const availH = ctr.clientHeight * FIT_RATIO;
+      if (availH <= 0) return;
 
-      const naturalW = content.scrollWidth;
-      const naturalH = content.scrollHeight;
+      const { config, tier } = scalingResult;
+      let lo = config.minMultiplier;
+      let hi = config.maxMultiplier;
+      let bestMultiplier = config.baseMultiplier;
+      let overflowsAtMin = false;
 
-      if (naturalH <= 0 || naturalW <= 0) {
-        requestAnimationFrame(recalc);
-        return;
-      }
+      // Apply the initial (base) sizes so we can measure
+      const baseSizes = computeFontSizes(tier, config.baseMultiplier);
+      applyFontSizeProps(cnt, baseSizes);
 
-      const scaleH = fitH / naturalH;
-      const scaleW = fitW / naturalW;
-      let scaleToFit = Math.min(scaleH, scaleW);
+      // Wait a frame for the browser to reflow with new font sizes
+      fitLoopRafRef.current = requestAnimationFrame(() => {
+        if (cancelled) return;
 
-      if (scaleToFit < 1) {
-        scaleToFit = Math.max(scaleToFit, MIN_SCALE);
-        setContentScale(scaleToFit);
-      } else {
-        const scale = Math.min(Math.min(scaleToFit, MAX_SCALE_UP) * FIT_HEIGHT_RATIO, 1);
-        setContentScale(scale);
-      }
+        const naturalH = cnt.scrollHeight;
+
+        if (naturalH <= 0) return;
+
+        const fitsH = naturalH <= availH;
+
+        if (fitsH) {
+          // Content fits — check if there's headroom to scale up
+          const fillRatio = naturalH / availH;
+          if (fillRatio < HEADROOM_THRESHOLD && config.baseMultiplier < config.maxMultiplier) {
+            // Binary search upwards
+            lo = config.baseMultiplier;
+            hi = config.maxMultiplier;
+          } else {
+            // Good fit already — keep base sizes
+            setSafetyScale(1);
+            setNeedsScroll(false);
+            logger.debug('[Carousel] Fit OK at base multiplier', { tier, multiplier: config.baseMultiplier });
+            return;
+          }
+        } else {
+          // Content overflows — binary search downwards
+          lo = config.minMultiplier;
+          hi = config.baseMultiplier;
+        }
+
+        // Binary search for the best multiplier
+        let iterations = 0;
+        const search = () => {
+          if (cancelled || iterations >= MAX_FIT_ITERATIONS) {
+            // Apply the best multiplier found during the search
+            const finalSizes = computeFontSizes(tier, bestMultiplier);
+            applyFontSizeProps(cnt, finalSizes);
+
+            // Final measurement — one extra RAF so the browser reflows at finalSizes
+            fitLoopRafRef.current = requestAnimationFrame(() => {
+              if (cancelled) return;
+              const finalH = cnt.scrollHeight;
+              const isDua = currentItem?.type?.toLowerCase() === 'dua';
+              if (finalH > availH) {
+                // Content still overflows even at minimum font sizes.
+                // Dua: use auto-scroll so text stays readable at larger size.
+                // Other types: fall back to transform: scale() so nothing is clipped.
+                if (isDua) {
+                  setSafetyScale(1);
+                  setNeedsScroll(true);
+                  logger.debug('[Carousel] Dua auto-scroll enabled', { tier, multiplier: bestMultiplier });
+                } else {
+                  const neededScale = Math.max(availH / finalH, 0.4);
+                  setSafetyScale(neededScale);
+                  setNeedsScroll(false);
+                  logger.debug('[Carousel] Safety scale applied', { tier, scale: neededScale });
+                }
+              } else {
+                setSafetyScale(1);
+                setNeedsScroll(false);
+                logger.debug('[Carousel] Fit found', { tier, multiplier: bestMultiplier });
+              }
+            });
+            return;
+          }
+
+          const mid = (lo + hi) / 2;
+          const testSizes = computeFontSizes(tier, mid);
+          applyFontSizeProps(cnt, testSizes);
+
+          fitLoopRafRef.current = requestAnimationFrame(() => {
+            if (cancelled) return;
+
+            const h = cnt.scrollHeight;
+            const fits = h <= availH;
+
+            if (fits) {
+              bestMultiplier = mid;
+              lo = mid;
+            } else {
+              hi = mid;
+              if (mid <= config.minMultiplier + 0.01) {
+                overflowsAtMin = true;
+              }
+            }
+
+            iterations++;
+            search();
+          });
+        };
+
+        search();
+      });
     };
 
-    const raf = requestAnimationFrame(recalc);
-    const containerObserver = new ResizeObserver(() => requestAnimationFrame(recalc));
-    containerObserver.observe(container);
+    // Initial run after a frame (content needs to be in the DOM first)
+    fitLoopRafRef.current = requestAnimationFrame(runFitLoop);
+
+    // Re-run when container resizes
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(fitLoopRafRef.current);
+      fitLoopRafRef.current = requestAnimationFrame(runFitLoop);
+    });
+    observer.observe(container);
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(raf);
-      containerObserver.disconnect();
+      cancelAnimationFrame(fitLoopRafRef.current);
+      observer.disconnect();
     };
-  }, [activeIdx, items]);
+  }, [activeIdx, scalingResult]);
+
+  /**
+   * Auto-scroll effect for content that overflows at minimum font sizes.
+   *
+   * Pauses at the top, scrolls down slowly, pauses at the bottom, then
+   * resets. Scroll speed and pause durations are constants from
+   * contentScaling.ts. Only the scroll wrapper scrolls — the badge and
+   * any static elements above remain fixed.
+   */
+  useEffect(() => {
+    if (!needsScroll) return;
+
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+
+    let cancelled = false;
+    let lastTimestamp = 0;
+    let scrollDirection: 'down' | 'paused-top' | 'paused-bottom' = 'paused-top';
+
+    // Reset scroll position
+    scrollEl.scrollTop = 0;
+
+    // Start with a pause at the top
+    scrollTimerRef.current = setTimeout(() => {
+      if (cancelled) return;
+      scrollDirection = 'down';
+      lastTimestamp = 0;
+
+      const tick = (timestamp: number) => {
+        if (cancelled) return;
+
+        if (lastTimestamp === 0) {
+          lastTimestamp = timestamp;
+          scrollRafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+
+        const delta = (timestamp - lastTimestamp) / 1000; // seconds
+        lastTimestamp = timestamp;
+
+        if (scrollDirection === 'down') {
+          scrollEl.scrollTop += AUTO_SCROLL_SPEED * delta;
+
+          const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+          if (scrollEl.scrollTop >= maxScroll - 1) {
+            scrollEl.scrollTop = maxScroll;
+            scrollDirection = 'paused-bottom';
+
+            scrollTimerRef.current = setTimeout(() => {
+              if (cancelled) return;
+              // Reset to top and pause
+              scrollEl.scrollTop = 0;
+              scrollDirection = 'paused-top';
+
+              scrollTimerRef.current = setTimeout(() => {
+                if (cancelled) return;
+                scrollDirection = 'down';
+                lastTimestamp = 0;
+                scrollRafRef.current = requestAnimationFrame(tick);
+              }, AUTO_SCROLL_PAUSE_TOP);
+            }, AUTO_SCROLL_PAUSE_BOTTOM);
+            return;
+          }
+        }
+
+        scrollRafRef.current = requestAnimationFrame(tick);
+      };
+
+      scrollRafRef.current = requestAnimationFrame(tick);
+    }, AUTO_SCROLL_PAUSE_TOP);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(scrollRafRef.current);
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    };
+  }, [needsScroll, activeIdx]);
 
   if (safeItems.length === 0) {
     return (
@@ -218,8 +458,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     );
   }
 
-  const item = safeItems[activeIdx] ?? safeItems[0];
-  const isEventSlide = !!item.event;
+  const item = currentItem;
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
   // from the randomly selected entry rather than from the item-level fields.
@@ -233,79 +472,79 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative w-full">
-      {/* Measurement container — always clip; content is scaled to fit */}
+      {/* Measurement container — always clip; content adapts via font sizes */}
       <div
         ref={containerRef}
         className="flex-1 min-h-0 w-full overflow-hidden"
       >
-        {/* Animated crossfade wrapper — centred so content has even space from all edges */}
+        {/* Animated crossfade wrapper */}
         <div
           key={item.id}
           className={`
-            w-full h-full gpu-accelerated flex flex-col justify-center items-stretch
+            w-full h-full gpu-accelerated flex flex-col items-stretch
+            ${needsScroll ? 'justify-start' : 'justify-center'}
             ${phase === 'in' ? 'animate-fade-in' : 'animate-fade-out'}
           `}
         >
-          {/* Scaled content wrapper — applies to all slide types including EventSlide */}
+          {/* Content wrapper — when needsScroll, fills container so scroll region has constrained height. */}
           <div
-            ref={isEventSlide ? undefined : contentRef}
-            className="flex flex-col gap-4 min-w-0 flex-shrink-0 w-full max-w-full"
-            style={isEventSlide ? undefined : {
-              transform: `scale(${contentScale})`,
-              transformOrigin: 'center center',
-            }}
+            ref={contentRef}
+            className={`flex flex-col gap-4 min-w-0 w-full max-w-full ${needsScroll ? 'flex-1 min-h-0' : 'flex-shrink-0'}`}
+            style={safetyScale < 1 ? {
+              transform: `scale(${safetyScale})`,
+              transformOrigin: 'top center',
+            } : undefined}
           >
             {isEventSlide && item.event ? (
-              /* Events V2 — rich slide; inherits carousel's transparent background */
               <Suspense fallback={null}>
                 <EventSlide event={item.event} compact={compact} />
               </Suspense>
             ) : (
               <>
-                {/* Type badge — Dua uses distinct blue badge */}
+                {/* Type badge — stays outside the scroll wrapper so it's always visible */}
                 <span
                   className={`badge self-start ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
                 >
                   {getContentTypeLabel(item.type)}
                 </span>
 
-                {/* Image — constrained so it doesn't overflow; rem-based to match 720p scaling */}
-                {item.imageUrl && (
-                  <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
-                    <img
-                      src={item.imageUrl}
-                      alt=""
-                      className="max-w-full max-h-full object-contain rounded-lg"
-                    />
-                  </div>
-                )}
+                {/* Scrollable text region — when needsScroll, flex-1 min-h-0 constrains height for scroll. */}
+                <div
+                  ref={scrollRef}
+                  className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-hidden' : ''}`}
+                >
+                  {item.imageUrl && (
+                    <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
+                      <img
+                        src={item.imageUrl}
+                        alt=""
+                        className="max-w-full max-h-full object-contain rounded-lg"
+                      />
+                    </div>
+                  )}
 
-                {/* Title — scaled to match display readability */}
-                {displayTitle && (
-                  <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>
-                )}
+                  {displayTitle && (
+                    <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>
+                  )}
 
-                {/* Arabic text — larger for prominence (verse/hadith, Dua, Asma al Husna) */}
-                {displayArabic && (
-                  <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
-                )}
+                  {displayArabic && (
+                    <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
+                  )}
 
-                {/* Transliteration — LTR (Dua and any type with transliteration) */}
-                {item.transliteration && (
-                  <p className="text-carousel-body text-text-secondary leading-relaxed" dir="ltr">
-                    {item.transliteration}
-                  </p>
-                )}
+                  {item.transliteration && (
+                    <p className="text-carousel-body text-text-secondary leading-relaxed" dir="ltr">
+                      {item.transliteration}
+                    </p>
+                  )}
 
-                {/* English body / translation — larger for readability from a distance */}
-                {displayBody && (
-                  <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
-                )}
+                  {displayBody && (
+                    <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
+                  )}
 
-                {/* Source — slightly smaller than body but still legible */}
-                {displaySource && (
-                  <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
-                )}
+                  {displaySource && (
+                    <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
+                  )}
+                </div>
               </>
             )}
           </div>

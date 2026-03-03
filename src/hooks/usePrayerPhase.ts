@@ -19,6 +19,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { usePrayerTimes } from './usePrayerTimes';
 import { useCurrentTime } from './useCurrentTime';
+import { toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
 
 /* ------------------------------------------------------------------ */
@@ -68,17 +69,6 @@ declare global {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-/**
- * Parse an "HH:mm" string into total minutes since midnight.
- * Returns -1 if invalid.
- */
-function toMinutes(timeStr: string | undefined): number {
-  if (!timeStr) return -1;
-  const [h, m] = timeStr.split(':').map(Number);
-  if (isNaN(h) || isNaN(m)) return -1;
-  return h * 60 + m;
-}
 
 /**
  * Convert a Date into total minutes since midnight.
@@ -145,7 +135,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     // Use currentPrayer so we stay on "Jamaat in progress" for the full duration even after
     // nextPrayer has already advanced to the next salaat (avoids carousel flashing back after ~0.5s).
     if (currentPrayer?.jamaat) {
-      const currentJamaatMin = toMinutes(currentPrayer.jamaat);
+      const currentJamaatMin = toMinutesFromMidnight(currentPrayer.jamaat, currentPrayer.name);
       if (currentJamaatMin >= 0 && now >= currentJamaatMin) {
         const minutesSinceJamaat = now - currentJamaatMin;
         if (minutesSinceJamaat <= IN_PRAYER_DURATION_MIN) {
@@ -154,13 +144,23 @@ export const usePrayerPhase = (): PrayerPhaseData => {
           );
           return { phase: 'in-prayer', prayerName: currentPrayer.name };
         }
+        // Diagnostic: if minutesSinceJamaat is unexpectedly large (>1h), may indicate time parsing bug
+        if (minutesSinceJamaat > 60) {
+          logger.warn('[PrayerPhase] Past jamaat but minutesSinceJamaat unexpectedly large — possible time format mismatch', {
+            prayerName: currentPrayer.name,
+            jamaat: currentPrayer.jamaat,
+            minutesSinceJamaat: Math.round(minutesSinceJamaat),
+            nowMinutes: Math.round(now),
+            jamaatMinutes: currentJamaatMin,
+          });
+        }
       }
     }
 
     if (!nextPrayer) return defaultResult;
 
-    const adhanMin = toMinutes(nextPrayer.time);
-    const jamaatMin = toMinutes(nextPrayer.jamaat);
+    const adhanMin = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
+    const jamaatMin = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
 
     // If we don't have valid adhan time, fall back to default
     if (adhanMin < 0) return defaultResult;
@@ -185,6 +185,16 @@ export const usePrayerPhase = (): PrayerPhaseData => {
           `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based)`,
         );
         return { phase: 'in-prayer', prayerName: nextPrayer.name };
+      }
+      // Diagnostic: if minutesSinceJamaat is unexpectedly large (>1h), may indicate time parsing bug (e.g. 12h format)
+      if (minutesSinceJamaat > 60) {
+        logger.warn('[PrayerPhase] Past jamaat but minutesSinceJamaat unexpectedly large — possible time format mismatch', {
+          prayerName: nextPrayer.name,
+          jamaat: nextPrayer.jamaat,
+          minutesSinceJamaat: Math.round(minutesSinceJamaat),
+          nowMinutes: Math.round(now),
+          jamaatMinutes: jamaatMin,
+        });
       }
     }
 

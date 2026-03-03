@@ -45,6 +45,7 @@ import {
   shouldShowQrCode,
   getEventImage,
   getEventLocation,
+  getEventDescription,
   formatEventDateTime,
   getCapacityInfo,
   getEventTypeLabel,
@@ -63,6 +64,7 @@ export interface EventSlideProps {
 const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
   const image = useMemo(() => getEventImage(event), [event]);
   const location = useMemo(() => getEventLocation(event), [event]);
+  const description = useMemo(() => getEventDescription(event), [event]);
   const dateTime = useMemo(() => formatEventDateTime(event), [event]);
   const badge = useMemo(() => getRegistrationBadge(event), [event]);
   const badgeStyle = useMemo(() => getRegistrationBadgeStyle(badge), [badge]);
@@ -83,6 +85,7 @@ const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
       <PortraitContent
         event={event}
         image={image}
+        description={description}
         location={location}
         dateTime={dateTime}
         badge={badge}
@@ -100,6 +103,7 @@ const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
     <LandscapeContent
       event={event}
       image={image}
+      description={description}
       location={location}
       dateTime={dateTime}
       badge={badge}
@@ -120,6 +124,8 @@ const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
 interface ContentProps {
   event: EventV2;
   image: string | null;
+  /** Extracted body/description text (handles various API shapes) */
+  description: string | null;
   location: string | null;
   dateTime: { dateLine: string; timeLine: string };
   badge: import('../../utils/eventUtils').RegistrationBadge;
@@ -138,6 +144,7 @@ interface ContentProps {
 const LandscapeContent: React.FC<ContentProps> = ({
   event,
   image,
+  description,
   location,
   dateTime,
   badge,
@@ -170,18 +177,10 @@ const LandscapeContent: React.FC<ContentProps> = ({
           {event.title}
         </h2>
 
-        {/* Short description (preferred) or description */}
-        {(event.shortDescription || event.description) && (
-          <p
-            className="text-carousel-body text-text-secondary"
-            style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
-            {event.shortDescription ?? event.description}
+        {/* Body/description — full text; content scaling shrinks if it overflows */}
+        {description && (
+          <p className="text-carousel-body text-text-secondary leading-relaxed">
+            {description}
           </p>
         )}
 
@@ -269,6 +268,7 @@ const LandscapeContent: React.FC<ContentProps> = ({
 const PortraitContent: React.FC<ContentProps> = ({
   event,
   image,
+  description,
   location,
   dateTime,
   badge,
@@ -306,6 +306,13 @@ const PortraitContent: React.FC<ContentProps> = ({
     >
       {event.title}
     </h2>
+
+    {/* Body/description — full text; content scaling shrinks if it overflows */}
+    {description && (
+      <p className="text-carousel-body text-text-secondary leading-relaxed">
+        {description}
+      </p>
+    )}
 
     {/* Date */}
     <div className="flex items-center gap-1.5 text-text-secondary">

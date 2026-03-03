@@ -26,7 +26,7 @@
 import React, { useMemo } from 'react';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
-import { getTimeUntilNextPrayer, formatTimeToDisplay } from '../../utils/dateUtils';
+import { getTimeUntilNextPrayer, getTimeDisplayParts } from '../../utils/dateUtils';
 import { useSelector } from 'react-redux';
 import CountdownDisplay from './CountdownDisplay';
 import { selectTimeFormat } from '../../store/slices/contentSlice';
@@ -57,20 +57,6 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
 
   /* ---- Post-Iftar: count down to Imsak (suhoor ends) when available, else Fajr ---- */
   const suhoorCountdownTarget = imsakTimeProp ?? suhoorEndTime;
-
-  /* ---- Formatted display times ---- */
-  const displayIftarTime = useMemo(
-    () => (iftarTime ? formatTimeToDisplay(iftarTime, timeFormat) : null),
-    [iftarTime, timeFormat],
-  );
-  const displaySuhoorTime = useMemo(
-    () => (suhoorEndTime ? formatTimeToDisplay(suhoorEndTime, timeFormat) : null),
-    [suhoorEndTime, timeFormat],
-  );
-  const displayImsakTime = useMemo(
-    () => (suhoorCountdownTarget ? formatTimeToDisplay(suhoorCountdownTarget, timeFormat) : null),
-    [suhoorCountdownTarget, timeFormat],
-  );
 
   /* ---- Live Ramadan countdown ---- */
   const ramadanCountdown = useMemo(() => {
@@ -119,8 +105,6 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
 
   /* ---- Determine Ramadan column label and prayer name ---- */
   const ramadanLabel = isFastingHours ? 'Iftar in' : 'Suhoor ends in';
-  const ramadanPrayerName = isFastingHours ? 'Maghrib' : (imsakTimeProp ? 'Imsak' : 'Fajr');
-  const ramadanDisplayTime = isFastingHours ? displayIftarTime : (imsakTimeProp ? displayImsakTime : displaySuhoorTime);
 
   /* ---- Check if both columns would count to the same prayer ---- */
   const isMerged = useMemo(() => {
@@ -159,10 +143,10 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
         </div>
 
         {/* Countdown — use prayer-side countdown so last-5-mins seconds apply */}
-        <p className="text-prayer text-gold font-bold">
+        <p className="text-countdown text-gold font-bold">
           <CountdownDisplay
             value={nextPrayerCountdown || ramadanCountdown}
-            className="text-prayer text-gold font-bold"
+            className="text-countdown text-gold font-bold"
           />
         </p>
       </div>
@@ -190,16 +174,22 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           </p>
 
           {ramadanCountdown ? (
-            <h3 className="text-prayer text-gold font-bold">
-              <CountdownDisplay value={ramadanCountdown} className="text-prayer text-gold font-bold" />
+            <h3 className="text-countdown text-gold font-bold">
+              <CountdownDisplay value={ramadanCountdown} className="text-countdown text-gold font-bold" />
             </h3>
           ) : (
-            /* Static Suhoor time when there's no active countdown */
-            (ramadanDisplayTime ?? displaySuhoorTime) && (
-              <p className="text-prayer text-gold font-semibold countdown-stable">
-                {ramadanDisplayTime ?? displaySuhoorTime}
-              </p>
-            )
+            /* Static Suhoor time when there's no active countdown — main + small am/pm like rest of display */
+            suhoorCountdownTarget && (() => {
+              const { main, period } = getTimeDisplayParts(suhoorCountdownTarget, timeFormat);
+              return (
+                <p className="text-prayer text-gold font-semibold countdown-stable">
+                  {main}
+                  {period != null && (
+                    <span className="opacity-80 font-normal ml-0.5 align-baseline text-[0.85em]">{period}</span>
+                  )}
+                </p>
+              );
+            })()
           )}
         </div>
 
@@ -210,10 +200,10 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
           </p>
 
           {nextPrayerCountdown && (
-            <p className="text-prayer text-gold font-semibold">
+            <p className="text-countdown text-gold">
               <CountdownDisplay
                 value={nextPrayerCountdown}
-                className="text-prayer text-gold font-semibold"
+                className="text-countdown text-gold"
               />
             </p>
           )}

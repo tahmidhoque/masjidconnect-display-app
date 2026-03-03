@@ -45,9 +45,9 @@ interface PrayerTimesPanelProps {
 }
 
 /** Fixed width for each time column so Start/Jamaat align vertically. */
-const TIME_COL_CLASS = 'block w-[7rem] text-right tabular-nums';
+const TIME_COL_CLASS = 'block w-[7.5rem] text-right tabular-nums';
 /** Grid: prayer name | Start | Jamaat — same structure for every row so columns align. */
-const ROW_GRID_CLASS = 'grid grid-cols-[1fr_7rem_7rem] gap-x-4 items-center';
+const ROW_GRID_CLASS = 'grid grid-cols-[1fr_7.5rem_7.5rem] gap-x-4 items-center';
 
 /** Renders time as main (e.g. "5:39") with optional small am/pm subtext. Use inside a right-aligned column. */
 const TimeWithPeriod: React.FC<{

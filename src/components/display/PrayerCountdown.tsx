@@ -13,7 +13,7 @@
 import React, { useMemo } from 'react';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
-import { getTimeUntilNextPrayer } from '../../utils/dateUtils';
+import { getTimeUntilNextPrayer, toMinutesFromMidnight } from '../../utils/dateUtils';
 import type { PrayerPhase } from '../../hooks/usePrayerPhase';
 import CountdownDisplay from './CountdownDisplay';
 
@@ -49,28 +49,6 @@ function isCountingToJamaat(
   return Boolean(targetTime && jamaat && targetTime.time === jamaat);
 }
 
-/** Parse "H:mm" or "HH:mm" to minutes since midnight. Returns -1 if invalid. */
-function timeToMinutes(hhmm: string | undefined): number {
-  if (!hhmm) return -1;
-  const [h, m] = hhmm.split(':').map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return -1;
-  return h * 60 + m;
-}
-
-/**
- * Effective minutes for comparison when API may send 12h format for evening prayers.
- * For Maghrib/Isha, if parsed hour is 1–11, treat as PM (add 12h) so "7:45" → 19:45.
- */
-function effectiveMinutes(hhmm: string | undefined, prayerName: string): number {
-  const min = timeToMinutes(hhmm);
-  if (min < 0 || !hhmm) return min;
-  const h = Number(hhmm.split(':')[0]);
-  if (Number.isNaN(h)) return min;
-  const isEveningPrayer = prayerName === 'Maghrib' || prayerName === 'Isha';
-  if (isEveningPrayer && h >= 1 && h <= 11) return min + 12 * 60; // PM
-  return min;
-}
-
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   const { nextPrayer } = usePrayerTimes();
   const currentTime = useCurrentTime();
@@ -84,8 +62,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     if (!nextPrayer) return null;
 
     const nowMin = currentTime.getHours() * 60 + currentTime.getMinutes() + currentTime.getSeconds() / 60;
-    const adhanMin = effectiveMinutes(nextPrayer.time, nextPrayer.name);
-    const jamaatMin = effectiveMinutes(nextPrayer.jamaat, nextPrayer.name);
+    const adhanMin = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
+    const jamaatMin = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
 
     // Between adhan and jamaat — count down to jamaat (numeric comparison avoids "9:45" vs "19:45" string issues)
     if (adhanMin >= 0 && jamaatMin >= 0 && nowMin >= adhanMin && nowMin < jamaatMin) {
@@ -155,12 +133,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   /* ---- Normal / jamaat countdown display — single label line + countdown (prayer highlighted above) ---- */
   return (
     <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
-      <p className="text-body text-text-muted uppercase tracking-wider">
+      <p className="text-subheading text-text-muted uppercase tracking-wider">
         {countdownLabel}
       </p>
       {liveCountdown && (
-        <p className="text-prayer text-gold font-semibold">
-          <CountdownDisplay value={liveCountdown} className="text-prayer text-gold font-semibold" />
+        <p className="text-countdown text-gold">
+          <CountdownDisplay value={liveCountdown} className="text-countdown text-gold" />
         </p>
       )}
     </div>

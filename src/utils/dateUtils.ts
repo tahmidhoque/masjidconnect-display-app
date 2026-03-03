@@ -163,6 +163,38 @@ export const formatDateToDisplay = (dateString: string): string => {
   });
 };
 
+/**
+ * Parse "H:mm" or "HH:mm" to minutes since midnight.
+ * Returns -1 if invalid.
+ */
+function parseTimeToMinutes(hhmm: string | undefined): number {
+  if (!hhmm) return -1;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return -1;
+  return h * 60 + m;
+}
+
+/**
+ * Convert a prayer time string to minutes since midnight for comparison.
+ * Handles 12h format for Maghrib/Isha: when API sends "7:45" (PM), treat as 19:45.
+ * Use this for all prayer time comparisons to avoid "in-prayer" never showing.
+ *
+ * @param timeStr - Time string (e.g. "12:05", "7:45")
+ * @param prayerName - Prayer name; when "Maghrib" or "Isha", hour 1–11 is treated as PM
+ */
+export const toMinutesFromMidnight = (
+  timeStr: string | undefined,
+  prayerName?: string,
+): number => {
+  const min = parseTimeToMinutes(timeStr);
+  if (min < 0 || !timeStr) return min;
+  const h = Number(timeStr.split(':')[0]);
+  if (Number.isNaN(h)) return min;
+  const isEveningPrayer = prayerName === 'Maghrib' || prayerName === 'Isha';
+  if (isEveningPrayer && h >= 1 && h <= 11) return min + 12 * 60; // PM
+  return min;
+};
+
 // Convert 12-hour time string to 24-hour time string using dayjs
 export const convertTo24Hour = (timeString: string): string => {
   if (!timeString) return "";

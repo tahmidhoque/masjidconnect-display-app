@@ -15,7 +15,7 @@
 
 import React, { useMemo } from 'react';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
-import { getTimeUntilNextPrayer, formatTimeToDisplay } from '../../utils/dateUtils';
+import { getTimeUntilNextPrayer, formatTimeToDisplay, getTimeDisplayParts } from '../../utils/dateUtils';
 import { useSelector } from 'react-redux';
 import CountdownDisplay from './CountdownDisplay';
 import { selectTimeFormat } from '../../store/slices/contentSlice';
@@ -87,12 +87,12 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
         <h3
           className={`
             text-gold font-bold tabular-nums
-            ${compact ? 'text-prayer' : 'text-display'}
+            ${compact ? 'text-countdown' : 'text-display'}
           `}
         >
           <CountdownDisplay
             value={liveIftarCountdown}
-            className={`text-gold font-bold ${compact ? 'text-prayer' : 'text-display'}`}
+            className={`text-gold font-bold ${compact ? 'text-countdown' : 'text-display'}`}
           />
         </h3>
 
@@ -119,15 +119,25 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
           Suhoor ends in
         </p>
 
-        <h3 className="text-prayer text-gold font-semibold tabular-nums">
+        <h3 className="text-countdown text-gold tabular-nums">
           <CountdownDisplay
             value={liveSuhoorCountdown}
-            className="text-prayer text-gold font-semibold"
+            className="text-countdown text-gold"
           />
         </h3>
 
         <p className="text-body text-text-secondary tabular-nums">
-          {displaySuhoorLabel} &middot; {displaySuhoorTime}
+          {displaySuhoorLabel} &middot; {suhoorCountdownTarget && (() => {
+            const { main, period } = getTimeDisplayParts(suhoorCountdownTarget, timeFormat);
+            return (
+              <>
+                {main}
+                {period != null && (
+                  <span className="opacity-80 font-normal ml-0.5 align-baseline text-[0.85em]">{period}</span>
+                )}
+              </>
+            );
+          })()}
         </p>
       </div>
     );
@@ -143,7 +153,18 @@ const IftarCountdown: React.FC<IftarCountdownProps> = ({
         `}
       >
         <p className="text-body text-text-secondary">
-          Suhoor ends at <span className="text-gold font-medium tabular-nums">{displaySuhoorTime}</span>
+          Suhoor ends at{' '}
+          {suhoorCountdownTarget && (() => {
+            const { main, period } = getTimeDisplayParts(suhoorCountdownTarget, timeFormat);
+            return (
+              <span className="text-gold font-medium tabular-nums">
+                {main}
+                {period != null && (
+                  <span className="opacity-80 font-normal ml-0.5 align-baseline text-[0.85em]">{period}</span>
+                )}
+              </span>
+            );
+          })()}
         </p>
       </div>
     );
