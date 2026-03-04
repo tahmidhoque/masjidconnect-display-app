@@ -11,12 +11,14 @@ set -euo pipefail
 PORT="${PORT:-3001}"
 URL="http://localhost:${PORT}"
 WIFI_SETUP_PORT="${WIFI_SETUP_PORT:-3002}"
-WIFI_SETUP_URL="http://127.0.0.1:${WIFI_SETUP_PORT}"
 WIFI_FLAG="/tmp/masjidconnect-wifi-done"
 
-# Log for debugging after reboot: ssh in and run  cat /tmp/kiosk.log
+# Log for debugging: from another machine run:
+#   ssh pi@<Pi-IP> "cat /tmp/kiosk.log"
+# Or from a TTY on the Pi (Ctrl+Alt+F2): cat /tmp/kiosk.log
 KIOSK_LOG="/tmp/kiosk.log"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$KIOSK_LOG" 2>/dev/null || true; }
+: >> "$KIOSK_LOG" 2>/dev/null || true
 log "xinitrc-kiosk started (user=$(whoami) DISPLAY=${DISPLAY:-:0})"
 
 # Disable DPMS (screen sleep) and screen saver
@@ -24,82 +26,30 @@ xset s off 2>/dev/null || true
 xset -dpms 2>/dev/null || true
 xset s noblank 2>/dev/null || true
 
+# Branded background so there is no black/grey flash during startup.
+xsetroot -solid '#0A2647' 2>/dev/null || true
+if command -v feh &>/dev/null && [ -f /opt/masjidconnect/background.png ]; then
+  feh --bg-center --image-bg '#0A2647' /opt/masjidconnect/background.png 2>/dev/null &
+fi
+
+# Tell Plymouth to hand the display to X and hold its last frame until we paint
+# over it. Without this, Plymouth times out and the raw VT is briefly visible.
+/bin/plymouth quit --retain-splash 2>/dev/null || true
+
 # Hide the mouse cursor after 0.5s of inactivity
 if command -v unclutter &>/dev/null; then
   unclutter -idle 0.5 -root &
 fi
 
-# ----- Pre-kiosk: if no internet, show WiFi setup GUI (for end users who only have the image) -----
-have_connectivity() {
-  curl -sf --connect-timeout 4 -o /dev/null "https://portal.masjidconnect.co.uk" 2>/dev/null || \
-    ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1
-}
-
-if ! have_connectivity; then
-  log "No internet detected — starting WiFi setup"
-  rm -f "$WIFI_FLAG"
-  WIFI_SERVER_PID=""
-  if [ -x "/opt/masjidconnect/deploy/wifi-setup-server.mjs" ] || [ -f "/opt/masjidconnect/deploy/wifi-setup-server.mjs" ]; then
-    sudo /opt/masjidconnect/deploy/wifi-setup-server.mjs &
-    WIFI_SERVER_PID=$!
-    for i in $(seq 1 30); do
-      if curl -sf -o /dev/null "${WIFI_SETUP_URL}/api/status" 2>/dev/null; then break; fi
-      sleep 0.5
-    done
-    if curl -sf -o /dev/null "${WIFI_SETUP_URL}/api/status" 2>/dev/null; then
-      CHROMIUM=""
-      command -v chromium-browser &>/dev/null && CHROMIUM="chromium-browser" || command -v chromium &>/dev/null && CHROMIUM="chromium"
-      if [ -n "$CHROMIUM" ]; then
-        export DISPLAY="${DISPLAY:-:0}"
-        export XAUTHORITY="${HOME:-/tmp}/.Xauthority"
-        CHROMIUM_USER_DATA="${HOME:-/tmp}/.config/chromium-wifi-setup"
-        mkdir -p "${CHROMIUM_USER_DATA}" 2>/dev/null || true
-        env DBUS_SESSION_BUS_ADDRESS= "$CHROMIUM" \
-          --start-fullscreen --start-maximized --window-position=0,0 --no-first-run \
-          --user-data-dir="${CHROMIUM_USER_DATA}" \
-          --noerrdialogs --disable-infobars --disable-sync --password-store=basic \
-          "${WIFI_SETUP_URL}" 2>/dev/null || true
-      fi
-      [ -n "$WIFI_SERVER_PID" ] && kill "$WIFI_SERVER_PID" 2>/dev/null || true
-    fi
-  fi
-  if [ -f "$WIFI_FLAG" ]; then
-    log "WiFi setup completed (flag set), waiting for network..."
-    for i in $(seq 1 20); do
-      sleep 1
-      have_connectivity && break
-    done
-    rm -f "$WIFI_FLAG"
-  fi
-fi
-
-# Wait for the display server to be ready
-for i in $(seq 1 90); do
-  if curl -sf "${URL}/health" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-
-# Use chromium-browser (Bookworm) or chromium (Trixie)
-CHROMIUM=""
-if command -v chromium-browser &>/dev/null; then
-  CHROMIUM="chromium-browser"
-elif command -v chromium &>/dev/null; then
-  CHROMIUM="chromium"
-else
-  echo "[Kiosk] ERROR: Chromium not found." >&2
-  exit 1
-fi
-
-# At boot we run as pi (xinit was started by pi from .profile). Do NOT use runuser — only root can use it.
+# =============================================================================
+# Display size detection — done early so ALL Chromium instances (Wi-Fi setup
+# AND main kiosk) use the correct --window-size and fill the screen.
+# =============================================================================
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${HOME:-/tmp}/.Xauthority"
 
-# Detect display size dynamically (any resolution). Prefer xrandr (actual current mode), then xdpyinfo.
 WINDOW_SIZE="1920,1080"
 if command -v xrandr &>/dev/null; then
-  # "Screen 0: ... current 3840 x 2160 ..." or similar
   DIM=$(xrandr --current 2>/dev/null | sed -n 's/.* current \([0-9]*\) x \([0-9]*\).*/\1,\2/p' | head -1)
   if [ -n "$DIM" ] && [ "$DIM" != "," ]; then
     WINDOW_SIZE="$DIM"
@@ -109,23 +59,278 @@ if [ "$WINDOW_SIZE" = "1920,1080" ] && command -v xdpyinfo &>/dev/null; then
   DIM=$(xdpyinfo 2>/dev/null | grep 'dimensions:' | head -1 | awk '{print $2}' | tr 'x' ',')
   [ -n "$DIM" ] && WINDOW_SIZE="$DIM"
 fi
-log "Display size: $WINDOW_SIZE (--window-size will force fullscreen)"
+log "Display size: $WINDOW_SIZE"
 
-# Dedicated profile so no sign-in prompts.
+# Resolve Chromium binary once — used for both Wi-Fi setup and main kiosk.
+CHROMIUM=""
+if command -v chromium-browser &>/dev/null; then
+  CHROMIUM="chromium-browser"
+elif command -v chromium &>/dev/null; then
+  CHROMIUM="chromium"
+else
+  log "ERROR: Chromium not found"
+  exit 1
+fi
+
+# Helper: launch Chromium filling the full screen (Wi-Fi setup pages).
+# Usage: launch_chromium_fullscreen <url> <profile_dir>
+launch_chromium_fullscreen() {
+  local url="$1"
+  local profile="$2"
+  mkdir -p "$profile" 2>/dev/null || true
+  # stdout AND stderr must go to /dev/null. If stdout stays connected to the
+  # calling $(...) pipe, the command substitution blocks until Chromium exits,
+  # which hangs the entire script.
+  env DBUS_SESSION_BUS_ADDRESS= "$CHROMIUM" \
+    --kiosk \
+    --start-fullscreen \
+    --start-maximized \
+    --window-position=0,0 \
+    --window-size="${WINDOW_SIZE}" \
+    --no-first-run \
+    --user-data-dir="$profile" \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-sync \
+    --password-store=basic \
+    --disable-dev-shm-usage \
+    --force-device-scale-factor=1 \
+    --disable-session-crashed-bubble \
+    --disable-component-update \
+    --blink-settings=defaultBackgroundColor=4278855239 \
+    "$url" >/dev/null 2>&1 &
+  echo $!
+}
+
+# =============================================================================
+# Connectivity + Wi-Fi hotspot setup
+# =============================================================================
+HOTSPOT_SCRIPT="/opt/masjidconnect/deploy/wifi-hotspot.sh"
+WIFI_SETUP_SERVER="/opt/masjidconnect/deploy/wifi-setup-server.mjs"
+
+have_connectivity() {
+  if curl -sf --connect-timeout 4 -o /dev/null "https://portal.masjidconnect.co.uk" 2>/dev/null; then
+    return 0
+  fi
+  if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+# Log network state for diagnostics
+log "Network state at X start:"
+log "  route: $(ip route show default 2>/dev/null | head -1 || echo none)"
+log "  rfkill: $(rfkill list 2>/dev/null | head -5 || echo 'rfkill unavailable')"
+log "  iw dev: $(iw dev 2>/dev/null | head -5 || echo 'none')"
+
+# Allow a couple of seconds for the network stack to settle after X starts
+sleep 2
+
+# Force Wi-Fi setup for testing (skip connectivity check):
+#   ssh pi@<Pi-IP> "touch /tmp/masjidconnect-force-wifi-setup && sudo reboot"
+FORCE_WIFI_SETUP=false
+[ -f /tmp/masjidconnect-force-wifi-setup ] && FORCE_WIFI_SETUP=true
+[ "${MASJIDCONNECT_FORCE_WIFI_SETUP:-0}" = "1" ] && FORCE_WIFI_SETUP=true
+[ "$FORCE_WIFI_SETUP" = true ] && log "FORCE_WIFI_SETUP enabled"
+
+# PIDs of any setup-phase Chromium instances. Kept alive through the AP teardown
+# and display-server wait so the user always sees branded content during the
+# transition — killed just before the main kiosk Chromium paints.
+INSTRUCTIONS_PID=""
+NOWIFI_PID=""
+
+if [ "$FORCE_WIFI_SETUP" = true ] || ! have_connectivity; then
+  [ "$FORCE_WIFI_SETUP" = false ] && log "No internet — starting Wi-Fi setup"
+  rm -f "$WIFI_FLAG"
+
+  # ------------------------------------------------------------------
+  # RPi 4 and RPi 5: unblock rfkill FIRST. On RPi 5 the built-in Wi-Fi
+  # (CYW43455 over PCIe) is often soft-blocked until explicitly unblocked,
+  # which prevents iw/ip from showing any wireless interface.
+  # ------------------------------------------------------------------
+  rfkill unblock wifi 2>/dev/null || true
+  rfkill unblock wlan 2>/dev/null || true
+  rfkill unblock all  2>/dev/null || true
+  sleep 1
+
+  # Find the wireless interface. iw dev lists all; also fall back to scanning
+  # /sys/class/net for any interface the kernel exposes as type "wlan".
+  # Retry for up to 30 s (RPi 5 driver can be slow to register after unblock).
+  HAS_WLAN=false
+  WLAN_IFACE=""
+
+  find_wlan_iface() {
+    # Method 1: iw dev (most reliable when driver is loaded)
+    local iface
+    iface=$(iw dev 2>/dev/null | awk '/^\tInterface / {print $2; exit}')
+    [ -n "$iface" ] && { echo "$iface"; return 0; }
+
+    # Method 2: scan /sys/class/net for wireless_mode marker
+    for f in /sys/class/net/*/wireless; do
+      [ -e "$f" ] || continue
+      iface=$(basename "$(dirname "$f")")
+      ip link show "$iface" &>/dev/null && { echo "$iface"; return 0; }
+    done
+
+    # Method 3: any interface whose name starts with wlan or wlp or wlx
+    for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -E '^(wlan|wlp|wlx)'); do
+      echo "$iface"; return 0
+    done
+
+    return 1
+  }
+
+  for attempt in $(seq 1 15); do
+    WLAN_IFACE=$(find_wlan_iface 2>/dev/null || true)
+    if [ -n "$WLAN_IFACE" ]; then
+      HAS_WLAN=true
+      log "Wireless interface '$WLAN_IFACE' found (attempt $attempt)"
+      break
+    fi
+    log "  attempt $attempt: no wlan interface yet (rfkill: $(rfkill list 2>/dev/null | grep -c 'Soft blocked: yes' || echo '?') soft-blocked)"
+    sleep 2
+  done
+
+  if [ "$HAS_WLAN" = false ]; then
+    log "No wireless interface after 30s — showing no-Wi-Fi screen"
+    log "  iw dev: $(iw dev 2>/dev/null || echo 'empty')"
+    log "  rfkill: $(rfkill list 2>/dev/null || echo 'unavailable')"
+    log "  ip link: $(ip -o link show 2>/dev/null | head -10)"
+  fi
+
+  # ------------------------------------------------------------------
+  # Hotspot path: we have a wireless interface
+  # ------------------------------------------------------------------
+  if [ "$HAS_WLAN" = true ] && [ -f "$HOTSPOT_SCRIPT" ] && [ -f "$WIFI_SETUP_SERVER" ]; then
+    export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
+    log "Using interface: $WIFI_HOTSPOT_IFACE"
+
+    log "Pre-scanning networks..."
+    sudo "$HOTSPOT_SCRIPT" scan "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 \
+      || log "  scan failed (non-fatal)"
+
+    log "Starting MasjidConnect-Setup hotspot..."
+    sudo "$HOTSPOT_SCRIPT" start "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 \
+      || log "  hotspot start failed (non-fatal)"
+    sleep 1
+
+    # Start setup server in AP mode (port 80, all interfaces).
+    # Run via its shebang (not "sudo node ...") — the sudoers rule grants NOPASSWD
+    # for the script path directly, and args avoid sudo env-var restrictions.
+    sudo "$WIFI_SETUP_SERVER" --ap-mode --iface="$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 &
+    WIFI_SERVER_PID=$!
+    log "Wi-Fi setup server PID=$WIFI_SERVER_PID"
+
+    SERVER_READY=false
+    for i in $(seq 1 30); do
+      curl -sf -o /dev/null "http://localhost/api/status" 2>/dev/null \
+        && { SERVER_READY=true; break; }
+      sleep 0.5
+    done
+    log "Setup server ready=$SERVER_READY"
+
+    if [ "$SERVER_READY" = true ]; then
+      INSTRUCTIONS_PID=$(launch_chromium_fullscreen \
+        "http://localhost/instructions" \
+        "${HOME:-/tmp}/.config/chromium-wifi-setup")
+      log "Instructions page (Chromium PID=$INSTRUCTIONS_PID)"
+    fi
+
+    log "Waiting for Wi-Fi config (timeout 300s)..."
+    for i in $(seq 1 300); do
+      [ -f "$WIFI_FLAG" ] && { log "Flag file set"; break; }
+      have_connectivity && { log "Connectivity detected"; break; }
+      sleep 1
+    done
+
+    # Keep INSTRUCTIONS_PID alive — we kill it just before the main kiosk
+    # opens so the user sees branded content all through the AP teardown and
+    # display-server wait rather than a bare dark root window.
+    # Server runs as root (via sudo) — need sudo to kill it, plus any child node process
+    if [ -n "$WIFI_SERVER_PID" ]; then
+      sudo kill "$WIFI_SERVER_PID" 2>/dev/null || true
+      sudo pkill -f "wifi-setup-server" 2>/dev/null || true
+    fi
+    sudo "$HOTSPOT_SCRIPT" stop "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 || true
+    rm -f "$WIFI_FLAG"
+
+    if ! have_connectivity; then
+      log "Waiting for network after AP teardown..."
+      for i in $(seq 1 15); do
+        sleep 1
+        have_connectivity && break
+      done
+    fi
+
+    log "Wi-Fi setup done (connected=$(have_connectivity && echo yes || echo no))"
+
+  # ------------------------------------------------------------------
+  # No Wi-Fi path: show a branded screen with "connect via Ethernet" message
+  # ------------------------------------------------------------------
+  else
+    log "No wlan interface — showing no-Wi-Fi screen"
+    WIFI_SERVER_PID=""
+    if [ -f "$WIFI_SETUP_SERVER" ]; then
+      node "$WIFI_SETUP_SERVER" >>"$KIOSK_LOG" 2>&1 &
+      WIFI_SERVER_PID=$!
+      for i in $(seq 1 20); do
+        curl -sf -o /dev/null "http://127.0.0.1:${WIFI_SETUP_PORT}/api/status" 2>/dev/null \
+          && break
+        sleep 0.5
+      done
+      NOWIFI_PID=$(launch_chromium_fullscreen \
+        "http://127.0.0.1:${WIFI_SETUP_PORT}/no-wifi" \
+        "${HOME:-/tmp}/.config/chromium-wifi-setup")
+      log "No-Wi-Fi screen (Chromium PID=$NOWIFI_PID)"
+
+      for i in $(seq 1 300); do
+        [ -f "$WIFI_FLAG" ] && break
+        have_connectivity && break
+        sleep 1
+      done
+
+      # Keep NOWIFI_PID alive for the same reason as INSTRUCTIONS_PID above.
+      if [ -n "$WIFI_SERVER_PID" ]; then
+        kill "$WIFI_SERVER_PID" 2>/dev/null || true
+        sudo pkill -f "wifi-setup-server" 2>/dev/null || true
+      fi
+      rm -f "$WIFI_FLAG"
+    fi
+  fi
+
+  rm -f /tmp/masjidconnect-force-wifi-setup
+else
+  log "Internet available — skipping Wi-Fi setup"
+fi
+
+# =============================================================================
+# Main kiosk launch
+# =============================================================================
+
+# Wait for the display server (node static server) to be ready
+for i in $(seq 1 90); do
+  curl -sf "${URL}/health" >/dev/null 2>&1 && break
+  sleep 1
+done
+
+# Brief delay so X/DRM is fully ready
+sleep 1
+
+# Kill any setup-phase Chromium now — main kiosk is about to paint.
+# Doing it here (rather than during AP teardown) keeps branded content on
+# screen all through the network-settle and display-server-wait periods.
+[ -n "$INSTRUCTIONS_PID" ] && kill "$INSTRUCTIONS_PID" 2>/dev/null || true
+[ -n "$NOWIFI_PID" ]       && kill "$NOWIFI_PID"       2>/dev/null || true
+
+log "Starting Chromium kiosk (DISPLAY=$DISPLAY, size=$WINDOW_SIZE)"
+
 CHROMIUM_USER_DATA="${HOME:-/tmp}/.config/chromium-kiosk"
 mkdir -p "${CHROMIUM_USER_DATA}" 2>/dev/null || true
 
-# Brief delay so X/DRM is fully ready.
-sleep 5
-
-log "Starting Chromium (DISPLAY=$DISPLAY)"
-
-# GPU flags match install.sh/kiosk.sh for better performance (avoids CPU-bound rendering and freezes).
-# Set KIOSK_DISABLE_GPU=1 in the environment if you get a black screen and need software rendering.
 CHROMIUM_GPU_FLAGS="--enable-gpu-rasterization --enable-oop-rasterization"
 [ "${KIOSK_DISABLE_GPU:-0}" = "1" ] && CHROMIUM_GPU_FLAGS="--disable-gpu"
 
-# Launch Chromium in a loop (same user as xinit — no runuser).
 while true; do
   env DBUS_SESSION_BUS_ADDRESS= "${CHROMIUM}" \
     --kiosk \
@@ -153,6 +358,7 @@ while true; do
     --renderer-process-limit=1 \
     --disable-background-networking \
     --disable-backgrounding-occluded-windows \
+    --blink-settings=defaultBackgroundColor=4278855239 \
     "${URL}" || true
   log "Chromium exited, restarting in 5s"
   sleep 5

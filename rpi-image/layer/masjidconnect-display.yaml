@@ -29,9 +29,13 @@ mmdebstrap:
     - xinit
     - x11-xserver-utils
     - unclutter
+    - feh
     - kbd
     - wpasupplicant
     - iw
+    - iproute2
+    - hostapd
+    - dnsmasq
     - raspi-config
   customize-hooks:
     # Install Node.js 20 from NodeSource (build host needs network)
@@ -42,7 +46,7 @@ mmdebstrap:
       ARCHIVE="${IGconf_masjidconnect_app_archive:-app/masjidconnect-display.tar.gz}"; [ -z "$ARCHIVE" ] && { echo "MasjidConnect app archive path not set (IGconf_masjidconnect_app_archive)"; exit 1; }; [ ! -f "$ARCHIVE" ] && { echo "MasjidConnect app archive not found: $ARCHIVE"; exit 1; }; mkdir -p "$1/opt/masjidconnect"; cp "$ARCHIVE" "$1/tmp/masjidconnect-app.tar.gz"; chroot "$1" /bin/bash -c "tar -xzf /tmp/masjidconnect-app.tar.gz -C /opt/masjidconnect && rm /tmp/masjidconnect-app.tar.gz"
     # Ownership (pi user is typically 1000:1000)
     - chroot $1 /bin/bash -c 'chown -R 1000:1000 /opt/masjidconnect'
-    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/xinitrc-kiosk /opt/masjidconnect/deploy/start-kiosk-x11.sh /opt/masjidconnect/deploy/start-kiosk-now.sh /opt/masjidconnect/deploy/wifi-setup-server.mjs /opt/masjidconnect/deploy/update-from-github.sh 2>/dev/null || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/xinitrc-kiosk /opt/masjidconnect/deploy/start-kiosk-x11.sh /opt/masjidconnect/deploy/start-kiosk-now.sh /opt/masjidconnect/deploy/wifi-setup-server.mjs /opt/masjidconnect/deploy/wifi-hotspot.sh /opt/masjidconnect/deploy/update-from-github.sh 2>/dev/null || true'
     # Deploy overlay: copy kiosk scripts from repo so image has them even if the app archive was built before they were added.
     - |
       if [ -d "${SRCROOT}/deploy-overlay" ]; then
@@ -68,14 +72,18 @@ mmdebstrap:
       fi
     # Disable HDMI overscan (KMS) so display is not cut off on TVs
     - chroot $1 raspi-config nonint do_overscan_kms 1 1 || true
-    # Silent boot: redirect console to tty2 so no kernel/init text on tty1 (X11 kiosk uses tty1)
+    # Silent boot: redirect console to tty2 so no kernel/init text on tty1 (X11 kiosk uses tty1).
+    # POSIX sh — mmdebstrap hooks run with sh, not bash, so no [[ ]] or bash-isms.
     - |
       CMDLINE="$1/boot/firmware/cmdline.txt"
       [ -f "$CMDLINE" ] || CMDLINE="$1/boot/cmdline.txt"
       if [ -f "$CMDLINE" ]; then
         line=$(cat "$CMDLINE")
-        for param in quiet loglevel=0 logo.nologo console=tty2; do
-          [[ " $line " = *" $param "* ]] || line="$line $param"
+        for param in quiet loglevel=0 logo.nologo console=tty2 vt.global_cursor_default=0; do
+          case " $line " in
+            *" $param "*) ;;
+            *) line="$line $param" ;;
+          esac
         done
         echo "$line" > "$CMDLINE"
       fi
@@ -96,7 +104,7 @@ mmdebstrap:
       fi
     # Append kiosk start to UID 1000 .profile (console tty1 only)
     - |
-      chroot "$1" /bin/bash -c 'H=$(getent passwd 1000 | cut -d: -f6); [ -n "$H" ] && { touch "$H/.profile"; echo "" >> "$H/.profile"; echo "# MasjidConnect kiosk (console only)" >> "$H/.profile"; echo "[ \"\$(tty)\" = \"/dev/tty1\" ] 2>/dev/null && exec /opt/masjidconnect/deploy/start-kiosk-x11.sh" >> "$H/.profile"; chown 1000:1000 "$H/.profile"; }'
+      chroot "$1" /bin/bash -c 'H=$(getent passwd 1000 | cut -d: -f6); [ -n "$H" ] && { touch "$H/.profile"; echo "" >> "$H/.profile"; echo "# MasjidConnect kiosk (console only — clear screen and hide cursor before launching X)" >> "$H/.profile"; echo "[ \"\$(tty)\" = \"/dev/tty1\" ] 2>/dev/null && { clear; setterm --cursor off 2>/dev/null; exec /opt/masjidconnect/deploy/start-kiosk-x11.sh; }" >> "$H/.profile"; chown 1000:1000 "$H/.profile"; }'
     # Keep getty@tty2 masked so kernel console stays on tty2
     - ln -sf /dev/null "$1/etc/systemd/system/getty@tty2.service"
     # Install kiosk setup (adds UID 1000 to render/video at boot) and X11 kiosk unit
@@ -104,11 +112,17 @@ mmdebstrap:
     - cp "${SRCROOT}/layer/masjidconnect-console-vt1.service" "$1/etc/systemd/system/"
     - cp "${SRCROOT}/layer/kiosk-x11.service.tpl" "$1/etc/systemd/system/masjidconnect-kiosk.service"
     - $BDEBSTRAP_HOOKS/enable-units "$1" masjidconnect-kiosk-setup masjidconnect-console-vt1 masjidconnect-display
-    # Custom boot splash: copy rpi-image/assets/splash.png into Plymouth pix theme if present
+    # hostapd and dnsmasq are used on-demand by wifi-hotspot.sh — must not start at boot
+    - chroot $1 systemctl disable hostapd.service 2>/dev/null || true
+    - chroot $1 systemctl disable dnsmasq.service 2>/dev/null || true
+    - chroot $1 systemctl mask hostapd.service 2>/dev/null || true
+    - chroot $1 systemctl mask dnsmasq.service 2>/dev/null || true
+    # Custom boot splash: copy rpi-image/assets/splash.png into Plymouth pix theme and set as default
     - |
       if [ -f "${SRCROOT}/assets/splash.png" ]; then
         mkdir -p "$1/usr/share/plymouth/themes/pix"
         cp "${SRCROOT}/assets/splash.png" "$1/usr/share/plymouth/themes/pix/splash.png"
+        chroot "$1" plymouth-set-default-theme pix 2>/dev/null || true
         chroot "$1" /bin/bash -c 'update-initramfs -u' || true
       fi
     # Optional background image (e.g. for in-app or loading); copy to /opt/masjidconnect for app use
@@ -135,6 +149,9 @@ mmdebstrap:
       [ -n "${IGconf_masjidconnect_wifi_ssid:-}" ] && WIFI_SSID="${IGconf_masjidconnect_wifi_ssid}"
       [ -n "${IGconf_masjidconnect_wifi_password:-}" ] && WIFI_PASSWORD="${IGconf_masjidconnect_wifi_password}"
       [ -n "${IGconf_masjidconnect_wifi_country:-}" ] && WIFI_COUNTRY="${IGconf_masjidconnect_wifi_country}"
+      # Guard: reject description-text values leaked from YAML metadata (e.g. "Optional. WiFi SSID...")
+      case "$WIFI_SSID" in "Optional."*|"") WIFI_SSID="" ;; esac
+      case "$WIFI_PASSWORD" in "Optional."*|"") WIFI_PASSWORD="" ;; esac
       if [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASSWORD" ]; then
         mkdir -p "$1/etc/wpa_supplicant"
         printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=%s\n' "$WIFI_COUNTRY" > "$1/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
@@ -144,11 +161,11 @@ mmdebstrap:
         printf '[Match]\nName=wlan0\n\n[Network]\nDHCP=yes\n' > "$1/etc/systemd/network/25-wlan0.network"
         chroot "$1" systemctl enable wpa_supplicant@wlan0.service
       fi
-    # Allow first user (pi) to run WiFi setup server as root without password (for on-device WiFi GUI when no internet).
+    # Allow first user (pi) to run WiFi setup server, hotspot script, and kill/pkill as root without password.
     - |
       U=$(chroot "$1" getent passwd 1000 | cut -d: -f1)
       if [ -n "$U" ]; then
-        echo "${U} ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/wifi-setup-server.mjs" > "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
+        printf '%s ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/wifi-setup-server.mjs *\n%s ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/wifi-hotspot.sh *\n%s ALL=(ALL) NOPASSWD: /usr/bin/kill *\n%s ALL=(ALL) NOPASSWD: /usr/bin/pkill *\n' "$U" "$U" "$U" "$U" > "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
         chmod 440 "$1/etc/sudoers.d/99-masjidconnect-wifi-setup"
       fi
     # Allow first user to run self-update script without password (FORCE_UPDATE from admin portal).
