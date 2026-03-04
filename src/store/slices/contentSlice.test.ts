@@ -72,6 +72,7 @@ describe('contentSlice', () => {
         timeFormat: '12h' as const,
         timestamp: new Date().toISOString(),
         schedule: undefined,
+        scheduledPlaylists: undefined,
         events: undefined,
       };
       const prev = contentReducer(undefined, refreshContent.pending('', {}));
@@ -128,6 +129,7 @@ describe('contentSlice', () => {
         timeFormat: '12h' as const,
         timestamp: new Date().toISOString(),
         schedule: scheduleWithDua,
+        scheduledPlaylists: undefined,
         events: undefined,
       };
       const prev = contentReducer(undefined, refreshContent.pending('', {}));
@@ -241,6 +243,7 @@ describe('contentSlice', () => {
     it('populates state from cached payload', () => {
       const payload = {
         schedule: { id: 's1', name: 'Main', items: [] } as never,
+        scheduledPlaylists: null,
         events: [] as never[],
         prayerTimes: minimalPrayerTimes,
         screenContent: mockScreenContent as never,

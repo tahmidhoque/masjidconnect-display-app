@@ -42,6 +42,7 @@ import {
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
 import { selectTimeFormat } from '../../store/slices/contentSlice';
 import type { CarouselItem } from '../display/ContentCarousel';
 
@@ -296,7 +297,7 @@ function buildCarouselItems(
 
 const DisplayScreen: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
-  const schedule = useSelector((s: RootState) => s.content.schedule);
+  const { schedule } = useScheduledPlaylist();
   const events = useSelector((s: RootState) => s.content.events);
   /* Dev-mode orientation override (Ctrl+Shift+O) */
   const [orientationOverride, setOrientationOverride] = useState<

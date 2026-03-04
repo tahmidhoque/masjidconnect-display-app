@@ -51,6 +51,7 @@ const VALID_INVALIDATION_TYPES: Array<ContentInvalidationPayload['type']> = [
   'schedule',
   'content_item',
   'schedule_assignment',
+  'playlist_assignment',
   'events',
 ];
 
@@ -256,6 +257,10 @@ export const realtimeMiddleware: Middleware = (api: any) => {
                 // schedule_assignment: screen's assigned schedule changed — refreshSchedule clears
                 // content cache and fetches fresh content so Redux state.schedule updates correctly.
                 dispatch(mod.refreshSchedule({ forceRefresh: true }));
+                break;
+              case 'playlist_assignment':
+                // playlist_assignment: playlist assignments changed — need full content with scheduledPlaylists.
+                dispatch(mod.refreshContent({ forceRefresh: true }));
                 break;
               case 'content_item':
                 dispatch(mod.refreshContent({ forceRefresh: true }));

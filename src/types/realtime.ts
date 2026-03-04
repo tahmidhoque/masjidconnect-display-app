@@ -222,7 +222,7 @@ export interface ContentChangeNotification {
  * Do not assume additional fields are present (FR-2).
  */
 export interface ContentInvalidationPayload {
-  type: "prayer_times" | "schedule" | "content_item" | "schedule_assignment" | "events";
+  type: "prayer_times" | "schedule" | "content_item" | "schedule_assignment" | "playlist_assignment" | "events";
   masjidId: string;
   entityId?: string;
   screenId?: string;
