@@ -70,4 +70,34 @@ describe('usePrayerTimes', () => {
     expect(result.current.nextPrayer).toBeNull();
     expect(result.current.currentPrayer).toBeNull();
   });
+
+  it('extracts Isha Jamaat when API returns IshaJamaat (capital I)', async () => {
+    const prayerTimesWithCapitalIsha = {
+      ...minimalPrayerTimes,
+      IshaJamaat: '20:15', // Backend may return capital I
+    };
+    delete (prayerTimesWithCapitalIsha as Record<string, unknown>).ishaJamaat;
+    const store = createTestStore();
+    const contentState = store.getState().content;
+    const storeWithPrayers = createTestStore({
+      content: {
+        ...contentState,
+        prayerTimes: prayerTimesWithCapitalIsha,
+        timeFormat: '12h',
+      },
+    });
+    const preloaded = storeWithPrayers.getState();
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
+    const { result } = renderHook(() => usePrayerTimes(), { wrapper });
+    await waitFor(() => {
+      const isha = result.current.todaysPrayerTimes.find((p) => p.name === 'Isha');
+      expect(isha).toBeDefined();
+      expect(isha?.jamaat).toBe('20:15');
+    });
+  });
 });
