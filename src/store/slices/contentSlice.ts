@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat } from "../../api/models";
+import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment } from "../../api/models";
 import apiClient from "../../api/apiClient";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
@@ -21,6 +21,7 @@ export interface ContentState {
   screenContent: ScreenContent | null;
   prayerTimes: PrayerTimes | null;
   schedule: Schedule | null;
+  scheduledPlaylists: ScheduledPlaylistAssignment[] | null;
   events: Event[] | null;
 
   // Masjid information
@@ -62,6 +63,7 @@ const initialState: ContentState = {
   screenContent: null,
   prayerTimes: null,
   schedule: null,
+  scheduledPlaylists: null,
   events: null,
   masjidName: DEFAULT_MASJID_NAME,
   masjidTimezone: null,
@@ -320,7 +322,8 @@ export const refreshContent = createAsyncThunk(
       // Prefer schedule from the content we just synced (API may embed it under various paths); fall back to separate key
       const contentAny = content as unknown as {
         schedule?: unknown;
-        data?: { schedule?: unknown; playlist?: unknown };
+        scheduledPlaylists?: ScheduledPlaylistAssignment[];
+        data?: { schedule?: unknown; playlist?: unknown; scheduledPlaylists?: ScheduledPlaylistAssignment[] };
         playlist?: unknown;
         assignedSchedule?: { schedule?: unknown };
       };
@@ -336,6 +339,16 @@ export const refreshContent = createAsyncThunk(
 
       const eventsData = await storageService.get<any>('events');
       const events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
+
+      const hasScheduledPlaylistsKey =
+        (contentAny && 'scheduledPlaylists' in contentAny) ||
+        (contentAny?.data && 'scheduledPlaylists' in contentAny.data);
+      const scheduledPlaylistsRaw = hasScheduledPlaylistsKey
+        ? (contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null)
+        : undefined;
+      const scheduledPlaylistsArray = hasScheduledPlaylistsKey
+        ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
+        : undefined;
 
       // Extract masjid information
       const masjidName = extractMasjidName(content);
@@ -388,6 +401,7 @@ export const refreshContent = createAsyncThunk(
         timeFormat,
         timestamp: new Date().toISOString(),
         schedule: schedule ?? undefined,
+        scheduledPlaylists: hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined,
         events: events ?? undefined,
       };
     } catch (error: any) {
@@ -617,16 +631,32 @@ export const loadCachedContent = createAsyncThunk(
         ? (Array.isArray(prayerTimes) ? prayerTimes[0] : prayerTimes)
         : null;
 
+      const contentAny = screenContent as unknown as {
+        scheduledPlaylists?: ScheduledPlaylistAssignment[] | null;
+        data?: { scheduledPlaylists?: ScheduledPlaylistAssignment[] | null };
+      } | null;
+      const hasScheduledPlaylistsKey =
+        (contentAny && 'scheduledPlaylists' in contentAny) ||
+        (contentAny?.data && 'scheduledPlaylists' in contentAny.data);
+      const scheduledPlaylistsRaw = hasScheduledPlaylistsKey
+        ? (contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null)
+        : undefined;
+      const scheduledPlaylistsArray = hasScheduledPlaylistsKey
+        ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
+        : undefined;
+
       logger.info("[Content] Cached content loaded", {
         hasSchedule: !!normalizedSchedule,
         scheduleItemsCount: normalizedSchedule?.items?.length || 0,
         eventsCount: events?.length || 0,
         hasPrayerTimes: !!normalizedPrayerTimes,
         hasScreenContent: !!screenContent,
+        hasScheduledPlaylists: !!scheduledPlaylistsArray,
       });
 
       return {
         schedule: normalizedSchedule ? normalizeScheduleData(normalizedSchedule) : null,
+        scheduledPlaylists: hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined,
         events: events || [],
         prayerTimes: normalizedPrayerTimes,
         screenContent,
@@ -770,6 +800,9 @@ const contentSlice = createSlice({
           if (action.payload.schedule !== undefined) {
             state.schedule = action.payload.schedule ?? null;
             state.lastScheduleUpdate = action.payload.timestamp || null;
+          }
+          if (action.payload.scheduledPlaylists !== undefined) {
+            state.scheduledPlaylists = action.payload.scheduledPlaylists ?? null;
           }
           if (action.payload.events !== undefined) {
             state.events = action.payload.events ?? null;
@@ -927,6 +960,9 @@ const contentSlice = createSlice({
         if (action.payload.schedule) {
           state.schedule = action.payload.schedule;
         }
+        if (action.payload.scheduledPlaylists !== undefined) {
+          state.scheduledPlaylists = action.payload.scheduledPlaylists;
+        }
         if (action.payload.events) {
           state.events = action.payload.events;
         }
@@ -1000,6 +1036,8 @@ export const selectPrayerTimes = (state: { content: ContentState }) =>
   state.content.prayerTimes;
 export const selectSchedule = (state: { content: ContentState }) =>
   state.content.schedule;
+export const selectScheduledPlaylists = (state: { content: ContentState }) =>
+  state.content.scheduledPlaylists;
 export const selectEvents = (state: { content: ContentState }) =>
   state.content.events;
 export const selectMasjidName = (state: { content: ContentState }) =>

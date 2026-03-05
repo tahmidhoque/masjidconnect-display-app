@@ -9,9 +9,11 @@ import {
   getNextPrayerTime,
   getTimeUntilNextPrayer,
   parseTimeString,
+  toMinutesFromMidnight,
   fetchHijriDate,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
+import { IN_PRAYER_DURATION_MIN } from "../config/prayerPhase";
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
@@ -65,6 +67,23 @@ interface PrayerTimesHook {
 
 const PRAYER_NAMES = ["Fajr", "Sunrise", "Zuhr", "Asr", "Maghrib", "Isha"];
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in countdown
+
+/**
+ * Resolve jamaat time from data object with case-insensitive key lookup.
+ * Handles backends that return IshaJamaat (capital I) or other casing variants.
+ */
+function getJamaatTime(data: Record<string, unknown>, lowerName: string): string | undefined {
+  const targetKey = `${lowerName}Jamaat`;
+  const exact = data[targetKey];
+  if (typeof exact === "string") return exact;
+  const found = Object.keys(data).find((k) => k.toLowerCase() === targetKey.toLowerCase());
+  if (found) {
+    const val = data[found];
+    return typeof val === "string" ? val : undefined;
+  }
+  const snake = (data[`${lowerName}_jamaat`] ?? data[`jamaat_${lowerName}`]) as string | undefined;
+  return typeof snake === "string" ? snake : undefined;
+}
 
 export const usePrayerTimes = (): PrayerTimesHook => {
   // Get prayerTimes and timeFormat from Redux store
@@ -841,12 +860,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             : "";
         const jamaat =
           typeof todayData === "object" && todayData !== null
-            ? (() => {
-                const base = (todayData[`${lowerName}Jamaat` as keyof PrayerTimes] as string | undefined);
-                if (base) return base;
-                const data = todayData as unknown as Record<string, unknown>;
-                return (data[`${lowerName}_jamaat`] ?? data[`jamaat_${lowerName}`]) as string | undefined;
-              })()
+            ? getJamaatTime(todayData as unknown as Record<string, unknown>, lowerName)
             : undefined;
 
         // Initialize with default values - we'll update these flags later
@@ -922,16 +936,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             : "";
         const jamaat =
           typeof tomorrowData === "object" && tomorrowData !== null
-            ? (() => {
-                const base = (tomorrowData as unknown as Record<string, unknown>)[
-                  `${lowerName}Jamaat`
-                ];
-                if (base) return base as string;
-                const d = tomorrowData as unknown as Record<string, unknown>;
-                return (d[`${lowerName}_jamaat`] ?? d[`jamaat_${lowerName}`]) as
-                  | string
-                  | undefined;
-              })()
+            ? getJamaatTime(tomorrowData as unknown as Record<string, unknown>, lowerName)
             : undefined;
         prayersFromTomorrow.push({
           name,
@@ -955,7 +960,26 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         );
         setNextPrayer(fajrFromTomorrow);
       }
-      setCurrentPrayer(null);
+      // Preserve currentPrayer = Isha during the in-prayer window so usePrayerPhase
+      // can correctly show "Jamaat in progress" for the full duration.
+      const inIshaInPrayerWindow =
+        ishaPrayer?.jamaat &&
+        (() => {
+          const nowMin =
+            nowDayjs.hour() * 60 +
+            nowDayjs.minute() +
+            nowDayjs.second() / 60;
+          const jamaatMin = toMinutesFromMidnight(
+            ishaPrayer.jamaat,
+            ishaPrayer.name,
+          );
+          return (
+            jamaatMin >= 0 &&
+            nowMin >= jamaatMin &&
+            nowMin - jamaatMin <= IN_PRAYER_DURATION_MIN
+          );
+        })();
+      setCurrentPrayer(inIshaInPrayerWindow ? ishaPrayer : null);
       setTodaysPrayerTimes(prayersFromTomorrow);
       setCurrentDate(
         nowDayjs.add(1, "day").format("dddd, MMMM D, YYYY"),

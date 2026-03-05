@@ -351,6 +351,28 @@ export interface Schedule {
   cacheControl?: { maxAge?: number; staleWhileRevalidate?: number };
 }
 
+export type PlaylistAssignmentType = 'DEFAULT' | 'RECURRING' | 'DATE_RANGE';
+
+export interface ScheduledPlaylistAssignment {
+  assignmentId: string;
+  type: PlaylistAssignmentType;
+  priority: number;
+  daysOfWeek: number[];
+  startTime: string | null;
+  endTime: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isActive: boolean;
+  schedule: {
+    id: string;
+    name: string;
+    description: string | null;
+    isDefault: boolean;
+    isActive: boolean;
+    items: ScheduleItem[];
+  };
+}
+
 export interface PrayerTimes {
   date?: string;
   fajr: string;
@@ -397,6 +419,7 @@ export interface ScreenContent {
     timezone: string;
   };
   schedule: Schedule;
+  scheduledPlaylists?: ScheduledPlaylistAssignment[];
   prayerTimes: PrayerTimes;
   contentOverrides: ContentOverride[];
   lastUpdated: string;
@@ -422,6 +445,7 @@ export interface ScreenContent {
       };
     };
     events?: Event[] | { data: Event[] };
+    scheduledPlaylists?: ScheduledPlaylistAssignment[];
   };
   events?: Event[] | { data: Event[] };
 }

@@ -69,6 +69,7 @@ describe('Startup to display flow (reducer state)', () => {
           timeFormat: '12h',
           timestamp: new Date().toISOString(),
           schedule: undefined,
+          scheduledPlaylists: undefined,
           events: undefined,
         },
         '',

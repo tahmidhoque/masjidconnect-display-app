@@ -10,7 +10,7 @@
  *   countdown-adhan  — Normal display. Carousel visible, counting down to adhan.
  *   countdown-jamaat — Adhan passed, carousel visible, counting down to jamaat (> 5 min).
  *   jamaat-soon      — Within 5 min of jamaat. Phones-off graphic replaces carousel.
- *   in-prayer        — Jamaat reached. Calm "get ready" screen for 5 min.
+ *   in-prayer        — Jamaat reached. Calm "get ready" screen for 10 min.
  *
  * Supports a dev override via window.__PRAYER_PHASE_FORCE so keyboard
  * shortcuts can force any phase for testing (same pattern as Ramadan toggle).
@@ -21,6 +21,7 @@ import { usePrayerTimes } from './usePrayerTimes';
 import { useCurrentTime } from './useCurrentTime';
 import { toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
+import { IN_PRAYER_DURATION_MIN } from '../config/prayerPhase';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -46,8 +47,8 @@ export interface PrayerPhaseData {
 /** How many minutes before jamaat to show the phones-off graphic */
 const JAMAAT_SOON_THRESHOLD_MIN = 5;
 
-/** How many minutes after jamaat to show the in-prayer screen */
-const IN_PRAYER_DURATION_MIN = 5;
+/** Re-export for consumers that need the constant */
+export { IN_PRAYER_DURATION_MIN } from '../config/prayerPhase';
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
