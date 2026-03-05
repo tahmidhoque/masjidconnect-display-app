@@ -206,6 +206,9 @@ export function getNextBoundary(
         if (startAt > nowMs && (nearest === null || startAt < nearest)) nearest = startAt;
         if (endAt > nowMs && a.startTime <= a.endTime && (nearest === null || endAt < nearest)) nearest = endAt;
       }
+    } else if (a.type === 'RECURRING' && (!a.startTime || !a.endTime)) {
+      const nextMidnight = nowD.add(1, 'day').startOf('day').toDate().getTime();
+      if (nextMidnight > nowMs && (nearest === null || nextMidnight < nearest)) nearest = nextMidnight;
     }
   }
 
