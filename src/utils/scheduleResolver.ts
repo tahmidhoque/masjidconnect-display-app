@@ -200,6 +200,7 @@ export function getNextBoundary(
         const endAt = dayStart.hour(eh).minute(em).second(0).millisecond(0).toDate().getTime();
         if (a.startTime > a.endTime) {
           const endNext = nowD.add(dayOffset + 1, 'day').hour(eh).minute(em).second(0).millisecond(0).toDate().getTime();
+          if (endAt > nowMs && (nearest === null || endAt < nearest)) nearest = endAt;
           if (endNext > nowMs && (nearest === null || endNext < nearest)) nearest = endNext;
         }
         if (startAt > nowMs && (nearest === null || startAt < nearest)) nearest = startAt;
