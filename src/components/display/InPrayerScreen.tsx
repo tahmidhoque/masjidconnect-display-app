@@ -1,7 +1,7 @@
 /**
  * InPrayerScreen
  *
- * Non-distracting display shown in place of the carousel for 5 minutes
+ * Non-distracting display shown in place of the carousel for 10 minutes
  * after Jamaat time is reached. Provides a calm "Jamaat in progress"
  * message with the prayer name, using a muted colour scheme that won't
  * draw attention away from the congregational prayer.

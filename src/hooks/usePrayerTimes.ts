@@ -9,9 +9,11 @@ import {
   getNextPrayerTime,
   getTimeUntilNextPrayer,
   parseTimeString,
+  toMinutesFromMidnight,
   fetchHijriDate,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
+import { IN_PRAYER_DURATION_MIN } from "../config/prayerPhase";
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
@@ -958,7 +960,26 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         );
         setNextPrayer(fajrFromTomorrow);
       }
-      setCurrentPrayer(null);
+      // Preserve currentPrayer = Isha during the in-prayer window so usePrayerPhase
+      // can correctly show "Jamaat in progress" for the full duration.
+      const inIshaInPrayerWindow =
+        ishaPrayer?.jamaat &&
+        (() => {
+          const nowMin =
+            nowDayjs.hour() * 60 +
+            nowDayjs.minute() +
+            nowDayjs.second() / 60;
+          const jamaatMin = toMinutesFromMidnight(
+            ishaPrayer.jamaat,
+            ishaPrayer.name,
+          );
+          return (
+            jamaatMin >= 0 &&
+            nowMin >= jamaatMin &&
+            nowMin - jamaatMin <= IN_PRAYER_DURATION_MIN
+          );
+        })();
+      setCurrentPrayer(inIshaInPrayerWindow ? ishaPrayer : null);
       setTodaysPrayerTimes(prayersFromTomorrow);
       setCurrentDate(
         nowDayjs.add(1, "day").format("dddd, MMMM D, YYYY"),
