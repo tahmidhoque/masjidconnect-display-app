@@ -254,6 +254,7 @@ describe('contentSlice', () => {
         loadCachedContent.fulfilled(payload, '', undefined),
       );
       expect(state.schedule).toEqual(payload.schedule);
+      expect(state.scheduledPlaylists).toEqual(payload.scheduledPlaylists);
       expect(state.events).toEqual([]);
       expect(state.prayerTimes).toEqual(minimalPrayerTimes);
       expect(state.screenContent).toEqual(mockScreenContent);

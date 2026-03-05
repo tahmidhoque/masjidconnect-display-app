@@ -340,12 +340,15 @@ export const refreshContent = createAsyncThunk(
       const eventsData = await storageService.get<any>('events');
       const events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
 
-      const scheduledPlaylists =
-        contentAny?.scheduledPlaylists ??
-        contentAny?.data?.scheduledPlaylists ??
-        null;
-      const scheduledPlaylistsArray =
-        Array.isArray(scheduledPlaylists) && scheduledPlaylists.length > 0 ? scheduledPlaylists : null;
+      const hasScheduledPlaylistsKey =
+        (contentAny && 'scheduledPlaylists' in contentAny) ||
+        (contentAny?.data && 'scheduledPlaylists' in contentAny.data);
+      const scheduledPlaylistsRaw = hasScheduledPlaylistsKey
+        ? (contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null)
+        : undefined;
+      const scheduledPlaylistsArray = hasScheduledPlaylistsKey
+        ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
+        : undefined;
 
       // Extract masjid information
       const masjidName = extractMasjidName(content);
@@ -398,7 +401,7 @@ export const refreshContent = createAsyncThunk(
         timeFormat,
         timestamp: new Date().toISOString(),
         schedule: schedule ?? undefined,
-        scheduledPlaylists: scheduledPlaylistsArray ?? undefined,
+        scheduledPlaylists: hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined,
         events: events ?? undefined,
       };
     } catch (error: any) {
@@ -629,13 +632,18 @@ export const loadCachedContent = createAsyncThunk(
         : null;
 
       const contentAny = screenContent as unknown as {
-        scheduledPlaylists?: ScheduledPlaylistAssignment[];
-        data?: { scheduledPlaylists?: ScheduledPlaylistAssignment[] };
+        scheduledPlaylists?: ScheduledPlaylistAssignment[] | null;
+        data?: { scheduledPlaylists?: ScheduledPlaylistAssignment[] | null };
       } | null;
-      const scheduledPlaylists =
-        contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null;
-      const scheduledPlaylistsArray =
-        Array.isArray(scheduledPlaylists) && scheduledPlaylists.length > 0 ? scheduledPlaylists : null;
+      const hasScheduledPlaylistsKey =
+        (contentAny && 'scheduledPlaylists' in contentAny) ||
+        (contentAny?.data && 'scheduledPlaylists' in contentAny.data);
+      const scheduledPlaylistsRaw = hasScheduledPlaylistsKey
+        ? (contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null)
+        : undefined;
+      const scheduledPlaylistsArray = hasScheduledPlaylistsKey
+        ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
+        : undefined;
 
       logger.info("[Content] Cached content loaded", {
         hasSchedule: !!normalizedSchedule,
@@ -648,7 +656,7 @@ export const loadCachedContent = createAsyncThunk(
 
       return {
         schedule: normalizedSchedule ? normalizeScheduleData(normalizedSchedule) : null,
-        scheduledPlaylists: scheduledPlaylistsArray,
+        scheduledPlaylists: hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined,
         events: events || [],
         prayerTimes: normalizedPrayerTimes,
         screenContent,

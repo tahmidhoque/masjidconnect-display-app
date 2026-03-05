@@ -9,7 +9,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import type { Schedule, ScheduledPlaylistAssignment } from '@/api/models';
+import type { ScheduledPlaylistAssignment } from '@/api/models';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -77,6 +77,7 @@ function getEffectiveDayForRecurring(
 
 /**
  * Check if now is within a DATE_RANGE assignment.
+ * Parses dates in the target zone and includes the full end date (entire day).
  */
 function isWithinDateRange(
   now: Date,
@@ -87,9 +88,9 @@ function isWithinDateRange(
   if (!startDate || !endDate) return false;
   const tz = timezoneStr || DEFAULT_TZ;
   const d = dayjs(now).tz(tz);
-  const start = dayjs(startDate).tz(tz);
-  const end = dayjs(endDate).tz(tz);
-  return (d.isSame(start) || d.isAfter(start)) && (d.isSame(end) || d.isBefore(end));
+  const startOfDay = dayjs.tz(startDate, tz).startOf('day');
+  const endOfDay = dayjs.tz(endDate, tz).endOf('day');
+  return (d.isSame(startOfDay) || d.isAfter(startOfDay)) && (d.isSame(endOfDay) || d.isBefore(endOfDay));
 }
 
 /**
@@ -116,20 +117,20 @@ function matchesRecurring(
 }
 
 /**
- * Resolve the active schedule from scheduled playlist assignments.
+ * Resolve the active schedule assignment from scheduled playlist assignments.
  *
  * Priority: DATE_RANGE (by priority desc) > RECURRING (by priority desc) > DEFAULT.
  *
  * @param scheduledPlaylists - Array of playlist assignments from the API
  * @param now - Current time
  * @param timezoneStr - Masjid timezone (e.g. "Europe/London")
- * @returns The active schedule, or null if none matches
+ * @returns The active assignment (with schedule and assignmentId), or null if none matches
  */
 export function resolveActiveSchedule(
   scheduledPlaylists: ScheduledPlaylistAssignment[],
   now: Date,
   timezoneStr: string
-): Schedule | null {
+): ScheduledPlaylistAssignment | null {
   const active = scheduledPlaylists.filter((a) => a.isActive);
   if (active.length === 0) return null;
 
@@ -141,7 +142,7 @@ export function resolveActiveSchedule(
     .sort((a, b) => b.priority - a.priority);
   for (const a of dateRange) {
     if (isWithinDateRange(now, a.startDate, a.endDate, tz)) {
-      return a.schedule;
+      return a;
     }
   }
 
@@ -150,12 +151,12 @@ export function resolveActiveSchedule(
     .filter((a) => a.type === 'RECURRING')
     .sort((a, b) => b.priority - a.priority);
   for (const a of recurring) {
-    if (matchesRecurring(now, a, tz)) return a.schedule;
+    if (matchesRecurring(now, a, tz)) return a;
   }
 
   // DEFAULT fallback
   const def = active.find((a) => a.type === 'DEFAULT');
-  return def ? def.schedule : null;
+  return def ?? null;
 }
 
 /**

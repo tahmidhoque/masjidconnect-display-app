@@ -26,15 +26,6 @@ export interface UseScheduledPlaylistResult {
   activeAssignmentId: string | null;
 }
 
-function findAssignmentIdForSchedule(
-  playlists: ScheduledPlaylistAssignment[],
-  schedule: Schedule
-): string | null {
-  const active = playlists.filter((a) => a.isActive);
-  const match = active.find((a) => a.schedule.id === schedule.id);
-  return match?.assignmentId ?? null;
-}
-
 /**
  * Hook that resolves the active schedule from scheduledPlaylists or falls back
  * to the server-resolved schedule. Schedules a timer to re-evaluate at the next
@@ -62,11 +53,11 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
     if (!useScheduledPlaylists || !playlists) return;
 
     const now = new Date();
-    const schedule = resolveActiveSchedule(playlists, now, tz);
-    if (schedule) {
-      const normalised = normalizeScheduleData(schedule);
+    const assignment = resolveActiveSchedule(playlists, now, tz);
+    if (assignment) {
+      const normalised = normalizeScheduleData(assignment.schedule);
       setResolvedSchedule(normalised);
-      setActiveAssignmentId(findAssignmentIdForSchedule(playlists, schedule));
+      setActiveAssignmentId(assignment.assignmentId);
     } else {
       setResolvedSchedule(null);
       setActiveAssignmentId(null);
