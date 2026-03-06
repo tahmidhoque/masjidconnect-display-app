@@ -8,7 +8,7 @@
  * Cleans up all timeouts on unmount (RPi memory rules).
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import {
   selectSchedule,
@@ -18,6 +18,12 @@ import {
 } from '@/store/slices/contentSlice';
 import { normalizeScheduleData } from '@/store/slices/contentSlice';
 import { resolveActiveSchedule, getNextBoundary } from '@/utils/scheduleResolver';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import type { Schedule, ScheduledPlaylistAssignment } from '@/api/models';
 import logger from '@/utils/logger';
 
@@ -49,11 +55,24 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
   const useScheduledPlaylists = Array.isArray(playlists) && playlists.length > 0;
   const tz = masjidTimezone || 'UTC';
 
+  // Stable key: only re-run effect when assignments or schedules actually change (avoids clearing timer on every content refresh)
+  const playlistsKey = useMemo(
+    () =>
+      playlists
+        ?.map((p) => `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}`)
+        .sort()
+        .join('|') ?? '',
+    [playlists]
+  );
+  const playlistsRef = useRef(playlists);
+  playlistsRef.current = playlists;
+
   const reEvaluate = useCallback(() => {
-    if (!useScheduledPlaylists || !playlists) return;
+    const pl = playlistsRef.current;
+    if (!useScheduledPlaylists || !pl) return;
 
     const now = new Date();
-    const assignment = resolveActiveSchedule(playlists, now, tz);
+    const assignment = resolveActiveSchedule(pl, now, tz);
     if (assignment) {
       const normalised = normalizeScheduleData(assignment.schedule);
       setResolvedSchedule(normalised);
@@ -62,7 +81,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
       setResolvedSchedule(null);
       setActiveAssignmentId(null);
     }
-  }, [playlists, useScheduledPlaylists, tz]);
+  }, [useScheduledPlaylists, tz]);
 
   useEffect(() => {
     if (!useScheduledPlaylists || !playlists) {
@@ -74,19 +93,28 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
     reEvaluate();
 
     const scheduleNextTimer = () => {
-      const next = getNextBoundary(playlists, new Date(), tz);
-      if (next) {
-        const delay = Math.max(0, next.getTime() - Date.now());
-        timeoutRef.current = setTimeout(() => {
-          timeoutRef.current = null;
-          reEvaluate();
-          scheduleNextTimer();
-        }, delay);
-        logger.debug('[useScheduledPlaylist] Next boundary scheduled', {
+      const pl = playlistsRef.current;
+      if (!pl) return;
+      const now = new Date();
+      let next = getNextBoundary(pl, now, tz);
+      // Fallback when no boundary found (e.g. only DEFAULT, or past all DATE_RANGE): re-evaluate at next midnight
+      if (!next) {
+        const nextMidnight = dayjs(now).tz(tz).add(1, 'day').startOf('day').toDate();
+        next = nextMidnight;
+        logger.debug('[useScheduledPlaylist] No boundary found, using next midnight fallback', {
           at: next.toISOString(),
-          delayMs: delay,
         });
       }
+      const delay = Math.max(0, next.getTime() - Date.now());
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        reEvaluate();
+        scheduleNextTimer();
+      }, delay);
+      logger.debug('[useScheduledPlaylist] Next boundary scheduled', {
+        at: next.toISOString(),
+        delayMs: delay,
+      });
     };
     scheduleNextTimer();
 
@@ -96,7 +124,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
         timeoutRef.current = null;
       }
     };
-  }, [playlists, useScheduledPlaylists, tz, reEvaluate]);
+  }, [playlistsKey, useScheduledPlaylists, tz, reEvaluate]);
 
   if (!useScheduledPlaylists || !playlists) {
     return {
