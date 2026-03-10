@@ -47,6 +47,6 @@ describe('environment', () => {
   it('DEFAULTS contains sync intervals', () => {
     expect(DEFAULTS.HEARTBEAT_INTERVAL).toBe(30_000);
     expect(DEFAULTS.CONTENT_SYNC_INTERVAL).toBe(5 * 60_000);
-    expect(DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL).toBe(24 * 60 * 60_000);
+    expect(DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL).toBe(4 * 60 * 60_000);
   });
 });
