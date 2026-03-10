@@ -20,6 +20,11 @@ GITHUB_OWNER="tahmidhoque"
 GITHUB_REPO="masjidconnect-display-app"
 COUNTDOWN_SECONDS=30
 
+# Optional: GitHub token for private repo (env, or from file baked into image)
+[ -z "${GITHUB_TOKEN:-}" ] && [ -f "${APP_DIR}/.github-token" ] && GITHUB_TOKEN=$(cat "${APP_DIR}/.github-token" 2>/dev/null | tr -d '\n\r')
+CURL_AUTH=()
+[ -n "${GITHUB_TOKEN:-}" ] && CURL_AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+
 debug() { echo "$(date -Iseconds) $*" >> "$DEBUG_LOG" 2>/dev/null || true; }
 
 write_status() {
@@ -43,7 +48,7 @@ write_status "checking" "Checking for update…"
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 resp_file="${tmp_dir}/releases.json"
-curl -sS -f -L -o "$resp_file" "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=30" 2>/dev/null || {
+curl -sS -f -L -o "$resp_file" "${CURL_AUTH[@]}" "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=30" 2>/dev/null || {
   write_status "no_update" "Up to date"
   exit 0
 }
@@ -98,7 +103,7 @@ write_status "downloading" "Downloading update…"
 
 tar_path="${tmp_dir}/masjidconnect-display.tar.gz"
 
-curl -sS -f -L -o "$tar_path" "$asset_url" 2>/dev/null || {
+curl -sS -f -L -o "$tar_path" "${CURL_AUTH[@]}" "$asset_url" 2>/dev/null || {
   write_status "no_update" "Up to date"
   exit 0
 }

@@ -19,6 +19,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
+import dayjs from 'dayjs';
 import localforage from 'localforage';
 import credentialService from '../services/credentialService';
 import environment from '../config/environment';
@@ -487,11 +488,12 @@ class ApiClient {
       const cached = await localforage.getItem<CachedData<T>>(key);
       if (!cached) return null;
 
-      // Check if expired
       const age = Date.now() - cached.timestamp;
       if (age > cached.ttl) {
         logger.debug('[ApiClient] Cache expired', { key, age, ttl: cached.ttl });
-        // Don't delete - still useful as fallback
+        if (this.isOnline) {
+          return null;
+        }
       }
 
       return cached.data;
@@ -646,7 +648,9 @@ class ApiClient {
   }
 
   /**
-   * Get prayer times
+   * Get prayer times.
+   * When no date is passed, uses today's date (YYYY-MM-DD) so the cache key
+   * naturally invalidates each day instead of reusing the static 'today' key.
    */
   public async getPrayerTimes(date?: string): Promise<ApiResponse<PrayerTimesResponse>> {
     if (!credentialService.hasCredentials()) {
@@ -656,11 +660,12 @@ class ApiClient {
       };
     }
 
+    const dateParam = date ?? dayjs().format('YYYY-MM-DD');
     return this.getWithCache<PrayerTimesResponse>(
       SCREEN_ENDPOINTS.GET_PRAYER_TIMES,
-      `${CACHE_KEYS.PRAYER_TIMES}_${date || 'today'}`,
+      `${CACHE_KEYS.PRAYER_TIMES}_${dateParam}`,
       CACHE_TTL.PRAYER_TIMES,
-      date ? { date } : undefined
+      { date: dateParam },
     );
   }
 
@@ -724,17 +729,25 @@ class ApiClient {
   // ==========================================================================
 
   /**
-   * Clear all cached data
+   * Clear all cached data.
+   * Prayer times are stored under cache_prayer_times_${date} (e.g. cache_prayer_times_today
+   * or cache_prayer_times_2025-03-10), not the bare CACHE_KEYS.PRAYER_TIMES.
    */
   public async clearCache(): Promise<void> {
     try {
+      const keys = await localforage.keys();
+      const prayerTimesKeys = keys.filter((k) =>
+        k.startsWith(`${CACHE_KEYS.PRAYER_TIMES}_`),
+      );
       await Promise.all([
         localforage.removeItem(CACHE_KEYS.CONTENT),
-        localforage.removeItem(CACHE_KEYS.PRAYER_TIMES),
         localforage.removeItem(CACHE_KEYS.EVENTS),
         localforage.removeItem(CACHE_KEYS.SYNC_STATUS),
+        ...prayerTimesKeys.map((k) => localforage.removeItem(k)),
       ]);
-      logger.info('[ApiClient] Cache cleared');
+      logger.info('[ApiClient] Cache cleared', {
+        prayerTimesKeysRemoved: prayerTimesKeys.length,
+      });
     } catch (error) {
       logger.error('[ApiClient] Failed to clear cache', { error });
     }

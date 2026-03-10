@@ -36,7 +36,7 @@ const DEFAULTS = {
   /** Used when pending command acks need to reach the server quickly */
   HEARTBEAT_FAST_INTERVAL: 5_000,
   CONTENT_SYNC_INTERVAL: 5 * 60_000,
-  PRAYER_TIMES_SYNC_INTERVAL: 24 * 60 * 60_000,
+  PRAYER_TIMES_SYNC_INTERVAL: 4 * 60 * 60_000,
   EVENTS_SYNC_INTERVAL: 30 * 60_000,
   PRAYER_STATUS_INTERVAL: 60_000,
 

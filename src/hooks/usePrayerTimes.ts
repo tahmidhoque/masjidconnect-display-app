@@ -13,6 +13,7 @@ import {
   fetchHijriDate,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
+import { prayerTimesSyncInterval } from "../config/environment";
 import { IN_PRAYER_DURATION_MIN } from "../config/prayerPhase";
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
@@ -214,6 +215,14 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       }
     };
   }, [prayerTimes, refreshPrayerTimesHandler]);
+
+  // Periodic refresh every 4 hours to ensure long-running displays get fresh prayer times
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshPrayerTimesHandler(true);
+    }, prayerTimesSyncInterval);
+    return () => clearInterval(interval);
+  }, [refreshPrayerTimesHandler]);
 
   // Process prayer times data when it changes
   useEffect(() => {
@@ -494,8 +503,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Clear all caches first
       apiClient.clearCache();
 
-      // Force refresh prayer times with high priority
-      refreshPrayerTimesHandler();
+      // Force refresh prayer times with high priority (bypass debounce)
+      refreshPrayerTimesHandler(true);
 
       // Update date information
       setCurrentDate(now.format("dddd, MMMM D, YYYY"));

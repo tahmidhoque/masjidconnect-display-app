@@ -374,6 +374,7 @@ class SyncService {
         });
 
         this.emitEvent('prayerTimes:synced', response.data);
+        window.dispatchEvent(new CustomEvent('prayerTimesUpdated'));
         logger.info('[SyncService] Prayer times synced successfully', {
           fromCache: response.fromCache,
         });

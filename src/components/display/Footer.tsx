@@ -22,6 +22,8 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 const STATUS_DISPLAY_DELAY_MS = 5_000;
 /** After showing "Up to date", clear the message after this delay (ms). */
 const NO_UPDATE_CLEAR_MS = 8_000;
+/** Poll interval for Wi‑Fi recovery status when offline (ms). */
+const WIFI_RECOVERY_POLL_MS = 5_000;
 
 /** Injected at build time by Vite (from package.json); also available in dev. */
 const APP_VERSION = import.meta.env.VITE_APP_VERSION;
@@ -34,6 +36,7 @@ const Footer: React.FC = () => {
   const updateMessage = useAppSelector(selectUpdateMessage);
   const updateRestartAt = useAppSelector(selectUpdateRestartAt);
   const [canShowStatus, setCanShowStatus] = useState(false);
+  const [hotspotActive, setHotspotActive] = useState(false);
   const [pendingSecondsLeft, setPendingSecondsLeft] = useState<number | null>(null);
   const [updateSecondsLeft, setUpdateSecondsLeft] = useState<number | null>(null);
 
@@ -41,6 +44,23 @@ const Footer: React.FC = () => {
     const timer = setTimeout(() => setCanShowStatus(true), STATUS_DISPLAY_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  // Poll for Wi‑Fi recovery hotspot status when offline (parallel reconnect path)
+  useEffect(() => {
+    if (status !== 'no-internet' && status !== 'no-connection') {
+      setHotspotActive(false);
+      return;
+    }
+    const poll = () => {
+      fetch('/internal/wifi-recovery-status')
+        .then((r) => r.json())
+        .then((d) => setHotspotActive(d.hotspotActive === true))
+        .catch(() => setHotspotActive(false));
+    };
+    poll();
+    const interval = setInterval(poll, WIFI_RECOVERY_POLL_MS);
+    return () => clearInterval(interval);
+  }, [status]);
 
   // Pending restart countdown (from remote command)
   useEffect(() => {
@@ -97,6 +117,7 @@ const Footer: React.FC = () => {
       return updateMessage || 'Updating…';
     }
     if (showPendingRestart) return `${pendingRestart.label} in ${pendingSecondsLeft}s`;
+    if (hotspotActive) return 'Connect to MasjidConnect-Setup, open 192.168.4.1';
     return message;
   })();
 
@@ -111,7 +132,7 @@ const Footer: React.FC = () => {
     return 'bg-alert-red';
   })();
 
-  const showStatusArea = canShowStatus || showPendingRestart || showUpdate;
+  const showStatusArea = canShowStatus || showPendingRestart || showUpdate || hotspotActive;
 
   return (
     <div className="flex items-center justify-between text-body font-medium">

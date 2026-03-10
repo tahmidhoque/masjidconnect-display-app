@@ -57,6 +57,8 @@ mmdebstrap:
       fi
     # Kiosk user needs render/video for X11/Chromium GPU. Base layer creates user pi (rpi-user-credentials).
     - chroot $1 /bin/bash -c 'getent group render >/dev/null || groupadd -r render; getent group video >/dev/null || groupadd -r video; usermod -aG render,video pi'
+    # Wi-Fi state dir for connectivity marker (first-run vs known-wifi-offline)
+    - chroot $1 /bin/bash -c 'mkdir -p /var/lib/masjidconnect && chown 1000:1000 /var/lib/masjidconnect'
     # Set a known default password for the first user (UID 1000) so SSH works when Pi Imager cannot apply OS customisation to custom images.
     - |
       chroot $1 /bin/bash -c 'u=$(getent passwd 1000 | cut -d: -f1); [ -n "$u" ] && echo "${u}:masjidconnect" | chpasswd'
@@ -174,4 +176,20 @@ mmdebstrap:
       if [ -n "$U" ]; then
         echo "${U} ALL=(ALL) NOPASSWD: /opt/masjidconnect/deploy/update-from-github.sh" > "$1/etc/sudoers.d/99-masjidconnect-update"
         chmod 440 "$1/etc/sudoers.d/99-masjidconnect-update"
+      fi
+    # Optional: SSH authorized_keys for key-based login (rpi-image/ssh/authorized_keys, gitignored).
+    - |
+      AUTH_KEYS="${SRCROOT}/ssh/authorized_keys"
+      if [ -f "$AUTH_KEYS" ]; then
+        H=$(chroot "$1" getent passwd 1000 | cut -d: -f6)
+        [ -n "$H" ] && chroot "$1" mkdir -p "${H}/.ssh" && chroot "$1" chmod 700 "${H}/.ssh"
+        [ -n "$H" ] && cp "$AUTH_KEYS" "$1${H}/.ssh/authorized_keys" && chroot "$1" chmod 600 "${H}/.ssh/authorized_keys" && chroot "$1" chown -R 1000:1000 "${H}/.ssh"
+      fi
+    # Optional: GitHub token for private repo releases (rpi-image/secrets/github-token, gitignored).
+    - |
+      GITHUB_TOKEN_FILE="${SRCROOT}/secrets/github-token"
+      if [ -f "$GITHUB_TOKEN_FILE" ]; then
+        cp "$GITHUB_TOKEN_FILE" "$1/opt/masjidconnect/.github-token"
+        chroot "$1" chmod 600 /opt/masjidconnect/.github-token
+        chroot "$1" chown 1000:1000 /opt/masjidconnect/.github-token
       fi

@@ -254,16 +254,16 @@ export const realtimeMiddleware: Middleware = (api: any) => {
                 break;
               case 'schedule':
               case 'schedule_assignment':
-                // schedule_assignment: screen's assigned schedule changed — refreshSchedule clears
-                // content cache and fetches fresh content so Redux state.schedule updates correctly.
                 dispatch(mod.refreshSchedule({ forceRefresh: true }));
+                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
                 break;
               case 'playlist_assignment':
-                // playlist_assignment: playlist assignments changed — need full content with scheduledPlaylists.
                 dispatch(mod.refreshContent({ forceRefresh: true }));
+                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
                 break;
               case 'content_item':
                 dispatch(mod.refreshContent({ forceRefresh: true }));
+                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
                 break;
               case 'events':
                 dispatch(mod.refreshEvents({ forceRefresh: true }));
