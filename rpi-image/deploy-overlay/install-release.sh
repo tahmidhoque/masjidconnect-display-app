@@ -19,7 +19,8 @@ APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 GITHUB_OWNER="tahmidhoque"
 GITHUB_REPO="masjidconnect-display-app"
 API_BASE="https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}"
-# Optional: set GITHUB_TOKEN for private repo or to avoid rate limits (e.g. export GITHUB_TOKEN=ghp_xxx)
+# Optional: GitHub token for private repo (env, or from file baked into image)
+[ -z "${GITHUB_TOKEN:-}" ] && [ -f "${APP_DIR}/.github-token" ] && GITHUB_TOKEN=$(cat "${APP_DIR}/.github-token" 2>/dev/null | tr -d '\n\r')
 CURL_AUTH=()
 [ -n "${GITHUB_TOKEN:-}" ] && CURL_AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
 

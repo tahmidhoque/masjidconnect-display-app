@@ -60,3 +60,6 @@ yarn-error.log*
 rpi-image/out/
 # WiFi credentials (optional build-time config)
 rpi-image/wifi.conf
+# SSH keys and secrets (optional build-time; never commit)
+rpi-image/ssh/
+rpi-image/secrets/

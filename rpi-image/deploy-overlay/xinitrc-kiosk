@@ -12,6 +12,9 @@ PORT="${PORT:-3001}"
 URL="http://localhost:${PORT}"
 WIFI_SETUP_PORT="${WIFI_SETUP_PORT:-3002}"
 WIFI_FLAG="/tmp/masjidconnect-wifi-done"
+WIFI_STATE_DIR="/var/lib/masjidconnect"
+WIFI_CONNECTED_MARKER="${WIFI_STATE_DIR}/wifi-connected-once"
+WIFI_HOTSPOT_ACTIVE_MARKER="/tmp/masjidconnect-hotspot-active"
 
 # Log for debugging: from another machine run:
 #   ssh pi@<Pi-IP> "cat /tmp/kiosk.log"
@@ -118,6 +121,19 @@ have_connectivity() {
   return 1
 }
 
+# Mark that we've had successful connectivity (persists across reboots).
+# Used to distinguish first-time setup from "known wifi but temporarily offline".
+mark_wifi_connected() {
+  mkdir -p "$WIFI_STATE_DIR" 2>/dev/null || true
+  [ -d "$WIFI_STATE_DIR" ] && touch "$WIFI_CONNECTED_MARKER" 2>/dev/null || true
+}
+
+# Known-wifi-offline: we had connectivity before (marker exists) but are offline now.
+# Use serial setup for first run; use parallel (display + background hotspot) for reconnect.
+known_wifi_offline() {
+  [ -f "$WIFI_CONNECTED_MARKER" ] && ! have_connectivity
+}
+
 # Log network state for diagnostics
 log "Network state at X start:"
 log "  route: $(ip route show default 2>/dev/null | head -1 || echo none)"
@@ -144,6 +160,50 @@ if [ "$FORCE_WIFI_SETUP" = true ] || ! have_connectivity; then
   [ "$FORCE_WIFI_SETUP" = false ] && log "No internet — starting Wi-Fi setup"
   rm -f "$WIFI_FLAG"
 
+  # Update marker when we have connectivity (e.g. forced setup with working network)
+  have_connectivity && mark_wifi_connected
+
+  # State machine: first-run (serial) vs known-wifi-offline (parallel)
+  KNOWN_WIFI_OFFLINE=false
+  if [ "$FORCE_WIFI_SETUP" = false ] && known_wifi_offline; then
+    KNOWN_WIFI_OFFLINE=true
+    log "Known Wi-Fi offline — parallel path (display + background hotspot)"
+  fi
+
+  # ------------------------------------------------------------------
+  # PARALLEL PATH: known wifi worked before, now offline. Start display
+  # immediately with stale content; run hotspot in background so user
+  # can reconnect from phone without blocking the screen.
+  # ------------------------------------------------------------------
+  if [ "$KNOWN_WIFI_OFFLINE" = true ]; then
+    rfkill unblock wifi 2>/dev/null || true
+    rfkill unblock wlan 2>/dev/null || true
+    rfkill unblock all  2>/dev/null || true
+    sleep 1
+
+    WLAN_IFACE=$(iw dev 2>/dev/null | awk '/^\tInterface / {print $2; exit}')
+    [ -z "$WLAN_IFACE" ] && WLAN_IFACE=$(ls -d /sys/class/net/wlan* 2>/dev/null | head -1 | xargs basename)
+    [ -z "$WLAN_IFACE" ] && WLAN_IFACE=$(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -E '^(wlan|wlp|wlx)' | head -1)
+
+    if [ -n "$WLAN_IFACE" ] && [ -f "$HOTSPOT_SCRIPT" ] && [ -f "$WIFI_SETUP_SERVER" ]; then
+      export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
+      log "Parallel: starting background hotspot on $WLAN_IFACE"
+      touch "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
+      (
+        sudo "$HOTSPOT_SCRIPT" scan "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
+        sudo "$HOTSPOT_SCRIPT" start "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
+        sleep 1
+        sudo "$WIFI_SETUP_SERVER" --ap-mode --iface="$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1
+      ) &
+      log "Parallel: hotspot and setup server running in background"
+    else
+      log "Parallel: no wlan interface, skipping background hotspot"
+      rm -f "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
+    fi
+    # Fall through to main kiosk launch — do not wait for connectivity
+  else
+  # ------------------------------------------------------------------
+  # SERIAL PATH: first run or no known wifi. Block until setup complete.
   # ------------------------------------------------------------------
   # RPi 4 and RPi 5: unblock rfkill FIRST. On RPi 5 the built-in Wi-Fi
   # (CYW43455 over PCIe) is often soft-blocked until explicitly unblocked,
@@ -263,6 +323,7 @@ if [ "$FORCE_WIFI_SETUP" = true ] || ! have_connectivity; then
       done
     fi
 
+    have_connectivity && mark_wifi_connected
     log "Wi-Fi setup done (connected=$(have_connectivity && echo yes || echo no))"
 
   # ------------------------------------------------------------------
@@ -295,12 +356,15 @@ if [ "$FORCE_WIFI_SETUP" = true ] || ! have_connectivity; then
         kill "$WIFI_SERVER_PID" 2>/dev/null || true
         sudo pkill -f "wifi-setup-server" 2>/dev/null || true
       fi
+      have_connectivity && mark_wifi_connected
       rm -f "$WIFI_FLAG"
     fi
   fi
 
   rm -f /tmp/masjidconnect-force-wifi-setup
+  fi
 else
+  mark_wifi_connected
   log "Internet available — skipping Wi-Fi setup"
 fi
 

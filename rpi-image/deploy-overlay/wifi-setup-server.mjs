@@ -58,6 +58,7 @@ const IFACE = (_args.find(a => a.startsWith('--iface=')) || '').replace('--iface
 const PORT = AP_MODE ? 80 : parseInt(process.env.WIFI_SETUP_PORT || '3002', 10);
 const HOST = AP_MODE ? '0.0.0.0' : '127.0.0.1';
 const FLAG_FILE = '/tmp/masjidconnect-wifi-done';
+const WIFI_CONNECTED_MARKER = '/var/lib/masjidconnect/wifi-connected-once';
 const WPA_CONF = `/etc/wpa_supplicant/wpa_supplicant-${IFACE}.conf`;
 const SCAN_CACHE = '/tmp/masjidconnect-wifi-scan.json';
 const HOTSPOT_SCRIPT = '/opt/masjidconnect/deploy/wifi-hotspot.sh';
@@ -312,6 +313,12 @@ async function apModeConnectAsync() {
       // Persist: enable services so Wi-Fi reconnects automatically on next boot
       enableWifiOnBoot();
 
+      // Mark that we've had successful connectivity (for xinitrc state machine)
+      try {
+        mkdirSync('/var/lib/masjidconnect', { recursive: true });
+        writeFileSync(WIFI_CONNECTED_MARKER, '1');
+      } catch { /* non-fatal */ }
+
       writeFileSync(FLAG_FILE, '1');
       writeFileSync(CONNECT_STATUS_FILE, JSON.stringify({ connected: true }));
     } else {
@@ -363,6 +370,12 @@ function handleStartDisplay() {
   if (DEV) return { ok: true, _dev: true };
   try {
     writeFileSync(FLAG_FILE, '1');
+    if (checkConnectivity()) {
+      try {
+        mkdirSync('/var/lib/masjidconnect', { recursive: true });
+        writeFileSync(WIFI_CONNECTED_MARKER, '1');
+      } catch { /* non-fatal */ }
+    }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };

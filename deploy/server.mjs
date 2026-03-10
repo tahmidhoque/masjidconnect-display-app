@@ -24,6 +24,7 @@ const APP_DIR = resolve(__dirname, '..');
 const DIST_DIR = resolve(APP_DIR, 'dist');
 const STATUS_FILE = join(APP_DIR, '.update-status.json');
 const UPDATE_SCRIPT = join(__dirname, 'update-from-github.sh');
+const WIFI_HOTSPOT_ACTIVE_MARKER = '/tmp/masjidconnect-hotspot-active';
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
@@ -110,6 +111,12 @@ const server = createServer((req, res) => {
       }
       res.writeHead(202, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, message: 'Update started' }));
+      return;
+    }
+    if (pathname === '/internal/wifi-recovery-status' && req.method === 'GET') {
+      const hotspotActive = existsSync(WIFI_HOTSPOT_ACTIVE_MARKER);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ hotspotActive }));
       return;
     }
     if (pathname === '/internal/update-status' && req.method === 'GET') {
