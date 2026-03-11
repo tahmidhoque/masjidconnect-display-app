@@ -11,9 +11,9 @@
  *  - `in-prayer` — replaces carousel with calm "Jamaat in progress" screen
  *
  * During Ramadan mode (auto-detected from the Hijri calendar), the display:
- *  - Inserts an IftarCountdown hero element during fasting hours
  *  - Passes Ramadan props to Header (day badge) and PrayerTimesPanel (labels)
  *  - Applies the green/gold theme via useRamadanMode's CSS side effect
+ *  - Countdown is unified: always PrayerCountdown (Maghrib = Iftar, Fajr = Suhoor end)
  *
  * Data is sourced from Redux (contentSlice) and hooks.
  */
@@ -34,7 +34,6 @@ import {
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
-  RamadanCountdownBar,
   SilentPhonesGraphic,
   InPrayerScreen,
 } from '../display';
@@ -420,22 +419,7 @@ const DisplayScreenInner: React.FC = () => {
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
 
-  /**
-   * Countdown slot: during Ramadan, use the unified RamadanCountdownBar
-   * which merges Suhoor/Iftar + Next Prayer into a single compact card.
-   * Outside Ramadan, use the standard PrayerCountdown.
-   */
-  const countdownSlot = ramadan.isRamadan ? (
-    <RamadanCountdownBar
-      iftarTime={ramadan.iftarTime}
-      suhoorEndTime={ramadan.suhoorEndTime}
-      imsakTime={ramadan.imsakTime}
-      isFastingHours={ramadan.isFastingHours}
-      compact={isPortrait}
-    />
-  ) : (
-    countdown
-  );
+  const countdownSlot = countdown;
 
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
 

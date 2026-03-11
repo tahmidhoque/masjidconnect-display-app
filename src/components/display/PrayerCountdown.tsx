@@ -23,23 +23,6 @@ interface PrayerCountdownProps {
 }
 
 /**
- * Map a prayer phase to its top label text.
- * Single dynamic line: "{prayerName} prayer in" or "{prayerName} Jamaat in".
- */
-function phaseLabel(phase: PrayerPhase | undefined, prayerName: string | null | undefined): string {
-  switch (phase) {
-    case 'countdown-jamaat':
-    case 'jamaat-soon':
-      return prayerName ? `${prayerName} Jamaat in` : 'Jamaat in';
-    case 'in-prayer':
-      return 'In Progress';
-    case 'countdown-adhan':
-    default:
-      return prayerName ? `${prayerName} prayer in` : 'Next prayer in';
-  }
-}
-
-/**
  * Whether we are currently counting down to jamaat (between adhan and jamaat).
  */
 function isCountingToJamaat(
@@ -115,31 +98,34 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     return null;
   }
 
-  /* ---- In-prayer: calm static display, no ticking countdown ---- */
+  /* ---- In-prayer: single line "Fajr | Jamaat in progress" ---- */
   if (phase === 'in-prayer') {
     return (
-      <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
-        <p className="text-subheading text-text-muted uppercase tracking-wider font-medium">
-          {phaseLabel(phase, nextPrayer.name)}
-        </p>
-        <h3 className="text-prayer text-gold font-bold">{nextPrayer.name}</h3>
-        <p className="text-heading font-bold text-text-primary">
+      <div className="countdown-container flex flex-row items-baseline justify-center gap-2 py-1.5 px-4 text-center">
+        <span className="text-body text-text-muted uppercase tracking-wider font-medium">
+          {nextPrayer.name}
+        </span>
+        <span className="text-text-muted/50">|</span>
+        <span className="text-body font-bold text-text-primary">
           Jamaat in progress
-        </p>
+        </span>
       </div>
     );
   }
 
-  /* ---- Normal / jamaat countdown display — single label line + countdown (prayer highlighted above) ---- */
+  /* ---- Normal / jamaat countdown — single line "Fajr prayer in | 5h 19m 20s" ---- */
   return (
-    <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
-      <p className="text-subheading text-text-muted uppercase tracking-wider">
+    <div className="countdown-container flex flex-row items-baseline justify-center gap-2 py-1.5 px-4 text-center">
+      <span className="text-body text-text-muted uppercase tracking-wider font-medium">
         {countdownLabel}
-      </p>
+      </span>
       {liveCountdown && (
-        <p className="text-countdown text-gold">
-          <CountdownDisplay value={liveCountdown} className="text-countdown text-gold" />
-        </p>
+        <>
+          <span className="text-text-muted/50">|</span>
+          <span className="text-countdown text-gold font-bold">
+            <CountdownDisplay value={liveCountdown} className="text-countdown text-gold font-bold" />
+          </span>
+        </>
       )}
     </div>
   );
