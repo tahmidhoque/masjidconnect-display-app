@@ -15,14 +15,16 @@ const DEFAULT_MASJID_NAME = "Masjid Connect"; // Default masjid name if none is 
 /**
  * Normalise prayer times for Redux storage.
  * usePrayerTimes expects { data: [day0, day1, ...] } for tomorrow's jamaat column.
- * When API returns an array, wrap it; when object with data, keep as-is.
+ * When API returns an array: single element → store flat; multiple → wrap as { data }.
+ * When object with data, keep as-is. When flat object, return as-is.
  */
 function normalisePrayerTimesForStore(
   raw: PrayerTimes | PrayerTimes[] | null | undefined
 ): PrayerTimes | null {
   if (!raw) return null;
   if (Array.isArray(raw)) {
-    return raw.length > 0 ? ({ data: raw } as PrayerTimes) : null;
+    if (raw.length === 0) return null;
+    return raw.length === 1 ? raw[0] : ({ data: raw } as PrayerTimes);
   }
   if (raw.data && Array.isArray(raw.data)) {
     return raw;
