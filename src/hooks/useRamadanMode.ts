@@ -21,7 +21,8 @@ import { useSelector } from 'react-redux';
 import { usePrayerTimes } from './usePrayerTimes';
 import { useCurrentTime } from './useCurrentTime';
 import { calculateApproximateHijriDate, getTimeUntilNextPrayer, formatTimeToDisplay } from '../utils/dateUtils';
-import { selectTimeFormat } from '../store/slices/contentSlice';
+import { selectTimeFormat, selectDisplaySettings, selectPrayerTimes } from '../store/slices/contentSlice';
+import type { PrayerTimes } from '../api/models';
 import logger from '../utils/logger';
 
 /**
@@ -84,6 +85,16 @@ interface ParsedHijri {
 }
 
 /**
+ * Extract today's raw prayer times entry (with imsak) from Redux.
+ * State stores a single day; handle data wrapper format.
+ */
+function getTodaysPrayerTimesRaw(pt: PrayerTimes | null): PrayerTimes | null {
+  if (!pt) return null;
+  if (pt.data && Array.isArray(pt.data) && pt.data.length > 0) return pt.data[0] as PrayerTimes;
+  return pt as PrayerTimes;
+}
+
+/**
  * Parse the string returned by `calculateApproximateHijriDate()`.
  * Expected format: "15 Ramadan 1447 AH"
  */
@@ -109,6 +120,8 @@ export const useRamadanMode = (): RamadanModeData => {
   const currentTime = useCurrentTime();
   const { todaysPrayerTimes } = usePrayerTimes();
   const timeFormat = useSelector(selectTimeFormat);
+  const displaySettings = useSelector(selectDisplaySettings);
+  const prayerTimesRaw = useSelector(selectPrayerTimes);
 
   /* ---- Dev force flag as reactive state ---- */
   const [forceFlag, setForceFlag] = useState<boolean | undefined>(
@@ -130,12 +143,14 @@ export const useRamadanMode = (): RamadanModeData => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTime.getDate()]);
 
-  /* ---- Ramadan detection ---- */
+  /* ---- Ramadan detection: API displaySettings.isRamadanActive takes precedence when present; else Hijri ---- */
+  const isRamadanFromHijri = hijriParsed?.month === 'Ramadan';
   const isRamadan = useMemo(() => {
     if (forceFlag === true) return true;
     if (forceFlag === false) return false;
-    return hijriParsed?.month === 'Ramadan';
-  }, [hijriParsed, forceFlag]);
+    if (displaySettings != null) return displaySettings.isRamadanActive;
+    return isRamadanFromHijri;
+  }, [displaySettings, forceFlag, isRamadanFromHijri]);
 
   const ramadanDay = useMemo(() => {
     if (!isRamadan) return null;
@@ -157,21 +172,25 @@ export const useRamadanMode = (): RamadanModeData => {
     return maghrib?.time ?? null;
   }, [isRamadan, todaysPrayerTimes]);
 
-  /* ---- Imsak time (IMSAK_OFFSET_MINUTES before Fajr) ---- */
+  /* ---- Imsak time: use pt.imsak from API when displaySettings.showImsak; else derive when no displaySettings + Ramadan ---- */
   const imsakTime = useMemo(() => {
-    if (!isRamadan || !suhoorEndTime) return null;
+    const todaysRaw = getTodaysPrayerTimesRaw(prayerTimesRaw);
+    const ptImsak = todaysRaw?.imsak ?? null;
 
+    if (displaySettings != null) {
+      if (!displaySettings.showImsak) return null;
+      return ptImsak && ptImsak.trim() ? ptImsak : null;
+    }
+
+    if (!isRamadan || !suhoorEndTime) return null;
     const [fajrHours, fajrMinutes] = suhoorEndTime.split(':').map(Number);
     if (isNaN(fajrHours) || isNaN(fajrMinutes)) return null;
-
-    // Subtract the offset, wrapping around midnight if necessary
     const totalMinutes = fajrHours * 60 + fajrMinutes - IMSAK_OFFSET_MINUTES;
     const wrappedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
     const h = Math.floor(wrappedMinutes / 60);
     const m = wrappedMinutes % 60;
-
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }, [isRamadan, suhoorEndTime]);
+  }, [displaySettings, isRamadan, suhoorEndTime, prayerTimesRaw]);
 
   const imsakDisplayTime = useMemo(
     () => (imsakTime ? formatTimeToDisplay(imsakTime, timeFormat) : null),

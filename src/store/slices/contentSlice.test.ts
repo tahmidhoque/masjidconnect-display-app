@@ -12,6 +12,7 @@ import {
   loadCachedContent,
   refreshAllContent,
   normalizeScheduleData,
+  DEFAULT_DISPLAY_SETTINGS,
 } from './contentSlice';
 import {
   setCarouselTime,
@@ -70,6 +71,7 @@ describe('contentSlice', () => {
         masjidTimezone: 'Europe/London',
         carouselTime: 30,
         timeFormat: '12h' as const,
+        displaySettings: DEFAULT_DISPLAY_SETTINGS,
         timestamp: new Date().toISOString(),
         schedule: undefined,
         scheduledPlaylists: undefined,
@@ -127,6 +129,7 @@ describe('contentSlice', () => {
         masjidTimezone: 'Europe/London',
         carouselTime: 30,
         timeFormat: '12h' as const,
+        displaySettings: DEFAULT_DISPLAY_SETTINGS,
         timestamp: new Date().toISOString(),
         schedule: scheduleWithDua,
         scheduledPlaylists: undefined,
@@ -247,6 +250,7 @@ describe('contentSlice', () => {
         events: [] as never[],
         prayerTimes: minimalPrayerTimes,
         screenContent: mockScreenContent as never,
+        displaySettings: DEFAULT_DISPLAY_SETTINGS,
         timestamp: new Date().toISOString(),
       };
       const state = contentReducer(

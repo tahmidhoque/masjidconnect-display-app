@@ -54,15 +54,15 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
         {header}
       </header>
 
-      {/* Main area — two columns: content gets more width to reduce text wrapping */}
+      {/* Main area — two columns: 50/50 split so prayer times panel uses half the screen */}
       <main className="flex-1 flex min-h-0 gap-3">
-        {/* Left column — content carousel (wider so hadith/announcements don't overflow vertically) */}
-        <section className="flex-[58] min-w-0 flex flex-col">
+        {/* Left column — content carousel */}
+        <section className="flex-1 min-w-0 flex flex-col">
           {content}
         </section>
 
         {/* Right column — prayer times + countdown */}
-        <aside className="flex-[42] min-w-0 flex flex-col gap-2">
+        <aside className="flex-1 min-w-0 flex flex-col gap-2">
           {sidebar}
         </aside>
       </main>

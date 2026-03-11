@@ -52,6 +52,9 @@ interface FormattedPrayerTime {
   jamaatTime?: string;
 }
 
+/** Map of prayer name to jamaat time for the "tomorrow" relative to displayed date. */
+export type TomorrowsJamaatsMap = Record<string, string> | null;
+
 interface PrayerTimesHook {
   todaysPrayerTimes: FormattedPrayerTime[];
   nextPrayer: FormattedPrayerTime | null;
@@ -64,10 +67,14 @@ interface PrayerTimesHook {
   jumuahKhutbahTime: string | null;
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
+  /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
+  tomorrowsJamaats: TomorrowsJamaatsMap;
 }
 
 const PRAYER_NAMES = ["Fajr", "Sunrise", "Zuhr", "Asr", "Maghrib", "Isha"];
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in countdown
+/** Prayers that have jamaat times (excludes Sunrise). */
+const PRAYERS_WITH_JAMAAT = ["Fajr", "Zuhr", "Asr", "Maghrib", "Isha"];
 
 /**
  * Resolve jamaat time from data object with case-insensitive key lookup.
@@ -84,6 +91,22 @@ function getJamaatTime(data: Record<string, unknown>, lowerName: string): string
   }
   const snake = (data[`${lowerName}_jamaat`] ?? data[`jamaat_${lowerName}`]) as string | undefined;
   return typeof snake === "string" ? snake : undefined;
+}
+
+/** Build tomorrow's jamaats map from a day's prayer data. Returns null if no valid jamaats. */
+function buildTomorrowsJamaats(dayData: PrayerTimes | null): TomorrowsJamaatsMap {
+  if (!dayData || typeof dayData !== "object") return null;
+  const data = dayData as unknown as Record<string, unknown>;
+  const map: Record<string, string> = {};
+  let hasAny = false;
+  for (const name of PRAYERS_WITH_JAMAAT) {
+    const jamaat = getJamaatTime(data, name.toLowerCase());
+    if (jamaat) {
+      map[name] = jamaat;
+      hasAny = true;
+    }
+  }
+  return hasAny ? map : null;
 }
 
 export const usePrayerTimes = (): PrayerTimesHook => {
@@ -129,6 +152,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   );
   const [forbiddenPrayer, setForbiddenPrayer] =
     useState<CurrentForbiddenState | null>(null);
+  const [tomorrowsJamaats, setTomorrowsJamaats] =
+    useState<TomorrowsJamaatsMap>(null);
   /** Dev override: when set (not undefined), use this instead of computed forbiddenPrayer. */
   const [devForbiddenOverride, setDevForbiddenOverride] = useState<
     CurrentForbiddenState | null | undefined
@@ -782,7 +807,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Update formatted prayer times for display
   const updateFormattedPrayerTimes = useCallback(() => {
     if (!prayerTimes) return;
-
     const prayers: FormattedPrayerTime[] = [];
     const prayerTimesForCalculation: { name: string; time: string }[] = [];
 
@@ -793,6 +817,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     // API returns { data: [ day0, day1, ... ] } with 5 days; use index 0 for today, 1 for tomorrow (after Isha)
     let tomorrowData: PrayerTimes | null = null;
+    let dayAfterTomorrowData: PrayerTimes | null = null;
     if (
       prayerTimes &&
       prayerTimes.data &&
@@ -802,6 +827,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       todayData = prayerTimes.data[0];
       if (prayerTimes.data.length > 1) {
         tomorrowData = prayerTimes.data[1];
+      }
+      if (prayerTimes.data.length > 2) {
+        dayAfterTomorrowData = prayerTimes.data[2];
       }
     }
 
@@ -934,7 +962,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     if (!needTomorrowList) {
       setCurrentDate(nowDayjs.format("dddd, MMMM D, YYYY"));
       setIsJumuahToday(nowDayjs.day() === 5);
+      setTomorrowsJamaats(buildTomorrowsJamaats(tomorrowData));
     } else if (needTomorrowList && tomorrowData) {
+      setTomorrowsJamaats(buildTomorrowsJamaats(dayAfterTomorrowData));
       // Build displayed list from tomorrow's day in the API data array (data[1])
       const prayersFromTomorrow: FormattedPrayerTime[] = [];
       PRAYER_NAMES.forEach((name) => {
@@ -1023,6 +1053,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         ) ?? null,
       );
       return;
+    } else {
+      // needTomorrowList but no tomorrowData — fall through with today's list
+      setTomorrowsJamaats(buildTomorrowsJamaats(tomorrowData));
     }
 
     // Apply the calculated flags
@@ -1265,5 +1298,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahDisplayTime,
     jumuahKhutbahTime,
     forbiddenPrayer: effectiveForbiddenPrayer,
+    tomorrowsJamaats,
   };
 };

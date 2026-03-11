@@ -448,6 +448,15 @@ class ApiClient {
           await storageService.set('events', contentResponse.events);
           logger.debug('[ApiClient] Saved events from content');
         }
+
+        // Persist displaySettings for Redux (admin-controlled screen customisation)
+        const displaySettings =
+          contentResponse.displaySettings ??
+          (contentResponse as { data?: { displaySettings?: unknown } }).data?.displaySettings;
+        if (displaySettings) {
+          await storageService.set('displaySettings', displaySettings);
+          logger.debug('[ApiClient] Saved displaySettings from content');
+        }
       } else if (cacheKey.startsWith(CACHE_KEYS.PRAYER_TIMES)) {
         await storageService.set('prayerTimes', data);
         logger.debug('[ApiClient] Saved prayer times to storageService');

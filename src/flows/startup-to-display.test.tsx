@@ -9,7 +9,7 @@ import {
   checkPairingStatus,
   initializeFromStorage,
 } from '@/store/slices/authSlice';
-import { refreshContent } from '@/store/slices/contentSlice';
+import { refreshContent, DEFAULT_DISPLAY_SETTINGS } from '@/store/slices/contentSlice';
 import { mockPairingCodeResponse, mockPairingStatusResponse, mockScreenContent } from '@/test-utils/mocks';
 
 describe('Startup to display flow (reducer state)', () => {
@@ -67,6 +67,7 @@ describe('Startup to display flow (reducer state)', () => {
           masjidTimezone: 'Europe/London',
           carouselTime: 30,
           timeFormat: '12h',
+          displaySettings: DEFAULT_DISPLAY_SETTINGS,
           timestamp: new Date().toISOString(),
           schedule: undefined,
           scheduledPlaylists: undefined,
