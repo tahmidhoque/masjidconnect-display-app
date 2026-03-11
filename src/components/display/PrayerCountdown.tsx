@@ -101,7 +101,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   /* ---- In-prayer: single line "Fajr | Jamaat in progress" ---- */
   if (phase === 'in-prayer') {
     return (
-      <div className="countdown-container flex flex-row items-baseline justify-center gap-2 py-1.5 px-4 text-center">
+      <div className="countdown-container flex flex-row items-baseline justify-center gap-2 text-center">
         <span className="text-body text-text-muted uppercase tracking-wider font-medium">
           {nextPrayer.name}
         </span>
@@ -113,19 +113,16 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     );
   }
 
-  /* ---- Normal / jamaat countdown — single line "Fajr prayer in | 5h 19m 20s" ---- */
+  /* ---- Normal / jamaat countdown — single line: label left, countdown right, full horizontal width ---- */
   return (
-    <div className="countdown-container flex flex-row items-baseline justify-center gap-2 py-1.5 px-4 text-center">
-      <span className="text-body text-text-muted uppercase tracking-wider font-medium">
+    <div className="countdown-container flex flex-row items-center justify-between gap-4">
+      <span className="text-subheading text-text-muted uppercase tracking-wider font-semibold text-left">
         {countdownLabel}
       </span>
       {liveCountdown && (
-        <>
-          <span className="text-text-muted/50">|</span>
-          <span className="text-countdown text-gold font-bold">
-            <CountdownDisplay value={liveCountdown} className="text-countdown text-gold font-bold" />
-          </span>
-        </>
+        <span className="text-countdown text-gold font-bold text-right">
+          <CountdownDisplay value={liveCountdown} className="text-countdown text-gold font-bold" />
+        </span>
       )}
     </div>
   );
