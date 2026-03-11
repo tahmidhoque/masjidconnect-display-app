@@ -41,14 +41,14 @@ const ForbiddenPrayerNotice: React.FC<ForbiddenPrayerNoticeProps> = ({
       aria-live="polite"
     >
       {!compact && (
-        <Info className="w-3.5 h-3.5 shrink-0 text-gold/60" aria-hidden />
+        <Info className="w-3.5 h-3.5 shrink-0 text-gold/75" aria-hidden />
       )}
       <p
-        className={`text-caption text-text-muted ${compact ? 'truncate' : ''}`}
+        className={`text-caption text-text-secondary ${compact ? 'truncate' : ''}`}
         title={compact ? `Nafl prayer not recommended until ${displayEndsAtAria}` : undefined}
       >
         Nafl prayer not recommended until {main}
-        {period != null && <span className="opacity-80 font-normal"> {period}</span>}
+        {period != null && <span className="opacity-90 font-normal"> {period}</span>}
       </p>
     </div>
   );

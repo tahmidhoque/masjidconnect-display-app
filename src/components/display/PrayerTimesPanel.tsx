@@ -66,7 +66,7 @@ const TimeWithPeriod: React.FC<{
     <span className={className}>
       {main}
       {period != null && (
-        <span className="text-caption opacity-80 font-normal ml-0.5 align-baseline text-[0.85em]">{period}</span>
+        <span className="text-caption opacity-90 font-normal ml-0.5 align-baseline text-[0.9em]">{period}</span>
       )}
     </span>
   );
@@ -116,7 +116,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 <div className={`${rowGridClass} px-3 py-1.5 rounded-lg`}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-prayer font-medium text-gold/70 italic">Imsak</span>
-                    <span className="text-caption text-gold/50 font-normal italic">Suhoor ends</span>
+                    <span className="text-caption text-gold/70 font-normal italic">Suhoor ends</span>
                   </div>
                   {showTomorrowCol ? (
                     <>
@@ -155,7 +155,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                     {prayer.name}
                   </span>
                   {ramadanLabel && (
-                    <span className="text-caption text-gold/60 font-normal italic">{ramadanLabel}</span>
+                    <span className="text-caption text-gold/75 font-normal italic">{ramadanLabel}</span>
                   )}
                 </div>
 
@@ -180,7 +180,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                         <TimeWithPeriod
                           timeString={tomorrowsJamaats?.[prayer.name] ?? ''}
                           timeFormat={timeFormat}
-                          className="text-prayer text-gold/60"
+                          className="text-prayer text-gold/75"
                         />
                       </span>
                     )}
@@ -225,10 +225,10 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             compact
           />
         </div>
-        <span className={`text-subheading text-text-muted font-medium ${TIME_COL_CLASS}`}>Start</span>
+                        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>Start</span>
         <span className={`text-subheading text-gold/80 font-medium ${TIME_COL_CLASS}`}>Jamaat</span>
         {showTomorrowCol && (
-          <span className={`text-subheading text-gold/60 font-medium ${TIME_COL_CLASS}`}>Tomorrow&apos;s Jamaat</span>
+          <span className={`text-subheading text-gold/75 font-medium ${TIME_COL_CLASS}`}>Tomorrow&apos;s Jamaat</span>
         )}
       </div>
     </div>

@@ -243,6 +243,17 @@ html, body {
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
+/* Respect reduced motion preference — essential for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ============================================================
    Arabic text helpers
    ============================================================ */
@@ -593,35 +604,32 @@ html, body {
   border-color: rgba(212, 168, 74, 0.3);
 }
 
-/* Countdown container — Ramadan gold border for green theme cohesion */
-[data-theme="ramadan"] .countdown-container {
-  border-color: rgba(240, 212, 138, 0.3);
-}
+/* Countdown container — Ramadan theme uses same gradient as header; no override needed */
 
 /* Iftar/Ramadan countdown card — no glow for display clarity. */
 .iftar-countdown-card {
   /* Previously had iftarGlow animation; removed per display-only design. */
 }
 
-/* Countdown container — hero treatment with gold accent. Matches the clock
-   header's visual weight so the countdown reads as a primary focal point. */
+/* Countdown container — same treatment as header bar for visual consistency.
+   Uses identical gradient, padding, and gold accent as Header (clock) so both
+   hero metrics share the same design language. No border or card — minimal chrome. */
 .countdown-container {
   position: relative;
-  border: 1px solid rgba(233, 196, 106, 0.25);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
-  border-radius: 0.75rem;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
+  border-radius: 0.5rem;
   padding: 1rem 1.5rem;
 }
 
-/* Gold accent line — mirrors the clock header for visual cohesion */
+/* Gold accent line — identical to header's accent (w-[3.75rem], h-[0.2rem]) */
 .countdown-container::after {
   content: '';
   position: absolute;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 5rem;
-  height: 0.25rem;
+  width: 3.75rem;
+  height: 0.2rem;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--color-gold), var(--color-gold-light));
 }

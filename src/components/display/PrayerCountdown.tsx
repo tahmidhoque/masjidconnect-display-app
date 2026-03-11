@@ -116,7 +116,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   /* ---- Normal / jamaat countdown — single line: label left, countdown right, full horizontal width ---- */
   return (
     <div className="countdown-container flex flex-row items-center justify-between gap-4">
-      <span className="text-subheading text-text-muted uppercase tracking-wider font-semibold text-left">
+      <span className="text-subheading text-text-secondary uppercase tracking-wider font-semibold text-left">
         {countdownLabel}
       </span>
       {liveCountdown && (

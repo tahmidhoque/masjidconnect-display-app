@@ -49,7 +49,7 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
     />
 
     {/* Content grid — uniform padding (same on all sides) so edges look consistent */}
-    <div className="relative z-10 flex flex-col w-full h-full p-4 gap-1">
+    <div className="relative z-10 flex flex-col w-full h-full p-4 gap-2">
       <header className="shrink-0">
         {header}
       </header>
