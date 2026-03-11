@@ -20,6 +20,8 @@ import CountdownDisplay from './CountdownDisplay';
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
   phase?: PrayerPhase;
+  /** When true (landscape), use tighter spacing and smaller label */
+  compact?: boolean;
 }
 
 /**
@@ -32,7 +34,7 @@ function isCountingToJamaat(
   return Boolean(targetTime && jamaat && targetTime.time === jamaat);
 }
 
-const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
+const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = false }) => {
   const { nextPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
 
@@ -101,27 +103,27 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
   /* ---- In-prayer: single line "Fajr | Jamaat in progress" ---- */
   if (phase === 'in-prayer') {
     return (
-      <div className="countdown-container flex flex-row items-baseline justify-center gap-2 text-center">
-        <span className="text-body text-text-muted uppercase tracking-wider font-medium">
+      <div className={`countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
+        <span className={`text-text-muted uppercase font-medium ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`}>
           {nextPrayer.name}
         </span>
         <span className="text-text-muted/50">|</span>
-        <span className="text-body font-bold text-text-primary">
+        <span className={`font-bold text-text-primary ${compact ? 'text-body' : 'text-subheading'}`}>
           Jamaat in progress
         </span>
       </div>
     );
   }
 
-  /* ---- Normal / jamaat countdown — single line: label left, countdown right, full horizontal width ---- */
+  /* ---- Normal / jamaat countdown — label left, countdown right ---- */
   return (
-    <div className="countdown-container flex flex-row items-center justify-between gap-4">
-      <span className="text-subheading text-text-secondary uppercase tracking-wider font-semibold text-left">
+    <div className={`countdown-container flex flex-row items-center justify-between ${compact ? 'gap-3' : 'gap-4'}`}>
+      <span className={`text-text-secondary uppercase font-semibold text-left ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`}>
         {countdownLabel}
       </span>
       {liveCountdown && (
-        <span className="text-countdown text-gold font-bold text-right">
-          <CountdownDisplay value={liveCountdown} className="text-countdown text-gold font-bold" />
+        <span className="text-countdown text-gold text-right">
+          <CountdownDisplay value={liveCountdown} className="text-countdown text-gold" />
         </span>
       )}
     </div>

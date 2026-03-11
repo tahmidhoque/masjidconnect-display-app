@@ -145,8 +145,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
               {/* Standard prayer row */}
               <div
                 className={`
-                  ${rowGridClass} px-3 py-1.5 rounded-lg
-                  transition-colors duration-normal
+                  ${rowGridClass} px-3 py-1.5 rounded-lg transition-colors duration-normal
                   ${isNext ? 'bg-emerald/15' : ''}
                 `}
               >
@@ -214,8 +213,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
 
       {/* Legend — distinct block so row highlight never bleeds; border sits below last row */}
       <div
-        className={`${rowGridClass} shrink-0 gap-2 px-3 pt-2 border-t border-white/10 ${
-          compact ? 'mt-0.5' : 'mt-4'
+        className={`${rowGridClass} shrink-0 gap-2 px-3 border-t border-white/10 ${
+          compact ? 'pt-3 mt-0.5' : 'pt-2 mt-4'
         }`}
       >
         <div className="min-w-0 overflow-hidden">
@@ -225,7 +224,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             compact
           />
         </div>
-                        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>Start</span>
+        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>Start</span>
         <span className={`text-subheading text-gold/80 font-medium ${TIME_COL_CLASS}`}>Jamaat</span>
         {showTomorrowCol && (
           <span className={`text-subheading text-gold/75 font-medium ${TIME_COL_CLASS}`}>Tomorrow&apos;s Jamaat</span>

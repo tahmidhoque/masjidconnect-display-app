@@ -363,6 +363,7 @@ const DisplayScreenInner: React.FC = () => {
     <Header
       key={`header-hijri-${hijriDateAdjustment}`}
       masjidName={masjidName}
+      compact={!isPortrait}
       isRamadan={ramadan.isRamadan}
       ramadanDay={ramadan.ramadanDay}
       ramadanTwoLines={isPortrait}
@@ -384,7 +385,7 @@ const DisplayScreenInner: React.FC = () => {
       tomorrowsJamaats={tomorrowsJamaats}
     />
   );
-  const countdown = <PrayerCountdown phase={prayerPhase} />;
+  const countdown = <PrayerCountdown phase={prayerPhase} compact={!isPortrait} />;
 
   /**
    * Content slot: swapped based on the current prayer phase.

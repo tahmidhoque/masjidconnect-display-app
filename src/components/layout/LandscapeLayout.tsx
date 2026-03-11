@@ -33,7 +33,7 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
   footer,
   background,
 }) => (
-  <div className="relative w-full h-full flex flex-col bg-midnight gpu-accelerated overflow-hidden">
+  <div className="relative w-full h-full flex flex-col bg-midnight gpu-accelerated overflow-hidden" data-orientation="landscape">
     {/* Background layer (e.g. subtle Islamic pattern) */}
     {background && (
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -41,14 +41,13 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
       </div>
     )}
 
-    {/* Unified frosted overlay — one continuous layer over content area */}
+    {/* Unified overlay — theme-aware tint (midnight default, green Ramadan) */}
     <div
-      className="absolute inset-0 z-[5] pointer-events-none"
-      style={{ background: 'rgba(13, 59, 46, 0.35)' }}
+      className="absolute inset-0 z-[5] pointer-events-none layout-overlay"
       aria-hidden
     />
 
-    {/* Content grid — uniform padding (same on all sides) so edges look consistent */}
+    {/* Content grid — compact in landscape so prayer times + carousel fit without overflow */}
     <div className="relative z-10 flex flex-col w-full h-full p-4 gap-2">
       <header className="shrink-0">
         {header}
@@ -62,7 +61,7 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
         </section>
 
         {/* Right column — prayer times + countdown */}
-        <aside className="flex-1 min-w-0 flex flex-col gap-2">
+        <aside className="flex-1 min-w-0 flex flex-col gap-1.5">
           {sidebar}
         </aside>
       </main>
