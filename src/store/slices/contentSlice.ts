@@ -12,6 +12,24 @@ const MIN_REFRESH_INTERVAL = 30 * 1000; // Increased from 10 to 30 seconds to pr
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in announcements
 const DEFAULT_MASJID_NAME = "Masjid Connect"; // Default masjid name if none is found
 
+/**
+ * Normalise prayer times for Redux storage.
+ * usePrayerTimes expects { data: [day0, day1, ...] } for tomorrow's jamaat column.
+ * When API returns an array, wrap it; when object with data, keep as-is.
+ */
+function normalisePrayerTimesForStore(
+  raw: PrayerTimes | PrayerTimes[] | null | undefined
+): PrayerTimes | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    return raw.length > 0 ? ({ data: raw } as PrayerTimes) : null;
+  }
+  if (raw.data && Array.isArray(raw.data)) {
+    return raw;
+  }
+  return raw;
+}
+
 /** Safe defaults when displaySettings is missing from API (backward compatibility). */
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   ramadanMode: "auto",
@@ -554,13 +572,12 @@ export const loadPrayerTimesFromStorage = createAsyncThunk(
   "content/loadPrayerTimesFromStorage",
   async (_, { rejectWithValue }) => {
     try {
-      const prayerTimes = await storageService.get<PrayerTimes>('prayerTimes');
+      const prayerTimes = await storageService.get<PrayerTimes | PrayerTimes[]>('prayerTimes');
       if (!prayerTimes) {
         return { skipped: true, reason: "no data" };
       }
-      const normalized = Array.isArray(prayerTimes) ? prayerTimes[0] || null : prayerTimes;
       return {
-        prayerTimes: normalized,
+        prayerTimes: normalisePrayerTimesForStore(prayerTimes),
         timestamp: new Date().toISOString(),
       };
     } catch (error: unknown) {
@@ -692,10 +709,7 @@ export const loadCachedContent = createAsyncThunk(
         ? (Array.isArray(schedule) ? schedule[0] : schedule)
         : null;
 
-      // Normalize prayerTimes if it's an array (shouldn't be, but handle it)
-      const normalizedPrayerTimes = prayerTimes
-        ? (Array.isArray(prayerTimes) ? prayerTimes[0] : prayerTimes)
-        : null;
+      const normalizedPrayerTimes = normalisePrayerTimesForStore(prayerTimes);
 
       const contentAny = screenContent as unknown as {
         scheduledPlaylists?: ScheduledPlaylistAssignment[] | null;
@@ -915,14 +929,7 @@ const contentSlice = createSlice({
 
         // Skip update if this was debounced
         if (!action.payload.skipped) {
-          // Handle both single PrayerTimes object and array format
-          const prayerTimes = action.payload.prayerTimes;
-          if (Array.isArray(prayerTimes)) {
-            // If it's an array, take the first element (today's prayer times)
-            state.prayerTimes = prayerTimes[0] || null;
-          } else {
-            state.prayerTimes = prayerTimes || null;
-          }
+          state.prayerTimes = normalisePrayerTimesForStore(action.payload.prayerTimes);
           state.lastPrayerTimesUpdate =
             action.payload.timestamp || new Date().toISOString();
           state.lastUpdated =
