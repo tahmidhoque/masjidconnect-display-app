@@ -37,7 +37,7 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
   footer,
   background,
 }) => (
-  <div className="relative w-full h-full flex flex-col bg-midnight gpu-accelerated overflow-hidden">
+  <div className="relative w-full h-full flex flex-col bg-midnight gpu-accelerated overflow-hidden" data-orientation="portrait">
     {/* Background layer */}
     {background && (
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -45,15 +45,14 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
       </div>
     )}
 
-    {/* Unified frosted overlay — one continuous layer over content area */}
+    {/* Unified overlay — theme-aware tint (midnight default, green Ramadan) */}
     <div
-      className="absolute inset-0 z-[5] pointer-events-none"
-      style={{ background: 'rgba(13, 59, 46, 0.35)' }}
+      className="absolute inset-0 z-[5] pointer-events-none layout-overlay"
       aria-hidden
     />
 
-    {/* Content stack — uniform padding (same on all sides) so edges look consistent */}
-    <div className="relative z-10 flex flex-col w-full h-full p-4 gap-1">
+    {/* Content stack — generous padding for spatial drama, clear hierarchy */}
+    <div className="relative z-10 flex flex-col w-full h-full p-6 gap-4">
       <header className="shrink-0">
         {header}
       </header>

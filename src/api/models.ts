@@ -308,6 +308,27 @@ export interface ScreenContentConfig {
   [key: string]: any; // Allow additional settings
 }
 
+/**
+ * Display settings from the content API (screen customisation).
+ * Admin-controlled; bundled in content response.
+ */
+export interface DisplaySettings {
+  /** Admin choice: "auto" = use Hijri calendar, "on" = force Ramadan mode, "off" = force off */
+  ramadanMode: "auto" | "on" | "off";
+  /** Resolved value: true if Ramadan mode should be shown (based on ramadanMode + Hijri date) */
+  isRamadanActive: boolean;
+  /** "12h" = 5:30 AM, "24h" = 05:30 */
+  timeFormat: "12h" | "24h";
+  /** Show imsak/sehri time in the prayer times section */
+  showImsak: boolean;
+  /** Show a column with tomorrow's jamaat times */
+  showTomorrowJamaat: boolean;
+  /** Minutes before Fajr for imsak/sehri. Use to compute imsak on the fly when pt.imsak is null. */
+  imsakOffset: number;
+  /** Days to add to the calculated Hijri date (e.g. +1 if API/local calc is 1 day behind). */
+  hijriDateAdjustment: number;
+}
+
 // Content Types
 export type ContentItemType =
   | "VERSE_HADITH"
@@ -381,6 +402,8 @@ export interface PrayerTimes {
   asr: string;
   maghrib: string;
   isha: string;
+  /** Imsak time in HH:mm (e.g. "05:20"); null if not calculated. From API when masjid has it configured. */
+  imsak?: string | null;
   fajrJamaat: string;
   zuhrJamaat: string;
   asrJamaat: string;
@@ -423,6 +446,8 @@ export interface ScreenContent {
   prayerTimes: PrayerTimes;
   contentOverrides: ContentOverride[];
   lastUpdated: string;
+  /** Display settings from admin portal (screen customisation). Bundled in content API response. */
+  displaySettings?: DisplaySettings;
   // New fields for the updated API format
   data?: {
     masjid?: {
@@ -446,6 +471,7 @@ export interface ScreenContent {
     };
     events?: Event[] | { data: Event[] };
     scheduledPlaylists?: ScheduledPlaylistAssignment[];
+    displaySettings?: DisplaySettings;
   };
   events?: Event[] | { data: Event[] };
 }

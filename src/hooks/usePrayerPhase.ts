@@ -17,7 +17,7 @@
  */
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { usePrayerTimes } from './usePrayerTimes';
+import { usePrayerTimesContext } from '../contexts/PrayerTimesContext';
 import { useCurrentTime } from './useCurrentTime';
 import { toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
@@ -83,7 +83,7 @@ function nowMinutes(date: Date): number {
 /* ------------------------------------------------------------------ */
 
 export const usePrayerPhase = (): PrayerPhaseData => {
-  const { nextPrayer, currentPrayer } = usePrayerTimes();
+  const { nextPrayer, currentPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
 
   /* ---- Dev force flag as reactive state ---- */

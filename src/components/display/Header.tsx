@@ -17,6 +17,8 @@ import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/
 interface HeaderProps {
   /** Unused — kept for API compatibility; masjid name is no longer displayed */
   masjidName?: string | null;
+  /** When true (landscape), use tighter padding and gap so layout fits */
+  compact?: boolean;
   /** Whether Ramadan mode is active */
   isRamadan?: boolean;
   /** Current day of Ramadan (1-30) */
@@ -25,6 +27,8 @@ interface HeaderProps {
   ramadanTwoLines?: boolean;
   /** Time display format (12h or 24h); defaults to 12h */
   timeFormat?: TimeFormat;
+  /** Days to add to the calculated Hijri date (from displaySettings.hijriDateAdjustment) */
+  hijriDateAdjustment?: number;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -34,10 +38,12 @@ const MONTHS = [
 ];
 
 const Header: React.FC<HeaderProps> = ({
+  compact = false,
   isRamadan = false,
   ramadanDay = null,
   ramadanTwoLines = false,
   timeFormat = '12h',
+  hijriDateAdjustment = 0,
 }) => {
   const currentTime = useCurrentTime();
 
@@ -52,7 +58,10 @@ const Header: React.FC<HeaderProps> = ({
   const dateLine2 = `${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
 
   const calendarDate = currentTime.getDate();
-  const hijriDate = useMemo(() => calculateApproximateHijriDate(), [calendarDate]);
+  const hijriDate = useMemo(
+    () => calculateApproximateHijriDate(undefined, hijriDateAdjustment),
+    [calendarDate, hijriDateAdjustment],
+  );
 
   const rightDateContent = useMemo(() => {
     if (isRamadan && ramadanDay != null) {
@@ -63,12 +72,15 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <div
-      className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-lg px-4 py-4 overflow-hidden"
+      className={`relative grid grid-cols-[1fr_auto_1fr] items-center overflow-hidden ${
+        compact ? 'gap-4 rounded-lg px-4 py-3' : 'gap-5 rounded-lg px-4 py-4'
+      }`}
       style={{
-        background: 'linear-gradient(90deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%)',
+        background: 'linear-gradient(90deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.08) 100%)',
+        border: '1px solid rgba(255,255,255,0.08)',
       }}
     >
-      {/* Gold accent line at the bottom */}
+      {/* Gold accent line */}
       <div
         className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[0.2rem] w-[3.75rem] rounded-sm"
         style={{
@@ -78,18 +90,18 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* Left — Gregorian date (day on first line, rest on second) */}
       <div className="min-w-0 flex flex-col">
-        <p className="text-body text-text-secondary font-semibold truncate leading-tight">{dateLine1}</p>
+        <p className={`text-text-secondary font-semibold truncate leading-tight ${compact ? 'text-body' : 'text-subheading'}`}>{dateLine1}</p>
         <p className="text-body text-text-secondary font-semibold truncate leading-tight">{dateLine2}</p>
       </div>
 
-      {/* Centre — Clock (main focus); time and period scale together; no glow */}
-      <div className="flex items-baseline gap-1.5 justify-center shrink-0 pointer-events-none">
+      {/* Centre — Clock */}
+      <div className={`flex items-baseline justify-center shrink-0 pointer-events-none ${compact ? 'gap-1.5' : 'gap-2'}`}>
         <span className="text-clock text-gold">{timeMain}</span>
         {timePeriod != null && (
-          <span className="text-subheading text-gold/90 font-normal align-baseline">{timePeriod}</span>
+          <span className={`text-gold/90 align-baseline ${compact ? 'text-body font-normal' : 'text-subheading font-medium'}`}>{timePeriod}</span>
         )}
         {timeFormat === '24h' && (
-          <span className="text-caption text-gold/70 tabular-nums">{secStr}</span>
+          <span className="text-caption text-gold/70 tabular-nums font-medium">{secStr}</span>
         )}
       </div>
 
@@ -97,7 +109,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="min-w-0 flex flex-col items-end">
         {isRamadan && ramadanDay != null && ramadanTwoLines ? (
           <>
-            <p className="text-body font-semibold truncate text-right text-gold/80">
+            <p className="text-subheading font-bold truncate text-right text-gold/90">
               Day {ramadanDay}
             </p>
             <p className="text-body font-semibold truncate text-right text-gold/80 leading-tight">

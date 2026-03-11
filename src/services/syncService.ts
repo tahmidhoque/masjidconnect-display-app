@@ -305,7 +305,8 @@ class SyncService {
 
     const forceRefresh = options?.forceRefresh === true;
     if (forceRefresh) {
-      await apiClient.clearContentCache();
+      // Do NOT clear content cache — when offline, getContent needs it to fall back.
+      // cacheBust param ensures fresh network fetch when online.
       this.lastKnownTimestamps = null;
     }
 
@@ -320,7 +321,9 @@ class SyncService {
         return { success: true, fromCache: true };
       }
 
-      const response = await apiClient.getContent(forceRefresh ? { cacheBust: true } : undefined);
+      const response = await apiClient.getContent(
+        forceRefresh ? { cacheBust: true, forceNetwork: true } : undefined
+      );
 
       if (response.success && response.data) {
         this.updateState('content', {
@@ -375,7 +378,7 @@ class SyncService {
 
         this.emitEvent('prayerTimes:synced', response.data);
         window.dispatchEvent(new CustomEvent('prayerTimesUpdated'));
-        logger.info('[SyncService] Prayer times synced successfully', {
+        logger.debug('[SyncService] Prayer times synced successfully', {
           fromCache: response.fromCache,
         });
 

@@ -377,9 +377,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
    * Auto-scroll effect for content that overflows at minimum font sizes.
    *
    * Pauses at the top, scrolls down slowly, pauses at the bottom, then
-   * resets. Scroll speed and pause durations are constants from
-   * contentScaling.ts. Only the scroll wrapper scrolls — the badge and
-   * any static elements above remain fixed.
+   * scrolls back up to the top (no abrupt jump). Scroll speed and pause
+   * durations are constants from contentScaling.ts. Only the scroll
+   * wrapper scrolls — the badge and any static elements above remain fixed.
    */
   useEffect(() => {
     if (!needsScroll) return;
@@ -389,57 +389,65 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
 
     let cancelled = false;
     let lastTimestamp = 0;
-    let scrollDirection: 'down' | 'paused-top' | 'paused-bottom' = 'paused-top';
+    let scrollDirection: 'down' | 'up' | 'paused-top' | 'paused-bottom' = 'paused-top';
 
     // Reset scroll position
     scrollEl.scrollTop = 0;
 
-    // Start with a pause at the top
+    const tick = (timestamp: number) => {
+      if (cancelled) return;
+
+      if (lastTimestamp === 0) {
+        lastTimestamp = timestamp;
+        scrollRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const delta = (timestamp - lastTimestamp) / 1000; // seconds
+      lastTimestamp = timestamp;
+
+      const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+
+      if (scrollDirection === 'down') {
+        scrollEl.scrollTop += AUTO_SCROLL_SPEED * delta;
+
+        if (scrollEl.scrollTop >= maxScroll - 1) {
+          scrollEl.scrollTop = maxScroll;
+          scrollDirection = 'paused-bottom';
+
+          scrollTimerRef.current = setTimeout(() => {
+            if (cancelled) return;
+            scrollDirection = 'up';
+            lastTimestamp = 0;
+            scrollRafRef.current = requestAnimationFrame(tick);
+          }, AUTO_SCROLL_PAUSE_BOTTOM);
+          return;
+        }
+      } else if (scrollDirection === 'up') {
+        scrollEl.scrollTop -= AUTO_SCROLL_SPEED * delta;
+
+        if (scrollEl.scrollTop <= 1) {
+          scrollEl.scrollTop = 0;
+          scrollDirection = 'paused-top';
+
+          scrollTimerRef.current = setTimeout(() => {
+            if (cancelled) return;
+            scrollDirection = 'down';
+            lastTimestamp = 0;
+            scrollRafRef.current = requestAnimationFrame(tick);
+          }, AUTO_SCROLL_PAUSE_TOP);
+          return;
+        }
+      }
+
+      scrollRafRef.current = requestAnimationFrame(tick);
+    };
+
+    // Start with a pause at the top, then begin scrolling down
     scrollTimerRef.current = setTimeout(() => {
       if (cancelled) return;
       scrollDirection = 'down';
       lastTimestamp = 0;
-
-      const tick = (timestamp: number) => {
-        if (cancelled) return;
-
-        if (lastTimestamp === 0) {
-          lastTimestamp = timestamp;
-          scrollRafRef.current = requestAnimationFrame(tick);
-          return;
-        }
-
-        const delta = (timestamp - lastTimestamp) / 1000; // seconds
-        lastTimestamp = timestamp;
-
-        if (scrollDirection === 'down') {
-          scrollEl.scrollTop += AUTO_SCROLL_SPEED * delta;
-
-          const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
-          if (scrollEl.scrollTop >= maxScroll - 1) {
-            scrollEl.scrollTop = maxScroll;
-            scrollDirection = 'paused-bottom';
-
-            scrollTimerRef.current = setTimeout(() => {
-              if (cancelled) return;
-              // Reset to top and pause
-              scrollEl.scrollTop = 0;
-              scrollDirection = 'paused-top';
-
-              scrollTimerRef.current = setTimeout(() => {
-                if (cancelled) return;
-                scrollDirection = 'down';
-                lastTimestamp = 0;
-                scrollRafRef.current = requestAnimationFrame(tick);
-              }, AUTO_SCROLL_PAUSE_TOP);
-            }, AUTO_SCROLL_PAUSE_BOTTOM);
-            return;
-          }
-        }
-
-        scrollRafRef.current = requestAnimationFrame(tick);
-      };
-
       scrollRafRef.current = requestAnimationFrame(tick);
     }, AUTO_SCROLL_PAUSE_TOP);
 
@@ -501,7 +509,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
               </Suspense>
             ) : (
               <>
-                {/* Type badge — stays outside the scroll wrapper so it's always visible */}
+                {/* Type badge — bold, distinctive; stays outside the scroll wrapper */}
                 <span
                   className={`badge self-start ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
                 >
@@ -511,7 +519,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                 {/* Scrollable text region — when needsScroll, flex-1 min-h-0 constrains height for scroll. */}
                 <div
                   ref={scrollRef}
-                  className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-hidden' : ''}`}
+                  className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar' : ''}`}
                 >
                   {item.imageUrl && (
                     <div className="flex justify-center min-h-0 max-h-[18rem] w-full">

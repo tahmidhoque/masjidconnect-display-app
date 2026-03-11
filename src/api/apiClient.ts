@@ -355,19 +355,23 @@ class ApiClient {
 
   /**
    * Make a GET request with caching and offline fallback
+   * @param options.forceNetwork - When true, always attempt network even if navigator reports offline (e.g. content:invalidate).
    */
   private async getWithCache<T>(
     endpoint: string,
     cacheKey: string,
     ttl: number,
-    params?: Record<string, string | number | boolean | undefined>
+    params?: Record<string, string | number | boolean | undefined>,
+    options?: { forceNetwork?: boolean }
   ): Promise<ApiResponse<T>> {
     const url = params
       ? buildUrlWithParams('', endpoint, params)
       : endpoint;
 
-    // Try network first if online
-    if (this.isOnline) {
+    const shouldTryNetwork = this.isOnline || options?.forceNetwork === true;
+
+    // Try network first if online (or when forceNetwork, e.g. content:invalidate)
+    if (shouldTryNetwork) {
       const response = await this.requestWithRetry<T>({
         method: 'GET',
         url,
@@ -447,6 +451,15 @@ class ApiClient {
         if (contentResponse.events) {
           await storageService.set('events', contentResponse.events);
           logger.debug('[ApiClient] Saved events from content');
+        }
+
+        // Persist displaySettings for Redux (admin-controlled screen customisation)
+        const displaySettings =
+          contentResponse.displaySettings ??
+          (contentResponse as { data?: { displaySettings?: unknown } }).data?.displaySettings;
+        if (displaySettings) {
+          await storageService.set('displaySettings', displaySettings);
+          logger.debug('[ApiClient] Saved displaySettings from content');
         }
       } else if (cacheKey.startsWith(CACHE_KEYS.PRAYER_TIMES)) {
         await storageService.set('prayerTimes', data);
@@ -629,8 +642,9 @@ class ApiClient {
   /**
    * Get screen content.
    * @param options.cacheBust - When true, append a unique query param so server/HTTP cache returns fresh data (e.g. after content:invalidate).
+   * @param options.forceNetwork - When true, always attempt network even if navigator reports offline (e.g. after content:invalidate).
    */
-  public async getContent(options?: { cacheBust?: boolean }): Promise<ApiResponse<ContentResponse>> {
+  public async getContent(options?: { cacheBust?: boolean; forceNetwork?: boolean }): Promise<ApiResponse<ContentResponse>> {
     if (!credentialService.hasCredentials()) {
       return {
         success: false,
@@ -639,11 +653,13 @@ class ApiClient {
     }
 
     const params = options?.cacheBust ? { _t: Date.now() } : undefined;
+    const forceNetwork = options?.cacheBust ?? options?.forceNetwork ?? false;
     return this.getWithCache<ContentResponse>(
       SCREEN_ENDPOINTS.GET_CONTENT,
       CACHE_KEYS.CONTENT,
       CACHE_TTL.CONTENT,
-      params
+      params,
+      { forceNetwork }
     );
   }
 

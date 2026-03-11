@@ -53,6 +53,7 @@ const VALID_INVALIDATION_TYPES: Array<ContentInvalidationPayload['type']> = [
   'schedule_assignment',
   'playlist_assignment',
   'events',
+  'display_settings',
 ];
 
 export const realtimeMiddleware: Middleware = (api: any) => {
@@ -237,19 +238,22 @@ export const realtimeMiddleware: Middleware = (api: any) => {
           return;
         }
 
-        logger.info('[RealtimeMW] content:invalidate received, scheduling refetch', {
+        logger.debug('[RealtimeMW] content:invalidate received, scheduling refetch', {
           type: payload.type,
           action: payload.action,
           coalesceMs: CONTENT_INVALIDATE_COALESCE_MS,
         });
-
         const runRefetch = () => {
           invalidationCoalesceMap.delete(payload.type);
-          logger.info('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
+          logger.debug('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
           import('../slices/contentSlice').then((mod) => {
             const dispatch = api.dispatch as AppDispatch;
             switch (payload.type) {
               case 'prayer_times':
+                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
+                break;
+              case 'display_settings':
+                dispatch(mod.refreshContent({ forceRefresh: true }));
                 dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
                 break;
               case 'schedule':

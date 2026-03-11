@@ -11,7 +11,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer, toMinutesFromMidnight } from '../../utils/dateUtils';
 import type { PrayerPhase } from '../../hooks/usePrayerPhase';
@@ -20,23 +20,8 @@ import CountdownDisplay from './CountdownDisplay';
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
   phase?: PrayerPhase;
-}
-
-/**
- * Map a prayer phase to its top label text.
- * Single dynamic line: "{prayerName} prayer in" or "{prayerName} Jamaat in".
- */
-function phaseLabel(phase: PrayerPhase | undefined, prayerName: string | null | undefined): string {
-  switch (phase) {
-    case 'countdown-jamaat':
-    case 'jamaat-soon':
-      return prayerName ? `${prayerName} Jamaat in` : 'Jamaat in';
-    case 'in-prayer':
-      return 'In Progress';
-    case 'countdown-adhan':
-    default:
-      return prayerName ? `${prayerName} prayer in` : 'Next prayer in';
-  }
+  /** When true (landscape), use tighter spacing and smaller label */
+  compact?: boolean;
 }
 
 /**
@@ -49,8 +34,8 @@ function isCountingToJamaat(
   return Boolean(targetTime && jamaat && targetTime.time === jamaat);
 }
 
-const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
-  const { nextPrayer } = usePrayerTimes();
+const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = false }) => {
+  const { nextPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
 
   /**
@@ -115,31 +100,31 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
     return null;
   }
 
-  /* ---- In-prayer: calm static display, no ticking countdown ---- */
+  /* ---- In-prayer: single line "Fajr | Jamaat in progress" ---- */
   if (phase === 'in-prayer') {
     return (
-      <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
-        <p className="text-subheading text-text-muted uppercase tracking-wider font-medium">
-          {phaseLabel(phase, nextPrayer.name)}
-        </p>
-        <h3 className="text-prayer text-gold font-bold">{nextPrayer.name}</h3>
-        <p className="text-heading font-bold text-text-primary">
+      <div className={`countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
+        <span className={`text-text-muted uppercase font-medium ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`}>
+          {nextPrayer.name}
+        </span>
+        <span className="text-text-muted/50">|</span>
+        <span className={`font-bold text-text-primary ${compact ? 'text-body' : 'text-subheading'}`}>
           Jamaat in progress
-        </p>
+        </span>
       </div>
     );
   }
 
-  /* ---- Normal / jamaat countdown display — single label line + countdown (prayer highlighted above) ---- */
+  /* ---- Normal / jamaat countdown — label left, countdown right ---- */
   return (
-    <div className="countdown-container flex flex-col items-center justify-center gap-0.5 py-2 px-4 text-center">
-      <p className="text-subheading text-text-muted uppercase tracking-wider">
+    <div className={`countdown-container flex flex-row items-center justify-between ${compact ? 'gap-3' : 'gap-4'}`}>
+      <span className={`text-text-secondary uppercase font-semibold text-left ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`}>
         {countdownLabel}
-      </p>
+      </span>
       {liveCountdown && (
-        <p className="text-countdown text-gold">
+        <span className="text-countdown text-gold text-right">
           <CountdownDisplay value={liveCountdown} className="text-countdown text-gold" />
-        </p>
+        </span>
       )}
     </div>
   );

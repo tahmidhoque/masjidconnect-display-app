@@ -11,9 +11,9 @@
  *  - `in-prayer` — replaces carousel with calm "Jamaat in progress" screen
  *
  * During Ramadan mode (auto-detected from the Hijri calendar), the display:
- *  - Inserts an IftarCountdown hero element during fasting hours
  *  - Passes Ramadan props to Header (day badge) and PrayerTimesPanel (labels)
  *  - Applies the green/gold theme via useRamadanMode's CSS side effect
+ *  - Countdown is unified: always PrayerCountdown (Maghrib = Iftar, Fajr = Suhoor end)
  *
  * Data is sourced from Redux (contentSlice) and hooks.
  */
@@ -34,16 +34,15 @@ import {
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
-  RamadanCountdownBar,
   SilentPhonesGraphic,
   InPrayerScreen,
 } from '../display';
 
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
-import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
-import { selectTimeFormat } from '../../store/slices/contentSlice';
+import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -295,7 +294,7 @@ function buildCarouselItems(
   return items;
 }
 
-const DisplayScreen: React.FC = () => {
+const DisplayScreenInner: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
   const { schedule } = useScheduledPlaylist();
   const events = useSelector((s: RootState) => s.content.events);
@@ -354,17 +353,22 @@ const DisplayScreen: React.FC = () => {
   const { phase: prayerPhase, prayerName: phasePrayerName } = usePrayerPhase();
 
   /* ---- Forbidden (makruh) time for voluntary prayer ---- */
-  const { forbiddenPrayer } = usePrayerTimes();
+  const { forbiddenPrayer, tomorrowsJamaats } = usePrayerTimesContext();
   const timeFormat = useAppSelector(selectTimeFormat);
+  const displaySettings = useAppSelector(selectDisplaySettings);
 
   /* ---- Compose slots ---- */
+  const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
   const headerSlot = (
     <Header
+      key={`header-hijri-${hijriDateAdjustment}`}
       masjidName={masjidName}
+      compact={!isPortrait}
       isRamadan={ramadan.isRamadan}
       ramadanDay={ramadan.ramadanDay}
       ramadanTwoLines={isPortrait}
       timeFormat={timeFormat}
+      hijriDateAdjustment={hijriDateAdjustment}
     />
   );
 
@@ -373,12 +377,15 @@ const DisplayScreen: React.FC = () => {
     <PrayerTimesPanel
       isRamadan={ramadan.isRamadan}
       imsakTime={ramadan.imsakTime}
+      showImsak={displaySettings?.showImsak ?? false}
       forbiddenPrayer={forbiddenPrayer}
       timeFormat={timeFormat}
       compact={isPortrait}
+      showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+      tomorrowsJamaats={tomorrowsJamaats}
     />
   );
-  const countdown = <PrayerCountdown phase={prayerPhase} />;
+  const countdown = <PrayerCountdown phase={prayerPhase} compact={!isPortrait} />;
 
   /**
    * Content slot: swapped based on the current prayer phase.
@@ -413,22 +420,7 @@ const DisplayScreen: React.FC = () => {
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
 
-  /**
-   * Countdown slot: during Ramadan, use the unified RamadanCountdownBar
-   * which merges Suhoor/Iftar + Next Prayer into a single compact card.
-   * Outside Ramadan, use the standard PrayerCountdown.
-   */
-  const countdownSlot = ramadan.isRamadan ? (
-    <RamadanCountdownBar
-      iftarTime={ramadan.iftarTime}
-      suhoorEndTime={ramadan.suhoorEndTime}
-      imsakTime={ramadan.imsakTime}
-      isFastingHours={ramadan.isFastingHours}
-      compact={isPortrait}
-    />
-  ) : (
-    countdown
-  );
+  const countdownSlot = countdown;
 
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
 
@@ -466,5 +458,11 @@ const DisplayScreen: React.FC = () => {
     </OrientationWrapper>
   );
 };
+
+const DisplayScreen: React.FC = () => (
+  <PrayerTimesProvider>
+    <DisplayScreenInner />
+  </PrayerTimesProvider>
+);
 
 export default DisplayScreen;

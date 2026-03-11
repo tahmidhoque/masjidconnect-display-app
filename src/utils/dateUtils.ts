@@ -364,9 +364,15 @@ export const getTimeUntilNextPrayer = (
 /**
  * Calculate accurate Hijri date using proper Islamic calendar algorithm
  * Based on the astronomical calculations and Julian Day Numbers
+ *
+ * @param date - Gregorian date to convert (defaults to today)
+ * @param adjustmentDays - Days to add to the date before conversion (e.g. +1 if local calc is 1 day behind)
  */
-export const calculateApproximateHijriDate = (date?: Date): string => {
-  const targetDate = date || new Date();
+export const calculateApproximateHijriDate = (date?: Date, adjustmentDays?: number): string => {
+  let targetDate = date || new Date();
+  if (typeof adjustmentDays === 'number' && adjustmentDays !== 0) {
+    targetDate = new Date(targetDate.getTime() + adjustmentDays * 24 * 60 * 60 * 1000);
+  }
 
   // Convert Gregorian date to Julian Day Number
   const year = targetDate.getFullYear();
@@ -467,15 +473,19 @@ export const calculateApproximateHijriDate = (date?: Date): string => {
 
 /**
  * Fetch the Hijri date string, falling back to local calculation on error.
+ *
+ * @param dateString - Optional date string (YYYY-MM-DD) to convert
+ * @param adjustmentDays - Days to add before conversion (from displaySettings.hijriDateAdjustment)
  */
 export const fetchHijriDate = async (
   dateString?: string,
+  adjustmentDays?: number,
 ): Promise<string> => {
   const targetDate = dateString ? new Date(dateString) : new Date();
 
   try {
-    return calculateApproximateHijriDate(targetDate);
+    return calculateApproximateHijriDate(targetDate, adjustmentDays);
   } catch {
-    return calculateApproximateHijriDate(targetDate);
+    return calculateApproximateHijriDate(targetDate, adjustmentDays);
   }
 };

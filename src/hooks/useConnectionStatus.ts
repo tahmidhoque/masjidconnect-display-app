@@ -56,6 +56,10 @@ export const useConnectionStatus = (): ConnectionStatus => {
     if (grace) {
       return { hasConnection: true, status: 'connected' as const, message: '', severity: 'error' as const, isReconnecting: false };
     }
+    /* WebSocket connected = we have connectivity; navigator.onLine can be false at dev startup. */
+    if (wsConnected && !wsReconnecting) {
+      return { hasConnection: true, status: 'connected' as const, message: '', severity: 'error' as const, isReconnecting: false };
+    }
     if (isOffline) {
       return { hasConnection: false, status: 'no-internet' as const, message: 'No Internet', severity: 'error' as const, isReconnecting: false };
     }

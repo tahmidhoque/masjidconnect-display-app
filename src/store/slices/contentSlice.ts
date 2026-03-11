@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment } from "../../api/models";
+import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings } from "../../api/models";
 import apiClient from "../../api/apiClient";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
@@ -11,6 +11,37 @@ import { setScreenOrientation } from "./uiSlice";
 const MIN_REFRESH_INTERVAL = 30 * 1000; // Increased from 10 to 30 seconds to prevent rapid firing
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in announcements
 const DEFAULT_MASJID_NAME = "Masjid Connect"; // Default masjid name if none is found
+
+/**
+ * Normalise prayer times for Redux storage.
+ * usePrayerTimes expects { data: [day0, day1, ...] } for tomorrow's jamaat column.
+ * When API returns an array: single element → store flat; multiple → wrap as { data }.
+ * When object with data, keep as-is. When flat object, return as-is.
+ */
+function normalisePrayerTimesForStore(
+  raw: PrayerTimes | PrayerTimes[] | null | undefined
+): PrayerTimes | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return null;
+    return raw.length === 1 ? raw[0] : ({ data: raw } as PrayerTimes);
+  }
+  if (raw.data && Array.isArray(raw.data)) {
+    return raw;
+  }
+  return raw;
+}
+
+/** Safe defaults when displaySettings is missing from API (backward compatibility). */
+export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
+  ramadanMode: "auto",
+  isRamadanActive: false,
+  timeFormat: "12h",
+  showImsak: false,
+  showTomorrowJamaat: false,
+  imsakOffset: 10,
+  hijriDateAdjustment: 0,
+};
 
 // Debounce map to prevent rapid successive calls
 const debounceMap = new Map<string, number>();
@@ -31,6 +62,7 @@ export interface ContentState {
   // UI settings
   carouselTime: number;
   timeFormat: TimeFormat;
+  displaySettings: DisplaySettings | null;
 
   // Prayer announcements
   showPrayerAnnouncement: boolean;
@@ -68,7 +100,8 @@ const initialState: ContentState = {
   masjidName: DEFAULT_MASJID_NAME,
   masjidTimezone: null,
   carouselTime: 30,
-  timeFormat: "12h", // Default to 12-hour format (admin portal can override via contentConfig.timeFormat)
+  timeFormat: "12h", // Default to 12-hour format (admin portal can override via displaySettings.timeFormat)
+  displaySettings: null,
   showPrayerAnnouncement: false,
   prayerAnnouncementName: "",
   isPrayerJamaat: false,
@@ -245,6 +278,30 @@ export const normalizeScheduleData = (schedule: any): Schedule => {
   }
 };
 
+/** Extract displaySettings from content with safe defaults. */
+const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings => {
+  const raw =
+    content?.displaySettings ??
+    (content as { data?: { displaySettings?: DisplaySettings } })?.data?.displaySettings;
+  const contentConfig = content?.screen?.contentConfig ?? content?.data?.screen?.contentConfig;
+  const timeFormatFromConfig = contentConfig?.timeFormat === "24h" ? "24h" : undefined;
+  if (!raw || typeof raw !== "object") {
+    return {
+      ...DEFAULT_DISPLAY_SETTINGS,
+      timeFormat: timeFormatFromConfig ?? "12h",
+    };
+  }
+  return {
+    ramadanMode: raw.ramadanMode ?? "auto",
+    isRamadanActive: raw.isRamadanActive ?? false,
+    timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
+    showImsak: raw.showImsak ?? false,
+    showTomorrowJamaat: raw.showTomorrowJamaat ?? false,
+    imsakOffset: raw.imsakOffset ?? 10,
+    hijriDateAdjustment: raw.hijriDateAdjustment ?? 0,
+  };
+};
+
 // Helper function to extract masjid name
 const extractMasjidName = (content: ScreenContent | null): string => {
   if (!content) return DEFAULT_MASJID_NAME;
@@ -305,18 +362,18 @@ export const refreshContent = createAsyncThunk(
       }
 
       // Use sync service for robust data fetching.
-      // When forceRefresh: call syncContent with forceRefresh so we clear content cache and
-      // fetch once; avoid forceRefresh() which runs syncAll() and can race with other syncs.
-      if (forceRefresh) {
-        await syncService.syncContent({ forceRefresh: true });
-      } else {
-        await syncService.syncContent();
+      let syncSucceeded = false;
+      try {
+        await syncService.syncContent({ forceRefresh });
+        syncSucceeded = true;
+      } catch (syncError) {
+        logger.warn('[Content] Sync failed, attempting to use cached content', { error: syncError });
       }
 
-      // Get the content from storage after sync (schedule/events may be in content or separate keys)
+      // Get the content from storage after sync (or from cache if sync failed)
       const content = await storageService.get<ScreenContent>('screenContent');
       if (!content) {
-        throw new Error("No content received from server");
+        throw new Error(syncSucceeded ? "No content received from server" : "Sync failed and no cached content available");
       }
 
       // Prefer schedule from the content we just synced (API may embed it under various paths); fall back to separate key
@@ -376,13 +433,16 @@ export const refreshContent = createAsyncThunk(
         ); // 5-300 seconds
       }
 
-      // Extract time format preference from content config
-      // Default to '12h' if not specified (admin portal can override)
+      // Extract displaySettings (admin-controlled screen customisation).
+      // Prefer content we just fetched (same response); storage may be stale from prior session.
+      const fromContent = extractDisplaySettings(content);
+      const fromStorage = await storageService.get<DisplaySettings>('displaySettings');
+      const displaySettings = fromContent ?? fromStorage;
       const timeFormat: TimeFormat =
+        displaySettings.timeFormat ||
         content.screen?.contentConfig?.timeFormat ||
         content.data?.screen?.contentConfig?.timeFormat ||
         "12h";
-
       // Apply orientation from screen content so production gets correct rotation even without WebSocket
       const screen = content.screen ?? content.data?.screen;
       if (screen?.orientation) {
@@ -399,6 +459,7 @@ export const refreshContent = createAsyncThunk(
         masjidTimezone: masjidTimezone || null,
         carouselTime: carouselTime || 30,
         timeFormat,
+        displaySettings,
         timestamp: new Date().toISOString(),
         schedule: schedule ?? undefined,
         scheduledPlaylists: hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined,
@@ -484,7 +545,7 @@ export const refreshPrayerTimes = createAsyncThunk(
         throw new Error("No prayer times found in storage or screen content");
       }
 
-      logger.info("[Content] Successfully loaded prayer times", {
+      logger.debug("[Content] Successfully loaded prayer times", {
         hasData: !!prayerTimes,
         isArray: Array.isArray(prayerTimes),
         dataKeys:
@@ -500,6 +561,29 @@ export const refreshPrayerTimes = createAsyncThunk(
     } catch (error: any) {
       logger.error("[Content] Error refreshing prayer times", { error });
       return rejectWithValue(error.message || "Failed to refresh prayer times");
+    }
+  },
+);
+
+/**
+ * Load prayer times from storage into Redux without syncing.
+ * Used when syncService.syncPrayerTimes completes (prayerTimesUpdated event)
+ * to avoid a feedback loop: refreshPrayerTimes would call sync again.
+ */
+export const loadPrayerTimesFromStorage = createAsyncThunk(
+  "content/loadPrayerTimesFromStorage",
+  async (_, { rejectWithValue }) => {
+    try {
+      const prayerTimes = await storageService.get<PrayerTimes | PrayerTimes[]>('prayerTimes');
+      if (!prayerTimes) {
+        return { skipped: true, reason: "no data" };
+      }
+      return {
+        prayerTimes: normalisePrayerTimesForStore(prayerTimes),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: unknown) {
+      return rejectWithValue(error instanceof Error ? error.message : "Failed to load prayer times");
     }
   },
 );
@@ -614,11 +698,12 @@ export const loadCachedContent = createAsyncThunk(
       logger.info("[Content] Loading cached content from storage...");
 
       // Load all cached data from storage in parallel
-      const [schedule, events, prayerTimes, screenContent] = await Promise.all([
+      const [schedule, events, prayerTimes, screenContent, displaySettingsFromStorage] = await Promise.all([
         storageService.get<any>('schedule'),
         storageService.get<any>('events'),
         storageService.get<PrayerTimes>('prayerTimes'),
         storageService.get<ScreenContent>('screenContent'),
+        storageService.get<DisplaySettings>('displaySettings'),
       ]);
 
       // Normalize schedule if it's an array (shouldn't be, but handle it)
@@ -626,10 +711,7 @@ export const loadCachedContent = createAsyncThunk(
         ? (Array.isArray(schedule) ? schedule[0] : schedule)
         : null;
 
-      // Normalize prayerTimes if it's an array (shouldn't be, but handle it)
-      const normalizedPrayerTimes = prayerTimes
-        ? (Array.isArray(prayerTimes) ? prayerTimes[0] : prayerTimes)
-        : null;
+      const normalizedPrayerTimes = normalisePrayerTimesForStore(prayerTimes);
 
       const contentAny = screenContent as unknown as {
         scheduledPlaylists?: ScheduledPlaylistAssignment[] | null;
@@ -645,6 +727,10 @@ export const loadCachedContent = createAsyncThunk(
         ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
         : undefined;
 
+      const displaySettings =
+        displaySettingsFromStorage ??
+        (screenContent ? extractDisplaySettings(screenContent) : null);
+
       logger.info("[Content] Cached content loaded", {
         hasSchedule: !!normalizedSchedule,
         scheduleItemsCount: normalizedSchedule?.items?.length || 0,
@@ -652,6 +738,7 @@ export const loadCachedContent = createAsyncThunk(
         hasPrayerTimes: !!normalizedPrayerTimes,
         hasScreenContent: !!screenContent,
         hasScheduledPlaylists: !!scheduledPlaylistsArray,
+        hasDisplaySettings: !!displaySettings,
       });
 
       return {
@@ -660,6 +747,7 @@ export const loadCachedContent = createAsyncThunk(
         events: events || [],
         prayerTimes: normalizedPrayerTimes,
         screenContent,
+        displaySettings: displaySettings ?? DEFAULT_DISPLAY_SETTINGS,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
@@ -795,6 +883,7 @@ const contentSlice = createSlice({
           state.masjidTimezone = action.payload.masjidTimezone || null;
           state.carouselTime = action.payload.carouselTime || 30;
           state.timeFormat = action.payload.timeFormat || "12h";
+          state.displaySettings = action.payload.displaySettings ?? null;
           state.lastContentUpdate = action.payload.timestamp || null;
           state.lastUpdated = action.payload.timestamp || null;
           if (action.payload.schedule !== undefined) {
@@ -817,7 +906,7 @@ const contentSlice = createSlice({
         state.isLoading = stillLoading;
 
         if (!stillLoading) {
-          logger.info(
+          logger.debug(
             "[ContentSlice] Content refresh complete, all loading finished",
           );
         }
@@ -842,14 +931,7 @@ const contentSlice = createSlice({
 
         // Skip update if this was debounced
         if (!action.payload.skipped) {
-          // Handle both single PrayerTimes object and array format
-          const prayerTimes = action.payload.prayerTimes;
-          if (Array.isArray(prayerTimes)) {
-            // If it's an array, take the first element (today's prayer times)
-            state.prayerTimes = prayerTimes[0] || null;
-          } else {
-            state.prayerTimes = prayerTimes || null;
-          }
+          state.prayerTimes = normalisePrayerTimesForStore(action.payload.prayerTimes);
           state.lastPrayerTimesUpdate =
             action.payload.timestamp || new Date().toISOString();
           state.lastUpdated =
@@ -864,7 +946,7 @@ const contentSlice = createSlice({
         state.isLoading = stillLoading;
 
         if (!stillLoading) {
-          logger.info(
+          logger.debug(
             "[ContentSlice] Prayer times refresh complete, all loading finished",
           );
         }
@@ -876,6 +958,13 @@ const contentSlice = createSlice({
           state.isLoadingContent ||
           state.isLoadingSchedule ||
           state.isLoadingEvents;
+      })
+      .addCase(loadPrayerTimesFromStorage.fulfilled, (state, action) => {
+        if (!action.payload.skipped && action.payload.prayerTimes) {
+          state.prayerTimes = action.payload.prayerTimes;
+          state.lastPrayerTimesUpdate = action.payload.timestamp ?? new Date().toISOString();
+          state.lastUpdated = action.payload.timestamp ?? new Date().toISOString();
+        }
       });
 
     // Refresh schedule
@@ -972,6 +1061,10 @@ const contentSlice = createSlice({
         if (action.payload.screenContent) {
           state.screenContent = action.payload.screenContent;
         }
+        if (action.payload.displaySettings) {
+          state.displaySettings = action.payload.displaySettings;
+          state.timeFormat = action.payload.displaySettings.timeFormat ?? "12h";
+        }
 
         // Mark loading as complete since we have cached data
         state.isLoading = false;
@@ -1048,6 +1141,8 @@ export const selectCarouselTime = (state: { content: ContentState }) =>
   state.content.carouselTime;
 export const selectTimeFormat = (state: { content: ContentState }) =>
   state.content.timeFormat;
+export const selectDisplaySettings = (state: { content: ContentState }) =>
+  state.content.displaySettings;
 export const selectShowPrayerAnnouncement = (state: {
   content: ContentState;
 }) => state.content.showPrayerAnnouncement;

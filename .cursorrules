@@ -18,6 +18,7 @@ All development rules are in `.cursor/rules/`:
 | Rule file | Scope |
 |---|---|
 | `project-overview.mdc` | Architecture, tech stack, directory structure, hooks, services (always applied) |
+| `design-context.mdc` | Users, brand personality, aesthetic direction, accessibility (always applied) |
 | `tailwind-v4-styling.mdc` | Tailwind v4 CSS config, design tokens, component classes, animations |
 | `deployment-raspberry-pi.mdc` | Chromium kiosk, systemd, install script, CI/CD pipeline, RPi optimisation |
 | `redux-state-management.mdc` | Slices, async thunks, middleware, persistence, typed hooks, selectors |

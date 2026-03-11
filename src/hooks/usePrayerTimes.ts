@@ -3,7 +3,7 @@ import { PrayerTimes } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
-import { refreshPrayerTimes, selectTimeFormat } from "../store/slices/contentSlice";
+import { refreshPrayerTimes, loadPrayerTimesFromStorage, selectTimeFormat, selectDisplaySettings } from "../store/slices/contentSlice";
 import {
   formatTimeToDisplay,
   getNextPrayerTime,
@@ -52,6 +52,9 @@ interface FormattedPrayerTime {
   jamaatTime?: string;
 }
 
+/** Map of prayer name to jamaat time for the "tomorrow" relative to displayed date. */
+export type TomorrowsJamaatsMap = Record<string, string> | null;
+
 interface PrayerTimesHook {
   todaysPrayerTimes: FormattedPrayerTime[];
   nextPrayer: FormattedPrayerTime | null;
@@ -64,10 +67,14 @@ interface PrayerTimesHook {
   jumuahKhutbahTime: string | null;
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
+  /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
+  tomorrowsJamaats: TomorrowsJamaatsMap;
 }
 
 const PRAYER_NAMES = ["Fajr", "Sunrise", "Zuhr", "Asr", "Maghrib", "Isha"];
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in countdown
+/** Prayers that have jamaat times (excludes Sunrise). */
+const PRAYERS_WITH_JAMAAT = ["Fajr", "Zuhr", "Asr", "Maghrib", "Isha"];
 
 /**
  * Resolve jamaat time from data object with case-insensitive key lookup.
@@ -86,6 +93,22 @@ function getJamaatTime(data: Record<string, unknown>, lowerName: string): string
   return typeof snake === "string" ? snake : undefined;
 }
 
+/** Build tomorrow's jamaats map from a day's prayer data. Returns null if no valid jamaats. */
+function buildTomorrowsJamaats(dayData: PrayerTimes | null): TomorrowsJamaatsMap {
+  if (!dayData || typeof dayData !== "object") return null;
+  const data = dayData as unknown as Record<string, unknown>;
+  const map: Record<string, string> = {};
+  let hasAny = false;
+  for (const name of PRAYERS_WITH_JAMAAT) {
+    const jamaat = getJamaatTime(data, name.toLowerCase());
+    if (jamaat) {
+      map[name] = jamaat;
+      hasAny = true;
+    }
+  }
+  return hasAny ? map : null;
+}
+
 export const usePrayerTimes = (): PrayerTimesHook => {
   // Get prayerTimes and timeFormat from Redux store
   const dispatch = useDispatch<AppDispatch>();
@@ -93,6 +116,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     (state: RootState) => state.content.prayerTimes,
   );
   const timeFormat = useSelector(selectTimeFormat);
+  const displaySettings = useSelector(selectDisplaySettings);
+  const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
 
   // Use refs to prevent unnecessary re-processing
   const lastProcessedTimes = useRef<PrayerTimes | null>(null);
@@ -129,6 +154,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   );
   const [forbiddenPrayer, setForbiddenPrayer] =
     useState<CurrentForbiddenState | null>(null);
+  const [tomorrowsJamaats, setTomorrowsJamaats] =
+    useState<TomorrowsJamaatsMap>(null);
   /** Dev override: when set (not undefined), use this instead of computed forbiddenPrayer. */
   const [devForbiddenOverride, setDevForbiddenOverride] = useState<
     CurrentForbiddenState | null | undefined
@@ -157,11 +184,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Min interval between calculations to prevent excessive processing
   const MIN_PROCESS_INTERVAL = 5000; // 5 seconds
 
-  // Listen for prayer times updates from data sync service
+  // Listen for prayer times updates from syncService (periodic sync or after refresh).
+  // Use loadPrayerTimesFromStorage to avoid feedback loop: refreshPrayerTimes would call
+  // syncPrayerTimes again, which would fire this event again.
   useEffect(() => {
     const handlePrayerTimesUpdate = () => {
-      logger.info("Prayer times update detected, refreshing data");
-      refreshPrayerTimesHandler(true); // Force refresh to bypass debouncing when data sync completes
+      dispatch(loadPrayerTimesFromStorage());
     };
 
     window.addEventListener("prayerTimesUpdated", handlePrayerTimesUpdate);
@@ -169,7 +197,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     return () => {
       window.removeEventListener("prayerTimesUpdated", handlePrayerTimesUpdate);
     };
-  }, [refreshPrayerTimesHandler]);
+  }, [dispatch]);
 
   // Set up periodic refresh to ensure components always have fresh prayer time data
   useEffect(() => {
@@ -235,7 +263,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     lastPrayerTimesDataRef.current = prayerTimes;
 
     // Log the prayer times data to help with debugging
-    logger.info("Prayer times data received in hook", {
+    logger.debug("Prayer times data received in hook", {
       hasData: !!prayerTimes,
       dataType: prayerTimes ? typeof prayerTimes : "none",
       hasDataArray:
@@ -324,7 +352,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     // Process the prayer times data if valid
     if (isDataValid) {
-      logger.info("Prayer times data is valid, processing", {
+      logger.debug("Prayer times data is valid, processing", {
         date: todayData?.date,
         hasFajr: !!todayData?.fajr,
         hasZuhr: !!todayData?.zuhr,
@@ -450,7 +478,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       localStorage.removeItem("hijriDateTimestamp");
       logger.info("Cleared cached Hijri date to ensure fresh calculation");
 
-      const hijriDateStr = await fetchHijriDate();
+      const hijriDateStr = await fetchHijriDate(undefined, hijriDateAdjustment);
 
       // Cache the result in localStorage
       localStorage.setItem("hijriDate", hijriDateStr);
@@ -465,7 +493,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
       // Calculate approximate date as fallback
       try {
-        const approximateDate = calculateApproximateHijriDate();
+        const approximateDate = calculateApproximateHijriDate(undefined, hijriDateAdjustment);
         logger.info("Using approximate Hijri date calculation", {
           approximateDate,
         });
@@ -485,7 +513,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         refreshHijriDate();
       }, 60000);
     }
-  }, []);
+  }, [hijriDateAdjustment]);
 
   // Check for day change and refresh data if needed - memoized
   const checkForDayChange = useCallback(() => {
@@ -782,7 +810,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Update formatted prayer times for display
   const updateFormattedPrayerTimes = useCallback(() => {
     if (!prayerTimes) return;
-
     const prayers: FormattedPrayerTime[] = [];
     const prayerTimesForCalculation: { name: string; time: string }[] = [];
 
@@ -793,6 +820,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     // API returns { data: [ day0, day1, ... ] } with 5 days; use index 0 for today, 1 for tomorrow (after Isha)
     let tomorrowData: PrayerTimes | null = null;
+    let dayAfterTomorrowData: PrayerTimes | null = null;
     if (
       prayerTimes &&
       prayerTimes.data &&
@@ -802,6 +830,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       todayData = prayerTimes.data[0];
       if (prayerTimes.data.length > 1) {
         tomorrowData = prayerTimes.data[1];
+      }
+      if (prayerTimes.data.length > 2) {
+        dayAfterTomorrowData = prayerTimes.data[2];
       }
     }
 
@@ -934,7 +965,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     if (!needTomorrowList) {
       setCurrentDate(nowDayjs.format("dddd, MMMM D, YYYY"));
       setIsJumuahToday(nowDayjs.day() === 5);
+      setTomorrowsJamaats(buildTomorrowsJamaats(tomorrowData));
     } else if (needTomorrowList && tomorrowData) {
+      setTomorrowsJamaats(buildTomorrowsJamaats(dayAfterTomorrowData));
       // Build displayed list from tomorrow's day in the API data array (data[1])
       const prayersFromTomorrow: FormattedPrayerTime[] = [];
       PRAYER_NAMES.forEach((name) => {
@@ -1023,6 +1056,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         ) ?? null,
       );
       return;
+    } else {
+      // needTomorrowList but no tomorrowData — fall through with today's list
+      setTomorrowsJamaats(buildTomorrowsJamaats(tomorrowData));
     }
 
     // Apply the calculated flags
@@ -1195,6 +1231,13 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prayerTimes]); // Only depend on prayerTimes
 
+  // Refresh Hijri date when hijriDateAdjustment changes (e.g. after display_settings content:invalidate)
+  useEffect(() => {
+    if (initializedRef.current) {
+      refreshHijriDate();
+    }
+  }, [hijriDateAdjustment, refreshHijriDate]);
+
   // Re-process prayer times when timeFormat changes
   useEffect(() => {
     if (prayerTimes && initializedRef.current) {
@@ -1265,5 +1308,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahDisplayTime,
     jumuahKhutbahTime,
     forbiddenPrayer: effectiveForbiddenPrayer,
+    tomorrowsJamaats,
   };
 };
