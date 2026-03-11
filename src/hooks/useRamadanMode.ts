@@ -18,7 +18,7 @@
 
 import { useMemo, useEffect, useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { usePrayerTimes } from './usePrayerTimes';
+import { usePrayerTimesContext } from '../contexts/PrayerTimesContext';
 import { useCurrentTime } from './useCurrentTime';
 import { calculateApproximateHijriDate, getTimeUntilNextPrayer, formatTimeToDisplay } from '../utils/dateUtils';
 import { selectTimeFormat, selectDisplaySettings, selectPrayerTimes } from '../store/slices/contentSlice';
@@ -118,7 +118,7 @@ function parseHijriString(hijri: string): ParsedHijri | null {
 
 export const useRamadanMode = (): RamadanModeData => {
   const currentTime = useCurrentTime();
-  const { todaysPrayerTimes } = usePrayerTimes();
+  const { todaysPrayerTimes } = usePrayerTimesContext();
   const timeFormat = useSelector(selectTimeFormat);
   const displaySettings = useSelector(selectDisplaySettings);
   const prayerTimesRaw = useSelector(selectPrayerTimes);

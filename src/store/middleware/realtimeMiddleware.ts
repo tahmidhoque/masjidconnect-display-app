@@ -238,14 +238,14 @@ export const realtimeMiddleware: Middleware = (api: any) => {
           return;
         }
 
-        logger.info('[RealtimeMW] content:invalidate received, scheduling refetch', {
+        logger.debug('[RealtimeMW] content:invalidate received, scheduling refetch', {
           type: payload.type,
           action: payload.action,
           coalesceMs: CONTENT_INVALIDATE_COALESCE_MS,
         });
         const runRefetch = () => {
           invalidationCoalesceMap.delete(payload.type);
-          logger.info('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
+          logger.debug('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
           import('../slices/contentSlice').then((mod) => {
             const dispatch = api.dispatch as AppDispatch;
             switch (payload.type) {

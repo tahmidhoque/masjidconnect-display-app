@@ -41,7 +41,7 @@ import {
 
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
-import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
 import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
 import type { CarouselItem } from '../display/ContentCarousel';
@@ -295,7 +295,7 @@ function buildCarouselItems(
   return items;
 }
 
-const DisplayScreen: React.FC = () => {
+const DisplayScreenInner: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
   const { schedule } = useScheduledPlaylist();
   const events = useSelector((s: RootState) => s.content.events);
@@ -354,7 +354,7 @@ const DisplayScreen: React.FC = () => {
   const { phase: prayerPhase, prayerName: phasePrayerName } = usePrayerPhase();
 
   /* ---- Forbidden (makruh) time for voluntary prayer ---- */
-  const { forbiddenPrayer, tomorrowsJamaats } = usePrayerTimes();
+  const { forbiddenPrayer, tomorrowsJamaats } = usePrayerTimesContext();
   const timeFormat = useAppSelector(selectTimeFormat);
   const displaySettings = useAppSelector(selectDisplaySettings);
 
@@ -470,5 +470,11 @@ const DisplayScreen: React.FC = () => {
     </OrientationWrapper>
   );
 };
+
+const DisplayScreen: React.FC = () => (
+  <PrayerTimesProvider>
+    <DisplayScreenInner />
+  </PrayerTimesProvider>
+);
 
 export default DisplayScreen;

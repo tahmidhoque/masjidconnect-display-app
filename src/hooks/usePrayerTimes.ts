@@ -3,7 +3,7 @@ import { PrayerTimes } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
-import { refreshPrayerTimes, selectTimeFormat } from "../store/slices/contentSlice";
+import { refreshPrayerTimes, loadPrayerTimesFromStorage, selectTimeFormat } from "../store/slices/contentSlice";
 import {
   formatTimeToDisplay,
   getNextPrayerTime,
@@ -182,11 +182,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Min interval between calculations to prevent excessive processing
   const MIN_PROCESS_INTERVAL = 5000; // 5 seconds
 
-  // Listen for prayer times updates from data sync service
+  // Listen for prayer times updates from syncService (periodic sync or after refresh).
+  // Use loadPrayerTimesFromStorage to avoid feedback loop: refreshPrayerTimes would call
+  // syncPrayerTimes again, which would fire this event again.
   useEffect(() => {
     const handlePrayerTimesUpdate = () => {
-      logger.info("Prayer times update detected, refreshing data");
-      refreshPrayerTimesHandler(true); // Force refresh to bypass debouncing when data sync completes
+      dispatch(loadPrayerTimesFromStorage());
     };
 
     window.addEventListener("prayerTimesUpdated", handlePrayerTimesUpdate);
@@ -194,7 +195,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     return () => {
       window.removeEventListener("prayerTimesUpdated", handlePrayerTimesUpdate);
     };
-  }, [refreshPrayerTimesHandler]);
+  }, [dispatch]);
 
   // Set up periodic refresh to ensure components always have fresh prayer time data
   useEffect(() => {
@@ -260,7 +261,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     lastPrayerTimesDataRef.current = prayerTimes;
 
     // Log the prayer times data to help with debugging
-    logger.info("Prayer times data received in hook", {
+    logger.debug("Prayer times data received in hook", {
       hasData: !!prayerTimes,
       dataType: prayerTimes ? typeof prayerTimes : "none",
       hasDataArray:
@@ -349,7 +350,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     // Process the prayer times data if valid
     if (isDataValid) {
-      logger.info("Prayer times data is valid, processing", {
+      logger.debug("Prayer times data is valid, processing", {
         date: todayData?.date,
         hasFajr: !!todayData?.fajr,
         hasZuhr: !!todayData?.zuhr,

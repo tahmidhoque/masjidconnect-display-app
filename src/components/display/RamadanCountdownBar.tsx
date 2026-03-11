@@ -24,7 +24,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer, getTimeDisplayParts } from '../../utils/dateUtils';
 import { useSelector } from 'react-redux';
@@ -53,7 +53,7 @@ const RamadanCountdownBar: React.FC<RamadanCountdownBarProps> = ({
 }) => {
   const currentTime = useCurrentTime();
   const timeFormat = useSelector(selectTimeFormat);
-  const { nextPrayer } = usePrayerTimes();
+  const { nextPrayer } = usePrayerTimesContext();
 
   /* ---- Post-Iftar: count down to Imsak (suhoor ends) when available, else Fajr ---- */
   const suhoorCountdownTarget = imsakTimeProp ?? suhoorEndTime;

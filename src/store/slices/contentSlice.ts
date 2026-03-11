@@ -261,11 +261,18 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
   const raw =
     content?.displaySettings ??
     (content as { data?: { displaySettings?: DisplaySettings } })?.data?.displaySettings;
-  if (!raw || typeof raw !== "object") return { ...DEFAULT_DISPLAY_SETTINGS };
+  const contentConfig = content?.screen?.contentConfig ?? content?.data?.screen?.contentConfig;
+  const timeFormatFromConfig = contentConfig?.timeFormat === "24h" ? "24h" : undefined;
+  if (!raw || typeof raw !== "object") {
+    return {
+      ...DEFAULT_DISPLAY_SETTINGS,
+      timeFormat: timeFormatFromConfig ?? "12h",
+    };
+  }
   return {
     ramadanMode: raw.ramadanMode ?? "auto",
     isRamadanActive: raw.isRamadanActive ?? false,
-    timeFormat: raw.timeFormat === "24h" ? "24h" : "12h",
+    timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
     showImsak: raw.showImsak ?? false,
     showTomorrowJamaat: raw.showTomorrowJamaat ?? false,
   };
@@ -331,18 +338,18 @@ export const refreshContent = createAsyncThunk(
       }
 
       // Use sync service for robust data fetching.
-      // When forceRefresh: call syncContent with forceRefresh so we clear content cache and
-      // fetch once; avoid forceRefresh() which runs syncAll() and can race with other syncs.
-      if (forceRefresh) {
-        await syncService.syncContent({ forceRefresh: true });
-      } else {
-        await syncService.syncContent();
+      let syncSucceeded = false;
+      try {
+        await syncService.syncContent({ forceRefresh });
+        syncSucceeded = true;
+      } catch (syncError) {
+        logger.warn('[Content] Sync failed, attempting to use cached content', { error: syncError });
       }
 
-      // Get the content from storage after sync (schedule/events may be in content or separate keys)
+      // Get the content from storage after sync (or from cache if sync failed)
       const content = await storageService.get<ScreenContent>('screenContent');
       if (!content) {
-        throw new Error("No content received from server");
+        throw new Error(syncSucceeded ? "No content received from server" : "Sync failed and no cached content available");
       }
 
       // Prefer schedule from the content we just synced (API may embed it under various paths); fall back to separate key
@@ -402,8 +409,11 @@ export const refreshContent = createAsyncThunk(
         ); // 5-300 seconds
       }
 
-      // Extract displaySettings (admin-controlled screen customisation)
-      const displaySettings = extractDisplaySettings(content);
+      // Extract displaySettings (admin-controlled screen customisation).
+      // Prefer content we just fetched (same response); storage may be stale from prior session.
+      const fromContent = extractDisplaySettings(content);
+      const fromStorage = await storageService.get<DisplaySettings>('displaySettings');
+      const displaySettings = fromContent ?? fromStorage;
       const timeFormat: TimeFormat =
         displaySettings.timeFormat ||
         content.screen?.contentConfig?.timeFormat ||
@@ -511,7 +521,7 @@ export const refreshPrayerTimes = createAsyncThunk(
         throw new Error("No prayer times found in storage or screen content");
       }
 
-      logger.info("[Content] Successfully loaded prayer times", {
+      logger.debug("[Content] Successfully loaded prayer times", {
         hasData: !!prayerTimes,
         isArray: Array.isArray(prayerTimes),
         dataKeys:
@@ -527,6 +537,30 @@ export const refreshPrayerTimes = createAsyncThunk(
     } catch (error: any) {
       logger.error("[Content] Error refreshing prayer times", { error });
       return rejectWithValue(error.message || "Failed to refresh prayer times");
+    }
+  },
+);
+
+/**
+ * Load prayer times from storage into Redux without syncing.
+ * Used when syncService.syncPrayerTimes completes (prayerTimesUpdated event)
+ * to avoid a feedback loop: refreshPrayerTimes would call sync again.
+ */
+export const loadPrayerTimesFromStorage = createAsyncThunk(
+  "content/loadPrayerTimesFromStorage",
+  async (_, { rejectWithValue }) => {
+    try {
+      const prayerTimes = await storageService.get<PrayerTimes>('prayerTimes');
+      if (!prayerTimes) {
+        return { skipped: true, reason: "no data" };
+      }
+      const normalized = Array.isArray(prayerTimes) ? prayerTimes[0] || null : prayerTimes;
+      return {
+        prayerTimes: normalized,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: unknown) {
+      return rejectWithValue(error instanceof Error ? error.message : "Failed to load prayer times");
     }
   },
 );
@@ -852,7 +886,7 @@ const contentSlice = createSlice({
         state.isLoading = stillLoading;
 
         if (!stillLoading) {
-          logger.info(
+          logger.debug(
             "[ContentSlice] Content refresh complete, all loading finished",
           );
         }
@@ -899,7 +933,7 @@ const contentSlice = createSlice({
         state.isLoading = stillLoading;
 
         if (!stillLoading) {
-          logger.info(
+          logger.debug(
             "[ContentSlice] Prayer times refresh complete, all loading finished",
           );
         }
@@ -911,6 +945,13 @@ const contentSlice = createSlice({
           state.isLoadingContent ||
           state.isLoadingSchedule ||
           state.isLoadingEvents;
+      })
+      .addCase(loadPrayerTimesFromStorage.fulfilled, (state, action) => {
+        if (!action.payload.skipped && action.payload.prayerTimes) {
+          state.prayerTimes = action.payload.prayerTimes;
+          state.lastPrayerTimesUpdate = action.payload.timestamp ?? new Date().toISOString();
+          state.lastUpdated = action.payload.timestamp ?? new Date().toISOString();
+        }
       });
 
     // Refresh schedule

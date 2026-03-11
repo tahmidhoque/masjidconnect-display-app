@@ -11,7 +11,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer, toMinutesFromMidnight } from '../../utils/dateUtils';
 import type { PrayerPhase } from '../../hooks/usePrayerPhase';
@@ -50,7 +50,7 @@ function isCountingToJamaat(
 }
 
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase }) => {
-  const { nextPrayer } = usePrayerTimes();
+  const { nextPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
 
   /**

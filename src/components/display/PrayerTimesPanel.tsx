@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
 import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
 import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
@@ -82,7 +82,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
 }) => {
-  const { todaysPrayerTimes } = usePrayerTimes();
+  const { todaysPrayerTimes } = usePrayerTimesContext();
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
