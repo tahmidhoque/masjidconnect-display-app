@@ -443,14 +443,22 @@ export const refreshContent = createAsyncThunk(
         content.screen?.contentConfig?.timeFormat ||
         content.data?.screen?.contentConfig?.timeFormat ||
         "12h";
-      // Apply orientation from screen content so production gets correct rotation even without WebSocket
+      // Apply orientation from screen content ONLY if no explicit orientation has been set.
+      // If localStorage has `screen_orientation`, the user/admin has configured it via WebSocket
+      // or command, so we should not overwrite it with possibly-stale API data.
       const screen = content.screen ?? content.data?.screen;
-      if (screen?.orientation) {
+      const storedOrientation =
+        typeof localStorage !== 'undefined' ? localStorage.getItem('screen_orientation') : null;
+      if (screen?.orientation && !storedOrientation) {
         const orientation = parseScreenOrientation(screen.orientation);
         const rotationDegrees =
           parseRotationDegrees((screen as { rotationDegrees?: unknown }).rotationDegrees) ??
           orientationToRotationDegrees(orientation);
         dispatch(setScreenOrientation({ orientation, rotationDegrees }));
+        logger.debug('[Content] Applied orientation from API (no localStorage override)', {
+          orientation,
+          rotationDegrees,
+        });
       }
 
       return {

@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { isPiPlatform } from '../../config/platform';
 import useConnectionStatus from '../../hooks/useConnectionStatus';
 import {
   selectPendingRestart,
@@ -46,7 +47,9 @@ const Footer: React.FC = () => {
   }, []);
 
   // Poll for Wi‑Fi recovery hotspot status when offline (parallel reconnect path)
+  // Only on Pi: deploy server provides /internal/wifi-recovery-status
   useEffect(() => {
+    if (!isPiPlatform) return;
     if (status !== 'no-internet' && status !== 'no-connection') {
       setHotspotActive(false);
       return;

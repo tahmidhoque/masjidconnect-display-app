@@ -9,6 +9,7 @@
 import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
+import { isPiPlatform } from '../config/platform';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
 export interface RemoteCommand {
@@ -260,6 +261,11 @@ class RemoteControlService {
         logger.info('[RemoteControl] CAPTURE_SCREENSHOT not implemented');
         break;
       case 'FORCE_UPDATE':
+        if (!isPiPlatform) {
+          // Hosted (Vercel/Android TV): no update script; reload to get latest from CDN
+          window.location.reload();
+          break;
+        }
         // Device update only: backend script downloads tarball, replaces dist/, then countdown + reload.
         // Do NOT call checkAndApplyUpdate() here — it triggers an immediate PWA reload and prevents
         // the user from seeing the proper flow (checking → downloading → installing → countdown).
