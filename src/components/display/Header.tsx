@@ -25,6 +25,8 @@ interface HeaderProps {
   ramadanTwoLines?: boolean;
   /** Time display format (12h or 24h); defaults to 12h */
   timeFormat?: TimeFormat;
+  /** Days to add to the calculated Hijri date (from displaySettings.hijriDateAdjustment) */
+  hijriDateAdjustment?: number;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -38,6 +40,7 @@ const Header: React.FC<HeaderProps> = ({
   ramadanDay = null,
   ramadanTwoLines = false,
   timeFormat = '12h',
+  hijriDateAdjustment = 0,
 }) => {
   const currentTime = useCurrentTime();
 
@@ -52,7 +55,10 @@ const Header: React.FC<HeaderProps> = ({
   const dateLine2 = `${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
 
   const calendarDate = currentTime.getDate();
-  const hijriDate = useMemo(() => calculateApproximateHijriDate(), [calendarDate]);
+  const hijriDate = useMemo(
+    () => calculateApproximateHijriDate(undefined, hijriDateAdjustment),
+    [calendarDate, hijriDateAdjustment],
+  );
 
   const rightDateContent = useMemo(() => {
     if (isRamadan && ramadanDay != null) {

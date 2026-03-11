@@ -3,7 +3,7 @@ import { PrayerTimes } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
-import { refreshPrayerTimes, loadPrayerTimesFromStorage, selectTimeFormat } from "../store/slices/contentSlice";
+import { refreshPrayerTimes, loadPrayerTimesFromStorage, selectTimeFormat, selectDisplaySettings } from "../store/slices/contentSlice";
 import {
   formatTimeToDisplay,
   getNextPrayerTime,
@@ -116,6 +116,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     (state: RootState) => state.content.prayerTimes,
   );
   const timeFormat = useSelector(selectTimeFormat);
+  const displaySettings = useSelector(selectDisplaySettings);
+  const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
 
   // Use refs to prevent unnecessary re-processing
   const lastProcessedTimes = useRef<PrayerTimes | null>(null);
@@ -476,7 +478,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       localStorage.removeItem("hijriDateTimestamp");
       logger.info("Cleared cached Hijri date to ensure fresh calculation");
 
-      const hijriDateStr = await fetchHijriDate();
+      const hijriDateStr = await fetchHijriDate(undefined, hijriDateAdjustment);
 
       // Cache the result in localStorage
       localStorage.setItem("hijriDate", hijriDateStr);
@@ -491,7 +493,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
       // Calculate approximate date as fallback
       try {
-        const approximateDate = calculateApproximateHijriDate();
+        const approximateDate = calculateApproximateHijriDate(undefined, hijriDateAdjustment);
         logger.info("Using approximate Hijri date calculation", {
           approximateDate,
         });
@@ -511,7 +513,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         refreshHijriDate();
       }, 60000);
     }
-  }, []);
+  }, [hijriDateAdjustment]);
 
   // Check for day change and refresh data if needed - memoized
   const checkForDayChange = useCallback(() => {
@@ -1228,6 +1230,13 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prayerTimes]); // Only depend on prayerTimes
+
+  // Refresh Hijri date when hijriDateAdjustment changes (e.g. after display_settings content:invalidate)
+  useEffect(() => {
+    if (initializedRef.current) {
+      refreshHijriDate();
+    }
+  }, [hijriDateAdjustment, refreshHijriDate]);
 
   // Re-process prayer times when timeFormat changes
   useEffect(() => {

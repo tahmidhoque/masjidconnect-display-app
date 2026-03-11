@@ -138,10 +138,11 @@ export const useRamadanMode = (): RamadanModeData => {
 
   /* ---- Hijri date (recalculated once per calendar day) ---- */
   const hijriParsed = useMemo(() => {
-    const hijriStr = calculateApproximateHijriDate();
+    const adjustment = displaySettings?.hijriDateAdjustment ?? 0;
+    const hijriStr = calculateApproximateHijriDate(undefined, adjustment);
     return parseHijriString(hijriStr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTime.getDate()]);
+  }, [currentTime.getDate(), displaySettings?.hijriDateAdjustment]);
 
   /* ---- Ramadan detection: API displaySettings.isRamadanActive takes precedence when present; else Hijri ---- */
   const isRamadanFromHijri = hijriParsed?.month === 'Ramadan';
@@ -177,19 +178,30 @@ export const useRamadanMode = (): RamadanModeData => {
     const todaysRaw = getTodaysPrayerTimesRaw(prayerTimesRaw);
     const ptImsak = todaysRaw?.imsak ?? null;
 
+    const computeImsakFromFajr = (fajr: string, offsetMinutes: number): string | null => {
+      const [fajrHours, fajrMinutes] = fajr.split(':').map(Number);
+      if (isNaN(fajrHours) || isNaN(fajrMinutes) || offsetMinutes < 0) return null;
+      const totalMinutes = fajrHours * 60 + fajrMinutes - offsetMinutes;
+      const wrappedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+      const h = Math.floor(wrappedMinutes / 60);
+      const m = wrappedMinutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
     if (displaySettings != null) {
       if (!displaySettings.showImsak) return null;
+      const fajr = todaysRaw?.fajr;
+      const offset = displaySettings.imsakOffset ?? 10;
+      /* Prefer computed imsak from fajr - imsakOffset so admin changes take effect.
+       * Use pt.imsak only when we cannot compute (no fajr). */
+      if (fajr && typeof offset === 'number' && offset >= 0) {
+        return computeImsakFromFajr(fajr, offset);
+      }
       return ptImsak && ptImsak.trim() ? ptImsak : null;
     }
 
     if (!isRamadan || !suhoorEndTime) return null;
-    const [fajrHours, fajrMinutes] = suhoorEndTime.split(':').map(Number);
-    if (isNaN(fajrHours) || isNaN(fajrMinutes)) return null;
-    const totalMinutes = fajrHours * 60 + fajrMinutes - IMSAK_OFFSET_MINUTES;
-    const wrappedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
-    const h = Math.floor(wrappedMinutes / 60);
-    const m = wrappedMinutes % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    return computeImsakFromFajr(suhoorEndTime, IMSAK_OFFSET_MINUTES);
   }, [displaySettings, isRamadan, suhoorEndTime, prayerTimesRaw]);
 
   const imsakDisplayTime = useMemo(

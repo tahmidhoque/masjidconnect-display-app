@@ -25,7 +25,7 @@ Define exactly what the Display App must do to consume the new **display setting
 
 **The display settings are bundled in the content response.** There is no separate endpoint for display settings.
 
-**Endpoint:** `GET /api/screens/content` (or `GET /api/screen/content` if your app uses that variant)
+**Endpoint:** `GET /api/screen/content` (canonical endpoint for the display app)
 
 **Authentication:** Same as other screen APIs:
 - Header: `Authorization: Bearer {apiKey}`
@@ -68,6 +68,8 @@ interface DisplaySettings {
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */
   showTomorrowJamaat: boolean;
+  /** Minutes before Fajr for imsak/sehri. Use to compute imsak on the fly when pt.imsak is null. */
+  imsakOffset: number;
 }
 ```
 
@@ -134,7 +136,7 @@ interface ContentInvalidationPayload {
 
 **Implementation options:**
 
-1. **Simplest:** Treat `display_settings` like other content types — refetch full content from `GET /api/screens/content` (or `/api/screen/content`). The response includes `displaySettings` and updated `prayerTimes` with `imsak`.
+1. **Simplest:** Treat `display_settings` like other content types — refetch full content from `GET /api/screen/content`. The response includes `displaySettings` and updated `prayerTimes` with `imsak`.
 2. **If you already refetch full content for `prayer_times`, `schedule`, etc.:** Add `display_settings` to the same handler — refetch full content. No separate logic needed.
 
 **Example handler (pseudo-code):**
@@ -188,6 +190,7 @@ Apply to:
 - When `showImsak === true`: include imsak in the prayer times section (e.g. as a row or column, depending on your layout).
 - When `showImsak === false`: do not show imsak.
 - Use `pt.imsak` from the prayer times array; it may be `null` for some dates.
+- **When `pt.imsak === null` but `pt.fajr` exists:** compute imsak on the fly: subtract `displaySettings.imsakOffset` minutes from Fajr (e.g. Fajr 05:30, imsakOffset 10 → imsak 05:20).
 
 ### 4.4 Show tomorrow's jamaats (`showTomorrowJamaat`)
 
@@ -252,13 +255,10 @@ Apply to:
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/screens/content` | GET | Bearer + X-Screen-ID | Full content including `displaySettings`, `prayerTimes` (with `imsak`), schedule, events. **This is the single source for display settings.** |
-| `/api/screen/content` | GET | Bearer + X-Screen-ID | Alternative content endpoint (if your app uses this path). Ensure it returns `displaySettings`; if not, the backend may need to be updated to add it to this route as well. |
-| `/api/screen/prayer-times` | GET | Bearer + X-Screen-ID | Prayer times only; now includes `imsak`. Use if you fetch prayer times separately. |
+| `/api/screen/content` | GET | Bearer + X-Screen-ID | **Canonical content endpoint for the display app.** Returns full content including `displaySettings`, `prayerTimes` (with `imsak`), schedule, scheduledPlaylists, events, signupQr, donationQr. |
+| `/api/screen/prayer-times` | GET | Bearer + X-Screen-ID | Prayer times only; includes `imsak`. Use if you fetch prayer times separately. |
 
-**Note:** If your display app uses `/api/screen/content` (singular) and that route does not yet return `displaySettings`, you have two options:
-1. Switch to `/api/screens/content` (plural), which includes `displaySettings`.
-2. Request a backend change to add `displaySettings` to `/api/screen/content`.
+**Note:** There is also `/api/screens/content` (plural), a simpler/legacy variant. The display app should use `/api/screen/content` (singular), which has the richer feature set (scheduled playlists, QR codes, Events V2) and now includes `displaySettings`.
 
 ---
 

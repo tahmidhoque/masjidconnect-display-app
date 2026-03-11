@@ -323,6 +323,10 @@ export interface DisplaySettings {
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */
   showTomorrowJamaat: boolean;
+  /** Minutes before Fajr for imsak/sehri. Use to compute imsak on the fly when pt.imsak is null. */
+  imsakOffset: number;
+  /** Days to add to the calculated Hijri date (e.g. +1 if API/local calc is 1 day behind). */
+  hijriDateAdjustment: number;
 }
 
 // Content Types

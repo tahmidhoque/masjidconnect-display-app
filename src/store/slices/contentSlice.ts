@@ -19,6 +19,8 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   timeFormat: "12h",
   showImsak: false,
   showTomorrowJamaat: false,
+  imsakOffset: 10,
+  hijriDateAdjustment: 0,
 };
 
 // Debounce map to prevent rapid successive calls
@@ -275,6 +277,8 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
     timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
     showImsak: raw.showImsak ?? false,
     showTomorrowJamaat: raw.showTomorrowJamaat ?? false,
+    imsakOffset: raw.imsakOffset ?? 10,
+    hijriDateAdjustment: raw.hijriDateAdjustment ?? 0,
   };
 };
 

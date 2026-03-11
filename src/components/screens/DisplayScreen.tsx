@@ -359,13 +359,16 @@ const DisplayScreenInner: React.FC = () => {
   const displaySettings = useAppSelector(selectDisplaySettings);
 
   /* ---- Compose slots ---- */
+  const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
   const headerSlot = (
     <Header
+      key={`header-hijri-${hijriDateAdjustment}`}
       masjidName={masjidName}
       isRamadan={ramadan.isRamadan}
       ramadanDay={ramadan.ramadanDay}
       ramadanTwoLines={isPortrait}
       timeFormat={timeFormat}
+      hijriDateAdjustment={hijriDateAdjustment}
     />
   );
 
