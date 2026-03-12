@@ -24,7 +24,7 @@
 
 import { createServer } from 'node:http';
 import { execSync } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { pbkdf2Sync } from 'node:crypto';
 
 // Parse CLI args — preferred over env vars because sudo strips arbitrary env vars.
@@ -63,6 +63,7 @@ const WPA_CONF = `/etc/wpa_supplicant/wpa_supplicant-${IFACE}.conf`;
 const SCAN_CACHE = '/tmp/masjidconnect-wifi-scan.json';
 const HOTSPOT_SCRIPT = '/opt/masjidconnect/deploy/wifi-hotspot.sh';
 const CONNECT_STATUS_FILE = '/tmp/masjidconnect-wifi-connect-status.json';
+const WIFI_HOTSPOT_ACTIVE_MARKER = '/tmp/masjidconnect-hotspot-active';
 
 /** Dev mode: no root, no real WiFi — mock scan/connect for local UI testing */
 const DEV = process.env.WIFI_SETUP_DEV === '1' || process.env.WIFI_SETUP_DEV === 'true';
@@ -319,6 +320,9 @@ async function apModeConnectAsync() {
         writeFileSync(WIFI_CONNECTED_MARKER, '1');
       } catch { /* non-fatal */ }
 
+      try {
+        unlinkSync(WIFI_HOTSPOT_ACTIVE_MARKER);
+      } catch { /* non-fatal */ }
       writeFileSync(FLAG_FILE, '1');
       writeFileSync(CONNECT_STATUS_FILE, JSON.stringify({ connected: true }));
     } else {
