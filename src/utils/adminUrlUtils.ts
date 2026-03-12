@@ -44,13 +44,13 @@ export const getAdminBaseUrl = (): string => {
   const protocol = window.location.protocol;
 
   if (currentHostname.includes('display')) {
-    return `${protocol}//${currentHostname.replace('display', 'dashboard')}`;
+    return `${protocol}//${currentHostname.replace('display', 'portal')}`;
   }
 
   // Subdomain structure — swap first part for "dashboard"
   const domainParts = currentHostname.split('.');
   if (domainParts.length > 1) {
-    domainParts[0] = 'dashboard';
+    domainParts[0] = 'portal';
     return `${protocol}//${domainParts.join('.')}`;
   }
 
