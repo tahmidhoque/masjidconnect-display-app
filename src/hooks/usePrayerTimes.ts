@@ -1176,15 +1176,21 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       getCurrentForbiddenWindow(todayData as PrayerTimes, new Date()) ?? null,
     );
 
-    // Set Jumuah time if it's Friday
-    if (isJumuahToday && todayData && todayData.jummahJamaat) {
+    // Set Jumuah time if it's Friday — use nowDayjs.day() directly to avoid stale closure
+    // (isJumuahToday state may not have updated yet when this effect runs)
+    const isFriday = nowDayjs.day() === 5;
+    if (isFriday && todayData && todayData.jummahJamaat) {
       setJumuahTime(todayData.jummahJamaat);
       setJumuahDisplayTime(formatTimeToDisplay(todayData.jummahJamaat, timeFormat));
-
-      // Set Khutbah time if available
-      if (todayData.jummahKhutbah) {
-        setJumuahKhutbahTime(formatTimeToDisplay(todayData.jummahKhutbah, timeFormat));
-      }
+      setJumuahKhutbahTime(
+        todayData.jummahKhutbah
+          ? formatTimeToDisplay(todayData.jummahKhutbah, timeFormat)
+          : null,
+      );
+    } else {
+      setJumuahTime(null);
+      setJumuahDisplayTime(null);
+      setJumuahKhutbahTime(null);
     }
   }, [
     prayerTimes,

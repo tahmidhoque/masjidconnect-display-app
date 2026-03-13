@@ -585,12 +585,17 @@ export const loadPrayerTimesFromStorage = createAsyncThunk(
   "content/loadPrayerTimesFromStorage",
   async (_, { rejectWithValue }) => {
     try {
-      const prayerTimes = await storageService.get<PrayerTimes | PrayerTimes[]>('prayerTimes');
+      let prayerTimes = await storageService.get<PrayerTimes | PrayerTimes[] | { prayerTimes?: PrayerTimes | PrayerTimes[] }>('prayerTimes');
       if (!prayerTimes) {
         return { skipped: true, reason: "no data" };
       }
+      // Unwrap if stored in API response format { prayerTimes, hijriDate, ... }
+      const unwrapped =
+        typeof prayerTimes === 'object' && prayerTimes !== null && 'prayerTimes' in prayerTimes && (prayerTimes as { prayerTimes?: unknown }).prayerTimes
+          ? (prayerTimes as { prayerTimes: PrayerTimes | PrayerTimes[] }).prayerTimes
+          : prayerTimes;
       return {
-        prayerTimes: normalisePrayerTimesForStore(prayerTimes),
+        prayerTimes: normalisePrayerTimesForStore(unwrapped as PrayerTimes | PrayerTimes[] | null),
         timestamp: new Date().toISOString(),
       };
     } catch (error: unknown) {

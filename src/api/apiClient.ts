@@ -465,7 +465,10 @@ class ApiClient {
           logger.debug('[ApiClient] Saved displaySettings from content');
         }
       } else if (cacheKey.startsWith(CACHE_KEYS.PRAYER_TIMES)) {
-        await storageService.set('prayerTimes', data);
+        // Prayer-times endpoint returns { prayerTimes, hijriDate, gregorianDate, lastUpdated }
+        // Store only the prayerTimes payload so usePrayerTimes receives the correct shape
+        const payload = (data as PrayerTimesResponse).prayerTimes ?? data;
+        await storageService.set('prayerTimes', payload);
         logger.debug('[ApiClient] Saved prayer times to storageService');
       } else if (cacheKey === CACHE_KEYS.EVENTS) {
         await storageService.set('events', data);
