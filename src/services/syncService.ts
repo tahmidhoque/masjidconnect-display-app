@@ -22,7 +22,8 @@ import apiClient, {
   RemoteCommand,
 } from '../api/apiClient';
 import credentialService from './credentialService';
-import environment from '../config/environment';
+import storageService from './storageService';
+import environment, { defaultMasjidTimezone } from '../config/environment';
 import logger from '../utils/logger';
 
 // ============================================================================
@@ -356,9 +357,11 @@ class SyncService {
   }
 
   /**
-   * Sync prayer times from server
+   * Sync prayer times from server.
+   * Uses masjid timezone when provided (or from storage) so dates align with
+   * mosque local time, not device time (critical for Pi in UTC).
    */
-  public async syncPrayerTimes(): Promise<SyncResult<PrayerTimesResponse>> {
+  public async syncPrayerTimes(timezoneOverride?: string): Promise<SyncResult<PrayerTimesResponse>> {
     if (this.state.prayerTimes.isLoading) {
       logger.debug('[SyncService] Prayer times sync already in progress');
       return { success: false, error: 'Sync already in progress' };
@@ -367,7 +370,12 @@ class SyncService {
     this.updateState('prayerTimes', { isLoading: true, error: null });
 
     try {
-      const response = await apiClient.getPrayerTimes();
+      let timezone = timezoneOverride;
+      if (!timezone) {
+        const screenContent = await storageService.get<{ masjid?: { timezone?: string }; data?: { masjid?: { timezone?: string } } }>('screenContent');
+        timezone = screenContent?.masjid?.timezone ?? screenContent?.data?.masjid?.timezone ?? defaultMasjidTimezone;
+      }
+      const response = await apiClient.getPrayerTimes(undefined, timezone);
 
       if (response.success && response.data) {
         this.updateState('prayerTimes', {

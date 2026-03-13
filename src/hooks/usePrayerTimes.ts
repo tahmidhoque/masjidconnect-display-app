@@ -3,7 +3,7 @@ import { PrayerTimes } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
-import { refreshPrayerTimes, loadPrayerTimesFromStorage, selectTimeFormat, selectDisplaySettings } from "../store/slices/contentSlice";
+import { refreshPrayerTimes, loadPrayerTimesFromStorage, selectTimeFormat, selectDisplaySettings, selectMasjidTimezone } from "../store/slices/contentSlice";
 import {
   formatTimeToDisplay,
   getNextPrayerTime,
@@ -13,12 +13,15 @@ import {
   fetchHijriDate,
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
-import { prayerTimesSyncInterval } from "../config/environment";
+import { prayerTimesSyncInterval, defaultMasjidTimezone } from "../config/environment";
 import { IN_PRAYER_DURATION_MIN } from "../config/prayerPhase";
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
 import dayjs from "dayjs";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(timezone);
 
 /** Dev-only: when set, overrides computed forbiddenPrayer (see useDevKeyboard Ctrl+Shift+F). */
 export const FORBIDDEN_PRAYER_FORCE_EVENT = "forbidden-prayer-force-change";
@@ -117,6 +120,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   );
   const timeFormat = useSelector(selectTimeFormat);
   const displaySettings = useSelector(selectDisplaySettings);
+  const masjidTimezone = useSelector(selectMasjidTimezone);
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
 
   // Use refs to prevent unnecessary re-processing
@@ -425,7 +429,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       return;
     }
 
-    const currentDate = new Date().toISOString().split("T")[0];
+    const tz = masjidTimezone || defaultMasjidTimezone;
+    const currentDate = dayjs().tz(tz).format("YYYY-MM-DD");
 
     if (!forceReprocess) {
       // Check if we've already processed this exact data (Redux-driven path only)
@@ -464,7 +469,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     } finally {
       calculationsRef.current.isProcessing = false;
     }
-  }, [prayerTimes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checkForDayChange and updateFormattedPrayerTimes omitted to avoid definition-order issues
+  }, [prayerTimes, masjidTimezone]);
 
   // Get and update Hijri date - memoized to prevent rerenders
   const refreshHijriDate = useCallback(async () => {
@@ -517,7 +523,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
   // Check for day change and refresh data if needed - memoized
   const checkForDayChange = useCallback(() => {
-    const now = dayjs();
+    const tz = masjidTimezone || defaultMasjidTimezone;
+    const now = dayjs().tz(tz);
     const newDay = now.date();
 
     // If the day has changed, force refresh the prayer data
@@ -543,7 +550,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Refresh Hijri date
       refreshHijriDate();
     }
-  }, [refreshPrayerTimesHandler, refreshHijriDate]);
+  }, [refreshPrayerTimesHandler, refreshHijriDate, masjidTimezone]);
 
   // Helper function to determine current prayer - memoized
   const calculateCurrentPrayer = useCallback(
@@ -818,7 +825,11 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     let nextPrayerName = "";
     let currentPrayerName = "";
 
-    // API returns { data: [ day0, day1, ... ] } with 5 days; use index 0 for today, 1 for tomorrow (after Isha)
+    // API returns { data: [ day0, day1, ... ] }; resolve today/tomorrow by date field
+    // so we show correct day when offline at midnight (data[0] may be yesterday).
+    const tz = masjidTimezone || defaultMasjidTimezone;
+    const todayInMasjidTz = dayjs().tz(tz).format("YYYY-MM-DD");
+
     let tomorrowData: PrayerTimes | null = null;
     let dayAfterTomorrowData: PrayerTimes | null = null;
     if (
@@ -827,12 +838,26 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       Array.isArray(prayerTimes.data) &&
       prayerTimes.data.length > 0
     ) {
-      todayData = prayerTimes.data[0];
-      if (prayerTimes.data.length > 1) {
-        tomorrowData = prayerTimes.data[1];
-      }
-      if (prayerTimes.data.length > 2) {
-        dayAfterTomorrowData = prayerTimes.data[2];
+      const dataArr = prayerTimes.data as (PrayerTimes & { date?: string })[];
+      const todayIndex = dataArr.findIndex((d) => d.date === todayInMasjidTz);
+
+      if (todayIndex >= 0) {
+        todayData = dataArr[todayIndex];
+        if (todayIndex + 1 < dataArr.length) tomorrowData = dataArr[todayIndex + 1];
+        if (todayIndex + 2 < dataArr.length) dayAfterTomorrowData = dataArr[todayIndex + 2];
+      } else {
+        const firstDate = dataArr[0]?.date;
+        if (firstDate && firstDate < todayInMasjidTz) {
+          // Offline roll-forward: data[0] is yesterday, data[1] is today
+          todayData = dataArr[1] ?? dataArr[0];
+          tomorrowData = dataArr[2] ?? null;
+          dayAfterTomorrowData = dataArr[3] ?? null;
+        } else {
+          // No date field or data[0] is today/future: fall back to index-based
+          todayData = dataArr[0];
+          if (dataArr.length > 1) tomorrowData = dataArr[1];
+          if (dataArr.length > 2) dayAfterTomorrowData = dataArr[2];
+        }
       }
     }
 
@@ -938,7 +963,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
 
     // After Isha the next prayer is tomorrow's Fajr; show next day's list from API data array (data[1])
-    const nowDayjs = dayjs();
+    const nowDayjs = dayjs().tz(tz);
     const ishaPrayer = prayers.find((p) => p.name === "Isha");
     let ishaTimeToday: dayjs.Dayjs | null = null;
     if (ishaPrayer?.time) {
@@ -1165,6 +1190,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     prayerTimes,
     isJumuahToday,
     timeFormat,
+    masjidTimezone,
     calculateCurrentPrayer,
     calculatePrayersAccurately,
   ]);

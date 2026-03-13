@@ -20,7 +20,10 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
 import localforage from 'localforage';
+
+dayjs.extend(timezone);
 import credentialService from '../services/credentialService';
 import environment from '../config/environment';
 import logger from '../utils/logger';
@@ -665,10 +668,11 @@ class ApiClient {
 
   /**
    * Get prayer times.
-   * When no date is passed, uses today's date (YYYY-MM-DD) so the cache key
-   * naturally invalidates each day instead of reusing the static 'today' key.
+   * When no date is passed, uses today's date (YYYY-MM-DD) in the given timezone
+   * so the cache key naturally invalidates each day. Uses masjid timezone when
+   * provided to avoid device-UTC mismatch (e.g. Pi in UTC, mosque in Europe/London).
    */
-  public async getPrayerTimes(date?: string): Promise<ApiResponse<PrayerTimesResponse>> {
+  public async getPrayerTimes(date?: string, timezoneStr?: string): Promise<ApiResponse<PrayerTimesResponse>> {
     if (!credentialService.hasCredentials()) {
       return {
         success: false,
@@ -676,7 +680,9 @@ class ApiClient {
       };
     }
 
-    const dateParam = date ?? dayjs().format('YYYY-MM-DD');
+    const dateParam = date ?? (timezoneStr
+      ? dayjs().tz(timezoneStr).format('YYYY-MM-DD')
+      : dayjs().format('YYYY-MM-DD'));
     return this.getWithCache<PrayerTimesResponse>(
       SCREEN_ENDPOINTS.GET_PRAYER_TIMES,
       `${CACHE_KEYS.PRAYER_TIMES}_${dateParam}`,
