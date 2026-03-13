@@ -6,6 +6,8 @@
  */
 
 export interface EnvironmentConfig {
+  /** Default timezone when masjid timezone is not yet loaded (e.g. Europe/London for UK). */
+  defaultMasjidTimezone: string;
   apiUrl: string;
   realtimeUrl: string;
   isDevelopment: boolean;
@@ -27,6 +29,8 @@ export interface EnvironmentConfig {
 }
 
 const DEFAULTS = {
+  /** Default masjid timezone when not in content (UK deployments). */
+  DEFAULT_MASJID_TIMEZONE: 'Europe/London',
   PRODUCTION_API_URL: 'https://portal.masjidconnect.co.uk',
   PRODUCTION_REALTIME_URL: 'https://masjidconnect-realtime.fly.dev',
   DEV_API_URL: 'http://localhost:3001',
@@ -64,6 +68,7 @@ function buildConfig(): EnvironmentConfig {
   }
 
   return {
+    defaultMasjidTimezone: (import.meta.env.VITE_DEFAULT_MASJID_TIMEZONE ?? '').trim() || DEFAULTS.DEFAULT_MASJID_TIMEZONE,
     apiUrl,
     realtimeUrl,
     isDevelopment: isDev,
@@ -84,6 +89,7 @@ const config = buildConfig();
 export default config;
 
 export const {
+  defaultMasjidTimezone,
   apiUrl,
   realtimeUrl,
   isDevelopment: isDevMode,

@@ -482,7 +482,7 @@ export const refreshContent = createAsyncThunk(
 
 export const refreshPrayerTimes = createAsyncThunk(
   "content/refreshPrayerTimes",
-  async (options: { forceRefresh?: boolean } = {}, { rejectWithValue }) => {
+  async (options: { forceRefresh?: boolean } = {}, { rejectWithValue, getState }) => {
     try {
       const { forceRefresh = false } = options;
       const debounceKey = "refreshPrayerTimes";
@@ -501,9 +501,12 @@ export const refreshPrayerTimes = createAsyncThunk(
       debounceMap.set(debounceKey, now);
       logger.debug("[Content] Refreshing prayer times...");
 
+      const state = getState() as { content: ContentState };
+      const masjidTimezone = state.content.masjidTimezone ?? undefined;
+
       // First, try to sync prayer times separately (but don't fail if it doesn't work)
       try {
-        await syncService.syncPrayerTimes();
+        await syncService.syncPrayerTimes(masjidTimezone);
         logger.debug("[Content] Prayer times sync completed successfully");
       } catch (syncError) {
         logger.warn(
