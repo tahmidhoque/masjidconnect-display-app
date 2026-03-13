@@ -34,6 +34,7 @@ import {
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
+  JumuahBar,
   SilentPhonesGraphic,
   InPrayerScreen,
 } from '../display';
@@ -433,6 +434,7 @@ const DisplayScreenInner: React.FC = () => {
             prayerSection={
               <div className="flex flex-col gap-3 h-full">
                 {prayerPanel}
+                <JumuahBar />
                 {countdownSlot}
               </div>
             }
@@ -447,6 +449,7 @@ const DisplayScreenInner: React.FC = () => {
             sidebar={
               <>
                 {prayerPanel}
+                <JumuahBar compact />
                 {countdownSlot}
               </>
             }
