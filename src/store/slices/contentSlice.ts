@@ -585,7 +585,7 @@ export const loadPrayerTimesFromStorage = createAsyncThunk(
   "content/loadPrayerTimesFromStorage",
   async (_, { rejectWithValue }) => {
     try {
-      let prayerTimes = await storageService.get<PrayerTimes | PrayerTimes[] | { prayerTimes?: PrayerTimes | PrayerTimes[] }>('prayerTimes');
+      const prayerTimes = await storageService.get<PrayerTimes | PrayerTimes[] | { prayerTimes?: PrayerTimes | PrayerTimes[] }>('prayerTimes');
       if (!prayerTimes) {
         return { skipped: true, reason: "no data" };
       }

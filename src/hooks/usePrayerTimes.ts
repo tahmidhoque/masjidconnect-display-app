@@ -1194,7 +1194,6 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     }
   }, [
     prayerTimes,
-    isJumuahToday,
     timeFormat,
     masjidTimezone,
     calculateCurrentPrayer,

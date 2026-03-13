@@ -6,6 +6,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 export default tseslint.config(
   {
     ignores: [
+      ".cursor/",
       "build/",
       "dist/",
       "node_modules/",
