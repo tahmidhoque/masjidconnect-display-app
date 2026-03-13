@@ -47,7 +47,7 @@ export const getAdminBaseUrl = (): string => {
     return `${protocol}//${currentHostname.replace('display', 'portal')}`;
   }
 
-  // Subdomain structure — swap first part for "dashboard"
+  // Subdomain structure — swap first part for "portal"
   const domainParts = currentHostname.split('.');
   if (domainParts.length > 1) {
     domainParts[0] = 'portal';

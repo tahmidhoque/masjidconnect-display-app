@@ -51,16 +51,16 @@ describe('getAdminBaseUrl', () => {
     expect(typeof url).toBe('string');
   });
 
-  it('replaces "display" with "dashboard" in hostname when hostname includes display', () => {
+  it('replaces "display" with "portal" in hostname when hostname includes display', () => {
     mockLocation({ hostname: 'display.masjidconnect.co.uk', protocol: 'https:' });
     const url = getAdminBaseUrl();
-    expect(url).toBe('https://dashboard.masjidconnect.co.uk');
+    expect(url).toBe('https://portal.masjidconnect.co.uk');
   });
 
   it('uses subdomain swap when hostname has multiple parts', () => {
     mockLocation({ hostname: 'app.example.com', protocol: 'https:' });
     const url = getAdminBaseUrl();
-    expect(url).toBe('https://dashboard.example.com');
+    expect(url).toBe('https://portal.example.com');
   });
 
   it('returns URL derived from API when hostname has no subdomain', () => {
