@@ -18,6 +18,8 @@ describe('environment', () => {
       prayerTimesSyncInterval: expect.any(Number),
       eventsSyncInterval: expect.any(Number),
       prayerStatusInterval: expect.any(Number),
+      dailySyncOffsetMs: expect.any(Number),
+      dailyUpdateCheckOffsetMs: expect.any(Number),
       maxRetries: expect.any(Number),
       initialRetryDelay: expect.any(Number),
       maxRetryDelay: expect.any(Number),
@@ -46,7 +48,10 @@ describe('environment', () => {
 
   it('DEFAULTS contains sync intervals', () => {
     expect(DEFAULTS.HEARTBEAT_INTERVAL).toBe(30_000);
-    expect(DEFAULTS.CONTENT_SYNC_INTERVAL).toBe(5 * 60_000);
-    expect(DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL).toBe(4 * 60 * 60_000);
+    expect(DEFAULTS.CONTENT_SYNC_INTERVAL).toBe(24 * 60 * 60_000);
+    expect(DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL).toBe(24 * 60 * 60_000);
+    expect(DEFAULTS.EVENTS_SYNC_INTERVAL).toBe(24 * 60 * 60_000);
+    expect(DEFAULTS.DAILY_SYNC_OFFSET_MS).toBe(3 * 60 * 60 * 1000);
+    expect(DEFAULTS.DAILY_UPDATE_CHECK_OFFSET_MS).toBe(4 * 60 * 60 * 1000);
   });
 });

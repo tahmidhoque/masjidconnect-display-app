@@ -180,10 +180,10 @@ const CACHE_KEYS = {
 } as const;
 
 const CACHE_TTL = {
-  CONTENT: 5 * 60 * 1000, // 5 minutes
+  CONTENT: 24 * 60 * 60 * 1000, // 24 hours — WebSocket invalidation drives fresh fetches
   PRAYER_TIMES: 24 * 60 * 60 * 1000, // 24 hours
-  EVENTS: 30 * 60 * 1000, // 30 minutes
-  SYNC_STATUS: 60 * 1000, // 1 minute
+  EVENTS: 24 * 60 * 60 * 1000, // 24 hours
+  SYNC_STATUS: 24 * 60 * 60 * 1000, // 24 hours — no longer polled; kept for manual/on-demand use
 } as const;
 
 interface CachedData<T> {

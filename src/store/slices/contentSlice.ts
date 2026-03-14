@@ -8,7 +8,7 @@ import { parseScreenOrientation, parseRotationDegrees, orientationToRotationDegr
 import { setScreenOrientation } from "./uiSlice";
 
 // Constants
-const MIN_REFRESH_INTERVAL = 30 * 1000; // Increased from 10 to 30 seconds to prevent rapid firing
+const MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — forceRefresh bypasses this
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in announcements
 const DEFAULT_MASJID_NAME = "Masjid Connect"; // Default masjid name if none is found
 

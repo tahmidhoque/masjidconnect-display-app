@@ -10,6 +10,7 @@ import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
 import { isPiPlatform } from '../config/platform';
+import { checkAndApplyUpdate } from '../pwa';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
 export interface RemoteCommand {
@@ -72,6 +73,21 @@ class RemoteControlService {
   /** Stop polling /internal/update-status (e.g. on logout). */
   public clearDeviceUpdatePolling(): void {
     this.stopUpdatePolling();
+  }
+
+  /**
+   * Trigger an update check. Used by daily scheduler and FORCE_UPDATE command.
+   * Pi: POSTs to /internal/trigger-update (runs update-from-github.sh).
+   * Hosted: Checks PWA service worker and reloads if new version available.
+   */
+  public triggerUpdateCheck(): void {
+    if (isPiPlatform) {
+      logger.info('[RemoteControl] Daily update check: triggering device update');
+      void this.triggerDeviceUpdateAndPoll();
+    } else {
+      logger.info('[RemoteControl] Daily update check: checking PWA service worker');
+      void checkAndApplyUpdate();
+    }
   }
 
   private stopUpdatePolling(): void {
@@ -261,16 +277,8 @@ class RemoteControlService {
         logger.info('[RemoteControl] CAPTURE_SCREENSHOT not implemented');
         break;
       case 'FORCE_UPDATE':
-        if (!isPiPlatform) {
-          // Hosted (Vercel/Android TV): no update script; reload to get latest from CDN
-          window.location.reload();
-          break;
-        }
-        // Device update only: backend script downloads tarball, replaces dist/, then countdown + reload.
-        // Do NOT call checkAndApplyUpdate() here — it triggers an immediate PWA reload and prevents
-        // the user from seeing the proper flow (checking → downloading → installing → countdown).
-        logger.info('[RemoteControl] FORCE_UPDATE: triggering device update');
-        void this.triggerDeviceUpdateAndPoll();
+        logger.info('[RemoteControl] FORCE_UPDATE: triggering update check');
+        this.triggerUpdateCheck();
         break;
       case 'FACTORY_RESET':
         localStorage.clear();

@@ -18,11 +18,11 @@ import apiClient, {
   EventsResponse,
   HeartbeatRequest,
   HeartbeatResponse,
-  SyncStatusResponse,
   RemoteCommand,
 } from '../api/apiClient';
 import credentialService from './credentialService';
 import storageService from './storageService';
+import remoteControlService from './remoteControlService';
 import environment, { defaultMasjidTimezone } from '../config/environment';
 import logger from '../utils/logger';
 
@@ -79,11 +79,12 @@ export type SyncEventListener<T = unknown> = (data: T) => void;
 // ============================================================================
 
 class SyncService {
-  // Polling intervals
-  private contentInterval: NodeJS.Timeout | null = null;
-  private prayerTimesInterval: NodeJS.Timeout | null = null;
-  private eventsInterval: NodeJS.Timeout | null = null;
+  // Intervals (heartbeat only; content/events/prayer are WebSocket-driven + once-daily)
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private dailySyncTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private dailySyncIntervalId: ReturnType<typeof setInterval> | null = null;
+  private dailyUpdateCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private dailyUpdateCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
   // Sync state
   private state: SyncState = {
@@ -92,9 +93,6 @@ class SyncService {
     events: { lastSynced: null, isLoading: false, error: null },
     heartbeat: { lastSynced: null, isLoading: false, error: null },
   };
-
-  // Cached timestamps from sync status
-  private lastKnownTimestamps: SyncStatusResponse | null = null;
 
   // Event listeners
   private listeners: Map<SyncEventType, Set<SyncEventListener>> = new Map();
@@ -139,11 +137,14 @@ class SyncService {
     // Perform initial sync
     this.performInitialSync();
 
-    // Start intervals
+    // Heartbeat (HTTP fallback when WebSocket disconnected)
     this.startHeartbeatInterval();
-    this.startContentInterval();
-    this.startPrayerTimesInterval();
-    this.startEventsInterval();
+
+    // Once-daily fallback sync — content/events/prayer are otherwise WebSocket-driven
+    this.scheduleDailySync();
+
+    // Once-daily update check — Pi: device update script; Hosted: PWA service worker
+    this.scheduleDailyUpdateCheck();
   }
 
   /**
@@ -196,24 +197,28 @@ class SyncService {
   }
 
   /**
-   * Clear all intervals
+   * Clear all intervals and timeouts
    */
   private clearAllIntervals(): void {
-    if (this.contentInterval) {
-      clearInterval(this.contentInterval);
-      this.contentInterval = null;
-    }
-    if (this.prayerTimesInterval) {
-      clearInterval(this.prayerTimesInterval);
-      this.prayerTimesInterval = null;
-    }
-    if (this.eventsInterval) {
-      clearInterval(this.eventsInterval);
-      this.eventsInterval = null;
-    }
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
+    }
+    if (this.dailySyncTimeoutId) {
+      clearTimeout(this.dailySyncTimeoutId);
+      this.dailySyncTimeoutId = null;
+    }
+    if (this.dailySyncIntervalId) {
+      clearInterval(this.dailySyncIntervalId);
+      this.dailySyncIntervalId = null;
+    }
+    if (this.dailyUpdateCheckTimeoutId) {
+      clearTimeout(this.dailyUpdateCheckTimeoutId);
+      this.dailyUpdateCheckTimeoutId = null;
+    }
+    if (this.dailyUpdateCheckIntervalId) {
+      clearInterval(this.dailyUpdateCheckIntervalId);
+      this.dailyUpdateCheckIntervalId = null;
     }
   }
 
@@ -233,31 +238,85 @@ class SyncService {
     this.sendHeartbeat();
   }
 
-  private startContentInterval(): void {
-    // Sync content every 5 minutes
-    this.contentInterval = setInterval(() => {
-      if (!this.isPaused) {
-        this.syncContent();
-      }
-    }, environment.contentSyncInterval);
+  /**
+   * Schedule once-daily sync at configured offset (e.g. 03:00 UTC).
+   * Content, events, and prayer times are otherwise fetched only via WebSocket invalidation.
+   */
+  private scheduleDailySync(): void {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const offsetMs = environment.dailySyncOffsetMs;
+
+    const startOfTodayUTC = Date.UTC(
+      new Date().getUTCFullYear(),
+      new Date().getUTCMonth(),
+      new Date().getUTCDate(),
+    );
+    let nextSyncAt = startOfTodayUTC + offsetMs;
+    if (nextSyncAt <= now) {
+      nextSyncAt += ONE_DAY_MS;
+    }
+    const msUntil = nextSyncAt - now;
+
+    this.dailySyncTimeoutId = setTimeout(() => {
+      this.dailySyncTimeoutId = null;
+      this.runDailySync();
+      this.dailySyncIntervalId = setInterval(() => this.runDailySync(), ONE_DAY_MS);
+    }, msUntil);
+
+    logger.info('[SyncService] Daily sync scheduled', {
+      inMs: msUntil,
+      nextAt: new Date(nextSyncAt).toISOString(),
+    });
   }
 
-  private startPrayerTimesInterval(): void {
-    // Sync prayer times daily (but check more frequently for updates)
-    this.prayerTimesInterval = setInterval(() => {
-      if (!this.isPaused) {
-        this.syncPrayerTimes();
-      }
-    }, environment.prayerTimesSyncInterval);
+  /** Run full sync with forceRefresh (used by once-daily fallback). */
+  private runDailySync(): void {
+    if (this.isPaused) return;
+    logger.info('[SyncService] Running once-daily fallback sync');
+    void this.syncAll({ forceRefresh: true });
   }
 
-  private startEventsInterval(): void {
-    // Sync events every 30 minutes
-    this.eventsInterval = setInterval(() => {
-      if (!this.isPaused) {
-        this.syncEvents();
-      }
-    }, environment.eventsSyncInterval);
+  /**
+   * Schedule once-daily update check at configured offset (e.g. 04:00 UTC).
+   * Pi: triggers device update script; Hosted: checks PWA service worker.
+   */
+  private scheduleDailyUpdateCheck(): void {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const offsetMs = environment.dailyUpdateCheckOffsetMs;
+
+    const startOfTodayUTC = Date.UTC(
+      new Date().getUTCFullYear(),
+      new Date().getUTCMonth(),
+      new Date().getUTCDate(),
+    );
+    let nextCheckAt = startOfTodayUTC + offsetMs;
+    if (nextCheckAt <= now) {
+      nextCheckAt += ONE_DAY_MS;
+    }
+    const msUntil = nextCheckAt - now;
+
+    this.dailyUpdateCheckTimeoutId = setTimeout(() => {
+      this.dailyUpdateCheckTimeoutId = null;
+      this.runDailyUpdateCheck();
+      this.dailyUpdateCheckIntervalId = setInterval(
+        () => this.runDailyUpdateCheck(),
+        ONE_DAY_MS,
+      );
+    }, msUntil);
+
+    logger.info('[SyncService] Daily update check scheduled', {
+      inMs: msUntil,
+      nextAt: new Date(nextCheckAt).toISOString(),
+    });
+  }
+
+  /** Run update check (used by once-daily scheduler). */
+  private runDailyUpdateCheck(): void {
+    if (this.isPaused) return;
+    logger.info('[SyncService] Running once-daily update check');
+    remoteControlService.triggerUpdateCheck();
   }
 
   // ==========================================================================
@@ -278,17 +337,20 @@ class SyncService {
   }
 
   /**
-   * Sync all data types
+   * Sync all data types.
+   * @param options.forceRefresh - When true, bypass cache and always fetch (e.g. daily fallback, content:invalidate).
    */
-  public async syncAll(): Promise<void> {
+  public async syncAll(options?: { forceRefresh?: boolean }): Promise<void> {
     if (this.isPaused) {
       logger.debug('[SyncService] Sync skipped - paused');
       return;
     }
 
+    const forceRefresh = options?.forceRefresh === true;
+
     // Run syncs in parallel
     await Promise.all([
-      this.syncContent(),
+      this.syncContent({ forceRefresh }),
       this.syncPrayerTimes(),
       this.syncEvents(),
     ]);
@@ -305,23 +367,11 @@ class SyncService {
     }
 
     const forceRefresh = options?.forceRefresh === true;
-    if (forceRefresh) {
-      // Do NOT clear content cache — when offline, getContent needs it to fall back.
-      // cacheBust param ensures fresh network fetch when online.
-      this.lastKnownTimestamps = null;
-    }
 
     this.updateState('content', { isLoading: true, error: null });
 
     try {
-      // Check if content has changed using sync endpoint (skip when forceRefresh)
-      const shouldSync = forceRefresh || (await this.checkIfContentChanged());
-      if (!shouldSync) {
-        logger.debug('[SyncService] Content unchanged, skipping sync');
-        this.updateState('content', { isLoading: false });
-        return { success: true, fromCache: true };
-      }
-
+      // No sync-status polling — fetch when called (daily fallback or WebSocket invalidation)
       const response = await apiClient.getContent(
         forceRefresh ? { cacheBust: true, forceNetwork: true } : undefined
       );
@@ -513,45 +563,6 @@ class SyncService {
   }
 
   // ==========================================================================
-  // Smart Sync
-  // ==========================================================================
-
-  /**
-   * Check if content has changed using the sync endpoint
-   */
-  private async checkIfContentChanged(): Promise<boolean> {
-    try {
-      const response = await apiClient.getSyncStatus();
-
-      if (!response.success || !response.data) {
-        // If we can't check, assume we need to sync
-        return true;
-      }
-
-      const newTimestamps = response.data;
-
-      // First sync or no previous timestamps
-      if (!this.lastKnownTimestamps) {
-        this.lastKnownTimestamps = newTimestamps;
-        return true;
-      }
-
-      // Check if content has changed
-      const contentChanged =
-        newTimestamps.contentUpdated !== this.lastKnownTimestamps.contentUpdated;
-
-      if (contentChanged) {
-        this.lastKnownTimestamps = newTimestamps;
-      }
-
-      return contentChanged;
-    } catch (error) {
-      logger.debug('[SyncService] Could not check sync status, proceeding with sync');
-      return true;
-    }
-  }
-
-  // ==========================================================================
   // Command Processing
   // ==========================================================================
 
@@ -638,14 +649,11 @@ class SyncService {
   public async forceRefresh(): Promise<void> {
     logger.info('[SyncService] Forcing full refresh');
 
-    // Clear cached timestamps to force sync
-    this.lastKnownTimestamps = null;
-
     // Clear API cache
     await apiClient.clearCache();
 
-    // Perform full sync
-    await this.syncAll();
+    // Perform full sync with forceRefresh
+    await this.syncAll({ forceRefresh: true });
   }
 
   /**
