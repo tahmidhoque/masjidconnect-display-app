@@ -8,7 +8,7 @@ import { parseScreenOrientation, parseRotationDegrees, orientationToRotationDegr
 import { setScreenOrientation } from "./uiSlice";
 
 // Constants
-const MIN_REFRESH_INTERVAL = 30 * 1000; // Increased from 10 to 30 seconds to prevent rapid firing
+const MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — forceRefresh bypasses this
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in announcements
 const DEFAULT_MASJID_NAME = "Masjid Connect"; // Default masjid name if none is found
 
@@ -333,8 +333,8 @@ export const refreshContent = createAsyncThunk(
     { forceRefresh = false }: { forceRefresh?: boolean } = {},
     { rejectWithValue, getState, dispatch },
   ) => {
+    const debounceKey = "refreshContent";
     try {
-      const debounceKey = "refreshContent";
       const now = Date.now();
       const lastCall = debounceMap.get(debounceKey) || 0;
 
@@ -474,6 +474,7 @@ export const refreshContent = createAsyncThunk(
         events: events ?? undefined,
       };
     } catch (error: any) {
+      debounceMap.delete(debounceKey);
       logger.error("[Content] Error refreshing content", { error });
       return rejectWithValue(error.message || "Failed to refresh content");
     }
@@ -483,9 +484,9 @@ export const refreshContent = createAsyncThunk(
 export const refreshPrayerTimes = createAsyncThunk(
   "content/refreshPrayerTimes",
   async (options: { forceRefresh?: boolean } = {}, { rejectWithValue, getState }) => {
+    const { forceRefresh = false } = options;
+    const debounceKey = "refreshPrayerTimes";
     try {
-      const { forceRefresh = false } = options;
-      const debounceKey = "refreshPrayerTimes";
       const now = Date.now();
       const lastCall = debounceMap.get(debounceKey) || 0;
 
@@ -570,6 +571,7 @@ export const refreshPrayerTimes = createAsyncThunk(
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
+      debounceMap.delete(debounceKey);
       logger.error("[Content] Error refreshing prayer times", { error });
       return rejectWithValue(error.message || "Failed to refresh prayer times");
     }

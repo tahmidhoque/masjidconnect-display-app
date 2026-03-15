@@ -21,6 +21,10 @@ export interface EnvironmentConfig {
   prayerTimesSyncInterval: number;
   eventsSyncInterval: number;
   prayerStatusInterval: number;
+  /** Offset from midnight UTC (ms) for once-daily sync, e.g. 3*60*60*1000 = 03:00 UTC */
+  dailySyncOffsetMs: number;
+  /** Offset from midnight UTC (ms) for once-daily update check, e.g. 4*60*60*1000 = 04:00 UTC */
+  dailyUpdateCheckOffsetMs: number;
 
   // Retry configuration
   maxRetries: number;
@@ -39,10 +43,14 @@ const DEFAULTS = {
   HEARTBEAT_INTERVAL: 30_000,
   /** Used when pending command acks need to reach the server quickly */
   HEARTBEAT_FAST_INTERVAL: 5_000,
-  CONTENT_SYNC_INTERVAL: 5 * 60_000,
-  PRAYER_TIMES_SYNC_INTERVAL: 4 * 60 * 60_000,
-  EVENTS_SYNC_INTERVAL: 30 * 60_000,
+  CONTENT_SYNC_INTERVAL: 24 * 60 * 60_000,
+  PRAYER_TIMES_SYNC_INTERVAL: 24 * 60 * 60_000,
+  EVENTS_SYNC_INTERVAL: 24 * 60 * 60_000,
   PRAYER_STATUS_INTERVAL: 60_000,
+  /** 03:00 UTC — low-traffic time for once-daily fallback sync */
+  DAILY_SYNC_OFFSET_MS: 3 * 60 * 60 * 1000,
+  /** 04:00 UTC — 1 hour after daily sync for once-daily update check */
+  DAILY_UPDATE_CHECK_OFFSET_MS: 4 * 60 * 60 * 1000,
 
   MAX_RETRIES: 3,
   INITIAL_RETRY_DELAY: 1_000,
@@ -67,6 +75,13 @@ function buildConfig(): EnvironmentConfig {
     apiUrl = apiUrl.replace('http://', 'https://');
   }
 
+  const dailySyncRaw = (import.meta.env.VITE_DAILY_SYNC_OFFSET_MS ?? '').trim();
+  const dailyUpdateRaw = (import.meta.env.VITE_DAILY_UPDATE_CHECK_OFFSET_MS ?? '').trim();
+  const parsedSync = dailySyncRaw ? parseInt(dailySyncRaw, 10) : NaN;
+  const parsedUpdate = dailyUpdateRaw ? parseInt(dailyUpdateRaw, 10) : NaN;
+  const dailySyncOffsetMs = Number.isNaN(parsedSync) ? DEFAULTS.DAILY_SYNC_OFFSET_MS : parsedSync;
+  const dailyUpdateCheckOffsetMs = Number.isNaN(parsedUpdate) ? DEFAULTS.DAILY_UPDATE_CHECK_OFFSET_MS : parsedUpdate;
+
   return {
     defaultMasjidTimezone: (import.meta.env.VITE_DEFAULT_MASJID_TIMEZONE ?? '').trim() || DEFAULTS.DEFAULT_MASJID_TIMEZONE,
     apiUrl,
@@ -79,6 +94,8 @@ function buildConfig(): EnvironmentConfig {
     prayerTimesSyncInterval: DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL,
     eventsSyncInterval: DEFAULTS.EVENTS_SYNC_INTERVAL,
     prayerStatusInterval: DEFAULTS.PRAYER_STATUS_INTERVAL,
+    dailySyncOffsetMs,
+    dailyUpdateCheckOffsetMs,
     maxRetries: DEFAULTS.MAX_RETRIES,
     initialRetryDelay: DEFAULTS.INITIAL_RETRY_DELAY,
     maxRetryDelay: DEFAULTS.MAX_RETRY_DELAY,
@@ -100,6 +117,8 @@ export const {
   prayerTimesSyncInterval,
   eventsSyncInterval,
   prayerStatusInterval,
+  dailySyncOffsetMs,
+  dailyUpdateCheckOffsetMs,
   maxRetries,
   initialRetryDelay,
   maxRetryDelay,

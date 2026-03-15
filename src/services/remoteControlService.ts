@@ -10,6 +10,7 @@ import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
 import { isPiPlatform } from '../config/platform';
+import { checkAndApplyUpdate } from '../pwa';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
 export interface RemoteCommand {
@@ -58,6 +59,7 @@ class RemoteControlService {
   private scheduledRestartTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private onUpdateStatus: OnUpdateStatus | null = null;
   private updatePollIntervalId: ReturnType<typeof setInterval> | null = null;
+  private isUpdateInProgress = false;
 
   /** Register callback to show on-screen countdown when a delayed restart/reload is scheduled. */
   public setOnScheduledRestart(cb: OnScheduledRestart | null): void {
@@ -74,11 +76,36 @@ class RemoteControlService {
     this.stopUpdatePolling();
   }
 
+  /**
+   * Trigger an update check. Used by daily scheduler and FORCE_UPDATE command.
+   * Pi: POSTs to /internal/trigger-update (runs update-from-github.sh).
+   * Hosted: Checks PWA service worker and reloads if new version available.
+   * Re-entry guard: returns immediately if an update flow is already running.
+   */
+  public triggerUpdateCheck(): void {
+    if (this.isUpdateInProgress) {
+      logger.debug('[RemoteControl] Update check already in progress, skipping');
+      return;
+    }
+    this.isUpdateInProgress = true;
+
+    if (isPiPlatform) {
+      logger.info('[RemoteControl] Daily update check: triggering device update');
+      void this.triggerDeviceUpdateAndPoll();
+    } else {
+      logger.info('[RemoteControl] Daily update check: checking PWA service worker');
+      void checkAndApplyUpdate().finally(() => {
+        this.isUpdateInProgress = false;
+      });
+    }
+  }
+
   private stopUpdatePolling(): void {
     if (this.updatePollIntervalId) {
       clearInterval(this.updatePollIntervalId);
       this.updatePollIntervalId = null;
     }
+    this.isUpdateInProgress = false;
   }
 
   private notifyUpdateStatus(phase: DeviceUpdatePhase, message: string, restartAt: number | null): void {
@@ -96,10 +123,12 @@ class RemoteControlService {
       const res = await fetch(`${INTERNAL_BASE}/internal/trigger-update`, { method: 'POST' });
       if (res.status !== 202) {
         this.notifyUpdateStatus('no_update', 'Up to date', null);
+        this.isUpdateInProgress = false;
         return;
       }
     } catch {
       this.notifyUpdateStatus('no_update', 'Up to date', null);
+      this.isUpdateInProgress = false;
       return;
     }
 
@@ -261,16 +290,8 @@ class RemoteControlService {
         logger.info('[RemoteControl] CAPTURE_SCREENSHOT not implemented');
         break;
       case 'FORCE_UPDATE':
-        if (!isPiPlatform) {
-          // Hosted (Vercel/Android TV): no update script; reload to get latest from CDN
-          window.location.reload();
-          break;
-        }
-        // Device update only: backend script downloads tarball, replaces dist/, then countdown + reload.
-        // Do NOT call checkAndApplyUpdate() here — it triggers an immediate PWA reload and prevents
-        // the user from seeing the proper flow (checking → downloading → installing → countdown).
-        logger.info('[RemoteControl] FORCE_UPDATE: triggering device update');
-        void this.triggerDeviceUpdateAndPoll();
+        logger.info('[RemoteControl] FORCE_UPDATE: triggering update check');
+        this.triggerUpdateCheck();
         break;
       case 'FACTORY_RESET':
         localStorage.clear();
