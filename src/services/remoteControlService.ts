@@ -59,6 +59,7 @@ class RemoteControlService {
   private scheduledRestartTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private onUpdateStatus: OnUpdateStatus | null = null;
   private updatePollIntervalId: ReturnType<typeof setInterval> | null = null;
+  private isUpdateInProgress = false;
 
   /** Register callback to show on-screen countdown when a delayed restart/reload is scheduled. */
   public setOnScheduledRestart(cb: OnScheduledRestart | null): void {
@@ -79,14 +80,23 @@ class RemoteControlService {
    * Trigger an update check. Used by daily scheduler and FORCE_UPDATE command.
    * Pi: POSTs to /internal/trigger-update (runs update-from-github.sh).
    * Hosted: Checks PWA service worker and reloads if new version available.
+   * Re-entry guard: returns immediately if an update flow is already running.
    */
   public triggerUpdateCheck(): void {
+    if (this.isUpdateInProgress) {
+      logger.debug('[RemoteControl] Update check already in progress, skipping');
+      return;
+    }
+    this.isUpdateInProgress = true;
+
     if (isPiPlatform) {
       logger.info('[RemoteControl] Daily update check: triggering device update');
       void this.triggerDeviceUpdateAndPoll();
     } else {
       logger.info('[RemoteControl] Daily update check: checking PWA service worker');
-      void checkAndApplyUpdate();
+      void checkAndApplyUpdate().finally(() => {
+        this.isUpdateInProgress = false;
+      });
     }
   }
 
@@ -95,6 +105,7 @@ class RemoteControlService {
       clearInterval(this.updatePollIntervalId);
       this.updatePollIntervalId = null;
     }
+    this.isUpdateInProgress = false;
   }
 
   private notifyUpdateStatus(phase: DeviceUpdatePhase, message: string, restartAt: number | null): void {
@@ -112,10 +123,12 @@ class RemoteControlService {
       const res = await fetch(`${INTERNAL_BASE}/internal/trigger-update`, { method: 'POST' });
       if (res.status !== 202) {
         this.notifyUpdateStatus('no_update', 'Up to date', null);
+        this.isUpdateInProgress = false;
         return;
       }
     } catch {
       this.notifyUpdateStatus('no_update', 'Up to date', null);
+      this.isUpdateInProgress = false;
       return;
     }
 

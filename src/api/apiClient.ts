@@ -390,12 +390,12 @@ class ApiClient {
         return response;
       }
 
-      // Network failed, try cache
+      // Network failed, try cache (stale-if-error: allow expired cache when network fails)
       logger.warn('[ApiClient] Network request failed, trying cache', { url });
     }
 
-    // Try cache
-    const cached = await this.getCachedData<T>(cacheKey);
+    // Try cache (allowStale: serve expired cache when network failed — stale-if-error)
+    const cached = await this.getCachedData<T>(cacheKey, true);
     if (cached) {
       logger.info('[ApiClient] Using cached data', { cacheKey });
       return {
@@ -502,7 +502,11 @@ class ApiClient {
     }
   }
 
-  private async getCachedData<T>(key: string): Promise<T | null> {
+  /**
+   * Get cached data.
+   * @param allowStale - When true (e.g. network failed), return expired cache (stale-if-error).
+   */
+  private async getCachedData<T>(key: string, allowStale = false): Promise<T | null> {
     try {
       const cached = await localforage.getItem<CachedData<T>>(key);
       if (!cached) return null;
@@ -510,7 +514,7 @@ class ApiClient {
       const age = Date.now() - cached.timestamp;
       if (age > cached.ttl) {
         logger.debug('[ApiClient] Cache expired', { key, age, ttl: cached.ttl });
-        if (this.isOnline) {
+        if (!allowStale && this.isOnline) {
           return null;
         }
       }

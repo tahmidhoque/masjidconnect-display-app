@@ -197,7 +197,8 @@ class SyncService {
   }
 
   /**
-   * Clear all intervals and timeouts
+   * Clear all intervals and timeouts.
+   * Also stops remote device update polling so stop() is authoritative.
    */
   private clearAllIntervals(): void {
     if (this.heartbeatInterval) {
@@ -220,6 +221,7 @@ class SyncService {
       clearInterval(this.dailyUpdateCheckIntervalId);
       this.dailyUpdateCheckIntervalId = null;
     }
+    remoteControlService.clearDeviceUpdatePolling();
   }
 
   // ==========================================================================
@@ -260,7 +262,9 @@ class SyncService {
 
     this.dailySyncTimeoutId = setTimeout(() => {
       this.dailySyncTimeoutId = null;
+      if (!this.isStarted) return;
       this.runDailySync();
+      if (!this.isStarted) return;
       this.dailySyncIntervalId = setInterval(() => this.runDailySync(), ONE_DAY_MS);
     }, msUntil);
 
@@ -272,7 +276,7 @@ class SyncService {
 
   /** Run full sync with forceRefresh (used by once-daily fallback). */
   private runDailySync(): void {
-    if (this.isPaused) return;
+    if (!this.isStarted || this.isPaused) return;
     logger.info('[SyncService] Running once-daily fallback sync');
     void this.syncAll({ forceRefresh: true });
   }
@@ -299,7 +303,9 @@ class SyncService {
 
     this.dailyUpdateCheckTimeoutId = setTimeout(() => {
       this.dailyUpdateCheckTimeoutId = null;
+      if (!this.isStarted) return;
       this.runDailyUpdateCheck();
+      if (!this.isStarted) return;
       this.dailyUpdateCheckIntervalId = setInterval(
         () => this.runDailyUpdateCheck(),
         ONE_DAY_MS,
@@ -314,7 +320,7 @@ class SyncService {
 
   /** Run update check (used by once-daily scheduler). */
   private runDailyUpdateCheck(): void {
-    if (this.isPaused) return;
+    if (!this.isStarted || this.isPaused) return;
     logger.info('[SyncService] Running once-daily update check');
     remoteControlService.triggerUpdateCheck();
   }

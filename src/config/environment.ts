@@ -75,6 +75,13 @@ function buildConfig(): EnvironmentConfig {
     apiUrl = apiUrl.replace('http://', 'https://');
   }
 
+  const dailySyncRaw = (import.meta.env.VITE_DAILY_SYNC_OFFSET_MS ?? '').trim();
+  const dailyUpdateRaw = (import.meta.env.VITE_DAILY_UPDATE_CHECK_OFFSET_MS ?? '').trim();
+  const parsedSync = dailySyncRaw ? parseInt(dailySyncRaw, 10) : NaN;
+  const parsedUpdate = dailyUpdateRaw ? parseInt(dailyUpdateRaw, 10) : NaN;
+  const dailySyncOffsetMs = Number.isNaN(parsedSync) ? DEFAULTS.DAILY_SYNC_OFFSET_MS : parsedSync;
+  const dailyUpdateCheckOffsetMs = Number.isNaN(parsedUpdate) ? DEFAULTS.DAILY_UPDATE_CHECK_OFFSET_MS : parsedUpdate;
+
   return {
     defaultMasjidTimezone: (import.meta.env.VITE_DEFAULT_MASJID_TIMEZONE ?? '').trim() || DEFAULTS.DEFAULT_MASJID_TIMEZONE,
     apiUrl,
@@ -87,8 +94,8 @@ function buildConfig(): EnvironmentConfig {
     prayerTimesSyncInterval: DEFAULTS.PRAYER_TIMES_SYNC_INTERVAL,
     eventsSyncInterval: DEFAULTS.EVENTS_SYNC_INTERVAL,
     prayerStatusInterval: DEFAULTS.PRAYER_STATUS_INTERVAL,
-    dailySyncOffsetMs: DEFAULTS.DAILY_SYNC_OFFSET_MS,
-    dailyUpdateCheckOffsetMs: DEFAULTS.DAILY_UPDATE_CHECK_OFFSET_MS,
+    dailySyncOffsetMs,
+    dailyUpdateCheckOffsetMs,
     maxRetries: DEFAULTS.MAX_RETRIES,
     initialRetryDelay: DEFAULTS.INITIAL_RETRY_DELAY,
     maxRetryDelay: DEFAULTS.MAX_RETRY_DELAY,
