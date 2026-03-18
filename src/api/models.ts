@@ -329,6 +329,8 @@ export interface DisplaySettings {
   imsakOffset: number;
   /** Days to add to the calculated Hijri date (e.g. +1 if API/local calc is 1 day behind). */
   hijriDateAdjustment: number;
+  /** Minutes after jamaat to keep "Jamaat in progress" before switching to next prayer (5–30, default 10). */
+  minutesAfterJamaatUntilNextPrayer?: number;
 }
 
 // Content Types

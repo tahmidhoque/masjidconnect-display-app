@@ -21,7 +21,8 @@ import { usePrayerTimesContext } from '../contexts/PrayerTimesContext';
 import { useCurrentTime } from './useCurrentTime';
 import { toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
-import { IN_PRAYER_DURATION_MIN } from '../config/prayerPhase';
+import { useAppSelector } from '@/store/hooks';
+import { selectDisplaySettings } from '@/store/slices/contentSlice';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -46,9 +47,6 @@ export interface PrayerPhaseData {
 
 /** How many minutes before jamaat to show the phones-off graphic */
 const JAMAAT_SOON_THRESHOLD_MIN = 5;
-
-/** Re-export for consumers that need the constant */
-export { IN_PRAYER_DURATION_MIN } from '../config/prayerPhase';
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
@@ -85,6 +83,8 @@ function nowMinutes(date: Date): number {
 export const usePrayerPhase = (): PrayerPhaseData => {
   const { nextPrayer, currentPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
+  const displaySettings = useAppSelector(selectDisplaySettings);
+  const durationMin = displaySettings?.minutesAfterJamaatUntilNextPrayer ?? 10;
 
   /* ---- Dev force flag as reactive state ---- */
   const [forceFlag, setForceFlag] = useState<PrayerPhase | undefined>(
@@ -132,14 +132,14 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     const now = nowMinutes(currentTime);
 
-    // === In-prayer window: past current prayer's jamaat but within IN_PRAYER_DURATION_MIN ===
+    // === In-prayer window: past current prayer's jamaat but within durationMin ===
     // Use currentPrayer so we stay on "Jamaat in progress" for the full duration even after
     // nextPrayer has already advanced to the next salaat (avoids carousel flashing back after ~0.5s).
     if (currentPrayer?.jamaat) {
       const currentJamaatMin = toMinutesFromMidnight(currentPrayer.jamaat, currentPrayer.name);
       if (currentJamaatMin >= 0 && now >= currentJamaatMin) {
         const minutesSinceJamaat = now - currentJamaatMin;
-        if (minutesSinceJamaat <= IN_PRAYER_DURATION_MIN) {
+        if (minutesSinceJamaat <= durationMin) {
           logger.debug(
             `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${currentPrayer.name} jamaat`,
           );
@@ -181,7 +181,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     // Ensures we show in-prayer as soon as we reach jamaat even if currentPrayer hasn't updated.
     if (jamaatMin >= 0 && now >= jamaatMin) {
       const minutesSinceJamaat = now - jamaatMin;
-      if (minutesSinceJamaat <= IN_PRAYER_DURATION_MIN) {
+      if (minutesSinceJamaat <= durationMin) {
         logger.debug(
           `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based)`,
         );
@@ -228,7 +228,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     // Past jamaat and past in-prayer window — back to normal countdown for next salaat
     return { phase: 'countdown-adhan', prayerName: nextPrayer.name };
-  }, [nextPrayer, currentPrayer, currentTime, forceFlag]);
+  }, [nextPrayer, currentPrayer, currentTime, forceFlag, durationMin]);
 
   return phaseData;
 };

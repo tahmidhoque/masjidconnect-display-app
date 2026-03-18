@@ -41,6 +41,7 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   showTomorrowJamaat: false,
   imsakOffset: 10,
   hijriDateAdjustment: 0,
+  minutesAfterJamaatUntilNextPrayer: 10,
 };
 
 // Debounce map to prevent rapid successive calls
@@ -291,6 +292,11 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
       timeFormat: timeFormatFromConfig ?? "12h",
     };
   }
+  const minutesAfterJamaat = (() => {
+    const v = raw.minutesAfterJamaatUntilNextPrayer ?? 10;
+    return Math.max(5, Math.min(30, typeof v === "number" ? v : 10));
+  })();
+
   return {
     ramadanMode: raw.ramadanMode ?? "auto",
     isRamadanActive: raw.isRamadanActive ?? false,
@@ -299,6 +305,7 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
     showTomorrowJamaat: raw.showTomorrowJamaat ?? false,
     imsakOffset: raw.imsakOffset ?? 10,
     hijriDateAdjustment: raw.hijriDateAdjustment ?? 0,
+    minutesAfterJamaatUntilNextPrayer: minutesAfterJamaat,
   };
 };
 

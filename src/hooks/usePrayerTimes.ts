@@ -14,7 +14,6 @@ import {
   calculateApproximateHijriDate,
 } from "../utils/dateUtils";
 import { prayerTimesSyncInterval, defaultMasjidTimezone } from "../config/environment";
-import { IN_PRAYER_DURATION_MIN } from "../config/prayerPhase";
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
@@ -1043,7 +1042,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           return (
             jamaatMin >= 0 &&
             nowMin >= jamaatMin &&
-            nowMin - jamaatMin <= IN_PRAYER_DURATION_MIN
+            nowMin - jamaatMin <= (displaySettings?.minutesAfterJamaatUntilNextPrayer ?? 10)
           );
         })();
       setCurrentPrayer(inIshaInPrayerWindow ? ishaPrayer : null);
@@ -1198,6 +1197,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     masjidTimezone,
     calculateCurrentPrayer,
     calculatePrayersAccurately,
+    displaySettings?.minutesAfterJamaatUntilNextPrayer,
   ]);
 
   // Initial loading of data
