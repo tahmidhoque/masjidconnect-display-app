@@ -394,11 +394,12 @@ const DisplayScreenInner: React.FC = () => {
    *   in-prayer   — calm "Jamaat in progress" screen
    *   otherwise   — normal content carousel
    */
-  /** Key from schedule content so we only remount when schedule/items actually change.
-   *  Using lastScheduleUpdate caused multiple remounts when both refreshContent and
-   *  refreshSchedule set lastScheduleUpdate to different timestamps. */
+  /** Key includes lastContentUpdate and lastScheduleUpdate so carousel remounts when
+   *  content:invalidate or RELOAD_CONTENT refreshes data — ensures new content is shown. */
+  const lastContentUpdate = useAppSelector((s: RootState) => s.content.lastContentUpdate);
+  const lastScheduleUpdate = useAppSelector((s: RootState) => s.content.lastScheduleUpdate);
   const carouselKey = schedule
-    ? `${schedule.id}-${schedule.items?.length ?? 0}-${schedule.items?.[0]?.id ?? 'e0'}`
+    ? `${schedule.id}-${schedule.items?.length ?? 0}-${lastContentUpdate ?? ''}-${lastScheduleUpdate ?? ''}`
     : 'no-schedule';
   const contentSlot = useMemo(() => {
     switch (prayerPhase) {

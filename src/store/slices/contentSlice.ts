@@ -790,9 +790,13 @@ export const refreshAllContent = createAsyncThunk(
         await dispatch(loadCachedContent());
       }
 
-      // Refresh all content in parallel for better performance
+      // Run refreshContent first — it fetches and saves content, schedule, events to storage.
+      // Running in parallel with refreshSchedule caused "Sync already in progress" so schedule
+      // read stale data before content had saved. Sequential order ensures storage is populated.
+      await dispatch(refreshContent({ forceRefresh }));
+
+      // Now refresh the others — they read from storage (populated by refreshContent)
       const results = await Promise.allSettled([
-        dispatch(refreshContent({ forceRefresh })),
         dispatch(refreshPrayerTimes({ forceRefresh: true })),
         dispatch(refreshSchedule({ forceRefresh })),
         dispatch(refreshEvents({})),
