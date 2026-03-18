@@ -10,7 +10,6 @@ import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
 import { isPiPlatform } from '../config/platform';
-import { checkAndApplyUpdate } from '../pwa';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
 export interface RemoteCommand {
@@ -79,7 +78,8 @@ class RemoteControlService {
   /**
    * Trigger an update check. Used by daily scheduler and FORCE_UPDATE command.
    * Pi: POSTs to /internal/trigger-update (runs update-from-github.sh).
-   * Hosted: Checks PWA service worker and reloads if new version available.
+   * Non-Pi (laptop, hosted): Performs a cache-busting hard reload to fetch fresh content,
+   * equivalent to Cmd+Shift+R / Ctrl+Shift+R.
    * Re-entry guard: returns immediately if an update flow is already running.
    */
   public triggerUpdateCheck(): void {
@@ -93,11 +93,20 @@ class RemoteControlService {
       logger.info('[RemoteControl] Daily update check: triggering device update');
       void this.triggerDeviceUpdateAndPoll();
     } else {
-      logger.info('[RemoteControl] Daily update check: checking PWA service worker');
-      void checkAndApplyUpdate().finally(() => {
-        this.isUpdateInProgress = false;
-      });
+      logger.info('[RemoteControl] FORCE_UPDATE on non-Pi: triggering hard reload');
+      this.hardReload();
+      this.isUpdateInProgress = false;
     }
+  }
+
+  /**
+   * Cache-busting reload — mimics hard refresh (Cmd+Shift+R).
+   * Forces the browser to fetch fresh HTML/JS instead of serving from cache.
+   */
+  private hardReload(): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set('_', String(Date.now()));
+    window.location.replace(url.toString());
   }
 
   private stopUpdatePolling(): void {
