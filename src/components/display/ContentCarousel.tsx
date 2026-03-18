@@ -23,6 +23,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import logger from '@/utils/logger';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import {
   getScalingForItem,
   getScalingForEvent,
@@ -51,6 +52,12 @@ export interface CarouselItem {
   type: string;
   title?: string;
   body?: string;
+  /** When true, body contains HTML — render with sanitised innerHTML */
+  bodyIsHTML?: boolean;
+  /** Per-item font size override: multiplies base body size */
+  bodyFontSize?: 'small' | 'medium' | 'large';
+  /** Text alignment for title and body (default: left) */
+  textAlign?: 'left' | 'center' | 'right';
   /** Arabic body text (rendered with arabic-text class) */
   arabicBody?: string;
   /** Transliteration / Latin script (e.g. for Dua); rendered LTR between Arabic and body */
@@ -251,14 +258,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       const availH = ctr.clientHeight * FIT_RATIO;
       if (availH <= 0) return;
 
-      const { config, tier } = scalingResult;
+      const { config, tier, bodyFontSizeMultiplier } = scalingResult;
       let lo = config.minMultiplier;
       let hi = config.maxMultiplier;
       let bestMultiplier = config.baseMultiplier;
       let overflowsAtMin = false;
 
       // Apply the initial (base) sizes so we can measure
-      const baseSizes = computeFontSizes(tier, config.baseMultiplier);
+      const baseSizes = computeFontSizes(tier, config.baseMultiplier, bodyFontSizeMultiplier);
       applyFontSizeProps(cnt, baseSizes);
 
       // Wait a frame for the browser to reflow with new font sizes
@@ -296,7 +303,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         const search = () => {
           if (cancelled || iterations >= MAX_FIT_ITERATIONS) {
             // Apply the best multiplier found during the search
-            const finalSizes = computeFontSizes(tier, bestMultiplier);
+            const finalSizes = computeFontSizes(tier, bestMultiplier, bodyFontSizeMultiplier);
             applyFontSizeProps(cnt, finalSizes);
 
             // Final measurement — one extra RAF so the browser reflows at finalSizes
@@ -328,7 +335,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
           }
 
           const mid = (lo + hi) / 2;
-          const testSizes = computeFontSizes(tier, mid);
+          const testSizes = computeFontSizes(tier, mid, bodyFontSizeMultiplier);
           applyFontSizeProps(cnt, testSizes);
 
           fitLoopRafRef.current = requestAnimationFrame(() => {
@@ -508,10 +515,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                 <EventSlide event={item.event} compact={compact} />
               </Suspense>
             ) : (
-              <>
+              <div style={{ textAlign: item.textAlign ?? 'left' }} className="flex flex-col gap-4 min-w-0 w-full">
                 {/* Type badge — bold, distinctive; stays outside the scroll wrapper */}
                 <span
-                  className={`badge self-start ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
+                  className={`badge ${item.textAlign === 'center' ? 'self-center' : item.textAlign === 'right' ? 'self-end' : 'self-start'} ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
                 >
                   {getContentTypeLabel(item.type)}
                 </span>
@@ -545,15 +552,26 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                     </p>
                   )}
 
-                  {displayBody && (
-                    <p className="text-carousel-body text-text-secondary leading-relaxed">{displayBody}</p>
-                  )}
+                  {displayBody && (item.bodyIsHTML ? (
+                    <div
+                      className="text-carousel-body text-text-secondary leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayBody) }}
+                      dir="auto"
+                    />
+                  ) : (
+                    <p
+                      className="text-carousel-body text-text-secondary leading-relaxed"
+                      style={{ whiteSpace: 'pre-wrap' }}
+                    >
+                      {displayBody}
+                    </p>
+                  ))}
 
                   {displaySource && (
                     <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>

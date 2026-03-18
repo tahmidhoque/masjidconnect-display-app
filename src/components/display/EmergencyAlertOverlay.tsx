@@ -14,6 +14,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import {
   ShieldAlert,
   Wrench,
@@ -242,18 +243,35 @@ const AlertContent: React.FC<AlertContentProps> = ({
           {alert.title}
         </h1>
 
-        <p
-          className={`emergency-message ${isPortrait ? 'emergency-message--portrait' : ''}`}
-          style={{
-            display: '-webkit-box',
-            WebkitLineClamp: messageLineClamp,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            maxWidth: '80vw',
-          }}
-        >
-          {alert.message}
-        </p>
+        {alert.message && (alert.message.includes('<') && alert.message.includes('>') ? (
+          <div
+            className={`emergency-message ${isPortrait ? 'emergency-message--portrait' : ''}`}
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: messageLineClamp,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              maxWidth: '80vw',
+              whiteSpace: 'normal',
+            }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(alert.message) }}
+            dir="auto"
+          />
+        ) : (
+          <p
+            className={`emergency-message ${isPortrait ? 'emergency-message--portrait' : ''}`}
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: messageLineClamp,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              maxWidth: '80vw',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {alert.message}
+          </p>
+        ))}
       </div>
 
       {/* ---- FOOTER ---- */}

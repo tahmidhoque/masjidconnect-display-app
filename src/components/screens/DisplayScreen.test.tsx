@@ -86,4 +86,65 @@ describe('scheduleItemToCarouselItems', () => {
     expect(result[0].transliteration).toBe('nun');
     expect(result[0].body).toBe('Text');
   });
+
+  it('maps ANNOUNCEMENT with isHTML and fontSize to bodyIsHTML and bodyFontSize', () => {
+    const scheduleItem = {
+      id: 'ann-1',
+      order: 0,
+      type: 'ANNOUNCEMENT',
+      title: 'Important notice',
+      content: {
+        text: '<p>Please <strong>attend</strong> the meeting.</p>',
+        isHTML: true,
+        fontSize: 'large',
+      },
+      duration: 15,
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    const carouselItem = result[0];
+    expect(carouselItem.type).toBe('ANNOUNCEMENT');
+    expect(carouselItem.body).toBe('<p>Please <strong>attend</strong> the meeting.</p>');
+    expect(carouselItem.bodyIsHTML).toBe(true);
+    expect(carouselItem.bodyFontSize).toBe('large');
+  });
+
+  it('maps CUSTOM with isHTML false to plain body (no bodyIsHTML)', () => {
+    const scheduleItem = {
+      id: 'custom-1',
+      order: 0,
+      type: 'CUSTOM',
+      title: 'Custom content',
+      content: {
+        text: 'Plain text with line breaks',
+        isHTML: false,
+      },
+      duration: 20,
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    const carouselItem = result[0];
+    expect(carouselItem.body).toBe('Plain text with line breaks');
+    expect(carouselItem.bodyIsHTML).toBeUndefined();
+    expect(carouselItem.bodyFontSize).toBeUndefined();
+  });
+
+  it('maps legacy item without isHTML (backward compatibility)', () => {
+    const scheduleItem = {
+      id: 'legacy-1',
+      order: 0,
+      type: 'ANNOUNCEMENT',
+      title: 'Legacy announcement',
+      content: {
+        text: 'Old format without isHTML flag',
+      },
+      duration: 10,
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    const carouselItem = result[0];
+    expect(carouselItem.body).toBe('Old format without isHTML flag');
+    expect(carouselItem.bodyIsHTML).toBeUndefined();
+    expect(carouselItem.bodyFontSize).toBeUndefined();
+  });
 });

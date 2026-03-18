@@ -200,11 +200,24 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     (item as any).imageUrl ??
     (item as any).bannerUrl;
 
+  const bodyFontSize = content.fontSize;
+  const validFontSize =
+    bodyFontSize === 'small' || bodyFontSize === 'medium' || bodyFontSize === 'large'
+      ? bodyFontSize
+      : undefined;
+
+  const textAlign = content.textAlign;
+  const validTextAlign =
+    textAlign === 'center' || textAlign === 'right' ? textAlign : undefined;
+
   return [{
     id: item.id ?? `sched-${index}`,
     type: typeof type === 'string' ? type : 'Content',
     title: typeof title === 'string' ? title : undefined,
     body: typeof body === 'string' ? body : undefined,
+    bodyIsHTML: typeof body === 'string' && body.length > 0 && content.isHTML === true ? true : undefined,
+    bodyFontSize: validFontSize,
+    textAlign: validTextAlign,
     arabicBody: typeof arabicBody === 'string' ? arabicBody : undefined,
     source: content.source ?? content.reference,
     imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,

@@ -73,6 +73,8 @@ export interface ScalingResult {
   config: TierConfig;
   /** Initial font sizes (rem) before the fit loop adjusts them */
   initialSizes: FontSizeConfig;
+  /** Per-item body font size multiplier (small: 0.85, medium: 1, large: 1.2) */
+  bodyFontSizeMultiplier: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -205,21 +207,34 @@ export function classifyContentDensity(item: CarouselItem): DensityTier {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Map per-item bodyFontSize to a numeric multiplier for body text only.
+ */
+export function getBodyFontSizeMultiplier(size?: 'small' | 'medium' | 'large'): number {
+  switch (size) {
+    case 'small': return 0.85;
+    case 'large': return 1.2;
+    default: return 1;
+  }
+}
+
+/**
  * Compute initial font sizes (in rem) for a given multiplier and tier.
  * These are applied as CSS custom properties on the content wrapper.
  * The binary-search fit loop in the carousel will adjust the multiplier
  * up or down from here.
+ * @param bodyFontSizeMultiplier - Optional multiplier for body size only (small: 0.85, large: 1.2)
  */
 export function computeFontSizes(
   tier: DensityTier,
   multiplier: number,
+  bodyFontSizeMultiplier: number = 1,
 ): FontSizeConfig {
   const config = TIER_CONFIGS[tier];
   const weights = config.elementWeights;
 
   return {
     titleSize:  Math.round((BASE_SIZES.title * multiplier * weights.title) * 100) / 100,
-    bodySize:   Math.round((BASE_SIZES.body * multiplier * weights.body) * 100) / 100,
+    bodySize:   Math.round((BASE_SIZES.body * multiplier * weights.body * bodyFontSizeMultiplier) * 100) / 100,
     arabicSize: Math.round((BASE_SIZES.arabic * multiplier * weights.arabic) * 100) / 100,
   };
 }
@@ -232,9 +247,10 @@ export function computeFontSizes(
 export function getScalingForItem(item: CarouselItem): ScalingResult {
   const tier = classifyContentDensity(item);
   const config = TIER_CONFIGS[tier];
-  const initialSizes = computeFontSizes(tier, config.baseMultiplier);
+  const bodyFontSizeMultiplier = getBodyFontSizeMultiplier(item.bodyFontSize);
+  const initialSizes = computeFontSizes(tier, config.baseMultiplier, bodyFontSizeMultiplier);
 
-  return { tier, config, initialSizes };
+  return { tier, config, initialSizes, bodyFontSizeMultiplier };
 }
 
 /**
@@ -251,7 +267,7 @@ export function getScalingForEvent(event: EventV2): ScalingResult {
 
   const config = TIER_CONFIGS[tier];
   const initialSizes = computeFontSizes(tier, config.baseMultiplier);
-  return { tier, config, initialSizes };
+  return { tier, config, initialSizes, bodyFontSizeMultiplier: 1 };
 }
 
 /**
