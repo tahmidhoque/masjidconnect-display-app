@@ -362,13 +362,14 @@ class ApiClient {
   /**
    * Make a GET request with caching and offline fallback
    * @param options.forceNetwork - When true, always attempt network even if navigator reports offline (e.g. content:invalidate).
+   * @param options.skipCacheFallback - When true, do not return cached data on network failure; propagate error (e.g. force-refresh).
    */
   private async getWithCache<T>(
     endpoint: string,
     cacheKey: string,
     ttl: number,
     params?: Record<string, string | number | boolean | undefined>,
-    options?: { forceNetwork?: boolean }
+    options?: { forceNetwork?: boolean; skipCacheFallback?: boolean }
   ): Promise<ApiResponse<T>> {
     const url = params
       ? buildUrlWithParams('', endpoint, params)
@@ -393,12 +394,17 @@ class ApiClient {
         return response;
       }
 
+      // Network failed — when skipCacheFallback (e.g. force-refresh), propagate error instead of serving stale cache
+      if (options?.skipCacheFallback) {
+        logger.warn('[ApiClient] Network request failed, skipping cache fallback (force-refresh)', { url });
+        return response;
+      }
       // Network failed, try cache (stale-if-error: allow expired cache when network fails)
       logger.warn('[ApiClient] Network request failed, trying cache', { url });
     }
 
     // Try cache (allowStale: serve expired cache when network failed — stale-if-error)
-    const cached = await this.getCachedData<T>(cacheKey, true);
+    const cached = await this.getCachedData<T>(cacheKey, !options?.skipCacheFallback);
     if (cached) {
       logger.info('[ApiClient] Using cached data', { cacheKey });
       return {
@@ -684,12 +690,13 @@ class ApiClient {
 
     const params = options?.cacheBust ? { _t: Date.now() } : undefined;
     const forceNetwork = options?.cacheBust ?? options?.forceNetwork ?? false;
+    const skipCacheFallback = options?.cacheBust ?? false;
     return this.getWithCache<ContentResponse>(
       SCREEN_ENDPOINTS.GET_CONTENT,
       CACHE_KEYS.CONTENT,
       CACHE_TTL.CONTENT,
       params,
-      { forceNetwork }
+      { forceNetwork, skipCacheFallback }
     );
   }
 

@@ -377,6 +377,10 @@ class SyncService {
     this.updateState('content', { isLoading: true, error: null });
 
     try {
+      // Clear content cache before force-refresh so we never return stale data on network failure
+      if (forceRefresh) {
+        await apiClient.clearContentCache();
+      }
       // No sync-status polling — fetch when called (daily fallback or WebSocket invalidation)
       const response = await apiClient.getContent(
         forceRefresh ? { cacheBust: true, forceNetwork: true } : undefined

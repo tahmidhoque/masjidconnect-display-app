@@ -181,7 +181,7 @@ export const realtimeMiddleware: Middleware = (api: any) => {
             timestamp: cmd.timestamp || new Date().toISOString(),
           });
           realtimeService.acknowledgeCommand(commandId, true, undefined, commandType);
-          if (commandType === 'CLEAR_CACHE') {
+          if (commandType === 'CLEAR_CACHE' || commandType === 'RELOAD_CONTENT') {
             import('../slices/contentSlice').then(({ refreshAllContent }) => {
               (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
             });
@@ -297,7 +297,7 @@ export const realtimeMiddleware: Middleware = (api: any) => {
         // When commands arrive via HTTP heartbeat (no WebSocket), we must still trigger
         // refetch and orientation updates — only the WebSocket listener did this before.
         const commandType = cmd.type;
-        if (commandType === 'CLEAR_CACHE') {
+        if (commandType === 'CLEAR_CACHE' || commandType === 'RELOAD_CONTENT') {
           import('../slices/contentSlice').then(({ refreshAllContent }) => {
             (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
           });
