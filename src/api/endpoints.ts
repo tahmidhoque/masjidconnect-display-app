@@ -21,9 +21,17 @@ export const PAIRING_ENDPOINTS = {
    * Check if pairing is complete
    * POST /api/screens/check-simple
    * Body: { pairingCode: string }
-   * Response: { isPaired: boolean }
+   * Response: { isPaired: boolean, needsDevicePairing?: boolean }
    */
   CHECK_PAIRING_STATUS: '/api/screens/check-simple',
+
+  /**
+   * Complete device pairing (when needsDevicePairing: true)
+   * PUT /api/screens/pair
+   * Body: { pairingCode: string, deviceInfo?: { deviceType?, orientation? } }
+   * Response: { success: boolean }
+   */
+  PAIR: '/api/screens/pair',
   
   /**
    * Get credentials after pairing

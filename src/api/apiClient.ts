@@ -74,6 +74,8 @@ export interface PairingCodeResponse {
  */
 export interface PairingStatusResponse {
   isPaired: boolean;
+  /** When true, display must call PUT /api/screens/pair before fetching credentials */
+  needsDevicePairing?: boolean;
 }
 
 /**
@@ -232,8 +234,9 @@ class ApiClient {
       (config: InternalAxiosRequestConfig) => {
         // Add auth header if we have credentials
         const authHeader = credentialService.getAuthHeader();
-        if (authHeader && !config.url?.includes('/screens/unpaired') && 
+        if (authHeader && !config.url?.includes('/screens/unpaired') &&
             !config.url?.includes('/screens/check-simple') &&
+            !config.url?.includes('/screens/pair') &&
             !config.url?.includes('/screens/paired-credentials')) {
           config.headers.set('Authorization', authHeader);
         }
@@ -553,6 +556,23 @@ class ApiClient {
       method: 'POST',
       url: PAIRING_ENDPOINTS.CHECK_PAIRING_STATUS,
       data: { pairingCode },
+    });
+  }
+
+  /**
+   * Complete device pairing when needsDevicePairing is true.
+   * Must be called before fetching credentials to transition screen to ONLINE.
+   */
+  public async completeDevicePairing(
+    pairingCode: string,
+    deviceInfo?: { deviceType?: string; orientation?: string }
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    logger.info('[ApiClient] Completing device pairing via PUT', { pairingCode });
+
+    return this.requestWithRetry<{ success: boolean }>({
+      method: 'PUT',
+      url: PAIRING_ENDPOINTS.PAIR,
+      data: { pairingCode, deviceInfo },
     });
   }
 

@@ -24,6 +24,7 @@ describe('Startup to display flow (reducer state)', () => {
           pairingCode: mockPairingCodeResponse.pairingCode,
           expiresAt: mockPairingCodeResponse.expiresAt,
           requestTime: Date.now(),
+          orientation: 'LANDSCAPE',
         },
         '',
         'LANDSCAPE',

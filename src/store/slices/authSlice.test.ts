@@ -22,10 +22,13 @@ const mockRequestPairingCode = vi.fn();
 const mockCheckPairingStatus = vi.fn();
 const mockGetPairedCredentials = vi.fn();
 
+const mockCompleteDevicePairing = vi.fn();
+
 vi.mock('@/api/apiClient', () => ({
   default: {
     requestPairingCode: (...args: unknown[]) => mockRequestPairingCode(...args),
     checkPairingStatus: (...args: unknown[]) => mockCheckPairingStatus(...args),
+    completeDevicePairing: (...args: unknown[]) => mockCompleteDevicePairing(...args),
     getPairedCredentials: (...args: unknown[]) => mockGetPairedCredentials(...args),
   },
 }));
@@ -77,6 +80,7 @@ describe('authSlice', () => {
         pairingCode: 'ABC123',
         expiresAt: '2024-12-31T12:00:00Z',
         requestTime: Date.now(),
+        orientation: 'LANDSCAPE' as const,
       };
       const prev = authReducer(undefined, requestPairingCode.pending('', 'LANDSCAPE'));
       const state = authReducer(prev, requestPairingCode.fulfilled(payload, '', 'LANDSCAPE'));
@@ -197,7 +201,7 @@ describe('authSlice', () => {
 
     it('setPairingCodeExpired clears pairing code when true', () => {
       const withCode = authReducer(undefined, requestPairingCode.fulfilled(
-        { pairingCode: 'C', expiresAt: '2024-12-31T12:00:00Z', requestTime: 0 },
+        { pairingCode: 'C', expiresAt: '2024-12-31T12:00:00Z', requestTime: 0, orientation: 'LANDSCAPE' },
         '',
         'LANDSCAPE',
       ));
@@ -250,6 +254,7 @@ describe('authSlice', () => {
     beforeEach(() => {
       mockRequestPairingCode.mockReset();
       mockCheckPairingStatus.mockReset();
+      mockCompleteDevicePairing.mockReset();
       mockGetPairedCredentials.mockReset();
     });
 
@@ -314,6 +319,7 @@ describe('authSlice', () => {
         },
       });
       const store = createTestStore();
+      await store.dispatch(requestPairingCode('LANDSCAPE'));
       await store.dispatch(checkPairingStatus('CODE'));
       const state = store.getState().auth;
       expect(state.isPaired).toBe(true);
@@ -321,6 +327,36 @@ describe('authSlice', () => {
       expect(state.screenId).toBe('sid');
       expect(state.apiKey).toBe('key');
       expect(state.masjidId).toBe('mid');
+    });
+
+    it('checkPairingStatus thunk calls PUT pair when needsDevicePairing true', async () => {
+      mockCheckPairingStatus.mockResolvedValue({
+        success: true,
+        data: { isPaired: true, needsDevicePairing: true },
+      });
+      mockCompleteDevicePairing.mockResolvedValue({ success: true });
+      mockGetPairedCredentials.mockResolvedValue({
+        success: true,
+        data: {
+          apiKey: 'key',
+          screenId: 'sid',
+          masjidId: 'mid',
+          masjidName: 'Masjid',
+          screenName: 'Screen 1',
+          orientation: 'LANDSCAPE',
+        },
+      });
+      const store = createTestStore();
+      await store.dispatch(requestPairingCode('LANDSCAPE'));
+      await store.dispatch(checkPairingStatus('CODE'));
+      expect(mockCompleteDevicePairing).toHaveBeenCalledWith('CODE', {
+        deviceType: 'WEB',
+        orientation: 'landscape',
+      });
+      expect(mockGetPairedCredentials).toHaveBeenCalledWith('CODE');
+      const state = store.getState().auth;
+      expect(state.isPaired).toBe(true);
+      expect(state.isAuthenticated).toBe(true);
     });
 
     it('initializeFromStorage thunk with credentials sets authenticated', async () => {
