@@ -63,6 +63,8 @@ export interface CheckPairingStatusRequest {
 export interface CheckPairingStatusResponse {
   isPaired?: boolean; // Keep for backward compatibility
   paired?: boolean; // This is what the API actually returns
+  /** When true, display must call PUT /api/screens/pair before fetching credentials */
+  needsDevicePairing?: boolean;
   screenId?: string;
   apiKey?: string;
   masjidId?: string;

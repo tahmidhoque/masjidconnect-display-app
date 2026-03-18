@@ -26,6 +26,7 @@ export interface AuthState {
   isPairing: boolean;
   pairingCode: string | null;
   pairingCodeExpiresAt: string | null;
+  pairingOrientation: Orientation | null;
   isPairingCodeExpired: boolean;
   isPolling: boolean;
 
@@ -57,6 +58,7 @@ const initialState: AuthState = {
   isPairing: false,
   pairingCode: null,
   pairingCodeExpiresAt: null,
+  pairingOrientation: null,
   isPairingCodeExpired: false,
   isPolling: false,
   screenId: null,
@@ -118,6 +120,7 @@ export const requestPairingCode = createAsyncThunk(
           pairingCode: response.data.pairingCode,
           expiresAt: response.data.expiresAt,
           requestTime: Date.now(),
+          orientation,
         };
       } else {
         throw new Error(response.error || 'Failed to request pairing code');
@@ -135,7 +138,7 @@ export const requestPairingCode = createAsyncThunk(
  */
 export const checkPairingStatus = createAsyncThunk(
   'auth/checkPairingStatus',
-  async (pairingCode: string, { rejectWithValue }) => {
+  async (pairingCode: string, { rejectWithValue, getState }) => {
     try {
       logger.debug('[Auth] Checking pairing status', { pairingCode });
 
@@ -151,7 +154,23 @@ export const checkPairingStatus = createAsyncThunk(
         return { isPaired: false, credentials: null };
       }
 
-      // Step 2: Pairing is complete, fetch credentials
+      // Step 2: If needsDevicePairing, call PUT /api/screens/pair before fetching credentials
+      if (statusResponse.data.needsDevicePairing) {
+        logger.info('[Auth] needsDevicePairing true, completing device pairing via PUT');
+        const state = getState() as { auth: AuthState };
+        const orientation = state.auth.pairingOrientation ?? 'LANDSCAPE';
+        const deviceInfo = {
+          deviceType: 'WEB',
+          orientation: orientation.toLowerCase(),
+        };
+        const putResponse = await apiClient.completeDevicePairing(pairingCode, deviceInfo);
+        if (!putResponse.success) {
+          throw new Error(putResponse.error || 'Failed to complete device pairing');
+        }
+        logger.info('[Auth] Device pairing completed, fetching credentials');
+      }
+
+      // Step 3: Fetch credentials
       logger.info('[Auth] Device is paired, fetching credentials');
       const credentialsResponse = await apiClient.getPairedCredentials(pairingCode);
 
@@ -322,6 +341,7 @@ const authSlice = createSlice({
       state.masjidId = null;
       state.pairingCode = null;
       state.pairingCodeExpiresAt = null;
+      state.pairingOrientation = null;
       state.isPairingCodeExpired = false;
       state.isPolling = false;
       state.pairingError = null;
@@ -358,6 +378,7 @@ const authSlice = createSlice({
         state.isRequestingPairingCode = false;
         state.pairingCode = action.payload.pairingCode;
         state.pairingCodeExpiresAt = action.payload.expiresAt;
+        state.pairingOrientation = action.payload.orientation;
         state.lastPairingCodeRequestTime = action.payload.requestTime;
         state.isPairingCodeExpired = false;
         state.pairingError = null;
@@ -391,6 +412,7 @@ const authSlice = createSlice({
           state.masjidId = action.payload.credentials.masjidId || null;
           state.pairingCode = null;
           state.pairingCodeExpiresAt = null;
+          state.pairingOrientation = null;
           state.isPairingCodeExpired = false;
           state.isPolling = false;
           state.pairingError = null;
@@ -419,6 +441,7 @@ const authSlice = createSlice({
           state.isPairing = false;
           state.pairingCode = null;
           state.pairingCodeExpiresAt = null;
+          state.pairingOrientation = null;
           state.isPairingCodeExpired = false;
           state.isPolling = false;
         } else if (action.payload.pairingData) {

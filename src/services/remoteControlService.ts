@@ -251,11 +251,8 @@ class RemoteControlService {
 
     switch (type) {
       case 'RELOAD_CONTENT':
-        if (delaySeconds > 0) {
-          this.scheduleReload(delaySeconds, 'Reloading');
-        } else {
-          window.location.reload();
-        }
+        await apiClient.clearCache();
+        logger.info('[RemoteControl] RELOAD_CONTENT: cache cleared; refetch is triggered by middleware');
         break;
       case 'RESTART_APP':
         if (delaySeconds > 0) {
