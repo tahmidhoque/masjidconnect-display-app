@@ -138,7 +138,7 @@ const Footer: React.FC = () => {
   const showStatusArea = canShowStatus || showPendingRestart || showUpdate || hotspotActive;
 
   return (
-    <div className="flex items-center justify-between text-body font-medium">
+    <div className="flex items-center justify-between text-body font-medium w-full">
       <div className="flex items-center gap-2 min-w-0">
         {showStatusArea && (
           <>
@@ -152,7 +152,7 @@ const Footer: React.FC = () => {
         )}
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="footer-branding flex items-center gap-2 shrink-0 ml-auto">
         <span className="text-text-muted font-medium">Powered by</span>
         <span className="text-gold font-medium" aria-label="MasjidConnect">
           <span className="font-bold">Masjid</span>Connect

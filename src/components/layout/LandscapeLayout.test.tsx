@@ -8,27 +8,24 @@ import { render, screen } from '@testing-library/react';
 import LandscapeLayout from './LandscapeLayout';
 
 describe('LandscapeLayout', () => {
-  it('renders header, content, sidebar, and footer', () => {
+  it('renders content, prayer strip, and footer', () => {
     render(
       <LandscapeLayout
-        header={<span data-testid="header">Header</span>}
         content={<span data-testid="content">Content</span>}
-        sidebar={<span data-testid="sidebar">Sidebar</span>}
+        prayerStrip={<span data-testid="prayer-strip">Prayer Strip</span>}
         footer={<span data-testid="footer">Footer</span>}
       />,
     );
-    expect(screen.getByTestId('header')).toHaveTextContent('Header');
     expect(screen.getByTestId('content')).toHaveTextContent('Content');
-    expect(screen.getByTestId('sidebar')).toHaveTextContent('Sidebar');
+    expect(screen.getByTestId('prayer-strip')).toHaveTextContent('Prayer Strip');
     expect(screen.getByTestId('footer')).toHaveTextContent('Footer');
   });
 
   it('renders background when provided', () => {
     render(
       <LandscapeLayout
-        header={<span>H</span>}
         content={<span>C</span>}
-        sidebar={<span>S</span>}
+        prayerStrip={<span>PS</span>}
         footer={<span>F</span>}
         background={<span data-testid="bg">Background</span>}
       />,
@@ -36,12 +33,11 @@ describe('LandscapeLayout', () => {
     expect(screen.getByTestId('bg')).toHaveTextContent('Background');
   });
 
-  it('has main and footer structure', () => {
+  it('has main, aside, and footer structure', () => {
     const { container } = render(
       <LandscapeLayout
-        header={<span>H</span>}
         content={<span>C</span>}
-        sidebar={<span>S</span>}
+        prayerStrip={<span>PS</span>}
         footer={<span>F</span>}
       />,
     );

@@ -31,6 +31,7 @@ import {
   Header,
   Footer,
   PrayerTimesPanel,
+  PrayerStrip,
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
@@ -458,14 +459,18 @@ const DisplayScreenInner: React.FC = () => {
           />
         ) : (
           <LandscapeLayout
-            header={headerSlot}
             content={contentSlot}
-            sidebar={
-              <>
-                {prayerPanel}
-                <JumuahBar compact />
-                {countdownSlot}
-              </>
+            prayerStrip={
+              <PrayerStrip
+                isRamadan={ramadan.isRamadan}
+                imsakTime={ramadan.imsakTime}
+                showImsak={displaySettings?.showImsak ?? false}
+                timeFormat={timeFormat}
+                hijriDateAdjustment={hijriDateAdjustment}
+                showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+                tomorrowsJamaats={tomorrowsJamaats}
+                countdownSlot={<PrayerCountdown phase={prayerPhase} variant="strip" />}
+              />
             }
             footer={footerSlot}
             background={bg}

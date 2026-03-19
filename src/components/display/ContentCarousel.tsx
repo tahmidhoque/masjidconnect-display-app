@@ -477,6 +477,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
   // from the randomly selected entry rather than from the item-level fields.
+  const typeLower = item?.type?.toLowerCase() ?? '';
+  const effectiveTextAlign: 'left' | 'center' | 'right' =
+    ['verse_hadith', 'asma_al_husna'].includes(typeLower) ? 'center' : (item?.textAlign ?? 'left');
   const selectedName = item.names?.[selectedNameIdx];
   const displayTitle    = selectedName?.transliteration ?? item.title;
   const displayArabic   = selectedName?.arabic           ?? item.arabicBody;
@@ -515,10 +518,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                 <EventSlide event={item.event} compact={compact} />
               </Suspense>
             ) : (
-              <div style={{ textAlign: item.textAlign ?? 'left' }} className="flex flex-col gap-4 min-w-0 w-full">
+              <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col gap-4 min-w-0 w-full">
                 {/* Type badge — bold, distinctive; stays outside the scroll wrapper */}
                 <span
-                  className={`badge ${item.textAlign === 'center' ? 'self-center' : item.textAlign === 'right' ? 'self-end' : 'self-start'} ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
+                  className={`badge ${effectiveTextAlign === 'center' ? 'self-center' : effectiveTextAlign === 'right' ? 'self-end' : 'self-start'} ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
                 >
                   {getContentTypeLabel(item.type)}
                 </span>
@@ -543,7 +546,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                   )}
 
                   {displayArabic && (
-                    <p className="arabic-text text-carousel-arabic text-gold leading-relaxed">{displayArabic}</p>
+                    <p
+                      className="arabic-text text-carousel-arabic text-gold leading-relaxed"
+                      // `.arabic-text` forces `text-align: right` for readability; override for centered verse/names.
+                      style={{ textAlign: effectiveTextAlign }}
+                    >
+                      {displayArabic}
+                    </p>
                   )}
 
                   {item.transliteration && (

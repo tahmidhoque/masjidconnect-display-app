@@ -1,0 +1,264 @@
+{
+  "version": "2.9",
+  "children": [
+    {
+      "type": "frame",
+      "id": "landscape-root",
+      "name": "Landscape 1280x720",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 720,
+      "layout": "vertical",
+      "gap": 8,
+      "padding": 24,
+      "fill": "#0A2647",
+      "children": [
+        {
+          "type": "frame",
+          "id": "countdown-bar",
+          "name": "Countdown Bar",
+          "width": 1232,
+          "height": 72,
+          "layout": "horizontal",
+          "gap": 24,
+          "padding": [20, 28],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "fill": "rgba(255,255,255,0.1)",
+          "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+          "cornerRadius": 8,
+          "children": [
+            { "type": "text", "id": "countdown-label", "name": "Label", "content": "MAGHRIB JAMAAT IN", "fontSize": 22, "fontWeight": "700", "fill": "#FFFFFF" },
+            { "type": "text", "id": "countdown-digits", "name": "Digits", "content": "43m 13s", "fontSize": 48, "fontWeight": "800", "fill": "#E9C46A" }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "content-carousel",
+          "name": "Content Carousel",
+          "width": 1232,
+          "height": 380,
+          "layout": "vertical",
+          "gap": 16,
+          "padding": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "badge",
+              "name": "Badge",
+              "layout": "horizontal",
+              "padding": [6, 12],
+              "fill": "rgba(42,157,143,0.35)",
+              "cornerRadius": 6,
+              "children": [
+                { "type": "text", "id": "badge-text", "content": "NAMES OF ALLAH", "fontSize": 12, "fontWeight": "700", "fill": "#3DBFAE" }
+              ]
+            },
+            { "type": "text", "id": "carousel-title", "name": "Title", "content": "An-Nur", "fontSize": 56, "fontWeight": "700", "fill": "#FFFFFF" },
+            { "type": "text", "id": "carousel-subtitle", "name": "Subtitle", "content": "The Light — Name 94 of 99", "fontSize": 18, "fill": "rgba(255,255,255,0.6)" },
+            {
+              "type": "frame",
+              "id": "pagination-dots",
+              "name": "Pagination dots",
+              "layout": "horizontal",
+              "gap": 8,
+              "justifyContent": "center",
+              "children": [
+                { "type": "ellipse", "id": "dot1", "width": 8, "height": 8, "fill": "rgba(255,255,255,0.3)" },
+                { "type": "ellipse", "id": "dot2", "width": 8, "height": 8, "fill": "rgba(255,255,255,0.6)" },
+                { "type": "ellipse", "id": "dot3", "width": 8, "height": 8, "fill": "#FFFFFF" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "strip-and-footer",
+          "name": "Prayer Strip + Footer",
+          "width": 1232,
+          "height": 200,
+          "layout": "vertical",
+          "gap": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "prayer-strip-row",
+              "name": "Prayer Strip Row",
+              "width": 1232,
+              "height": 140,
+              "layout": "horizontal",
+              "gap": 10,
+              "padding": 16,
+              "fill": "rgba(255,255,255,0.05)",
+              "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+              "cornerRadius": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "clock-card",
+                  "name": "Clock Card",
+                  "width": 160,
+                  "height": 108,
+                  "layout": "vertical",
+                  "gap": 4,
+                  "padding": 12,
+                  "fill": "rgba(255,255,255,0.06)",
+                  "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+                  "cornerRadius": 8,
+                  "children": [
+                    { "type": "text", "id": "clock-time", "content": "5:34pm", "fontSize": 32, "fontWeight": "800", "fill": "#E9C46A" },
+                    { "type": "text", "id": "clock-date", "content": "Wed 18 Mar 2026", "fontSize": 13, "fontWeight": "600", "fill": "rgba(255,255,255,0.7)" },
+                    { "type": "text", "id": "clock-hijri", "content": "29 Ramadan 1447 AH", "fontSize": 12, "fill": "rgba(255,255,255,0.5)" },
+                    { "type": "text", "id": "clock-status", "content": "Reconnecting...", "fontSize": 11, "fill": "rgba(255,255,255,0.45)" }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "prayer-cards-row",
+                  "name": "Prayer Cards",
+                  "width": 1030,
+                  "height": 108,
+                  "layout": "horizontal",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "card-fajr",
+                      "name": "Fajr",
+                      "width": 165,
+                      "height": 108,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": 10,
+                      "fill": "rgba(255,255,255,0.06)",
+                      "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+                      "cornerRadius": 8,
+                      "alignItems": "center",
+                      "children": [
+                        { "type": "text", "content": "FAJR", "fontSize": 11, "fontWeight": "700", "fill": "rgba(255,255,255,0.7)" },
+                        { "type": "text", "content": "5:23", "fontSize": 18, "fontWeight": "700", "fill": "#FFFFFF" },
+                        { "type": "text", "content": "Jamaat 5:45", "fontSize": 12, "fill": "#E9C46A" }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "card-shuruq",
+                      "name": "Shuruq",
+                      "width": 165,
+                      "height": 108,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": 10,
+                      "fill": "rgba(255,255,255,0.06)",
+                      "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+                      "cornerRadius": 8,
+                      "alignItems": "center",
+                      "children": [
+                        { "type": "text", "content": "SHURUQ", "fontSize": 11, "fontWeight": "700", "fill": "rgba(255,255,255,0.7)" },
+                        { "type": "text", "content": "6:42", "fontSize": 18, "fontWeight": "700", "fill": "#FFFFFF" }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "card-dhuhr",
+                      "name": "Dhuhr",
+                      "width": 165,
+                      "height": 108,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": 10,
+                      "fill": "rgba(255,255,255,0.06)",
+                      "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+                      "cornerRadius": 8,
+                      "alignItems": "center",
+                      "children": [
+                        { "type": "text", "content": "DHUHR", "fontSize": 11, "fontWeight": "700", "fill": "rgba(255,255,255,0.7)" },
+                        { "type": "text", "content": "12:18", "fontSize": 18, "fontWeight": "700", "fill": "#FFFFFF" },
+                        { "type": "text", "content": "Jamaat 12:45", "fontSize": 12, "fill": "#E9C46A" }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "card-asr",
+                      "name": "Asr",
+                      "width": 165,
+                      "height": 108,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": 10,
+                      "fill": "rgba(255,255,255,0.06)",
+                      "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+                      "cornerRadius": 8,
+                      "alignItems": "center",
+                      "children": [
+                        { "type": "text", "content": "ASR", "fontSize": 11, "fontWeight": "700", "fill": "rgba(255,255,255,0.7)" },
+                        { "type": "text", "content": "15:32", "fontSize": 18, "fontWeight": "700", "fill": "#FFFFFF" },
+                        { "type": "text", "content": "Jamaat 16:00", "fontSize": 12, "fill": "#E9C46A" }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "card-maghrib",
+                      "name": "Maghrib",
+                      "width": 165,
+                      "height": 108,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": 10,
+                      "fill": "rgba(42,157,143,0.15)",
+                      "stroke": { "fill": "#3DBFAE", "thickness": 2 },
+                      "cornerRadius": 8,
+                      "alignItems": "center",
+                      "children": [
+                        { "type": "text", "content": "MAGHRIB", "fontSize": 11, "fontWeight": "700", "fill": "#3DBFAE" },
+                        { "type": "text", "content": "6:17", "fontSize": 18, "fontWeight": "700", "fill": "#3DBFAE" },
+                        { "type": "text", "content": "Jamaat 6:22", "fontSize": 12, "fill": "#E9C46A" }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "card-isha",
+                      "name": "Isha",
+                      "width": 165,
+                      "height": 108,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": 10,
+                      "fill": "rgba(255,255,255,0.06)",
+                      "stroke": { "fill": "rgba(255,255,255,0.12)", "thickness": 1 },
+                      "cornerRadius": 8,
+                      "alignItems": "center",
+                      "children": [
+                        { "type": "text", "content": "ISHA", "fontSize": 11, "fontWeight": "700", "fill": "rgba(255,255,255,0.7)" },
+                        { "type": "text", "content": "7:35", "fontSize": 18, "fontWeight": "700", "fill": "#FFFFFF" },
+                        { "type": "text", "content": "Jamaat 7:50", "fontSize": 12, "fill": "#E9C46A" },
+                        { "type": "text", "content": "Tmrw 7:52", "fontSize": 10, "fill": "rgba(255,255,255,0.5)" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "footer-row",
+              "name": "Footer Row",
+              "width": 1232,
+              "height": 36,
+              "layout": "horizontal",
+              "gap": 16,
+              "padding": [8, 0],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                { "type": "text", "id": "footer-status", "content": "Reconnecting...", "fontSize": 12, "fill": "rgba(255,255,255,0.5)" },
+                { "type": "text", "id": "footer-brand", "content": "Powered by MasjidConnect v1.5.1", "fontSize": 11, "fill": "rgba(255,255,255,0.4)" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

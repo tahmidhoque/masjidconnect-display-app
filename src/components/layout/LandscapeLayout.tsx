@@ -1,35 +1,32 @@
 /**
  * LandscapeLayout
  *
- * Two-column layout for landscape orientation:
+ * Three-zone "Broadcast" layout for landscape orientation:
  *  ┌──────────────────────────────────────────────────┐
- *  │  Header (date, time, masjid name)                │
- *  ├─────────────────────────┬────────────────────────┤
- *  │  Left Column (50%)      │  Right Column (50%)    │
- *  │  Content Carousel       │  Prayer Times Panel    │
- *  │                         │  Next Prayer Countdown │
- *  ├─────────────────────────┴────────────────────────┤
- *  │  Footer (connection status, branding)            │
+ *  │  Content Carousel (full width)                   │
+ *  ├──────────────────────────────────────────────────┤
+ *  │  Prayer Strip (Imsak + clock/date + 6 cards +     │
+ *  │  countdown below, centred)                        │
+ *  ├──────────────────────────────────────────────────┤
+ *  │  Footer (connection status, branding) — edge      │
  *  └──────────────────────────────────────────────────┘
  *
- * All children are passed via named slots (props).
+ * Countdown is merged into the prayer strip; footer sits at bottom edge.
  */
 
 import React from 'react';
 
 export interface LandscapeLayoutProps {
-  header: React.ReactNode;
   content: React.ReactNode;
-  sidebar: React.ReactNode;
+  prayerStrip: React.ReactNode;
   footer: React.ReactNode;
   /** Optional background layer rendered behind everything */
   background?: React.ReactNode;
 }
 
 const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
-  header,
   content,
-  sidebar,
+  prayerStrip,
   footer,
   background,
 }) => (
@@ -47,26 +44,23 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
       aria-hidden
     />
 
-    {/* Content grid — compact in landscape so prayer times + carousel fit without overflow */}
-    <div className="relative z-10 flex flex-col w-full h-full p-4 gap-2">
-      <header className="shrink-0">
-        {header}
-      </header>
-
-      {/* Main area — two columns: 50/50 split so prayer times panel uses half the screen */}
-      <main className="flex-1 flex min-h-0 gap-3">
-        {/* Left column — content carousel */}
-        <section className="flex-1 min-w-0 flex flex-col">
-          {content}
-        </section>
-
-        {/* Right column — prayer times + countdown */}
-        <aside className="flex-1 min-w-0 flex flex-col gap-1.5">
-          {sidebar}
-        </aside>
+    {/* Three-zone stack — pt/px padding only; pb-0 so footer sits at bottom edge */}
+    <div className="relative z-10 flex flex-col w-full h-full pt-4 px-4 pb-0 gap-2">
+      {/* Content carousel — full width, fills remaining space */}
+      <main className="flex-1 min-h-0 flex flex-col" aria-label="Announcements and content">
+        {content}
       </main>
 
-      <footer className="shrink-0">
+      {/* Prayer strip — Imsak row + clock/date + 6 cards + countdown below; no overflow-hidden so countdown is never clipped */}
+      <aside
+        className="shrink-0 min-h-[10rem] max-h-[22rem]"
+        aria-label="Prayer times and countdown"
+      >
+        {prayerStrip}
+      </aside>
+
+      {/* Footer — at bottom edge; no padding below */}
+      <footer className="landscape-footer shrink-0 min-h-[1.5rem] py-0.5 flex items-center">
         {footer}
       </footer>
     </div>

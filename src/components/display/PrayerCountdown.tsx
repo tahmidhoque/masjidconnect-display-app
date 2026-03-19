@@ -22,6 +22,9 @@ interface PrayerCountdownProps {
   phase?: PrayerPhase;
   /** When true (landscape), use tighter spacing and smaller label */
   compact?: boolean;
+  /** When "bar", render for landscape countdown bar — no nested box, larger typography */
+  /** When "strip", render centred below prayer cards in prayer strip */
+  variant?: 'default' | 'bar' | 'strip';
 }
 
 /**
@@ -34,7 +37,7 @@ function isCountingToJamaat(
   return Boolean(targetTime && jamaat && targetTime.time === jamaat);
 }
 
-const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = false }) => {
+const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = false, variant = 'default' }) => {
   const { nextPrayer, isJumuahToday } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
 
@@ -101,30 +104,53 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = fals
     return null;
   }
 
+  const isBar = variant === 'bar';
+  const isStrip = variant === 'strip';
+  const containerClass = isBar
+    ? 'flex flex-row items-center justify-between w-full gap-6'
+    : isStrip
+      ? 'flex flex-row items-center justify-center gap-4 w-full'
+      : `countdown-container flex flex-row items-center justify-between ${compact ? 'gap-3' : 'gap-4'}`;
+  const labelClass = isBar
+    ? 'text-countdown-bar-label text-text-primary uppercase font-bold tracking-wider'
+    : isStrip
+      ? 'text-countdown-strip-label text-text-primary uppercase font-bold tracking-wider'
+      : `text-text-secondary uppercase font-semibold text-left ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`;
+  const digitsClass = isBar
+    ? 'text-countdown-bar-digits text-gold font-extrabold'
+    : isStrip
+      ? 'text-countdown-strip-digits text-gold font-extrabold'
+      : 'text-countdown text-gold';
+
+  const inPrayerLabelClass = isStrip
+    ? 'text-countdown-strip-label text-text-muted uppercase font-bold'
+    : isBar
+      ? 'text-countdown-bar-label text-text-muted uppercase font-bold'
+      : `text-text-muted uppercase font-medium ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`;
+  const inPrayerValueClass = isStrip || isBar
+    ? `${isStrip ? 'text-countdown-strip-label' : 'text-countdown-bar-label'} font-bold text-text-primary`
+    : `font-bold text-text-primary ${compact ? 'text-body' : 'text-subheading'}`;
+
   /* ---- In-prayer: single line "Fajr | Jamaat in progress" ---- */
   if (phase === 'in-prayer') {
     return (
-      <div className={`countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
-        <span className={`text-text-muted uppercase font-medium ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`}>
-          {displayName || nextPrayer.name}
-        </span>
+      <div className={isBar || isStrip ? 'flex flex-row items-baseline justify-center gap-4 w-full' : `countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
+        <span className={inPrayerLabelClass}>{displayName || nextPrayer.name}</span>
         <span className="text-text-muted/50">|</span>
-        <span className={`font-bold text-text-primary ${compact ? 'text-body' : 'text-subheading'}`}>
-          Jamaat in progress
-        </span>
+        <span className={inPrayerValueClass}>Jamaat in progress</span>
       </div>
     );
   }
 
-  /* ---- Normal / jamaat countdown — label left, countdown right ---- */
+  /* ---- Normal / jamaat countdown — strip: centred; bar: spread; default: boxed ---- */
   return (
-    <div className={`countdown-container flex flex-row items-center justify-between ${compact ? 'gap-3' : 'gap-4'}`}>
-      <span className={`text-text-secondary uppercase font-semibold text-left ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`}>
+    <div className={containerClass}>
+      <span className={labelClass}>
         {countdownLabel}
       </span>
       {liveCountdown && (
-        <span className="text-countdown text-gold text-right">
-          <CountdownDisplay value={liveCountdown} className="text-countdown text-gold" />
+        <span className={`${digitsClass} ${isStrip ? '' : 'text-right'}`}>
+          <CountdownDisplay value={liveCountdown} className={digitsClass} />
         </span>
       )}
     </div>

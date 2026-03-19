@@ -554,25 +554,66 @@ html, body {
 }
 
 /* ============================================================
-   Landscape overrides — scale back bolder typography so the
-   50/50 split (carousel | prayer times) fits without overflow.
-   Portrait keeps the full bolder treatment.
+   Landscape overrides — Broadcast layout. All times must be
+   big, bold, and readable from 10–15 ft.
    ============================================================ */
 [data-orientation="landscape"] .text-clock {
-  font-size: clamp(2.25rem, 3.6rem, 5rem);
+  font-size: clamp(2.5rem, 3.9rem, 5rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-[data-orientation="landscape"] .text-countdown {
-  font-size: clamp(2.5rem, 3.8rem, 4.75rem);
-  font-weight: 700;
+/* Countdown bar variant — bold label and digits (top bar; now unused in landscape) */
+.text-countdown-bar-label {
+  font-size: clamp(1.5rem, 1.9rem, 2.5rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.text-countdown-bar-digits {
+  font-size: clamp(3.25rem, 5rem, 6.5rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Countdown strip variant — centred below prayer cards in prayer strip */
+.text-countdown-strip-label {
+  font-size: clamp(1.1rem, 1.4rem, 1.75rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.text-countdown-strip-digits {
+  font-size: clamp(2.25rem, 3rem, 4rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Prayer strip — large, bold times; extreme scale so times dominate */
+.text-prayer-strip-clock {
+  font-size: clamp(2.5rem, 3.5rem, 4.5rem);
+  font-weight: 900;
   letter-spacing: -0.02em;
 }
 
-[data-orientation="landscape"] .text-prayer {
-  font-size: clamp(1.25rem, 1.65rem, 1.95rem);
-  font-weight: 600;
+.text-prayer-strip-time {
+  font-size: clamp(1.65rem, 2.15rem, 2.75rem);
+  font-weight: 800;
+}
+
+.text-prayer-strip-label {
+  font-size: clamp(0.85rem, 1rem, 1.2rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.text-prayer-strip-jamaat {
+  font-size: clamp(0.9rem, 1.1rem, 1.35rem);
+  font-weight: 700;
 }
 
 
@@ -664,3 +705,43 @@ html, body {
   border-radius: 2px;
   background: linear-gradient(90deg, var(--color-gold), var(--color-gold-light));
 }
+
+/* Landscape countdown — no nested box when inside prayer strip */
+[data-orientation="landscape"] .countdown-container {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+[data-orientation="landscape"] .countdown-container::after {
+  display: none;
+}
+
+/* Landscape prayer strip container — subtle gradient; no section borders */
+.landscape-prayer-strip {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+}
+
+/* Landscape footer — at bottom edge; minimal padding for legibility */
+[data-orientation="landscape"] footer {
+  min-height: 0 !important;
+  padding-top: 0.125rem;
+  padding-bottom: 0.25rem;
+}
+
+[data-orientation="landscape"] footer > * {
+  font-size: clamp(0.6rem, 0.7rem, 0.8rem);
+  font-weight: 500;
+}
+
+/* Landscape footer — branding always in right corner */
+[data-orientation="landscape"] .footer-branding {
+  margin-left: auto;
+}
+
+<｜tool▁call▁end｜><｜tool▁call▁begin｜>
+ReadLints

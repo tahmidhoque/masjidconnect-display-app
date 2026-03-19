@@ -2,6 +2,7 @@ export { default as EmergencyAlertOverlay } from './EmergencyAlertOverlay';
 export { default as Header } from './Header';
 export { default as Footer } from './Footer';
 export { default as PrayerTimesPanel } from './PrayerTimesPanel';
+export { default as PrayerStrip } from './PrayerStrip';
 export { default as PrayerCountdown } from './PrayerCountdown';
 export { default as ContentCarousel } from './ContentCarousel';
 export { default as CountdownDisplay } from './CountdownDisplay';
