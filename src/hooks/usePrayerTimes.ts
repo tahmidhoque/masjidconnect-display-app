@@ -17,6 +17,7 @@ import { prayerTimesSyncInterval, defaultMasjidTimezone } from "../config/enviro
 import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
+import { JAMAAT_DURATION_MIN } from "./usePrayerPhase";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 
@@ -587,7 +588,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
   // Helper function to determine current and next prayer accurately - memoized
   const calculatePrayersAccurately = useCallback(
-    (prayers: FormattedPrayerTime[]) => {
+    (prayers: FormattedPrayerTime[], minutesAfterJamaatUntilNextPrayer: number = 10) => {
       if (!prayers || prayers.length === 0)
         return { currentIndex: -1, nextIndex: -1 };
 
@@ -656,6 +657,23 @@ export const usePrayerTimes = (): PrayerTimesHook => {
               // Between Isha adhan and jamaat - mark Isha as current, still next for jamaat countdown
               currentIndex = ishaIndex;
               nextIndex = ishaIndex; // Still counting down to jamaat
+            } else if (
+              isha.jamaat &&
+              currentTimeStr >= isha.jamaat
+            ) {
+              // Past Isha jamaat — within JAMAAT_DURATION_MIN + minutesAfterJamaatUntilNextPrayer: keep next = Isha (jamaat in progress)
+              const jamaatMin = toMinutesFromMidnight(isha.jamaat, isha.name);
+              const nowMin =
+                now.hour() * 60 + now.minute() + now.second() / 60;
+              const minutesSinceJamaat = nowMin - jamaatMin;
+              const totalWindowMin = JAMAAT_DURATION_MIN + minutesAfterJamaatUntilNextPrayer;
+              if (minutesSinceJamaat <= totalWindowMin) {
+                currentIndex = ishaIndex;
+                nextIndex = ishaIndex;
+              } else {
+                currentIndex = ishaIndex;
+                nextIndex = fajrIndex;
+              }
             } else {
               // Isha is current (past jamaat or no jamaat), Fajr is next
               currentIndex = ishaIndex;
@@ -740,28 +758,49 @@ export const usePrayerTimes = (): PrayerTimesHook => {
                       `Between ${prayer.name} adhan (${prayer.time}) and jamaat (${prayer.jamaat}) - counting down to jamaat`,
                     );
                   } else {
-                    // Past jamaat time or no jamaat - next is the next prayer (skip Sunrise)
-                    if (isLastPrayerOfDay) {
-                      nextIndex = prayers.findIndex(
-                        (p) => p.name === sortedPrayersForNext[0].name,
+                    // Past jamaat time or no jamaat
+                    // Within JAMAAT_DURATION_MIN + minutesAfterJamaatUntilNextPrayer: keep next = current (jamaat in progress)
+                    const jamaatMin = prayer.jamaat
+                      ? toMinutesFromMidnight(prayer.jamaat, prayer.name)
+                      : -1;
+                    const nowMin =
+                      now.hour() * 60 + now.minute() + now.second() / 60;
+                    const minutesSinceJamaat =
+                      jamaatMin >= 0 ? nowMin - jamaatMin : Infinity;
+                    const totalWindowMin = JAMAAT_DURATION_MIN + minutesAfterJamaatUntilNextPrayer;
+                    const inJamaatProgressWindow =
+                      jamaatMin >= 0 &&
+                      minutesSinceJamaat <= totalWindowMin;
+
+                    if (inJamaatProgressWindow) {
+                      nextIndex = currentPrayerIndex;
+                      logger.info(
+                        `Within ${totalWindowMin} min of ${prayer.name} jamaat — keeping next = current (jamaat in progress)`,
                       );
                     } else {
-                      const idxInForNext = sortedPrayersForNext.findIndex(
-                        (p) => p.name === currentSortedPrayer.name,
+                      // Advance to next prayer (skip Sunrise)
+                      if (isLastPrayerOfDay) {
+                        nextIndex = prayers.findIndex(
+                          (p) => p.name === sortedPrayersForNext[0].name,
+                        );
+                      } else {
+                        const idxInForNext = sortedPrayersForNext.findIndex(
+                          (p) => p.name === currentSortedPrayer.name,
+                        );
+                        const nextInForNext =
+                          idxInForNext >= 0 && idxInForNext < sortedPrayersForNext.length - 1
+                            ? sortedPrayersForNext[idxInForNext + 1]
+                            : null;
+                        nextIndex = nextInForNext
+                          ? prayers.findIndex((p) => p.name === nextInForNext.name)
+                          : prayers.findIndex(
+                              (p) => p.name === sortedPrayersForNext[0].name,
+                            );
+                      }
+                      logger.info(
+                        `Past ${prayer.name} jamaat time or no jamaat - next prayer is ${nextIndex >= 0 ? prayers[nextIndex].name : "unknown"}`,
                       );
-                      const nextInForNext =
-                        idxInForNext >= 0 && idxInForNext < sortedPrayersForNext.length - 1
-                          ? sortedPrayersForNext[idxInForNext + 1]
-                          : null;
-                      nextIndex = nextInForNext
-                        ? prayers.findIndex((p) => p.name === nextInForNext.name)
-                        : prayers.findIndex(
-                            (p) => p.name === sortedPrayersForNext[0].name,
-                          );
                     }
-                    logger.info(
-                      `Past ${prayer.name} jamaat time or no jamaat - next prayer is ${nextIndex >= 0 ? prayers[nextIndex].name : "unknown"}`,
-                    );
                   }
                 }
                 break;
@@ -949,8 +988,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     prayersCountRef.current = prayers.length;
 
     // Use the accurate calculation function to determine current and next prayers
+    const durationMin = displaySettings?.minutesAfterJamaatUntilNextPrayer ?? 10;
     const { currentIndex, nextIndex: initialNextIndex } =
-      calculatePrayersAccurately(prayers);
+      calculatePrayersAccurately(prayers, durationMin);
     let nextIndex = initialNextIndex;
 
     // Dev: override next highlighted prayer (cycle via Ctrl+Shift+P)
@@ -1039,10 +1079,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
             ishaPrayer.jamaat,
             ishaPrayer.name,
           );
+          const totalWindowMin =
+            JAMAAT_DURATION_MIN + (displaySettings?.minutesAfterJamaatUntilNextPrayer ?? 10);
           return (
             jamaatMin >= 0 &&
             nowMin >= jamaatMin &&
-            nowMin - jamaatMin <= (displaySettings?.minutesAfterJamaatUntilNextPrayer ?? 10)
+            nowMin - jamaatMin <= totalWindowMin
           );
         })();
       setCurrentPrayer(inIshaInPrayerWindow ? ishaPrayer : null);

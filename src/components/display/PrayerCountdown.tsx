@@ -20,6 +20,8 @@ import CountdownDisplay from './CountdownDisplay';
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
   phase?: PrayerPhase;
+  /** When phase is 'in-prayer': 'jamaat' = 0–10 min (Jamaat in progress), 'post-jamaat' = 10–(10+X) min (In progress) */
+  inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
   /** When true (landscape), use tighter spacing and smaller label */
   compact?: boolean;
   /** When "bar", render for landscape countdown bar — no nested box, larger typography */
@@ -37,7 +39,12 @@ function isCountingToJamaat(
   return Boolean(targetTime && jamaat && targetTime.time === jamaat);
 }
 
-const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = false, variant = 'default' }) => {
+const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
+  phase,
+  inPrayerSubPhase,
+  compact = false,
+  variant = 'default',
+}) => {
   const { nextPrayer, isJumuahToday } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
 
@@ -131,13 +138,14 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({ phase, compact = fals
     ? `${isStrip ? 'text-countdown-strip-label' : 'text-countdown-bar-label'} font-bold text-text-primary`
     : `font-bold text-text-primary ${compact ? 'text-body' : 'text-subheading'}`;
 
-  /* ---- In-prayer: single line "Fajr | Jamaat in progress" ---- */
+  /* ---- In-prayer: single line "Fajr | Jamaat in progress" or "Fajr | In progress" ---- */
   if (phase === 'in-prayer') {
+    const statusText = inPrayerSubPhase === 'post-jamaat' ? 'In progress' : 'Jamaat in progress';
     return (
       <div className={isBar || isStrip ? 'flex flex-row items-baseline justify-center gap-4 w-full' : `countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
         <span className={inPrayerLabelClass}>{displayName || nextPrayer.name}</span>
         <span className="text-text-muted/50">|</span>
-        <span className={inPrayerValueClass}>Jamaat in progress</span>
+        <span className={inPrayerValueClass}>{statusText}</span>
       </div>
     );
   }

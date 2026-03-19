@@ -39,6 +39,8 @@ export interface PrayerPhaseData {
   phase: PrayerPhase;
   /** Name of the prayer this phase relates to (e.g. "Zuhr") */
   prayerName: string | null;
+  /** When phase is 'in-prayer': 'jamaat' = 0–10 min, 'post-jamaat' = 10–(10+X) min */
+  inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +49,9 @@ export interface PrayerPhaseData {
 
 /** How many minutes before jamaat to show the phones-off graphic */
 const JAMAAT_SOON_THRESHOLD_MIN = 5;
+
+/** Fixed duration of jamaat (actual prayer) in minutes. Post-jamaat delay is separate. */
+export const JAMAAT_DURATION_MIN = 10;
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
@@ -132,18 +137,21 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     const now = nowMinutes(currentTime);
 
-    // === In-prayer window: past current prayer's jamaat but within durationMin ===
+    // === In-prayer window: past current prayer's jamaat but within JAMAAT_DURATION_MIN + durationMin ===
     // Use currentPrayer so we stay on "Jamaat in progress" for the full duration even after
     // nextPrayer has already advanced to the next salaat (avoids carousel flashing back after ~0.5s).
+    const totalWindowMin = JAMAAT_DURATION_MIN + durationMin;
     if (currentPrayer?.jamaat) {
       const currentJamaatMin = toMinutesFromMidnight(currentPrayer.jamaat, currentPrayer.name);
       if (currentJamaatMin >= 0 && now >= currentJamaatMin) {
         const minutesSinceJamaat = now - currentJamaatMin;
-        if (minutesSinceJamaat <= durationMin) {
+        if (minutesSinceJamaat <= totalWindowMin) {
+          const inPrayerSubPhase: 'jamaat' | 'post-jamaat' =
+            minutesSinceJamaat <= JAMAAT_DURATION_MIN ? 'jamaat' : 'post-jamaat';
           logger.debug(
-            `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${currentPrayer.name} jamaat`,
+            `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${currentPrayer.name} jamaat (${inPrayerSubPhase})`,
           );
-          return { phase: 'in-prayer', prayerName: currentPrayer.name };
+          return { phase: 'in-prayer', prayerName: currentPrayer.name, inPrayerSubPhase };
         }
         // Diagnostic: if minutesSinceJamaat is unexpectedly large (>1h), may indicate time parsing bug
         if (minutesSinceJamaat > 60) {
@@ -177,15 +185,17 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       return { phase: 'countdown-adhan', prayerName };
     }
 
-    // === At or just past jamaat (0–5 min): in-prayer from nextPrayer's jamaat time ===
+    // === At or just past jamaat: in-prayer from nextPrayer's jamaat time ===
     // Ensures we show in-prayer as soon as we reach jamaat even if currentPrayer hasn't updated.
     if (jamaatMin >= 0 && now >= jamaatMin) {
       const minutesSinceJamaat = now - jamaatMin;
-      if (minutesSinceJamaat <= durationMin) {
+      if (minutesSinceJamaat <= totalWindowMin) {
+        const inPrayerSubPhase: 'jamaat' | 'post-jamaat' =
+          minutesSinceJamaat <= JAMAAT_DURATION_MIN ? 'jamaat' : 'post-jamaat';
         logger.debug(
-          `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based)`,
+          `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based, ${inPrayerSubPhase})`,
         );
-        return { phase: 'in-prayer', prayerName: nextPrayer.name };
+        return { phase: 'in-prayer', prayerName: nextPrayer.name, inPrayerSubPhase };
       }
       // Diagnostic: if minutesSinceJamaat is unexpectedly large (>1h), may indicate time parsing bug (e.g. 12h format)
       if (minutesSinceJamaat > 60) {
@@ -213,7 +223,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
         logger.debug(
           `[PrayerPhase] in-prayer: at or past jamaat (minutesToJamaat=${minutesToJamaat.toFixed(2)})`,
         );
-        return { phase: 'in-prayer', prayerName };
+        return { phase: 'in-prayer', prayerName, inPrayerSubPhase: 'jamaat' };
       }
 
       if (minutesToJamaat <= JAMAAT_SOON_THRESHOLD_MIN) {

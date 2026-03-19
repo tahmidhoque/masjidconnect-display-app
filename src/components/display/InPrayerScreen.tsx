@@ -14,9 +14,11 @@ import React from 'react';
 interface InPrayerScreenProps {
   /** Name of the prayer in progress (e.g. "Zuhr", "Asr") */
   prayerName?: string | null;
+  /** When 'post-jamaat': show "In progress"; else show "Jamaat in progress" */
+  statusMessage?: 'jamaat' | 'post-jamaat';
 }
 
-const InPrayerScreen: React.FC<InPrayerScreenProps> = ({ prayerName }) => (
+const InPrayerScreen: React.FC<InPrayerScreenProps> = ({ prayerName, statusMessage }) => (
   <div className="flex flex-col items-center justify-center h-full gap-8 text-center bg-midnight-dark/40 rounded-xl px-8">
     {/* Decorative crescent — larger to fill space */}
     <svg
@@ -40,7 +42,7 @@ const InPrayerScreen: React.FC<InPrayerScreenProps> = ({ prayerName }) => (
 
     {/* Status message — larger and bolder */}
     <p className="text-heading font-bold text-text-primary">
-      Jamaat in progress
+      {statusMessage === 'post-jamaat' ? 'In progress' : 'Jamaat in progress'}
     </p>
 
     {/* Subtle divider */}

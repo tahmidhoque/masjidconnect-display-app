@@ -365,7 +365,7 @@ const DisplayScreenInner: React.FC = () => {
   const isPortrait = isPortraitLayout(orientation);
 
   /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
-  const { phase: prayerPhase, prayerName: phasePrayerName } = usePrayerPhase();
+  const { phase: prayerPhase, prayerName: phasePrayerName, inPrayerSubPhase } = usePrayerPhase();
 
   /* ---- Forbidden (makruh) time for voluntary prayer ---- */
   const { forbiddenPrayer, tomorrowsJamaats } = usePrayerTimesContext();
@@ -400,7 +400,13 @@ const DisplayScreenInner: React.FC = () => {
       tomorrowsJamaats={tomorrowsJamaats}
     />
   );
-  const countdown = <PrayerCountdown phase={prayerPhase} compact={!isPortrait} />;
+  const countdown = (
+    <PrayerCountdown
+      phase={prayerPhase}
+      inPrayerSubPhase={inPrayerSubPhase}
+      compact={!isPortrait}
+    />
+  );
 
   /**
    * Content slot: swapped based on the current prayer phase.
@@ -420,7 +426,12 @@ const DisplayScreenInner: React.FC = () => {
       case 'jamaat-soon':
         return <SilentPhonesGraphic />;
       case 'in-prayer':
-        return <InPrayerScreen prayerName={phasePrayerName} />;
+        return (
+          <InPrayerScreen
+            prayerName={phasePrayerName}
+            statusMessage={inPrayerSubPhase}
+          />
+        );
       default:
         return (
           <ContentCarousel
@@ -431,7 +442,7 @@ const DisplayScreenInner: React.FC = () => {
           />
         );
     }
-  }, [prayerPhase, phasePrayerName, carouselItems, carouselInterval, carouselKey]);
+  }, [prayerPhase, phasePrayerName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
@@ -469,7 +480,13 @@ const DisplayScreenInner: React.FC = () => {
                 hijriDateAdjustment={hijriDateAdjustment}
                 showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
                 tomorrowsJamaats={tomorrowsJamaats}
-                countdownSlot={<PrayerCountdown phase={prayerPhase} variant="strip" />}
+                countdownSlot={
+                  <PrayerCountdown
+                    phase={prayerPhase}
+                    inPrayerSubPhase={inPrayerSubPhase}
+                    variant="strip"
+                  />
+                }
               />
             }
             footer={footerSlot}
