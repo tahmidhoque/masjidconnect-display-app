@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "arrange": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "computedHash": "5b9a169efb97f9b893b71b8cd01a422885e4992abe5a4ab509c514bdce61f391"
+    },
     "overdrive": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",

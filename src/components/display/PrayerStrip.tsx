@@ -157,7 +157,7 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
             <div
               key={prayer.name}
               className={`
-                flex-1 min-w-0 flex flex-col items-center justify-center rounded-lg px-3 py-2
+                flex-1 min-w-0 flex flex-col items-center justify-center rounded-lg px-3 py-1.5
                 transition-colors duration-normal
                 ${isNext ? 'bg-emerald/15 border-2 border-emerald/40' : 'bg-surface/50 border border-border'}
               `}
@@ -182,7 +182,7 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
               {/* Start time — large and bold */}
               <span
                 className={`
-                  text-prayer-strip-time tabular-nums mt-1
+                  text-prayer-strip-time tabular-nums mt-0.5
                   ${isNext ? 'text-emerald-light' : 'text-text-primary'}
                 `}
               >
@@ -195,11 +195,11 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
               {/* Jamaat time only (no "Jamaat" label to reduce text) */}
               {isSunrise ? (
                 <Sunrise
-                  className="w-6 h-6 text-gold/70 mt-1"
+                  className="w-6 h-6 text-gold/70 mt-0.5"
                   aria-hidden
                 />
               ) : isJumuahCard ? (
-                <div className="text-prayer-strip-jamaat text-gold/90 mt-1 text-center tabular-nums">
+                <div className="text-prayer-strip-jamaat text-gold/90 mt-0.5 text-center tabular-nums">
                   {jumuahKhutbahTime && jumuahDisplayTime && (
                     <span>{jumuahKhutbahTime} · {jumuahDisplayTime}</span>
                   )}
@@ -211,7 +211,7 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
                   )}
                 </div>
               ) : prayer.jamaat ? (
-                <span className="text-prayer-strip-jamaat text-gold/90 mt-1 tabular-nums">
+                <span className="text-prayer-strip-jamaat text-gold/90 mt-0.5 tabular-nums">
                   <TimeWithPeriod
                     timeString={prayer.jamaat}
                     timeFormat={timeFormat}
