@@ -3,7 +3,7 @@
  *
  * Landscape-only horizontal bar: clock/date on the left, six prayer cue cards
  * in a row. Replaces Header + PrayerTimesPanel in the landscape layout.
- * Designed for 10–15 ft readability with clear hierarchy.
+ * Designed for 10–15 ft readability: Jamaat line is visually primary; adhan/start is secondary.
  *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
@@ -77,8 +77,8 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
   const {
     todaysPrayerTimes,
     isJumuahToday,
-    jumuahDisplayTime,
-    jumuahKhutbahTime,
+    jumuahTime,
+    jumuahKhutbahRaw,
   } = usePrayerTimesContext();
 
   const timeStr24h = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
@@ -179,7 +179,7 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
                 )}
               </div>
 
-              {/* Start time — large and bold */}
+              {/* Adhan / start (secondary); Jumuah card: Khutbah in this slot, Zuhr start if no khutbah */}
               <span
                 className={`
                   text-prayer-strip-time tabular-nums mt-0.5
@@ -187,31 +187,31 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
                 `}
               >
                 <TimeWithPeriod
-                  timeString={prayer.time}
+                  timeString={
+                    isJumuahCard
+                      ? (jumuahKhutbahRaw ?? prayer.time)
+                      : prayer.time
+                  }
                   timeFormat={timeFormat}
                 />
               </span>
 
-              {/* Jamaat time only (no "Jamaat" label to reduce text) */}
+              {/* Jamaat (primary scale) or Sunrise icon; Jumuah: Jamaat only in this slot */}
               {isSunrise ? (
                 <Sunrise
                   className="w-6 h-6 text-gold/70 mt-0.5"
                   aria-hidden
                 />
               ) : isJumuahCard ? (
-                <div className="text-prayer-strip-jamaat text-gold/90 mt-0.5 text-center tabular-nums">
-                  {jumuahKhutbahTime && jumuahDisplayTime && (
-                    <span>{jumuahKhutbahTime} · {jumuahDisplayTime}</span>
-                  )}
-                  {jumuahKhutbahTime && !jumuahDisplayTime && (
-                    <span>{jumuahKhutbahTime}</span>
-                  )}
-                  {!jumuahKhutbahTime && jumuahDisplayTime && (
-                    <span>{jumuahDisplayTime}</span>
-                  )}
-                </div>
+                <span className="text-prayer-strip-jamaat-primary text-gold/90 mt-0.5 tabular-nums text-center">
+                  <TimeWithPeriod
+                    timeString={jumuahTime ?? ''}
+                    timeFormat={timeFormat}
+                    className="text-gold font-semibold"
+                  />
+                </span>
               ) : prayer.jamaat ? (
-                <span className="text-prayer-strip-jamaat text-gold/90 mt-0.5 tabular-nums">
+                <span className="text-prayer-strip-jamaat-primary text-gold/90 mt-0.5 tabular-nums">
                   <TimeWithPeriod
                     timeString={prayer.jamaat}
                     timeFormat={timeFormat}

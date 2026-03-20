@@ -600,9 +600,10 @@ html, body {
   letter-spacing: -0.02em;
 }
 
+/* Adhan / start — secondary scale (Jamaat is emphasised on the strip) */
 .text-prayer-strip-time {
-  font-size: clamp(1.65rem, 2.15rem, 2.75rem);
-  font-weight: 800;
+  font-size: clamp(1.05rem, 1.35rem, 1.6rem);
+  font-weight: 700;
 }
 
 .text-prayer-strip-label {
@@ -614,6 +615,12 @@ html, body {
 .text-prayer-strip-jamaat {
   font-size: clamp(1.05rem, 1.35rem, 1.6rem);
   font-weight: 700;
+}
+
+/* Congregation / Jamaat line on prayer cards — primary emphasis */
+.text-prayer-strip-jamaat-primary {
+  font-size: clamp(1.65rem, 2.15rem, 2.75rem);
+  font-weight: 800;
 }
 
 

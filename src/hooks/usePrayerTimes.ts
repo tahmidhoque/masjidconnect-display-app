@@ -68,6 +68,8 @@ interface PrayerTimesHook {
   jumuahTime: string | null;
   jumuahDisplayTime: string | null;
   jumuahKhutbahTime: string | null;
+  /** Khutbah time in HH:mm for TimeWithPeriod / strip (API `jummahKhutbah`). */
+  jumuahKhutbahRaw: string | null;
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
   /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
@@ -156,6 +158,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [jumuahKhutbahTime, setJumuahKhutbahTime] = useState<string | null>(
     null,
   );
+  const [jumuahKhutbahRaw, setJumuahKhutbahRaw] = useState<string | null>(null);
   const [forbiddenPrayer, setForbiddenPrayer] =
     useState<CurrentForbiddenState | null>(null);
   const [tomorrowsJamaats, setTomorrowsJamaats] =
@@ -1110,10 +1113,16 @@ export const usePrayerTimes = (): PrayerTimesHook => {
               )
             : null,
         );
+        setJumuahKhutbahRaw(
+          typeof tomorrowObj.jummahKhutbah === "string"
+            ? tomorrowObj.jummahKhutbah
+            : null,
+        );
       } else {
         setJumuahTime(null);
         setJumuahDisplayTime(null);
         setJumuahKhutbahTime(null);
+        setJumuahKhutbahRaw(null);
       }
       setForbiddenPrayer(
         getCurrentForbiddenWindow(
@@ -1228,10 +1237,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           ? formatTimeToDisplay(todayData.jummahKhutbah, timeFormat)
           : null,
       );
+      setJumuahKhutbahRaw(todayData.jummahKhutbah ?? null);
     } else {
       setJumuahTime(null);
       setJumuahDisplayTime(null);
       setJumuahKhutbahTime(null);
+      setJumuahKhutbahRaw(null);
     }
   }, [
     prayerTimes,
@@ -1380,6 +1391,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahTime,
     jumuahDisplayTime,
     jumuahKhutbahTime,
+    jumuahKhutbahRaw,
     forbiddenPrayer: effectiveForbiddenPrayer,
     tomorrowsJamaats,
   };
