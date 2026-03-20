@@ -9,7 +9,7 @@
  *  - "Iftar" label next to Maghrib
  *
  * When in a makruh (forbidden) time for voluntary prayer, shows a notice in the
- * Start/Jamaat footer row so layout does not shift.
+ * Start/Jamaat header row so layout does not shift.
  *
  * 12h format: time shown as "5:39" with small "PM" subtext so alignment matches 24h.
  *
@@ -39,11 +39,11 @@ interface PrayerTimesPanelProps {
   imsakTime?: string | null;
   /** When true, show Imsak row before Fajr. From displaySettings.showImsak. */
   showImsak?: boolean;
-  /** When set, show makruh notice in the footer (from usePrayerTimes). */
+  /** When set, show makruh notice in the header row (from usePrayerTimes). */
   forbiddenPrayer?: CurrentForbiddenState | null;
   /** Time format for the forbidden notice endsAt (from store). */
   timeFormat?: TimeFormat;
-  /** When true (portrait), use tighter spacing; when false (landscape), add more space above legend so separator line sits lower. */
+  /** When true (portrait), use tighter spacing; when false, add more space below header row. */
   compact?: boolean;
   /** When true, show Tomorrow's Jamaat column after Jamaat. From displaySettings.showTomorrowJamaat. */
   showTomorrowJamaat?: boolean;
@@ -104,7 +104,27 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         compact ? 'py-3' : 'pt-4 pb-1'
       }`}
     >
-      <div className="flex-1 min-h-0 flex flex-col gap-0.5 justify-center">
+      {/* Header row — column labels above data; border below separates from prayer rows */}
+      <div
+        className={`${rowGridClass} shrink-0 gap-2 px-3 border-b border-white/10 ${
+          compact ? 'pb-2 mb-0.5' : 'pb-2 mb-4'
+        }`}
+      >
+        <div className="min-w-0 overflow-hidden">
+          <ForbiddenPrayerNotice
+            forbiddenPrayer={forbiddenPrayer}
+            timeFormat={timeFormat}
+            compact
+          />
+        </div>
+        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>Start</span>
+        <span className={`text-subheading text-gold/80 font-medium ${TIME_COL_CLASS}`}>Jamaat</span>
+        {showTomorrowCol && (
+          <span className={`text-subheading text-gold/75 font-medium ${TIME_COL_CLASS}`}>Tomorrow&apos;s Jamaat</span>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col gap-0.5 justify-start">
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
           const ramadanLabel = isRamadan ? RAMADAN_LABELS[prayer.name] : undefined;
@@ -209,26 +229,6 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             </React.Fragment>
           );
         })}
-      </div>
-
-      {/* Legend — distinct block so row highlight never bleeds; border sits below last row */}
-      <div
-        className={`${rowGridClass} shrink-0 gap-2 px-3 border-t border-white/10 ${
-          compact ? 'pt-3 mt-0.5' : 'pt-2 mt-4'
-        }`}
-      >
-        <div className="min-w-0 overflow-hidden">
-          <ForbiddenPrayerNotice
-            forbiddenPrayer={forbiddenPrayer}
-            timeFormat={timeFormat}
-            compact
-          />
-        </div>
-        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>Start</span>
-        <span className={`text-subheading text-gold/80 font-medium ${TIME_COL_CLASS}`}>Jamaat</span>
-        {showTomorrowCol && (
-          <span className={`text-subheading text-gold/75 font-medium ${TIME_COL_CLASS}`}>Tomorrow&apos;s Jamaat</span>
-        )}
       </div>
     </div>
   );
