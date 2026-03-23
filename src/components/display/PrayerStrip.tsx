@@ -230,7 +230,7 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
               {/* Tomorrow's Jamaat — "Tmrw" + time */}
               {showTomorrowCol && prayer.jamaat && tomorrowsJamaats?.[prayer.name] && (
                 <span className="text-prayer-strip-jamaat text-text-muted mt-0.5 tabular-nums">
-                  Tmrw{' '}
+                  Tmw{' '}
                   <TimeWithPeriod
                     timeString={tomorrowsJamaats[prayer.name]}
                     timeFormat={timeFormat}
