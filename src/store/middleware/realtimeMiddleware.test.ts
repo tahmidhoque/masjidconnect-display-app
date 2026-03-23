@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { realtimeMiddleware, cleanupRealtimeMiddleware } from './realtimeMiddleware';
 import { createTestStore } from '@/test-utils/mock-store';
 
+const mockPerformFactoryReset = vi.fn();
 const mockOn = vi.fn(() => () => {});
 const mockConnect = vi.fn();
 const mockDisconnect = vi.fn();
@@ -54,6 +55,7 @@ vi.mock('@/services/remoteControlService', () => ({
     clearScheduledRestart: () => mockClearScheduledRestart(),
     clearDeviceUpdatePolling: () => mockClearDeviceUpdatePolling(),
     handleCommand: vi.fn(),
+    performFactoryReset: () => mockPerformFactoryReset(),
   },
 }));
 
@@ -164,5 +166,37 @@ describe('realtimeMiddleware', () => {
     const action = { type: 'test/action' };
     dispatch(action);
     expect(next).toHaveBeenCalledWith(action);
+  });
+
+  it('subscribes to screen_token_invalid and calls performFactoryReset when fired', () => {
+    const handlers = new Map<string, () => void>();
+    mockOn.mockImplementation((event: string, handler: () => void) => {
+      handlers.set(event, handler);
+      return () => handlers.delete(event);
+    });
+    const store = createTestStore({
+      auth: {
+        isAuthenticated: true,
+        isPaired: true,
+        screenId: 's',
+        apiKey: 'k',
+        masjidId: 'm',
+      } as never,
+    });
+    const middleware = realtimeMiddleware({
+      getState: store.getState,
+      dispatch: store.dispatch,
+    } as never);
+    const next = vi.fn((a: unknown) => a);
+    const dispatch = middleware(next);
+    dispatch({
+      type: 'auth/checkPairingStatus/fulfilled',
+      payload: { isPaired: true, credentials: { screenId: 's', apiKey: 'k', masjidId: 'm' } },
+    });
+    vi.advanceTimersByTime(100);
+    const invalidHandler = handlers.get('screen_token_invalid');
+    expect(invalidHandler).toBeDefined();
+    invalidHandler?.();
+    expect(mockPerformFactoryReset).toHaveBeenCalledTimes(1);
   });
 });

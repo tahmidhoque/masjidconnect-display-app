@@ -705,8 +705,14 @@ class ApiClient {
    * When no date is passed, uses today's date (YYYY-MM-DD) in the given timezone
    * so the cache key naturally invalidates each day. Uses masjid timezone when
    * provided to avoid device-UTC mismatch (e.g. Pi in UTC, mosque in Europe/London).
+   * @param options.cacheBust - Append unique query param and drop local cache entry for this date (e.g. after invalidate / force refresh).
+   * @param options.forceNetwork - Attempt network even if navigator reports offline (e.g. after invalidate).
    */
-  public async getPrayerTimes(date?: string, timezoneStr?: string): Promise<ApiResponse<PrayerTimesResponse>> {
+  public async getPrayerTimes(
+    date?: string,
+    timezoneStr?: string,
+    options?: { cacheBust?: boolean; forceNetwork?: boolean },
+  ): Promise<ApiResponse<PrayerTimesResponse>> {
     if (!credentialService.hasCredentials()) {
       return {
         success: false,
@@ -717,11 +723,30 @@ class ApiClient {
     const dateParam = date ?? (timezoneStr
       ? dayjs().tz(timezoneStr).format('YYYY-MM-DD')
       : dayjs().format('YYYY-MM-DD'));
+    const cacheKey = `${CACHE_KEYS.PRAYER_TIMES}_${dateParam}`;
+    const cacheBust = options?.cacheBust === true;
+    if (cacheBust) {
+      try {
+        await localforage.removeItem(cacheKey);
+        logger.debug('[ApiClient] Prayer times cache cleared for date', { dateParam });
+      } catch (error) {
+        logger.warn('[ApiClient] Failed to clear prayer times cache entry', { cacheKey, error });
+      }
+    }
+
+    const params: Record<string, string | number | boolean | undefined> = { date: dateParam };
+    if (cacheBust) {
+      params._t = Date.now();
+    }
+    const forceNetwork = cacheBust || options?.forceNetwork === true;
+    const skipCacheFallback = cacheBust;
+
     return this.getWithCache<PrayerTimesResponse>(
       SCREEN_ENDPOINTS.GET_PRAYER_TIMES,
-      `${CACHE_KEYS.PRAYER_TIMES}_${dateParam}`,
+      cacheKey,
       CACHE_TTL.PRAYER_TIMES,
-      { date: dateParam },
+      params,
+      { forceNetwork, skipCacheFallback },
     );
   }
 

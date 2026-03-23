@@ -255,6 +255,49 @@ class RemoteControlService {
     logger.info('[RemoteControl] Scheduled reload', { label, delaySeconds });
   }
 
+  /**
+   * Clear all local app storage and reload — same behaviour as remote FACTORY_RESET.
+   * Used when the screen no longer exists server-side (e.g. invalid screen token on WebSocket).
+   * Cache API failures must not block navigation; some environments reject `caches` or hang.
+   */
+  public async performFactoryReset(): Promise<void> {
+    logger.warn('[RemoteControl] Factory reset — clearing storage and reloading');
+    try {
+      realtimeService.disconnect();
+    } catch (e) {
+      logger.warn('[RemoteControl] Disconnect during factory reset failed (continuing)', {
+        error: String(e),
+      });
+    }
+    try {
+      localStorage.clear();
+    } catch (e) {
+      logger.warn('[RemoteControl] localStorage.clear failed (continuing)', { error: String(e) });
+    }
+    try {
+      if (typeof caches !== 'undefined' && typeof caches.keys === 'function') {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {
+      logger.warn('[RemoteControl] Cache clear failed during factory reset (continuing)', {
+        error: String(e),
+      });
+    }
+
+    const hardReload = (): void => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('_fr', String(Date.now()));
+        window.location.replace(url.toString());
+      } catch (e) {
+        logger.warn('[RemoteControl] location.replace failed, using reload', { error: String(e) });
+        window.location.reload();
+      }
+    };
+    queueMicrotask(hardReload);
+  }
+
   private async executeCommand(type: string, payload?: unknown): Promise<void> {
     const delaySeconds = this.getDelaySeconds(payload);
 
@@ -300,12 +343,7 @@ class RemoteControlService {
         this.triggerUpdateCheck();
         break;
       case 'FACTORY_RESET':
-        localStorage.clear();
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map((k) => caches.delete(k)));
-        }
-        window.location.reload();
+        await this.performFactoryReset();
         break;
       default:
         logger.warn('[RemoteControl] Unknown command type', { type });

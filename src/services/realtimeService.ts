@@ -39,6 +39,26 @@ const COMMAND_TYPES = [
   'FACTORY_RESET',
 ] as const;
 
+/**
+ * Socket.io connect_error payload may be a plain Error or an object with message;
+ * Engine.IO may prefix the message (e.g. packet type + JSON).
+ */
+function errorMessageFromConnectError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const m = (err as { message: unknown }).message;
+    if (typeof m === 'string') return m;
+  }
+  if (typeof err === 'string') return err;
+  return '';
+}
+
+/** Server rejected auth because this screen was deleted — device should factory reset. */
+function isInvalidScreenTokenError(err: unknown): boolean {
+  const raw = errorMessageFromConnectError(err).toLowerCase();
+  return raw.includes('invalid screen token') && raw.includes('screen not found');
+}
+
 class RealtimeService {
   private socket: Socket | null = null;
   private listeners = new Map<string, Set<EventCallback<any>>>();
@@ -284,9 +304,26 @@ class RealtimeService {
       this.scheduleReconnect();
     });
 
-    this.socket.on('connect_error', (err: Error) => {
-      logger.error('[Realtime] Connection error', { error: err.message });
-      this.emit('error', { message: err.message });
+    this.socket.on('connect_error', (err: unknown) => {
+      if (isInvalidScreenTokenError(err)) {
+        logger.warn(
+          '[Realtime] Invalid screen token (screen not on server) — stopping reconnect; factory reset required',
+        );
+        this.isIntentionalDisconnect = true;
+        this.stopHeartbeat();
+        this.reconnectAttempts = 0;
+        if (this.socket) {
+          this.socket.removeAllListeners();
+          this.socket.disconnect();
+          this.socket = null;
+        }
+        this.isConnected = false;
+        this.emit('screen_token_invalid', {});
+        return;
+      }
+      const msg = errorMessageFromConnectError(err);
+      logger.error('[Realtime] Connection error', { error: msg });
+      this.emit('error', { message: msg });
       this.scheduleReconnect();
     });
 

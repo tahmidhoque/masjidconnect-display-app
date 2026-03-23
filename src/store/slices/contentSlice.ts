@@ -514,7 +514,7 @@ export const refreshPrayerTimes = createAsyncThunk(
 
       // First, try to sync prayer times separately (but don't fail if it doesn't work)
       try {
-        await syncService.syncPrayerTimes(masjidTimezone);
+        await syncService.syncPrayerTimes(masjidTimezone, { forceRefresh });
         logger.debug("[Content] Prayer times sync completed successfully");
       } catch (syncError) {
         logger.warn(

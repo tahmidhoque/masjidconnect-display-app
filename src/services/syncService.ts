@@ -420,8 +420,12 @@ class SyncService {
    * Sync prayer times from server.
    * Uses masjid timezone when provided (or from storage) so dates align with
    * mosque local time, not device time (critical for Pi in UTC).
+   * @param options.forceRefresh - Bypass HTTP/local cache for this fetch (e.g. content:invalidate, force refresh).
    */
-  public async syncPrayerTimes(timezoneOverride?: string): Promise<SyncResult<PrayerTimesResponse>> {
+  public async syncPrayerTimes(
+    timezoneOverride?: string,
+    options?: { forceRefresh?: boolean },
+  ): Promise<SyncResult<PrayerTimesResponse>> {
     if (this.state.prayerTimes.isLoading) {
       logger.debug('[SyncService] Prayer times sync already in progress');
       return { success: false, error: 'Sync already in progress' };
@@ -435,7 +439,11 @@ class SyncService {
         const screenContent = await storageService.get<{ masjid?: { timezone?: string }; data?: { masjid?: { timezone?: string } } }>('screenContent');
         timezone = screenContent?.masjid?.timezone ?? screenContent?.data?.masjid?.timezone ?? defaultMasjidTimezone;
       }
-      const response = await apiClient.getPrayerTimes(undefined, timezone);
+      const forceRefresh = options?.forceRefresh === true;
+      const response = await apiClient.getPrayerTimes(undefined, timezone, {
+        cacheBust: forceRefresh,
+        forceNetwork: forceRefresh,
+      });
 
       if (response.success && response.data) {
         this.updateState('prayerTimes', {

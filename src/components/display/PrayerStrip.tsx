@@ -227,15 +227,20 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
                 </span>
               )}
 
-              {/* Tomorrow's Jamaat — "Tmrw" + time */}
-              {showTomorrowCol && prayer.jamaat && tomorrowsJamaats?.[prayer.name] && (
-                <span className="text-prayer-strip-jamaat text-text-muted mt-0.5 tabular-nums">
-                  Tmw{' '}
-                  <TimeWithPeriod
-                    timeString={tomorrowsJamaats[prayer.name]}
-                    timeFormat={timeFormat}
-                  />
-                </span>
+              {/* Tomorrow's Jamaat — fixed slot height when enabled; label + time stay on one line */}
+              {showTomorrowCol && (
+                <div className="mt-0.5 w-full min-w-0 min-h-[1.35rem] flex items-center justify-center shrink-0">
+                  {prayer.jamaat && tomorrowsJamaats?.[prayer.name] ? (
+                    <span className="inline-flex flex-nowrap items-baseline gap-x-0.5 whitespace-nowrap text-prayer-strip-jamaat text-text-muted tabular-nums max-w-full">
+                      <span className="shrink-0">Tmw</span>
+                      <TimeWithPeriod
+                        timeString={tomorrowsJamaats[prayer.name]}
+                        timeFormat={timeFormat}
+                        className="shrink-0"
+                      />
+                    </span>
+                  ) : null}
+                </div>
               )}
             </div>
           );

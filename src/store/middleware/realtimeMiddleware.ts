@@ -116,6 +116,14 @@ export const realtimeMiddleware: Middleware = (api: any) => {
       }),
     );
 
+    // Screen deleted on server — token rejected at handshake; wipe local state like FACTORY_RESET
+    unsubs.push(
+      realtimeService.on('screen_token_invalid', () => {
+        logger.warn('[RealtimeMW] Screen token invalid — performing factory reset');
+        void remoteControlService.performFactoryReset();
+      }),
+    );
+
     // Log heartbeat acks for RTT visibility (no Redux action needed)
     unsubs.push(
       realtimeService.on<{ serverTime?: string }>('heartbeat:ack', (ack) => {
@@ -246,36 +254,44 @@ export const realtimeMiddleware: Middleware = (api: any) => {
         const runRefetch = () => {
           invalidationCoalesceMap.delete(payload.type);
           logger.debug('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
-          import('../slices/contentSlice').then((mod) => {
-            const dispatch = api.dispatch as AppDispatch;
-            switch (payload.type) {
-              case 'prayer_times':
-                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
-                break;
-              case 'display_settings':
-                dispatch(mod.refreshContent({ forceRefresh: true }));
-                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
-                break;
-              case 'schedule':
-              case 'schedule_assignment':
-                dispatch(mod.refreshSchedule({ forceRefresh: true }));
-                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
-                break;
-              case 'playlist_assignment':
-                dispatch(mod.refreshContent({ forceRefresh: true }));
-                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
-                break;
-              case 'content_item':
-                dispatch(mod.refreshContent({ forceRefresh: true }));
-                dispatch(mod.refreshPrayerTimes({ forceRefresh: true }));
-                break;
-              case 'events':
-                dispatch(mod.refreshEvents({ forceRefresh: true }));
-                break;
-              default:
-                break;
+          void (async () => {
+            try {
+              const mod = await import('../slices/contentSlice');
+              const dispatch = api.dispatch as AppDispatch;
+              switch (payload.type) {
+                case 'prayer_times':
+                  await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+                  break;
+                case 'display_settings':
+                  await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
+                  await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+                  break;
+                case 'schedule':
+                case 'schedule_assignment':
+                  await dispatch(mod.refreshSchedule({ forceRefresh: true })).unwrap();
+                  await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+                  break;
+                case 'playlist_assignment':
+                  await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
+                  await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+                  break;
+                case 'content_item':
+                  await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
+                  await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+                  break;
+                case 'events':
+                  await dispatch(mod.refreshEvents({ forceRefresh: true })).unwrap();
+                  break;
+                default:
+                  break;
+              }
+            } catch (err) {
+              logger.warn('[RealtimeMW] content:invalidate refetch failed', {
+                type: payload.type,
+                error: err instanceof Error ? err.message : String(err),
+              });
             }
-          });
+          })();
         };
 
         const existing = invalidationCoalesceMap.get(payload.type);
