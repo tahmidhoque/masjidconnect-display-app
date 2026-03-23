@@ -45,10 +45,9 @@ const ForbiddenPrayerNotice: React.FC<ForbiddenPrayerNoticeProps> = ({
       )}
       <p
         className={`text-caption text-text-secondary ${compact ? 'truncate' : ''}`}
-        title={compact ? `Nafl prayer not recommended until ${displayEndsAtAria}` : undefined}
+        title={compact ? `Nafl prayer prohibited until ${displayEndsAtAria}` : undefined}
       >
-        Nafl prayer not recommended until {main}
-        {period != null && <span className="opacity-90 font-normal"> {period}</span>}
+        Nafl prayer prohibited
       </p>
     </div>
   );
