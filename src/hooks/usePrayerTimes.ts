@@ -19,8 +19,10 @@ import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
 import { JAMAAT_DURATION_MIN } from "./usePrayerPhase";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
+dayjs.extend(utc);
 dayjs.extend(timezone);
 
 /** Dev-only: when set, overrides computed forbiddenPrayer (see useDevKeyboard Ctrl+Shift+F). */
@@ -70,6 +72,10 @@ interface PrayerTimesHook {
   jumuahKhutbahTime: string | null;
   /** Khutbah time in HH:mm for TimeWithPeriod / strip (API `jummahKhutbah`). */
   jumuahKhutbahRaw: string | null;
+  /** Next Friday jamaat (HH:mm) for landscape prayer strip — all week when week data exists. */
+  upcomingJumuahJamaatRaw: string | null;
+  /** Next Friday khutbah (HH:mm) for landscape prayer strip. */
+  upcomingJumuahKhutbahRaw: string | null;
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
   /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
@@ -112,6 +118,63 @@ function buildTomorrowsJamaats(dayData: PrayerTimes | null): TomorrowsJamaatsMap
     }
   }
   return hasAny ? map : null;
+}
+
+/** Parse YYYY-MM-DD to that calendar day in masjid timezone (noon avoids DST edge cases). */
+function parseYmdInTz(dateStr: string, tz: string): dayjs.Dayjs | null {
+  if (!/^(\d{4})-(\d{2})-(\d{2})$/.test(dateStr)) return null;
+  const parsed = dayjs.tz(`${dateStr} 12:00:00`, tz);
+  return parsed.isValid() ? parsed : null;
+}
+
+/**
+ * First row in the API week array on or after today whose date is Friday and has jummah fields.
+ */
+function findUpcomingFridayJummahInWeek(
+  dataArr: (PrayerTimes & { date?: string })[],
+  todayYmd: string,
+  tz: string,
+): { jamaat: string | null; khutbah: string | null } | null {
+  for (const row of dataArr) {
+    const dateStr = row.date;
+    if (!dateStr || typeof dateStr !== "string") continue;
+    if (dateStr < todayYmd) continue;
+    const local = parseYmdInTz(dateStr, tz);
+    if (!local || local.day() !== 5) continue;
+    const rec = row as unknown as Record<string, unknown>;
+    const jamaat =
+      typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
+    const khutbah =
+      typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null;
+    if (!jamaat && !khutbah) continue;
+    return { jamaat, khutbah };
+  }
+  return null;
+}
+
+/**
+ * Jummah times for the landscape strip: upcoming Friday from `data`, or flat Friday-only payload.
+ */
+function resolveUpcomingFridayJummahRaw(
+  dataArr: (PrayerTimes & { date?: string })[] | null,
+  todayYmd: string,
+  tz: string,
+  todayData: unknown,
+): { jamaat: string | null; khutbah: string | null } | null {
+  if (dataArr?.length) {
+    const fromWeek = findUpcomingFridayJummahInWeek(dataArr, todayYmd, tz);
+    if (fromWeek) return fromWeek;
+  }
+  const todayLocal = parseYmdInTz(todayYmd, tz);
+  if (!todayLocal || todayLocal.day() !== 5) return null;
+  if (!todayData || typeof todayData !== "object") return null;
+  const rec = todayData as Record<string, unknown>;
+  const jamaat =
+    typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
+  const khutbah =
+    typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null;
+  if (!jamaat && !khutbah) return null;
+  return { jamaat, khutbah };
 }
 
 export const usePrayerTimes = (): PrayerTimesHook => {
@@ -159,6 +222,12 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     null,
   );
   const [jumuahKhutbahRaw, setJumuahKhutbahRaw] = useState<string | null>(null);
+  const [upcomingJumuahJamaatRaw, setUpcomingJumuahJamaatRaw] = useState<
+    string | null
+  >(null);
+  const [upcomingJumuahKhutbahRaw, setUpcomingJumuahKhutbahRaw] = useState<
+    string | null
+  >(null);
   const [forbiddenPrayer, setForbiddenPrayer] =
     useState<CurrentForbiddenState | null>(null);
   const [tomorrowsJamaats, setTomorrowsJamaats] =
@@ -873,13 +942,14 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     let tomorrowData: PrayerTimes | null = null;
     let dayAfterTomorrowData: PrayerTimes | null = null;
+    let dataArr: (PrayerTimes & { date?: string })[] | null = null;
     if (
       prayerTimes &&
       prayerTimes.data &&
       Array.isArray(prayerTimes.data) &&
       prayerTimes.data.length > 0
     ) {
-      const dataArr = prayerTimes.data as (PrayerTimes & { date?: string })[];
+      dataArr = prayerTimes.data as (PrayerTimes & { date?: string })[];
       const todayIndex = dataArr.findIndex((d) => d.date === todayInMasjidTz);
 
       if (todayIndex >= 0) {
@@ -901,6 +971,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         }
       }
     }
+
+    const stripJummah = resolveUpcomingFridayJummahRaw(
+      dataArr,
+      todayInMasjidTz,
+      tz,
+      todayData,
+    );
+    const applyStripJummahState = () => {
+      setUpcomingJumuahJamaatRaw(stripJummah?.jamaat ?? null);
+      setUpcomingJumuahKhutbahRaw(stripJummah?.khutbah ?? null);
+    };
 
     // Helper function to safely extract time
     const extractTime = (key: string): string => {
@@ -1130,6 +1211,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           new Date(),
         ) ?? null,
       );
+      applyStripJummahState();
       return;
     } else {
       // needTomorrowList but no tomorrowData — fall through with today's list
@@ -1244,6 +1326,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       setJumuahKhutbahTime(null);
       setJumuahKhutbahRaw(null);
     }
+
+    applyStripJummahState();
   }, [
     prayerTimes,
     timeFormat,
@@ -1392,6 +1476,8 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahDisplayTime,
     jumuahKhutbahTime,
     jumuahKhutbahRaw,
+    upcomingJumuahJamaatRaw,
+    upcomingJumuahKhutbahRaw,
     forbiddenPrayer: effectiveForbiddenPrayer,
     tomorrowsJamaats,
   };

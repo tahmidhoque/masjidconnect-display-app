@@ -170,10 +170,14 @@ describe('realtimeMiddleware', () => {
 
   it('subscribes to screen_token_invalid and calls performFactoryReset when fired', () => {
     const handlers = new Map<string, () => void>();
-    mockOn.mockImplementation((event: string, handler: () => void) => {
-      handlers.set(event, handler);
-      return () => handlers.delete(event);
-    });
+    mockOn.mockImplementation(
+      ((event: string, handler: () => void) => {
+        handlers.set(event, handler);
+        return () => {
+          handlers.delete(event);
+        };
+      }) as never,
+    );
     const store = createTestStore({
       auth: {
         isAuthenticated: true,

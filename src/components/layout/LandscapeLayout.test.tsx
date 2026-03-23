@@ -21,6 +21,23 @@ describe('LandscapeLayout', () => {
     expect(screen.getByTestId('footer')).toHaveTextContent('Footer');
   });
 
+  it('renders topBar above main when provided', () => {
+    const { container } = render(
+      <LandscapeLayout
+        topBar={<span data-testid="top-bar">Top</span>}
+        content={<span data-testid="content">Content</span>}
+        prayerStrip={<span data-testid="prayer-strip">Prayer Strip</span>}
+        footer={<span data-testid="footer">Footer</span>}
+      />,
+    );
+    expect(screen.getByTestId('top-bar')).toHaveTextContent('Top');
+    const stack = container.querySelector('.relative.z-10.flex.flex-col');
+    expect(stack).toBeTruthy();
+    const children = stack?.children;
+    expect(children?.[0]).toContainElement(screen.getByTestId('top-bar'));
+    expect(children?.[1]).toContainElement(screen.getByTestId('content'));
+  });
+
   it('renders background when provided', () => {
     render(
       <LandscapeLayout

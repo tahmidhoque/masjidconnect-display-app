@@ -96,7 +96,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow);
   }, [targetTime, currentTime, nextPrayer]);
 
-  /** When counting to jamaat: "{name} Jamaat in"; otherwise "{name} prayer in". On Friday, show "Jumuah" instead of "Zuhr". */
+  /** Default/strip: "{name} Jamaat in" / "{name} prayer in". Bar variant uses `barCountdownSubline` under hero digits. */
   const countingToJamaat = isCountingToJamaat(targetTime, nextPrayer?.jamaat);
   const displayName = nextPrayer?.name === 'Zuhr' && isJumuahToday ? 'Jumuah' : (nextPrayer?.name ?? '');
   const countdownLabel = useMemo(
@@ -107,17 +107,24 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     [countingToJamaat, displayName],
   );
 
+  /** Landscape bar only: mirrors date line under clock ("till … prayer/jamaat"). */
+  const barCountdownSubline = useMemo(
+    () =>
+      countingToJamaat
+        ? (displayName ? `till ${displayName} jamaat` : 'till jamaat')
+        : (displayName ? `till ${displayName} prayer` : 'till next prayer'),
+    [countingToJamaat, displayName],
+  );
+
   if (!nextPrayer) {
     return null;
   }
 
   const isBar = variant === 'bar';
   const isStrip = variant === 'strip';
-  const containerClass = isBar
-    ? 'flex flex-row items-center justify-between w-full gap-6'
-    : isStrip
-      ? 'flex flex-row items-center justify-center gap-4 w-full'
-      : `countdown-container flex flex-row items-center justify-between ${compact ? 'gap-3' : 'gap-4'}`;
+  const containerClass = isStrip
+    ? 'flex flex-row items-center justify-center gap-4 w-full'
+    : `countdown-container flex flex-row items-center justify-between ${compact ? 'gap-3' : 'gap-4'}`;
   const labelClass = isBar
     ? 'text-countdown-bar-label text-text-primary uppercase font-bold tracking-wider'
     : isStrip
@@ -141,16 +148,58 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   /* ---- In-prayer: single line "Fajr | Jamaat in progress" or "Fajr | In progress" ---- */
   if (phase === 'in-prayer') {
     const statusText = inPrayerSubPhase === 'post-jamaat' ? 'In progress' : 'Jamaat in progress';
-    return (
-      <div className={isBar || isStrip ? 'flex flex-row items-baseline justify-center gap-4 w-full' : `countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
+    const row = (
+      <>
         <span className={inPrayerLabelClass}>{displayName || nextPrayer.name}</span>
         <span className="text-text-muted/50">|</span>
         <span className={inPrayerValueClass}>{statusText}</span>
+      </>
+    );
+    if (isBar) {
+      return (
+        <div className="contents">
+          <div className="landscape-broadcast-countdown landscape-broadcast-countdown--status-row ms-auto flex h-full min-w-0 flex-row flex-wrap items-center justify-end gap-x-3 gap-y-0 text-right">
+            {row}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className={isStrip ? 'flex flex-row items-baseline justify-center gap-4 w-full' : `countdown-container flex flex-row items-baseline justify-center text-center ${compact ? 'gap-2' : 'gap-3'}`}>
+        {row}
       </div>
     );
   }
 
-  /* ---- Normal / jamaat countdown — strip: centred; bar: spread; default: boxed ---- */
+  /* ---- Normal / jamaat — bar: hero digits on top (like clock), subline below (like dates) ---- */
+  if (isBar) {
+    return (
+      <div className="contents">
+        <div
+          className={`
+            landscape-broadcast-countdown flex flex-col items-stretch justify-center gap-0.5
+            ms-auto min-w-0 h-full w-max max-w-full
+          `}
+        >
+          {liveCountdown ? (
+            <div className={`${digitsClass} tabular-nums leading-none shrink-0 min-w-0 text-right`}>
+              <CountdownDisplay value={liveCountdown} className={digitsClass} />
+            </div>
+          ) : null}
+          <p
+            className={`
+              landscape-broadcast-countdown-subline text-landscape-broadcast-header-dates
+              text-text-secondary min-w-0 whitespace-nowrap overflow-hidden text-ellipsis text-right
+            `}
+            title={barCountdownSubline}
+          >
+            {barCountdownSubline}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={containerClass}>
       <span className={labelClass}>

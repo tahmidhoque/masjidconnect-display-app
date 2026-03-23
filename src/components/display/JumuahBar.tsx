@@ -1,36 +1,56 @@
 /**
  * JumuahBar
  *
- * Displays Jumuah (Friday prayer) Khutbah and Jamaat times in a compact bar
- * between the prayer times panel and the countdown. Only visible on Fridays
- * (and Thursday evening when the panel shows tomorrow's times).
+ * Portrait layout: compact bar between the prayer times panel and the countdown
+ * showing the upcoming Friday Khutbah and Jamaat (same source as the landscape
+ * prayer strip), whenever the API provides jummah times in the week data.
  *
  * Uses gold-tinted styling to draw attention without overwhelming the display.
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
+import type { TimeFormat } from '../../api/models';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
+import { formatTimeToDisplay } from '../../utils/dateUtils';
 
 interface JumuahBarProps {
   /** When true (landscape), use tighter spacing */
   compact?: boolean;
+  /** Matches screen display setting (12h / 24h). */
+  timeFormat?: TimeFormat;
 }
 
-const JumuahBar: React.FC<JumuahBarProps> = ({ compact = false }) => {
-  const { isJumuahToday, jumuahDisplayTime, jumuahKhutbahTime } =
+const JumuahBar: React.FC<JumuahBarProps> = ({
+  compact = false,
+  timeFormat = '12h',
+}) => {
+  const { upcomingJumuahJamaatRaw, upcomingJumuahKhutbahRaw } =
     usePrayerTimesContext();
 
-  if (!isJumuahToday) return null;
+  const jamaatDisplay = useMemo(
+    () =>
+      upcomingJumuahJamaatRaw
+        ? formatTimeToDisplay(upcomingJumuahJamaatRaw, timeFormat)
+        : null,
+    [upcomingJumuahJamaatRaw, timeFormat],
+  );
+  const khutbahDisplay = useMemo(
+    () =>
+      upcomingJumuahKhutbahRaw
+        ? formatTimeToDisplay(upcomingJumuahKhutbahRaw, timeFormat)
+        : null,
+    [upcomingJumuahKhutbahRaw, timeFormat],
+  );
 
-  const hasJamaat = !!jumuahDisplayTime;
-  const hasKhutbah = !!jumuahKhutbahTime;
+  const hasJamaat = !!jamaatDisplay;
+  const hasKhutbah = !!khutbahDisplay;
 
   if (!hasJamaat && !hasKhutbah) return null;
 
   const parts: string[] = [];
-  if (hasKhutbah) parts.push(`Khutbah ${jumuahKhutbahTime}`);
-  if (hasJamaat) parts.push(`Jamaat ${jumuahDisplayTime}`);
+  if (hasKhutbah) parts.push(`Khutbah ${khutbahDisplay}`);
+  if (hasJamaat) parts.push(`Jamaat ${jamaatDisplay}`);
   const content = parts.join(' · ');
 
   return (

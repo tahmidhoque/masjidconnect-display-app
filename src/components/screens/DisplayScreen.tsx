@@ -3,7 +3,8 @@
  *
  * The main running display. Renders prayer times, countdown, content carousel,
  * header, and footer using either landscape or portrait layout depending on
- * the screen's configured orientation.
+ * the screen's configured orientation. In landscape, the live clock and
+ * countdown sit in a top bar above the carousel; the prayer strip is cue cards only.
  *
  * Prayer phase awareness:
  *  - `countdown-adhan` / `countdown-jamaat` — normal carousel
@@ -33,6 +34,7 @@ import {
   PrayerTimesPanel,
   PrayerStrip,
   PrayerCountdown,
+  LandscapeBroadcastHeader,
   ContentCarousel,
   IslamicPattern,
   JumuahBar,
@@ -424,12 +426,13 @@ const DisplayScreenInner: React.FC = () => {
   const contentSlot = useMemo(() => {
     switch (prayerPhase) {
       case 'jamaat-soon':
-        return <SilentPhonesGraphic />;
+        return <SilentPhonesGraphic landscapeSplit={!isPortrait} />;
       case 'in-prayer':
         return (
           <InPrayerScreen
             prayerName={phasePrayerName}
             statusMessage={inPrayerSubPhase}
+            landscapeSplit={!isPortrait}
           />
         );
       default:
@@ -442,12 +445,27 @@ const DisplayScreenInner: React.FC = () => {
           />
         );
     }
-  }, [prayerPhase, phasePrayerName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey]);
+  }, [prayerPhase, phasePrayerName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey, isPortrait]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
 
   const countdownSlot = countdown;
+
+  const landscapeTopBar = (
+    <LandscapeBroadcastHeader
+      key={`landscape-header-hijri-${hijriDateAdjustment}`}
+      timeFormat={timeFormat}
+      hijriDateAdjustment={hijriDateAdjustment}
+      countdown={
+        <PrayerCountdown
+          phase={prayerPhase}
+          inPrayerSubPhase={inPrayerSubPhase}
+          variant="bar"
+        />
+      }
+    />
+  );
 
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
 
@@ -460,7 +478,7 @@ const DisplayScreenInner: React.FC = () => {
             prayerSection={
               <div className="flex flex-col gap-3 h-full">
                 {prayerPanel}
-                <JumuahBar />
+                <JumuahBar timeFormat={timeFormat} />
                 {countdownSlot}
               </div>
             }
@@ -470,6 +488,7 @@ const DisplayScreenInner: React.FC = () => {
           />
         ) : (
           <LandscapeLayout
+            topBar={landscapeTopBar}
             content={contentSlot}
             prayerStrip={
               <PrayerStrip
@@ -477,16 +496,8 @@ const DisplayScreenInner: React.FC = () => {
                 imsakTime={ramadan.imsakTime}
                 showImsak={displaySettings?.showImsak ?? false}
                 timeFormat={timeFormat}
-                hijriDateAdjustment={hijriDateAdjustment}
                 showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
                 tomorrowsJamaats={tomorrowsJamaats}
-                countdownSlot={
-                  <PrayerCountdown
-                    phase={prayerPhase}
-                    inPrayerSubPhase={inPrayerSubPhase}
-                    variant="strip"
-                  />
-                }
               />
             }
             footer={footerSlot}

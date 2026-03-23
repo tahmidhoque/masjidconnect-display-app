@@ -5,9 +5,19 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import type { PrayerTimes } from '@/api/models';
 import { usePrayerTimes } from './usePrayerTimes';
 import { createTestStore, AllTheProviders } from '@/test-utils';
 import { mockPrayerTimesArray } from '@/test-utils/mocks';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+/** Matches default masjid TZ when `content.masjidTimezone` is null in tests. */
+const TEST_TZ = 'Europe/London';
 
 vi.mock('@/utils/logger', () => ({
   default: { info: vi.fn(), debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
@@ -50,6 +60,8 @@ describe('usePrayerTimes', () => {
       expect(result.current).toHaveProperty('hijriDate');
       expect(result.current).toHaveProperty('isJumuahToday');
       expect(result.current).toHaveProperty('jumuahTime');
+      expect(result.current).toHaveProperty('upcomingJumuahJamaatRaw');
+      expect(result.current).toHaveProperty('upcomingJumuahKhutbahRaw');
       expect(result.current).toHaveProperty('forbiddenPrayer');
       expect(Array.isArray(result.current.todaysPrayerTimes)).toBe(true);
     });
@@ -99,5 +111,61 @@ describe('usePrayerTimes', () => {
       expect(isha).toBeDefined();
       expect(isha?.jamaat).toBe('20:15');
     });
+  });
+
+  it('exposes upcoming Friday jummah whenever week data includes a future Friday row', async () => {
+    const dayRow = (date: string, jummah?: { jummahJamaat: string; jummahKhutbah: string }) => ({
+      date,
+      fajr: '05:30',
+      sunrise: '06:45',
+      zuhr: '12:15',
+      asr: '15:30',
+      maghrib: '18:20',
+      isha: '19:45',
+      fajrJamaat: '05:45',
+      zuhrJamaat: '12:30',
+      asrJamaat: '16:00',
+      maghribJamaat: '18:25',
+      ishaJamaat: '20:00',
+      ...jummah,
+    });
+
+    const start = dayjs().tz(TEST_TZ).startOf('day');
+    const rows = [];
+    for (let i = 0; i < 10; i++) {
+      const d = start.add(i, 'day');
+      const ymd = d.format('YYYY-MM-DD');
+      const isFri = d.day() === 5;
+      rows.push(
+        dayRow(
+          ymd,
+          isFri ? { jummahJamaat: '13:30', jummahKhutbah: '13:00' } : undefined,
+        ),
+      );
+    }
+    const weekPrayerTimes = { data: rows } as PrayerTimes;
+
+    const store = createTestStore();
+    const contentState = store.getState().content;
+    const storeWithWeek = createTestStore({
+      content: {
+        ...contentState,
+        prayerTimes: weekPrayerTimes,
+        timeFormat: '12h',
+      },
+    });
+    const preloaded = storeWithWeek.getState();
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
+    const { result } = renderHook(() => usePrayerTimes(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.upcomingJumuahJamaatRaw).toBe('13:30');
+      expect(result.current.upcomingJumuahKhutbahRaw).toBe('13:00');
+    });
+    expect(result.current.isJumuahToday).toBe(start.day() === 5);
   });
 });
