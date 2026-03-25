@@ -544,11 +544,11 @@ html, body {
   line-height: 1.55;
 }
 
-/* Countdown digits — prominent, legible from distance. */
+/* Countdown digits — prominent, legible from distance (portrait panel only; strip uses .text-countdown-strip-digits). */
 .text-countdown {
-  font-size: clamp(2.5rem, 3.9rem, 5rem);
+  font-size: clamp(2.1rem, 3.25rem, 4.25rem);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.05;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
@@ -724,7 +724,14 @@ html, body {
   position: relative;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
   border-radius: 0.5rem;
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1.25rem;
+}
+
+/* Portrait countdown row — label/status between body and subheading to save vertical space */
+.countdown-container .prayer-countdown-label,
+.countdown-container .prayer-countdown-status {
+  font-size: clamp(0.88rem, 1.05rem, 1.2rem);
+  line-height: 1.25;
 }
 
 /* Gold accent line */

@@ -26,8 +26,6 @@ interface PrayerCountdownProps {
   phase?: PrayerPhase;
   /** When phase is 'in-prayer': 'jamaat' = 0–10 min (Jamaat in progress), 'post-jamaat' = 10–(10+X) min (In progress) */
   inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
-  /** When true (landscape portrait panel), use tighter spacing and smaller label */
-  compact?: boolean;
   /** When "strip", render centred below prayer cards in the landscape prayer strip */
   variant?: 'default' | 'strip';
 }
@@ -45,7 +43,6 @@ function isCountingToJamaat(
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   phase,
   inPrayerSubPhase,
-  compact = false,
   variant = 'default',
 }) => {
   const { nextPrayer, isJumuahToday } = usePrayerTimesContext();
@@ -127,17 +124,17 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
   const labelClass = isStrip
     ? 'text-countdown-strip-label text-text-primary uppercase font-bold tracking-wider text-right min-w-0'
-    : `text-text-secondary uppercase font-semibold text-right min-w-0 ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`;
+    : 'prayer-countdown-label text-text-secondary uppercase font-semibold text-right min-w-0 tracking-wider';
   const digitsClass = isStrip
     ? 'text-countdown-strip-digits text-gold font-extrabold'
     : 'text-countdown text-gold';
 
   const inPrayerLabelClass = isStrip
     ? 'text-countdown-strip-label text-text-muted uppercase font-bold text-right min-w-0'
-    : `text-text-muted uppercase font-medium text-right min-w-0 ${compact ? 'text-body tracking-wider' : 'text-subheading tracking-wider'}`;
+    : 'prayer-countdown-label text-text-muted uppercase font-medium text-right min-w-0 tracking-wider';
   const inPrayerValueClass = isStrip
     ? 'text-countdown-strip-label font-bold text-text-primary text-left min-w-0'
-    : `font-bold text-text-primary text-left min-w-0 ${compact ? 'text-body' : 'text-subheading'}`;
+    : 'prayer-countdown-status font-bold text-text-primary text-left min-w-0';
 
   /* ---- In-prayer: name in left half, status in right half (same midline as countdown) ---- */
   if (phase === 'in-prayer') {

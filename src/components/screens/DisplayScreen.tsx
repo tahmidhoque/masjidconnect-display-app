@@ -403,11 +403,7 @@ const DisplayScreenInner: React.FC = () => {
     />
   );
   const countdown = (
-    <PrayerCountdown
-      phase={prayerPhase}
-      inPrayerSubPhase={inPrayerSubPhase}
-      compact={!isPortrait}
-    />
+    <PrayerCountdown phase={prayerPhase} inPrayerSubPhase={inPrayerSubPhase} />
   );
 
   /**
@@ -461,7 +457,7 @@ const DisplayScreenInner: React.FC = () => {
           <PortraitLayout
             header={headerSlot}
             prayerSection={
-              <div className="flex flex-col gap-3 h-full">
+              <div className="flex flex-col gap-2 h-full">
                 {prayerPanel}
                 <JumuahBar timeFormat={timeFormat} />
                 {countdownSlot}
