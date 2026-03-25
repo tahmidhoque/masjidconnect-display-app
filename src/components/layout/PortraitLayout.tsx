@@ -62,8 +62,8 @@ const PortraitLayout: React.FC<PortraitLayoutProps> = ({
         {prayerSection}
       </section>
 
-      {/* Content carousel — fills all remaining space */}
-      <main className="flex-1 min-h-0">
+      {/* Content carousel — fills all remaining space; flex so children can flex-1 / h-full and centre */}
+      <main className="flex flex-1 flex-col min-h-0 w-full">
         {content}
       </main>
 
