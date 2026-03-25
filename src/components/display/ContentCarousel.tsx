@@ -14,8 +14,8 @@
  *
  * Font sizes are applied via CSS custom properties (--carousel-title-size,
  * --carousel-body-size, --carousel-arabic-size) so each text element sizes
- * independently — unlike the old transform:scale() which scaled badges,
- * spacing, and line-height uniformly.
+ * independently — unlike the old transform:scale() which scaled
+ * spacing and line-height uniformly.
  *
  * The carousel interval is configurable via props (from screen config).
  * Falls back to 30s if not specified.
@@ -100,21 +100,6 @@ const FIT_RATIO = 0.92;
  * applying the tier's base multiplier, the fit loop will try to scale up.
  */
 const HEADROOM_THRESHOLD = 0.75;
-
-/** Map API content types to user-friendly labels for the carousel badge */
-function getContentTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    verse_hadith: 'Verse & Hadith',
-    announcement: 'Announcement',
-    prayer_times: 'Prayer Times',
-    event: 'Event',
-    content: 'Content',
-    custom: 'Content',
-    asma_al_husna: 'Names of Allah',
-    dua: 'Dua',
-  };
-  return labels[type.toLowerCase()] ?? type;
-}
 
 /**
  * Apply font sizes as CSS custom properties on a DOM element.
@@ -386,7 +371,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
    * Pauses at the top, scrolls down slowly, pauses at the bottom, then
    * scrolls back up to the top (no abrupt jump). Scroll speed and pause
    * durations are constants from contentScaling.ts. Only the scroll
-   * wrapper scrolls — the badge and any static elements above remain fixed.
+   * wrapper scrolls.
    */
   useEffect(() => {
     if (!needsScroll) return;
@@ -518,14 +503,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                 <EventSlide event={item.event} compact={compact} />
               </Suspense>
             ) : (
-              <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col gap-4 min-w-0 w-full">
-                {/* Type badge — bold, distinctive; stays outside the scroll wrapper */}
-                <span
-                  className={`badge ${effectiveTextAlign === 'center' ? 'self-center' : effectiveTextAlign === 'right' ? 'self-end' : 'self-start'} ${item.type?.toLowerCase() === 'dua' ? 'badge-dua' : 'badge-emerald'}`}
-                >
-                  {getContentTypeLabel(item.type)}
-                </span>
-
+              <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col min-w-0 w-full">
                 {/* Scrollable text region — when needsScroll, flex-1 min-h-0 constrains height for scroll. */}
                 <div
                   ref={scrollRef}

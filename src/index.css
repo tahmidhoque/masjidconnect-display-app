@@ -222,6 +222,15 @@ html, body {
   text-align: center;
 }
 
+/* PrayerCountdown two-column row: global 12ch + centred stable width fights equal
+   grid tracks and reads as label stacked above time. Shrink and left-align here. */
+.prayer-countdown-row .countdown-stable {
+  min-width: 0;
+  max-width: 100%;
+  width: auto;
+  text-align: left;
+}
+
 /* Countdown unit labels (h, m, s) — smaller than numbers so digits stay clear at a distance. */
 .countdown-unit {
   font-size: 0.6em;
@@ -594,80 +603,6 @@ html, body {
   font-size: clamp(2.5rem, 3.9rem, 5rem);
   font-weight: 700;
   letter-spacing: -0.02em;
-}
-
-/* Landscape broadcast top bar — matches prayer strip surface */
-.landscape-broadcast-header {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(255, 255, 255, 0.03) 100%
-  );
-  /* Stable height across countdown vs in-prayer (no layout jump) */
-  min-height: clamp(6.5rem, 7.25rem, 7.85rem);
-  box-sizing: border-box;
-}
-
-/* Countdown zone: hero digits + subline; spacing from clock via header flex gap (no extra inset) */
-
-/* Wall clock — main time anchor; legible at ~10–15 ft */
-.text-landscape-broadcast-clock {
-  font-size: clamp(2.65rem, 3.65rem, 4.5rem);
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-
-.text-landscape-broadcast-clock-period {
-  font-size: 0.52em;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-/* Gregorian + Hijri — single line in UI (ellipsis); rem-only */
-.text-landscape-broadcast-header-dates {
-  font-size: clamp(0.85rem, 1rem, 1.15rem);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.25;
-}
-
-/* Countdown bar variant — bold label and digits (landscape top bar) */
-.text-countdown-bar-label {
-  font-size: clamp(1.5rem, 1.9rem, 2.5rem);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.text-countdown-bar-digits {
-  font-size: clamp(3.25rem, 5rem, 6.5rem);
-  font-weight: 900;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Subline under bar countdown — typography from .text-landscape-broadcast-header-dates on the element */
-.landscape-broadcast-header .landscape-broadcast-countdown-subline {
-  margin: 0;
-}
-
-/* Hero row aligned with wall clock; capped to fixed bar height */
-.landscape-broadcast-header .text-countdown-bar-digits {
-  font-size: clamp(2.35rem, 3.2rem, 4.1rem);
-  line-height: 1;
-}
-
-/* Bar countdown: .countdown-stable defaults to centred text + 12ch min-width — that
-   misaligns digits vs the right-aligned subline; pin glyphs to the trailing edge. */
-.landscape-broadcast-header .landscape-broadcast-countdown .countdown-stable {
-  text-align: right;
-  min-width: 0;
-}
-
-/* In-prayer status row: same vertical band as stacked countdown */
-.landscape-broadcast-header .landscape-broadcast-countdown--status-row .text-countdown-bar-label {
-  font-size: clamp(1rem, 1.25rem, 1.5rem);
-  line-height: 1.2;
 }
 
 /* Countdown strip variant — centred below prayer cards in prayer strip */

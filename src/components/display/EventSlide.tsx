@@ -10,8 +10,6 @@
  *
  * Landscape layout (default):
  *  ┌─────────────────────────────────────────────────┐
- *  │  [BADGE: COURSE]                                │
- *  │                                                 │
  *  │  ┌──── left: details ──────────┐ ┌── right ─┐  │
  *  │  │  EVENT TITLE (2 lines max)  │ │ [IMAGE]  │  │
  *  │  │  Short description          │ │          │  │
@@ -24,7 +22,6 @@
  *
  * Portrait layout (compact = true):
  *  ┌─────────────────────┐
- *  │  [BADGE]            │
  *  │  [IMAGE constrained]│
  *  │  TITLE              │
  *  │  📅 Date · Time     │
@@ -48,7 +45,6 @@ import {
   getEventDescription,
   formatEventDateTime,
   getCapacityInfo,
-  getEventTypeLabel,
   getQrCaption,
 } from '../../utils/eventUtils';
 
@@ -74,7 +70,6 @@ const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
   );
   const capacity = useMemo(() => getCapacityInfo(event), [event]);
   const qrCaption = useMemo(() => getQrCaption(event), [event]);
-  const typeLabel = getEventTypeLabel(event.type);
 
   const qrSecondaryLabel = event.title.length > 30
     ? `${event.title.slice(0, 30)}…`
@@ -94,7 +89,6 @@ const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
         capacity={capacity}
         qrCaption={qrCaption}
         qrSecondaryLabel={qrSecondaryLabel}
-        typeLabel={typeLabel}
       />
     );
   }
@@ -112,7 +106,6 @@ const EventSlide: React.FC<EventSlideProps> = ({ event, compact = false }) => {
       capacity={capacity}
       qrCaption={qrCaption}
       qrSecondaryLabel={qrSecondaryLabel}
-      typeLabel={typeLabel}
     />
   );
 };
@@ -134,7 +127,6 @@ interface ContentProps {
   capacity: import('../../utils/eventUtils').CapacityInfo | null;
   qrCaption: string;
   qrSecondaryLabel: string;
-  typeLabel: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,12 +145,8 @@ const LandscapeContent: React.FC<ContentProps> = ({
   capacity,
   qrCaption,
   qrSecondaryLabel,
-  typeLabel,
 }) => (
   <div className="flex flex-col gap-4 min-w-0 flex-shrink-0 w-full max-w-full">
-    {/* Type badge — matches existing carousel badge styling */}
-    <span className="badge badge-emerald self-start">{typeLabel}</span>
-
     {/* Main row: left details + right image/QR */}
     <div className="flex gap-5 items-start min-w-0">
 
@@ -277,12 +265,8 @@ const PortraitContent: React.FC<ContentProps> = ({
   capacity,
   qrCaption,
   qrSecondaryLabel,
-  typeLabel,
 }) => (
   <div className="flex flex-col gap-3 min-w-0 flex-shrink-0 w-full max-w-full">
-    {/* Type badge */}
-    <span className="badge badge-emerald self-start">{typeLabel}</span>
-
     {/* Banner image — constrained */}
     {image && (
       <div className="flex justify-center min-h-0 max-h-[7rem] w-full">

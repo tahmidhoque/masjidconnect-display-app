@@ -10,7 +10,7 @@
  */
 
 import dayjs from "dayjs";
-import type { EventV2, EventType, EventCategory } from "../api/models";
+import type { EventV2, EventCategory } from "../api/models";
 
 // ---------------------------------------------------------------------------
 // Registration badge
@@ -227,25 +227,8 @@ export function formatEventDateTime(event: EventV2): EventDateTime {
 }
 
 // ---------------------------------------------------------------------------
-// Type / category labels
+// Category labels
 // ---------------------------------------------------------------------------
-
-const EVENT_TYPE_LABELS: Record<EventType, string> = {
-  PRAYER:     "Prayer",
-  PROGRAM:    "Program",
-  FUNDRAISER: "Fundraiser",
-  SOCIAL:     "Social",
-  COMMUNITY:  "Community",
-  YOUTH:      "Youth",
-  WOMEN:      "Women",
-  COURSE:     "Course",
-  WORKSHOP:   "Workshop",
-  CONFERENCE: "Conference",
-  VOLUNTEER:  "Volunteer",
-  COMMITTEE:  "Committee",
-  BOARD:      "Board",
-  OTHER:      "Other",
-};
 
 const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
   GENERAL:     "General",
@@ -262,10 +245,6 @@ const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
   BUSINESS:    "Business",
   SEASONAL:    "Seasonal",
 };
-
-export function getEventTypeLabel(type: EventType | string): string {
-  return EVENT_TYPE_LABELS[type as EventType] ?? type;
-}
 
 export function getEventCategoryLabel(category: EventCategory | string): string {
   return EVENT_CATEGORY_LABELS[category as EventCategory] ?? category;

@@ -1,18 +1,20 @@
 /**
  * PrayerStrip
  *
- * Landscape-only horizontal bar: optional Imsak row, then prayer cue cards in a
- * row, plus a trailing Jumuah card after Isha when upcoming Friday jummah data exists.
- * Clock and countdown live in LandscapeBroadcastHeader above the carousel.
+ * Landscape-only horizontal bar: optional Imsak row, then clock and dates (left),
+ * prayer cue cards, and an optional countdown row. Jumuah-specific times are not
+ * shown in landscape (portrait uses JumuahBar).
  *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Sunrise } from 'lucide-react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
+import { useCurrentTime } from '../../hooks/useCurrentTime';
 import {
+  calculateApproximateHijriDate,
   getTimeDisplayParts,
 } from '../../utils/dateUtils';
 import type { TimeFormat } from '../../api/models';
@@ -23,13 +25,22 @@ const DISPLAY_NAMES: Record<string, string> = {
   Zuhr: 'Dhuhr',
 };
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
 interface PrayerStripProps {
   isRamadan?: boolean;
   imsakTime?: string | null;
   showImsak?: boolean;
   timeFormat?: TimeFormat;
+  hijriDateAdjustment?: number;
   showTomorrowJamaat?: boolean;
   tomorrowsJamaats?: TomorrowsJamaatsMap;
+  /** Countdown rendered below prayer cards, centred */
+  countdownSlot?: React.ReactNode;
 }
 
 /** Renders time with optional period subtext (e.g. "5:39" + "pm") */
@@ -57,20 +68,29 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
   imsakTime = null,
   showImsak = false,
   timeFormat = '12h',
+  hijriDateAdjustment = 0,
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
+  countdownSlot = null,
 }) => {
-  const {
-    todaysPrayerTimes,
-    upcomingJumuahJamaatRaw,
-    upcomingJumuahKhutbahRaw,
-  } = usePrayerTimesContext();
+  const currentTime = useCurrentTime();
+  const { todaysPrayerTimes } = usePrayerTimesContext();
+
+  const timeStr24h = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
+  const { main: timeMain, period: timePeriod } = getTimeDisplayParts(
+    timeStr24h,
+    timeFormat,
+  );
+  const dayName = DAYS[currentTime.getDay()];
+  const dateStr = `${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
+  const calendarDate = currentTime.getDate();
+  const hijriDate = useMemo(
+    () => calculateApproximateHijriDate(undefined, hijriDateAdjustment),
+    [calendarDate, hijriDateAdjustment],
+  );
 
   const showTomorrowCol = showTomorrowJamaat && !!tomorrowsJamaats;
   const showImsakRow = showImsak && !!imsakTime;
-  const showTrailingJumuah = Boolean(
-    upcomingJumuahKhutbahRaw || upcomingJumuahJamaatRaw,
-  );
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
@@ -92,6 +112,23 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
       )}
 
       <div className="flex items-stretch flex-1 min-h-0">
+        <div className="flex flex-col justify-center shrink-0 w-[15%] min-w-[8rem] px-4 py-3">
+          <span className="text-prayer-strip-clock text-gold tabular-nums leading-tight">
+            {timeMain}
+            {timePeriod != null && (
+              <span className="text-prayer-strip-jamaat font-normal text-gold/90 ml-0.5">
+                {timePeriod}
+              </span>
+            )}
+          </span>
+          <span className="text-prayer-strip-label text-text-secondary mt-1">
+            {dayName} {dateStr}
+          </span>
+          <span className="text-prayer-strip-jamaat text-text-muted mt-0.5">
+            {hijriDate}
+          </span>
+        </div>
+
         <div className="flex-1 flex gap-2 px-4 py-3 min-w-0">
           {todaysPrayerTimes.map((prayer) => {
             const isNext = prayer.isNext;
@@ -178,40 +215,14 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
               </div>
             );
           })}
-
-          {showTrailingJumuah && (
-            <div
-              className="flex-1 min-w-0 flex flex-col items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-normal bg-surface/50 border border-border"
-              aria-label="Jumuah Khutbah and Jamaat"
-            >
-              <span className="text-prayer-strip-label uppercase tracking-wider text-text-secondary">
-                Jumuah
-              </span>
-              {upcomingJumuahKhutbahRaw ? (
-                <span className="text-prayer-strip-time tabular-nums mt-0.5 text-text-primary inline-flex flex-wrap items-baseline justify-center gap-x-1 gap-y-0">
-                  <span className="text-text-muted font-semibold uppercase tracking-wide text-[0.85em]">
-                  </span>
-                  <TimeWithPeriod
-                    timeString={upcomingJumuahKhutbahRaw}
-                    timeFormat={timeFormat}
-                  />
-                </span>
-              ) : null}
-              {upcomingJumuahJamaatRaw ? (
-                <span className="text-prayer-strip-jamaat-primary text-gold/90 mt-0.5 tabular-nums text-center inline-flex flex-wrap items-baseline justify-center gap-x-1 gap-y-0">
-                  <span className="text-prayer-strip-jamaat text-gold/70 font-semibold uppercase tracking-wide">
-                  </span>
-                  <TimeWithPeriod
-                    timeString={upcomingJumuahJamaatRaw}
-                    timeFormat={timeFormat}
-                    className="text-gold font-semibold"
-                  />
-                </span>
-              ) : null}
-            </div>
-          )}
         </div>
       </div>
+
+      {countdownSlot ? (
+        <div className="shrink-0 w-full min-w-0 py-2 px-4">
+          {countdownSlot}
+        </div>
+      ) : null}
     </div>
   );
 };

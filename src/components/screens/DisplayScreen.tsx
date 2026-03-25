@@ -3,8 +3,9 @@
  *
  * The main running display. Renders prayer times, countdown, content carousel,
  * header, and footer using either landscape or portrait layout depending on
- * the screen's configured orientation. In landscape, the live clock and
- * countdown sit in a top bar above the carousel; the prayer strip is cue cards only.
+ * the screen's configured orientation. In landscape, the live clock, dates,
+ * Hijri line, and prayer countdown sit inside the prayer strip below the carousel;
+ * portrait keeps Header, panel, Jumuah bar, and countdown stacked.
  *
  * Prayer phase awareness:
  *  - `countdown-adhan` / `countdown-jamaat` — normal carousel
@@ -34,7 +35,6 @@ import {
   PrayerTimesPanel,
   PrayerStrip,
   PrayerCountdown,
-  LandscapeBroadcastHeader,
   ContentCarousel,
   IslamicPattern,
   JumuahBar,
@@ -452,21 +452,6 @@ const DisplayScreenInner: React.FC = () => {
 
   const countdownSlot = countdown;
 
-  const landscapeTopBar = (
-    <LandscapeBroadcastHeader
-      key={`landscape-header-hijri-${hijriDateAdjustment}`}
-      timeFormat={timeFormat}
-      hijriDateAdjustment={hijriDateAdjustment}
-      countdown={
-        <PrayerCountdown
-          phase={prayerPhase}
-          inPrayerSubPhase={inPrayerSubPhase}
-          variant="bar"
-        />
-      }
-    />
-  );
-
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
 
   return (
@@ -488,7 +473,6 @@ const DisplayScreenInner: React.FC = () => {
           />
         ) : (
           <LandscapeLayout
-            topBar={landscapeTopBar}
             content={contentSlot}
             prayerStrip={
               <PrayerStrip
@@ -496,8 +480,16 @@ const DisplayScreenInner: React.FC = () => {
                 imsakTime={ramadan.imsakTime}
                 showImsak={displaySettings?.showImsak ?? false}
                 timeFormat={timeFormat}
+                hijriDateAdjustment={hijriDateAdjustment}
                 showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
                 tomorrowsJamaats={tomorrowsJamaats}
+                countdownSlot={
+                  <PrayerCountdown
+                    phase={prayerPhase}
+                    inPrayerSubPhase={inPrayerSubPhase}
+                    variant="strip"
+                  />
+                }
               />
             }
             footer={footerSlot}

@@ -1,18 +1,16 @@
 /**
  * LandscapeLayout
  *
- * Four-zone "Broadcast" layout for landscape orientation:
+ * Landscape orientation stack:
  *  ┌──────────────────────────────────────────────────┐
- *  │  Top bar — live clock, Gregorian/Hijri, countdown │
+ *  │  Content carousel (full width)                    │
  *  ├──────────────────────────────────────────────────┤
- *  │  Content Carousel (full width)                   │
+ *  │  Prayer strip (clock, dates, cards, countdown)  │
  *  ├──────────────────────────────────────────────────┤
- *  │  Prayer Strip (Imsak row + prayer cue cards)     │
- *  ├──────────────────────────────────────────────────┤
- *  │  Footer (connection status, branding) — edge       │
+ *  │  Footer (connection status, branding)             │
  *  └──────────────────────────────────────────────────┘
  *
- * When `topBar` is omitted, carousel remains the first content block (tests / legacy).
+ * Optional `topBar` is supported for tests or future use; production omits it.
  */
 
 import React from 'react';

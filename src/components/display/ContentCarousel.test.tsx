@@ -1,5 +1,5 @@
 /**
- * Tests for ContentCarousel — DUA content type, badge, and transliteration.
+ * Tests for ContentCarousel — DUA content type and transliteration.
  */
 
 import React from 'react';
@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe('ContentCarousel', () => {
-  it('renders DUA type label and badge-dua class for DUA items', () => {
+  it('renders DUA title and body without a type chip', () => {
     const items = [
       {
         id: 'dua-1',
@@ -32,9 +32,8 @@ describe('ContentCarousel', () => {
       },
     ];
     render(<ContentCarousel items={items} interval={30} />);
-    const badge = screen.getByText('Dua');
-    expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('badge-dua');
+    expect(screen.getByText('Dua for guidance')).toBeInTheDocument();
+    expect(document.querySelector('.badge-dua')).not.toBeInTheDocument();
   });
 
   it('renders transliteration in an LTR paragraph when present', () => {
@@ -54,7 +53,7 @@ describe('ContentCarousel', () => {
     expect(transliterationEl).toHaveAttribute('dir', 'ltr');
   });
 
-  it('uses badge-emerald for non-DUA types', () => {
+  it('renders non-DUA slide title without type chip', () => {
     const items = [
       {
         id: 'hadith-1',
@@ -65,9 +64,9 @@ describe('ContentCarousel', () => {
       },
     ];
     render(<ContentCarousel items={items} interval={30} />);
-    const badge = screen.getByText('Verse & Hadith');
-    expect(badge).toHaveClass('badge-emerald');
-    expect(badge).not.toHaveClass('badge-dua');
+    expect(screen.getByText('Hadith')).toBeInTheDocument();
+    expect(screen.queryByText('Verse & Hadith')).not.toBeInTheDocument();
+    expect(document.querySelector('.badge-emerald')).not.toBeInTheDocument();
   });
 
   it('renders without crashing when items is empty', () => {
