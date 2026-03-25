@@ -300,6 +300,9 @@ export interface AnalyticsResponse {
  */
 export type TimeFormat = "12h" | "24h";
 
+/** Prayer row keys for per-salah jamaat-in-progress overrides (portal display settings). */
+export type SalahKey = "fajr" | "zuhr" | "asr" | "maghrib" | "isha";
+
 /**
  * Screen content configuration settings
  * These are controlled from the admin portal
@@ -329,8 +332,20 @@ export interface DisplaySettings {
   imsakOffset: number;
   /** Days to add to the calculated Hijri date (e.g. +1 if API/local calc is 1 day behind). */
   hijriDateAdjustment: number;
-  /** Minutes after jamaat ends (10 min) to keep showing current prayer before switching to next. Total post-jamaat window = 10 min (jamaat) + this value. Default 10. */
+  /**
+   * Minutes after the "Jamaat in progress" segment ends before shifting next-prayer countdown/highlight.
+   * Also the duration of the "In progress" sub-phase. Range 5–30; default 10.
+   */
   minutesAfterJamaatUntilNextPrayer?: number;
+  /**
+   * Default minutes the UI stays on "Jamaat in progress" for the current prayer (unless overridden per salah).
+   * Range 5–30; default 10.
+   */
+  defaultJamaatInProgressMinutes?: number;
+  /**
+   * Per-salah overrides for "Jamaat in progress" duration (minutes, 5–30). Omitted keys use defaultJamaatInProgressMinutes.
+   */
+  minutesAfterJamaatUntilNextPrayerBySalah?: Partial<Record<SalahKey, number>>;
 }
 
 // Content Types

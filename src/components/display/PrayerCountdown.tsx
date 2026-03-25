@@ -24,7 +24,7 @@ import CountdownDisplay from './CountdownDisplay';
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
   phase?: PrayerPhase;
-  /** When phase is 'in-prayer': 'jamaat' = 0–10 min (Jamaat in progress), 'post-jamaat' = 10–(10+X) min (In progress) */
+  /** When phase is 'in-prayer': 'jamaat' = first A min, 'post-jamaat' = next B min (portal displaySettings). */
   inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
   /** When "strip", render centred below prayer cards in the landscape prayer strip */
   variant?: 'default' | 'strip';

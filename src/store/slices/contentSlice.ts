@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings } from "../../api/models";
+import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings, SalahKey } from "../../api/models";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
@@ -31,6 +31,29 @@ function normalisePrayerTimesForStore(
   return raw;
 }
 
+const SALAH_KEYS: SalahKey[] = ["fajr", "zuhr", "asr", "maghrib", "isha"];
+
+function clampJamaatSettingMinutes(value: unknown, fallback: number): number {
+  const n = typeof value === "number" ? value : fallback;
+  if (Number.isNaN(n)) return fallback;
+  return Math.max(5, Math.min(30, n));
+}
+
+/** Normalise per-salah jamaat-in-progress overrides from API (clamp, drop invalid keys). */
+function normaliseJamaatBySalah(
+  raw: Partial<Record<SalahKey, number>> | null | undefined,
+): Partial<Record<SalahKey, number>> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Partial<Record<SalahKey, number>> = {};
+  for (const key of SALAH_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) {
+      const v = raw[key];
+      out[key] = clampJamaatSettingMinutes(v, 10);
+    }
+  }
+  return out;
+}
+
 /** Safe defaults when displaySettings is missing from API (backward compatibility). */
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   ramadanMode: "auto",
@@ -41,6 +64,8 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   imsakOffset: 10,
   hijriDateAdjustment: 0,
   minutesAfterJamaatUntilNextPrayer: 10,
+  defaultJamaatInProgressMinutes: 10,
+  minutesAfterJamaatUntilNextPrayerBySalah: {},
 };
 
 // Debounce map to prevent rapid successive calls
@@ -291,10 +316,17 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
       timeFormat: timeFormatFromConfig ?? "12h",
     };
   }
-  const minutesAfterJamaat = (() => {
-    const v = raw.minutesAfterJamaatUntilNextPrayer ?? 10;
-    return Math.max(5, Math.min(30, typeof v === "number" ? v : 10));
-  })();
+  const minutesAfterJamaat = clampJamaatSettingMinutes(
+    raw.minutesAfterJamaatUntilNextPrayer,
+    10,
+  );
+  const defaultJamaatInProgressMinutes = clampJamaatSettingMinutes(
+    raw.defaultJamaatInProgressMinutes,
+    10,
+  );
+  const minutesAfterJamaatUntilNextPrayerBySalah = normaliseJamaatBySalah(
+    raw.minutesAfterJamaatUntilNextPrayerBySalah,
+  );
 
   return {
     ramadanMode: raw.ramadanMode ?? "auto",
@@ -305,6 +337,8 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
     imsakOffset: raw.imsakOffset ?? 10,
     hijriDateAdjustment: raw.hijriDateAdjustment ?? 0,
     minutesAfterJamaatUntilNextPrayer: minutesAfterJamaat,
+    defaultJamaatInProgressMinutes,
+    minutesAfterJamaatUntilNextPrayerBySalah,
   };
 };
 

@@ -31,7 +31,37 @@ import {
   parseRotationDegrees,
   orientationToRotationDegrees,
 } from '../../utils/orientation';
+import type { EmergencyAlert } from '../../api/models';
 import type { ContentInvalidationPayload } from '../../types/realtime';
+
+/**
+ * Normalise raw Socket.io `emergency:alert` payloads (object, JSON string, or `{ data: { ... } }`).
+ */
+function normaliseEmergencyAlertWsPayload(raw: unknown): Record<string, unknown> | null {
+  let parsed: unknown = raw;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const outer = parsed as Record<string, unknown>;
+  const inner = outer.data;
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+    return { ...outer, ...(inner as Record<string, unknown>) };
+  }
+  return outer;
+}
+
+/** True when the server intends to dismiss the full-screen alert without waiting for expiry. */
+function isEmergencyRemoteClearAction(payload: Record<string, unknown>): boolean {
+  const a = payload.action;
+  if (typeof a !== 'string') return false;
+  const n = a.trim().toLowerCase();
+  return n === 'clear' || n === 'hide' || n === 'cancel';
+}
 
 interface AuthShape {
   auth: { isAuthenticated: boolean };
@@ -137,25 +167,31 @@ export const realtimeMiddleware: Middleware = (api: any) => {
       }),
     );
 
-    // Emergency alerts — pass through v2 category/urgency/color fields
+    // Emergency alerts — `action: clear` (or hide/cancel) dismisses overlay immediately
     unsubs.push(
-      realtimeService.on<any>('emergency:alert', (payload) => {
-        if (payload.action === 'clear') {
+      realtimeService.on<unknown>('emergency:alert', (raw) => {
+        const payload = normaliseEmergencyAlertWsPayload(raw);
+        if (!payload) {
+          logger.debug('[RealtimeMW] emergency:alert ignored (invalid payload)');
+          return;
+        }
+        if (isEmergencyRemoteClearAction(payload)) {
+          logger.info('[RealtimeMW] emergency:alert remote clear');
           emergencyAlertService.clearAlert();
           return;
         }
         emergencyAlertService.setAlert({
-          id: payload.id || `alert-${Date.now()}`,
-          title: payload.title,
-          message: payload.message,
-          category: payload.category ?? 'community',
-          urgency: payload.urgency ?? 'high',
-          color: payload.color ?? null,
-          createdAt: payload.createdAt,
-          expiresAt: payload.expiresAt,
+          id: (typeof payload.id === 'string' && payload.id) || `alert-${Date.now()}`,
+          title: payload.title as string,
+          message: payload.message as string,
+          category: (payload.category as EmergencyAlert['category']) ?? 'community',
+          urgency: (payload.urgency as EmergencyAlert['urgency']) ?? 'high',
+          color: (payload.color as string | null | undefined) ?? null,
+          createdAt: payload.createdAt as string,
+          expiresAt: payload.expiresAt as string,
           masjidId: credentialService.getMasjidId() || '',
-          timing: payload.timing,
-          action: payload.action,
+          timing: payload.timing as EmergencyAlert['timing'],
+          action: payload.action as EmergencyAlert['action'],
         });
       }),
     );

@@ -10,7 +10,7 @@
  *   countdown-adhan  — Normal display. Carousel visible, counting down to adhan.
  *   countdown-jamaat — Adhan passed, carousel visible, counting down to jamaat (> 5 min).
  *   jamaat-soon      — Within 5 min of jamaat. Phones-off graphic replaces carousel.
- *   in-prayer        — Jamaat reached. Calm "get ready" screen for 10 min.
+ *   in-prayer        — Jamaat reached. Calm screen for A + B minutes (displaySettings: jamaat-in-progress + post-jamaat delay).
  *
  * Supports a dev override via window.__PRAYER_PHASE_FORCE so keyboard
  * shortcuts can force any phase for testing (same pattern as Ramadan toggle).
@@ -23,6 +23,10 @@ import { toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
 import { useAppSelector } from '@/store/hooks';
 import { selectDisplaySettings } from '@/store/slices/contentSlice';
+import {
+  jamaatPhaseMinutesForDisplayPrayer,
+  postJamaatDelayMinutes,
+} from '@/utils/displaySettingsJamaat';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -39,7 +43,7 @@ export interface PrayerPhaseData {
   phase: PrayerPhase;
   /** Name of the prayer this phase relates to (e.g. "Zuhr") */
   prayerName: string | null;
-  /** When phase is 'in-prayer': 'jamaat' = 0–10 min, 'post-jamaat' = 10–(10+X) min */
+  /** When phase is 'in-prayer': 'jamaat' = first A min, 'post-jamaat' = next B min (displaySettings). */
   inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
 }
 
@@ -49,9 +53,6 @@ export interface PrayerPhaseData {
 
 /** How many minutes before jamaat to show the phones-off graphic */
 const JAMAAT_SOON_THRESHOLD_MIN = 5;
-
-/** Fixed duration of jamaat (actual prayer) in minutes. Post-jamaat delay is separate. */
-export const JAMAAT_DURATION_MIN = 10;
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
@@ -89,7 +90,6 @@ export const usePrayerPhase = (): PrayerPhaseData => {
   const { nextPrayer, currentPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
   const displaySettings = useAppSelector(selectDisplaySettings);
-  const durationMin = displaySettings?.minutesAfterJamaatUntilNextPrayer ?? 10;
 
   /* ---- Dev force flag as reactive state ---- */
   const [forceFlag, setForceFlag] = useState<PrayerPhase | undefined>(
@@ -137,17 +137,22 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     const now = nowMinutes(currentTime);
 
-    // === In-prayer window: past current prayer's jamaat but within JAMAAT_DURATION_MIN + durationMin ===
+    // === In-prayer window: past current prayer's jamaat but within A + B (displaySettings) ===
     // Use currentPrayer so we stay on "Jamaat in progress" for the full duration even after
     // nextPrayer has already advanced to the next salaat (avoids carousel flashing back after ~0.5s).
-    const totalWindowMin = JAMAAT_DURATION_MIN + durationMin;
+    const delayMin = postJamaatDelayMinutes(displaySettings);
     if (currentPrayer?.jamaat) {
+      const jamaatProgressMin = jamaatPhaseMinutesForDisplayPrayer(
+        displaySettings,
+        currentPrayer.name,
+      );
+      const totalWindowMin = jamaatProgressMin + delayMin;
       const currentJamaatMin = toMinutesFromMidnight(currentPrayer.jamaat, currentPrayer.name);
       if (currentJamaatMin >= 0 && now >= currentJamaatMin) {
         const minutesSinceJamaat = now - currentJamaatMin;
         if (minutesSinceJamaat <= totalWindowMin) {
           const inPrayerSubPhase: 'jamaat' | 'post-jamaat' =
-            minutesSinceJamaat <= JAMAAT_DURATION_MIN ? 'jamaat' : 'post-jamaat';
+            minutesSinceJamaat <= jamaatProgressMin ? 'jamaat' : 'post-jamaat';
           logger.debug(
             `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${currentPrayer.name} jamaat (${inPrayerSubPhase})`,
           );
@@ -188,10 +193,15 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     // === At or just past jamaat: in-prayer from nextPrayer's jamaat time ===
     // Ensures we show in-prayer as soon as we reach jamaat even if currentPrayer hasn't updated.
     if (jamaatMin >= 0 && now >= jamaatMin) {
+      const jamaatProgressMin = jamaatPhaseMinutesForDisplayPrayer(
+        displaySettings,
+        nextPrayer.name,
+      );
+      const totalWindowMin = jamaatProgressMin + delayMin;
       const minutesSinceJamaat = now - jamaatMin;
       if (minutesSinceJamaat <= totalWindowMin) {
         const inPrayerSubPhase: 'jamaat' | 'post-jamaat' =
-          minutesSinceJamaat <= JAMAAT_DURATION_MIN ? 'jamaat' : 'post-jamaat';
+          minutesSinceJamaat <= jamaatProgressMin ? 'jamaat' : 'post-jamaat';
         logger.debug(
           `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based, ${inPrayerSubPhase})`,
         );
@@ -238,7 +248,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     // Past jamaat and past in-prayer window — back to normal countdown for next salaat
     return { phase: 'countdown-adhan', prayerName: nextPrayer.name };
-  }, [nextPrayer, currentPrayer, currentTime, forceFlag, durationMin]);
+  }, [nextPrayer, currentPrayer, currentTime, forceFlag, displaySettings]);
 
   return phaseData;
 };
