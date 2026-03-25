@@ -129,6 +129,26 @@ describe('scheduleItemToCarouselItems', () => {
     expect(carouselItem.bodyFontSize).toBeUndefined();
   });
 
+  it('maps VERSE_HADITH with HTML body but no isHTML flag to bodyIsHTML true', () => {
+    const scheduleItem = {
+      id: 'verse-1',
+      order: 0,
+      type: 'VERSE_HADITH',
+      title: 'Al-Fatiha',
+      content: {
+        translation: '<p>In the name of <strong>Allah</strong>, the Most Gracious.</p>',
+        arabicText: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+      },
+      duration: 30,
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    const carouselItem = result[0];
+    expect(carouselItem.body).toBe('<p>In the name of <strong>Allah</strong>, the Most Gracious.</p>');
+    expect(carouselItem.bodyIsHTML).toBe(true);
+    expect(carouselItem.arabicBody).toBe('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ');
+  });
+
   it('maps legacy item without isHTML (backward compatibility)', () => {
     const scheduleItem = {
       id: 'legacy-1',

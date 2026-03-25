@@ -218,7 +218,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     type: typeof type === 'string' ? type : 'Content',
     title: typeof title === 'string' ? title : undefined,
     body: typeof body === 'string' ? body : undefined,
-    bodyIsHTML: typeof body === 'string' && body.length > 0 && content.isHTML === true ? true : undefined,
+    bodyIsHTML: typeof body === 'string' && body.length > 0 && (content.isHTML === true || /<[a-z][^>]*>/i.test(body)) ? true : undefined,
     bodyFontSize: validFontSize,
     textAlign: validTextAlign,
     arabicBody: typeof arabicBody === 'string' ? arabicBody : undefined,
