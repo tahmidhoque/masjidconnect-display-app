@@ -434,7 +434,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         hasZuhr: !!todayData?.zuhr,
         hasAsr: !!todayData?.asr,
       });
-      setTimeout(() => processPrayerTimes(), 0);
+      // Bypass MIN_PROCESS_INTERVAL — otherwise WS/cache updates can leave on-screen times stale
+      // while Redux and IndexedDB already hold the new payload.
+      setTimeout(() => processPrayerTimes(true), 0);
     } else {
       // If we have invalid data, log details and request a refresh
       logger.warn(
@@ -527,6 +529,13 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       logger.debug("Processing prayer times data");
 
       if (!forceReprocess) {
+        lastProcessedTimes.current = prayerTimes;
+        lastProcessedDate.current = currentDate;
+      } else if (lastProcessedTimes.current !== prayerTimes) {
+        // forceReprocess(true) from the 15s timer keeps the same Redux reference so we skip
+        // this branch and avoid breaking countdown-only refreshes. When the reference changes
+        // (e.g. content:invalidate → new payload in Redux while MIN_PROCESS_INTERVAL would
+        // block a non-forced run), we must update refs so the formatted UI matches storage.
         lastProcessedTimes.current = prayerTimes;
         lastProcessedDate.current = currentDate;
       }
@@ -1391,7 +1400,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     if (prayerTimes && initializedRef.current) {
       // Add a small timeout to avoid render loop
       const timerId = setTimeout(() => {
-        processPrayerTimes();
+        processPrayerTimes(true);
       }, 50);
 
       return () => clearTimeout(timerId);
@@ -1415,7 +1424,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       
       // Process with new time format
       const timerId = setTimeout(() => {
-        processPrayerTimes();
+        processPrayerTimes(true);
       }, 10);
 
       return () => clearTimeout(timerId);

@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings } from "../../api/models";
-import apiClient from "../../api/apiClient";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
@@ -371,8 +370,13 @@ export const refreshContent = createAsyncThunk(
       // Use sync service for robust data fetching.
       let syncSucceeded = false;
       try {
-        await syncService.syncContent({ forceRefresh });
-        syncSucceeded = true;
+        const syncResult = await syncService.syncContent({ forceRefresh });
+        syncSucceeded = syncResult.success === true;
+        if (!syncSucceeded) {
+          logger.warn('[Content] Content sync unsuccessful, attempting to use cached content', {
+            error: syncResult.error,
+          });
+        }
       } catch (syncError) {
         logger.warn('[Content] Sync failed, attempting to use cached content', { error: syncError });
       }
@@ -514,8 +518,14 @@ export const refreshPrayerTimes = createAsyncThunk(
 
       // First, try to sync prayer times separately (but don't fail if it doesn't work)
       try {
-        await syncService.syncPrayerTimes(masjidTimezone, { forceRefresh });
-        logger.debug("[Content] Prayer times sync completed successfully");
+        const syncResult = await syncService.syncPrayerTimes(masjidTimezone, { forceRefresh });
+        if (syncResult.success) {
+          logger.debug("[Content] Prayer times sync completed successfully");
+        } else {
+          logger.warn("[Content] Prayer times sync unsuccessful, falling back to cached data", {
+            error: syncResult.error,
+          });
+        }
       } catch (syncError) {
         logger.warn(
           "[Content] Prayer times sync failed, falling back to cached data",
@@ -636,14 +646,26 @@ export const refreshSchedule = createAsyncThunk(
         return { skipped: true };
       }
 
-      // Schedule is synced as part of content sync (force refresh bypasses "unchanged" skip)
-      logger.info("[Content] Calling syncService.syncContent()...", { forceRefresh });
-      await syncService.syncContent({ forceRefresh });
-      logger.info("[Content] syncContent() completed");
-
-      // Get the schedule from storage after sync
-      logger.info("[Content] Loading schedule from storage...");
-      const scheduleData = await storageService.get<any>('schedule');
+      // Schedule is written by content sync (apiClient.saveToStorageService). Read storage only
+      // to avoid a second syncContent() call that would coalesce or race with refreshContent.
+      logger.info("[Content] Loading schedule from storage (after content sync path)...", {
+        forceRefresh,
+      });
+      const screenContent = await storageService.get<ScreenContent>("screenContent");
+      const scheduleFromStorage = await storageService.get<any>("schedule");
+      const contentAny = screenContent as unknown as {
+        schedule?: unknown;
+        data?: { schedule?: unknown; playlist?: unknown };
+        playlist?: unknown;
+        assignedSchedule?: { schedule?: unknown };
+      } | null;
+      const scheduleFromContent =
+        contentAny?.schedule ??
+        contentAny?.data?.schedule ??
+        contentAny?.playlist ??
+        contentAny?.assignedSchedule?.schedule ??
+        contentAny?.data?.playlist;
+      const scheduleData = scheduleFromContent ?? scheduleFromStorage;
       logger.info("[Content] Schedule loaded from storage", {
         hasSchedule: !!scheduleData,
         isArray: Array.isArray(scheduleData),
@@ -689,8 +711,14 @@ export const refreshEvents = createAsyncThunk(
 
       if (forceRefresh) {
         try {
-          await syncService.syncEvents();
-          logger.debug("[Content] Events sync completed successfully");
+          const syncResult = await syncService.syncEvents({ forceRefresh: true });
+          if (syncResult.success) {
+            logger.debug("[Content] Events sync completed successfully");
+          } else {
+            logger.warn("[Content] Events sync unsuccessful, falling back to cached data", {
+              error: syncResult.error,
+            });
+          }
         } catch (syncError) {
           logger.warn(
             "[Content] Events sync failed, falling back to cached data",
@@ -798,21 +826,18 @@ export const refreshAllContent = createAsyncThunk(
       }
 
       // Run refreshContent first — it fetches and saves content, schedule, events to storage.
-      // Running in parallel with refreshSchedule caused "Sync already in progress" so schedule
-      // read stale data before content had saved. Sequential order ensures storage is populated.
+      // Prayer times and events then refresh in parallel (schedule is updated inside refreshContent).
       await dispatch(refreshContent({ forceRefresh }));
 
-      // Now refresh the others — they read from storage (populated by refreshContent)
       const results = await Promise.allSettled([
         dispatch(refreshPrayerTimes({ forceRefresh: true })),
-        dispatch(refreshSchedule({ forceRefresh })),
-        dispatch(refreshEvents({})),
+        dispatch(refreshEvents({ forceRefresh })),
       ]);
 
       // Log any failures
       results.forEach((result, index) => {
         if (result.status === "rejected") {
-          const names = ["content", "prayerTimes", "schedule", "events"];
+          const names = ["prayerTimes", "events"];
           logger.warn(`[Content] Failed to refresh ${names[index]}`, {
             reason: result.reason,
           });

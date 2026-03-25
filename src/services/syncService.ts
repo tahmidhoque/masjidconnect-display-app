@@ -108,6 +108,14 @@ class SyncService {
    */
   private httpHeartbeatEnabled: boolean = true;
 
+  /**
+   * Coalesce concurrent syncs of the same type — callers await a single in-flight request
+   * instead of receiving `{ success: false, error: 'Sync already in progress' }`.
+   */
+  private contentSyncInFlight: Promise<SyncResult<ContentResponse>> | null = null;
+  private prayerTimesSyncInFlight: Promise<SyncResult<PrayerTimesResponse>> | null = null;
+  private eventsSyncInFlight: Promise<SyncResult<EventsResponse>> | null = null;
+
   constructor() {
     logger.info('[SyncService] Created');
   }
@@ -357,8 +365,8 @@ class SyncService {
     // Run syncs in parallel
     await Promise.all([
       this.syncContent({ forceRefresh }),
-      this.syncPrayerTimes(),
-      this.syncEvents(),
+      this.syncPrayerTimes(undefined, { forceRefresh }),
+      this.syncEvents({ forceRefresh }),
     ]);
   }
 
@@ -367,11 +375,22 @@ class SyncService {
    * @param options.forceRefresh - When true, bypass "content changed" check and clear content cache so we always fetch (e.g. after content:invalidate).
    */
   public async syncContent(options?: { forceRefresh?: boolean }): Promise<SyncResult<ContentResponse>> {
-    if (this.state.content.isLoading) {
-      logger.debug('[SyncService] Content sync already in progress');
-      return { success: false, error: 'Sync already in progress' };
+    if (this.contentSyncInFlight) {
+      logger.debug('[SyncService] Content sync coalesced — awaiting in-flight');
+      return this.contentSyncInFlight;
     }
 
+    const promise = this.runSyncContent(options);
+    this.contentSyncInFlight = promise;
+    void promise.finally(() => {
+      if (this.contentSyncInFlight === promise) {
+        this.contentSyncInFlight = null;
+      }
+    });
+    return promise;
+  }
+
+  private async runSyncContent(options?: { forceRefresh?: boolean }): Promise<SyncResult<ContentResponse>> {
     const forceRefresh = options?.forceRefresh === true;
 
     this.updateState('content', { isLoading: true, error: null });
@@ -426,11 +445,25 @@ class SyncService {
     timezoneOverride?: string,
     options?: { forceRefresh?: boolean },
   ): Promise<SyncResult<PrayerTimesResponse>> {
-    if (this.state.prayerTimes.isLoading) {
-      logger.debug('[SyncService] Prayer times sync already in progress');
-      return { success: false, error: 'Sync already in progress' };
+    if (this.prayerTimesSyncInFlight) {
+      logger.debug('[SyncService] Prayer times sync coalesced — awaiting in-flight');
+      return this.prayerTimesSyncInFlight;
     }
 
+    const promise = this.runSyncPrayerTimes(timezoneOverride, options);
+    this.prayerTimesSyncInFlight = promise;
+    void promise.finally(() => {
+      if (this.prayerTimesSyncInFlight === promise) {
+        this.prayerTimesSyncInFlight = null;
+      }
+    });
+    return promise;
+  }
+
+  private async runSyncPrayerTimes(
+    timezoneOverride?: string,
+    options?: { forceRefresh?: boolean },
+  ): Promise<SyncResult<PrayerTimesResponse>> {
     this.updateState('prayerTimes', { isLoading: true, error: null });
 
     try {
@@ -477,18 +510,36 @@ class SyncService {
   }
 
   /**
-   * Sync events from server
+   * Sync events from server.
+   * @param options.forceRefresh - Clear events cache and bypass stale HTTP cache (e.g. content:invalidate type events).
    */
-  public async syncEvents(): Promise<SyncResult<EventsResponse>> {
-    if (this.state.events.isLoading) {
-      logger.debug('[SyncService] Events sync already in progress');
-      return { success: false, error: 'Sync already in progress' };
+  public async syncEvents(options?: { forceRefresh?: boolean }): Promise<SyncResult<EventsResponse>> {
+    if (this.eventsSyncInFlight) {
+      logger.debug('[SyncService] Events sync coalesced — awaiting in-flight');
+      return this.eventsSyncInFlight;
     }
 
+    const promise = this.runSyncEvents(options);
+    this.eventsSyncInFlight = promise;
+    void promise.finally(() => {
+      if (this.eventsSyncInFlight === promise) {
+        this.eventsSyncInFlight = null;
+      }
+    });
+    return promise;
+  }
+
+  private async runSyncEvents(options?: { forceRefresh?: boolean }): Promise<SyncResult<EventsResponse>> {
     this.updateState('events', { isLoading: true, error: null });
 
     try {
-      const response = await apiClient.getEvents();
+      const forceRefresh = options?.forceRefresh === true;
+      if (forceRefresh) {
+        await apiClient.clearEventsCache();
+      }
+      const response = await apiClient.getEvents(
+        forceRefresh ? { cacheBust: true, forceNetwork: true } : undefined,
+      );
 
       if (response.success && response.data) {
         this.updateState('events', {

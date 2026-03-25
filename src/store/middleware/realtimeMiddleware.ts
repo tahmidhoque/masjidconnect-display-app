@@ -46,6 +46,12 @@ const CONTENT_INVALIDATE_COALESCE_MS = 3000;
 /** Pending coalesce timeouts per invalidation type. Cleared on cleanup. */
 const invalidationCoalesceMap = new Map<string, ReturnType<typeof setTimeout>>();
 
+/** Coalesce rapid `content:update` / `prayer-times:update` WS events (ms). */
+const WS_UPDATE_COALESCE_MS = 3000;
+
+/** Pending coalesce timeouts for legacy update event names. Cleared on cleanup. */
+const wsUpdateCoalesceMap = new Map<string, ReturnType<typeof setTimeout>>();
+
 const VALID_INVALIDATION_TYPES: Array<ContentInvalidationPayload['type']> = [
   'prayer_times',
   'schedule',
@@ -268,7 +274,8 @@ export const realtimeMiddleware: Middleware = (api: any) => {
                   break;
                 case 'schedule':
                 case 'schedule_assignment':
-                  await dispatch(mod.refreshSchedule({ forceRefresh: true })).unwrap();
+                  // Schedule payload is persisted during content sync — fetch content first.
+                  await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
                   await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
                   break;
                 case 'playlist_assignment':
@@ -298,6 +305,51 @@ export const realtimeMiddleware: Middleware = (api: any) => {
         if (existing) clearTimeout(existing);
         const timeoutId = setTimeout(runRefetch, CONTENT_INVALIDATE_COALESCE_MS);
         invalidationCoalesceMap.set(payload.type, timeoutId);
+      }),
+    );
+
+    // Legacy/alternate push events — backend may emit these instead of content:invalidate
+    const scheduleWsUpdateRefetch = (key: string, run: () => Promise<void>) => {
+      const runRefetch = () => {
+        wsUpdateCoalesceMap.delete(key);
+        void (async () => {
+          try {
+            await run();
+          } catch (err) {
+            logger.warn('[RealtimeMW] WS update refetch failed', {
+              key,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        })();
+      };
+      const existing = wsUpdateCoalesceMap.get(key);
+      if (existing) clearTimeout(existing);
+      const timeoutId = setTimeout(runRefetch, WS_UPDATE_COALESCE_MS);
+      wsUpdateCoalesceMap.set(key, timeoutId);
+    };
+
+    unsubs.push(
+      realtimeService.on('content:update', () => {
+        logger.debug('[RealtimeMW] content:update received, scheduling refetch', {
+          coalesceMs: WS_UPDATE_COALESCE_MS,
+        });
+        scheduleWsUpdateRefetch('content:update', async () => {
+          const mod = await import('../slices/contentSlice');
+          await (api.dispatch as AppDispatch)(mod.refreshContent({ forceRefresh: true })).unwrap();
+        });
+      }),
+    );
+
+    unsubs.push(
+      realtimeService.on('prayer-times:update', () => {
+        logger.debug('[RealtimeMW] prayer-times:update received, scheduling refetch', {
+          coalesceMs: WS_UPDATE_COALESCE_MS,
+        });
+        scheduleWsUpdateRefetch('prayer-times:update', async () => {
+          const mod = await import('../slices/contentSlice');
+          await (api.dispatch as AppDispatch)(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+        });
       }),
     );
 
@@ -356,6 +408,8 @@ export const realtimeMiddleware: Middleware = (api: any) => {
     unsubs.length = 0;
     invalidationCoalesceMap.forEach((id) => clearTimeout(id));
     invalidationCoalesceMap.clear();
+    wsUpdateCoalesceMap.forEach((id) => clearTimeout(id));
+    wsUpdateCoalesceMap.clear();
     api.dispatch(clearPendingRestart());
     api.dispatch(clearUpdateStatus());
     remoteControlService.clearScheduledRestart();
@@ -385,6 +439,8 @@ export const cleanupRealtimeMiddleware = () => {
   unsubs.length = 0;
   invalidationCoalesceMap.forEach((id) => clearTimeout(id));
   invalidationCoalesceMap.clear();
+  wsUpdateCoalesceMap.forEach((id) => clearTimeout(id));
+  wsUpdateCoalesceMap.clear();
   remoteControlService.clearScheduledRestart();
   remoteControlService.clearDeviceUpdatePolling();
   realtimeService.disconnect();

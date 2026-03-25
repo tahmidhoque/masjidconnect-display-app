@@ -769,9 +769,15 @@ class ApiClient {
   }
 
   /**
-   * Get events
+   * Get events.
+   * @param options.cacheBust - Append unique query param and skip stale cache fallback (e.g. after content:invalidate events).
+   * @param options.forceNetwork - Attempt network even if navigator reports offline (e.g. after invalidate).
    */
-  public async getEvents(limit?: number): Promise<ApiResponse<EventsResponse>> {
+  public async getEvents(options?: {
+    limit?: number;
+    cacheBust?: boolean;
+    forceNetwork?: boolean;
+  }): Promise<ApiResponse<EventsResponse>> {
     if (!credentialService.hasCredentials()) {
       return {
         success: false,
@@ -779,11 +785,24 @@ class ApiClient {
       };
     }
 
+    const limit = options?.limit;
+    const cacheBust = options?.cacheBust === true;
+    const params: Record<string, string | number | boolean | undefined> = {};
+    if (limit != null) {
+      params.limit = limit;
+    }
+    if (cacheBust) {
+      params._t = Date.now();
+    }
+    const forceNetwork = cacheBust || options?.forceNetwork === true;
+    const skipCacheFallback = cacheBust;
+
     return this.getWithCache<EventsResponse>(
       SCREEN_ENDPOINTS.GET_EVENTS,
       CACHE_KEYS.EVENTS,
       CACHE_TTL.EVENTS,
-      limit ? { limit } : undefined
+      Object.keys(params).length > 0 ? params : undefined,
+      { forceNetwork, skipCacheFallback },
     );
   }
 
@@ -847,6 +866,18 @@ class ApiClient {
       logger.debug('[ApiClient] Content cache cleared');
     } catch (error) {
       logger.error('[ApiClient] Failed to clear content cache', { error });
+    }
+  }
+
+  /**
+   * Clear events HTTP cache so the next getEvents() fetches fresh (e.g. after content:invalidate type events).
+   */
+  public async clearEventsCache(): Promise<void> {
+    try {
+      await localforage.removeItem(CACHE_KEYS.EVENTS);
+      logger.debug('[ApiClient] Events cache cleared');
+    } catch (error) {
+      logger.error('[ApiClient] Failed to clear events cache', { error });
     }
   }
 
