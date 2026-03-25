@@ -20,6 +20,9 @@ import { useCurrentTime } from '../../hooks/useCurrentTime';
 import { getTimeUntilNextPrayer, toMinutesFromMidnight } from '../../utils/dateUtils';
 import type { PrayerPhase } from '../../hooks/usePrayerPhase';
 import CountdownDisplay from './CountdownDisplay';
+import { useAppSelector } from '../../store/hooks';
+import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
 
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
@@ -47,6 +50,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 }) => {
   const { nextPrayer, isJumuahToday } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
+  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   /**
    * Determine the target time string (HH:mm) to count down to.
@@ -97,13 +101,22 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   }, [targetTime, currentTime, nextPrayer]);
 
   const countingToJamaat = isCountingToJamaat(targetTime, nextPrayer?.jamaat);
-  const displayName = nextPrayer?.name === 'Zuhr' && isJumuahToday ? 'Jumuah' : (nextPrayer?.name ?? '');
+  const displayName = useMemo(() => {
+    if (!nextPrayer?.name) return '';
+    if (nextPrayer.name === 'Zuhr' && isJumuahToday) {
+      return resolveTerminology(terminology, 'jummah', 'Jumuah');
+    }
+    const key = prayerRowNameToTerminologyKey(nextPrayer.name);
+    return key ? resolveTerminology(terminology, key, nextPrayer.name) : nextPrayer.name;
+  }, [nextPrayer?.name, isJumuahToday, terminology]);
+
+  const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
   const countdownLabel = useMemo(
     () =>
       countingToJamaat
-        ? (displayName ? `${displayName} Jamaat in` : 'Jamaat in')
+        ? (displayName ? `${displayName} ${jamaatLabel} in` : `${jamaatLabel} in`)
         : (displayName ? `${displayName} prayer in` : 'Next prayer in'),
-    [countingToJamaat, displayName],
+    [countingToJamaat, displayName, jamaatLabel],
   );
 
   if (!nextPrayer) {
@@ -138,7 +151,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
   /* ---- In-prayer: name in left half, status in right half (same midline as countdown) ---- */
   if (phase === 'in-prayer') {
-    const statusText = inPrayerSubPhase === 'post-jamaat' ? 'In progress' : 'Jamaat in progress';
+    const statusText =
+      inPrayerSubPhase === 'post-jamaat'
+        ? 'In progress'
+        : `${jamaatLabel} in progress`;
     return (
       <div className={outerClass}>
         <span className={inPrayerLabelClass}>{displayName || nextPrayer.name}</span>

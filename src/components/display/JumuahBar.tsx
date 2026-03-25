@@ -13,6 +13,9 @@ import React, { useMemo } from 'react';
 import type { TimeFormat } from '../../api/models';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import { formatTimeToDisplay } from '../../utils/dateUtils';
+import { useAppSelector } from '../../store/hooks';
+import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { resolveTerminology } from '../../utils/prayerTerminology';
 
 interface JumuahBarProps {
   /** When true (landscape), use tighter spacing */
@@ -27,6 +30,7 @@ const JumuahBar: React.FC<JumuahBarProps> = ({
 }) => {
   const { upcomingJumuahJamaatRaw, upcomingJumuahKhutbahRaw } =
     usePrayerTimesContext();
+  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   const jamaatDisplay = useMemo(
     () =>
@@ -48,9 +52,13 @@ const JumuahBar: React.FC<JumuahBarProps> = ({
 
   if (!hasJamaat && !hasKhutbah) return null;
 
+  const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
+  const khutbahLabel = resolveTerminology(terminology, 'khutbah', 'Khutbah');
+  const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
+
   const parts: string[] = [];
-  if (hasKhutbah) parts.push(`Khutbah ${khutbahDisplay}`);
-  if (hasJamaat) parts.push(`Jamaat ${jamaatDisplay}`);
+  if (hasKhutbah) parts.push(`${khutbahLabel} ${khutbahDisplay}`);
+  if (hasJamaat) parts.push(`${jamaatLabel} ${jamaatDisplay}`);
   const content = parts.join(' · ');
 
   return (
@@ -62,7 +70,7 @@ const JumuahBar: React.FC<JumuahBarProps> = ({
       `}
     >
       <span className="text-gold font-semibold uppercase tracking-wider text-subheading">
-        Jumuah
+        {jummahLabel}
       </span>
       <span className={`text-text-primary text-subheading ${compact ? 'ml-2' : 'ml-3'}`}>
         {content}

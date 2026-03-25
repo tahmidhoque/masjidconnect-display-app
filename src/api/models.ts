@@ -346,7 +346,34 @@ export interface DisplaySettings {
    * Per-salah overrides for "Jamaat in progress" duration (minutes, 5–30). Omitted keys use defaultJamaatInProgressMinutes.
    */
   minutesAfterJamaatUntilNextPrayerBySalah?: Partial<Record<SalahKey, number>>;
+
+  /**
+   * Mosque-specific terminology overrides (admin-controlled).
+   * When missing, the display app falls back to its existing FE strings.
+   *
+   * This map is merged server-side so every key may be present with a string value.
+   */
+  terminology?: Partial<Record<TerminologyKey, string>> | null;
 }
+
+/**
+ * Stable terminology keys (identifiers) that the display app uses to render labels.
+ * Values are user-facing copy returned from `data.displaySettings.terminology`.
+ */
+export type TerminologyKey =
+  | "fajr"
+  | "zuhr"
+  | "asr"
+  | "maghrib"
+  | "isha"
+  | "sunrise"
+  | "jummah"
+  | "adhan"
+  | "iqamah"
+  | "khutbah"
+  | "jamaat"
+  | "suhoor"
+  | "iftar";
 
 // Content Types
 export type ContentItemType =

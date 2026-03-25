@@ -14,7 +14,7 @@ const mockStart = vi.fn();
 const mockStop = vi.fn();
 const mockSetHttpHeartbeatEnabled = vi.fn();
 const mockHasCredentials = vi.fn();
-const mockGetMasjidId = vi.fn(() => null);
+const mockGetMasjidId = vi.fn((): string | null => null);
 const mockSetOnScheduledRestart = vi.fn();
 const mockSetOnUpdateStatus = vi.fn();
 const mockClearScheduledRestart = vi.fn();

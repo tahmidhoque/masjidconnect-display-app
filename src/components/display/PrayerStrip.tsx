@@ -18,6 +18,9 @@ import {
   getTimeDisplayParts,
 } from '../../utils/dateUtils';
 import type { TimeFormat } from '../../api/models';
+import { useAppSelector } from '../../store/hooks';
+import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
 
 /** Display names for prayer strip (broadcast-style labels) */
 const DISPLAY_NAMES: Record<string, string> = {
@@ -74,7 +77,8 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
   countdownSlot = null,
 }) => {
   const currentTime = useCurrentTime();
-  const { todaysPrayerTimes } = usePrayerTimesContext();
+  const { todaysPrayerTimes, isJumuahToday } = usePrayerTimesContext();
+  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   const timeStr24h = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
   const { main: timeMain, period: timePeriod } = getTimeDisplayParts(
@@ -133,12 +137,21 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
           {todaysPrayerTimes.map((prayer) => {
             const isNext = prayer.isNext;
             const isSunrise = prayer.name === 'Sunrise';
-            const displayName =
-              DISPLAY_NAMES[prayer.name] ?? prayer.name;
+            const displayName = (() => {
+              const fallback = DISPLAY_NAMES[prayer.name] ?? prayer.name;
+              if (isJumuahToday && prayer.name === 'Zuhr') {
+                return resolveTerminology(terminology, 'jummah', fallback);
+              }
+              const key = prayerRowNameToTerminologyKey(prayer.name);
+              return key ? resolveTerminology(terminology, key, fallback) : fallback;
+            })();
 
             const showImsakInCard =
               showImsak && !!imsakTime && prayer.name === 'Fajr';
-            const ramadanLabel = isRamadan && prayer.name === 'Maghrib' ? 'Iftar' : undefined;
+            const ramadanLabel =
+              isRamadan && prayer.name === 'Maghrib'
+                ? resolveTerminology(terminology, 'iftar', 'Iftar')
+                : undefined;
 
             return (
               <div

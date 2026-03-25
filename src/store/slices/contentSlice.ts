@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings, SalahKey } from "../../api/models";
+import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings, SalahKey, TerminologyKey } from "../../api/models";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
@@ -32,6 +32,39 @@ function normalisePrayerTimesForStore(
 }
 
 const SALAH_KEYS: SalahKey[] = ["fajr", "zuhr", "asr", "maghrib", "isha"];
+
+const TERMINOLOGY_KEYS: TerminologyKey[] = [
+  "fajr",
+  "zuhr",
+  "asr",
+  "maghrib",
+  "isha",
+  "sunrise",
+  "jummah",
+  "adhan",
+  "iqamah",
+  "khutbah",
+  "jamaat",
+  "suhoor",
+  "iftar",
+];
+
+function normaliseTerminology(raw: unknown): Partial<Record<TerminologyKey, string>> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+
+  const out: Partial<Record<TerminologyKey, string>> = {};
+  for (const key of TERMINOLOGY_KEYS) {
+    const val = rec[key];
+    if (typeof val !== "string") continue;
+    const trimmed = val.trim();
+    // Admin updates are validated 1–30 chars per field, so we mirror that defensively.
+    if (trimmed.length < 1 || trimmed.length > 30) continue;
+    out[key] = trimmed;
+  }
+
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 function clampJamaatSettingMinutes(value: unknown, fallback: number): number {
   const n = typeof value === "number" ? value : fallback;
@@ -339,6 +372,9 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
     minutesAfterJamaatUntilNextPrayer: minutesAfterJamaat,
     defaultJamaatInProgressMinutes,
     minutesAfterJamaatUntilNextPrayerBySalah,
+    terminology: normaliseTerminology(
+      (raw as unknown as { terminology?: unknown; terminologyPreferences?: unknown }).terminology,
+    ),
   };
 };
 

@@ -13,6 +13,9 @@
  */
 
 import React from 'react';
+import { useAppSelector } from '../../store/hooks';
+import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { resolveTerminology } from '../../utils/prayerTerminology';
 
 import prayerRugJamaatUrl from '../../assets/prayer-rug-jamaat.png';
 
@@ -40,8 +43,10 @@ const InPrayerScreen: React.FC<InPrayerScreenProps> = ({
   statusMessage,
   landscapeSplit = false,
 }) => {
+  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
   const statusText =
-    statusMessage === 'post-jamaat' ? 'In progress' : 'Jamaat in progress';
+    statusMessage === 'post-jamaat' ? 'In progress' : `${jamaatLabel} in progress`;
 
   if (landscapeSplit) {
     return (

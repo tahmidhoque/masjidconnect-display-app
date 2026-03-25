@@ -14,6 +14,9 @@
  */
 
 import React from 'react';
+import { useAppSelector } from '../../store/hooks';
+import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { resolveTerminology } from '../../utils/prayerTerminology';
 
 export interface SilentPhonesGraphicProps {
   /** Landscape: two-column row — large graphic left, message and badge right. */
@@ -92,6 +95,9 @@ const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
 const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
   landscapeSplit = false,
 }) => {
+  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
+
   if (landscapeSplit) {
     return (
       <div className="silent-phones-graphic--split panel grid grid-cols-[1.12fr_1fr] h-full min-h-0 max-h-full overflow-hidden gap-x-5 items-center">
@@ -107,11 +113,11 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
               <span className="block leading-snug">silent</span>
             </h2>
             <p className="leading-snug silent-phones-graphic-split-sub">
-              or turn it off before Jamaat begins
+              or turn it off before {jamaatLabel} begins
             </p>
           </div>
           <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
-            Jamaat is about to begin
+            {jamaatLabel} is about to begin
           </span>
         </div>
       </div>
@@ -129,11 +135,11 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
           <span className="block leading-snug">silent</span>
         </h2>
         <p className="text-body text-text-secondary leading-relaxed">
-          or turn it off before Jamaat begins
+          or turn it off before {jamaatLabel} begins
         </p>
       </div>
       <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
-        Jamaat is about to begin
+        {jamaatLabel} is about to begin
       </span>
     </div>
   );

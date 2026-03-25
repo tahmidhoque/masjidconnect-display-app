@@ -23,11 +23,9 @@ import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
 import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
 import { getTimeDisplayParts } from '../../utils/dateUtils';
 import type { TimeFormat } from '../../api/models';
-
-/** Ramadan-specific labels mapped to prayer names */
-const RAMADAN_LABELS: Record<string, string> = {
-  Maghrib: 'Iftar',
-};
+import { useAppSelector } from '../../store/hooks';
+import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
 
 interface PrayerTimesPanelProps {
   /** Whether Ramadan mode is active — shows Iftar annotation on Maghrib */
@@ -82,7 +80,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
 }) => {
-  const { todaysPrayerTimes } = usePrayerTimesContext();
+  const { todaysPrayerTimes, isJumuahToday } = usePrayerTimesContext();
+  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+
+  const adhanLabel = resolveTerminology(terminology, 'adhan', 'Start');
+  const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
+  const suhoorLabel = resolveTerminology(terminology, 'suhoor', 'Suhoor');
+  const iftarLabel = resolveTerminology(terminology, 'iftar', 'Iftar');
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
@@ -117,17 +121,17 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             compact
           />
         </div>
-        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>Start</span>
-        <span className={`text-subheading text-gold/80 font-medium ${TIME_COL_CLASS}`}>Jamaat</span>
+        <span className={`text-subheading text-text-secondary font-medium ${TIME_COL_CLASS}`}>{adhanLabel}</span>
+        <span className={`text-subheading text-gold/80 font-medium ${TIME_COL_CLASS}`}>{jamaatLabel}</span>
         {showTomorrowCol && (
-          <span className={`text-subheading text-gold/75 font-medium ${TIME_COL_CLASS}`}>Tomorrow&apos;s Jamaat</span>
+          <span className={`text-subheading text-gold/75 font-medium ${TIME_COL_CLASS}`}>{`Tomorrow's ${jamaatLabel}`}</span>
         )}
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col gap-0.5 justify-start">
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
-          const ramadanLabel = isRamadan ? RAMADAN_LABELS[prayer.name] : undefined;
+          const ramadanLabel = isRamadan && prayer.name === 'Maghrib' ? iftarLabel : undefined;
 
           return (
             <React.Fragment key={prayer.name}>
@@ -136,7 +140,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 <div className={`${rowGridClass} px-3 py-1.5 rounded-lg`}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-prayer font-medium text-gold/70 italic">Imsak</span>
-                    <span className="text-caption text-gold/70 font-normal italic">Suhoor ends</span>
+                    <span className="text-caption text-gold/70 font-normal italic">{`${suhoorLabel} ends`}</span>
                   </div>
                   {showTomorrowCol ? (
                     <>
@@ -171,7 +175,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`text-prayer font-medium ${isNext ? 'text-emerald-light' : 'text-text-primary'}`}>
-                    {prayer.name}
+                    {isJumuahToday && prayer.name === 'Zuhr'
+                      ? resolveTerminology(terminology, 'jummah', prayer.name)
+                      : (() => {
+                          const key = prayerRowNameToTerminologyKey(prayer.name);
+                          return key ? resolveTerminology(terminology, key, prayer.name) : prayer.name;
+                        })()}
                   </span>
                   {ramadanLabel && (
                     <span className="text-caption text-gold/75 font-normal italic">{ramadanLabel}</span>
