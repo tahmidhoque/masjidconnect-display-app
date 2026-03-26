@@ -25,9 +25,12 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearCurrentAlert } from '@/store/slices/emergencySlice';
+import { selectTimeFormat } from '@/store/slices/contentSlice';
 import type { RootState } from '@/store';
-import type { AlertCategory, AlertUrgency, EmergencyAlert } from '@/api/models';
+import type { AlertCategory, AlertUrgency, EmergencyAlert, TimeFormat } from '@/api/models';
 import { ORIENTATION_FORCE_EVENT } from '@/hooks/useDevKeyboard';
+import { useCurrentTime } from '@/hooks/useCurrentTime';
+import { getTimeDisplayParts } from '@/utils/dateUtils';
 import type { RotationDegrees } from '@/types/realtime';
 import logger from '@/utils/logger';
 
@@ -179,6 +182,7 @@ interface AlertContentProps {
   remainingMs: number;
   /** When 90 or 270, layout is portrait — message uses more lines and slightly smaller text. */
   rotationDegrees: RotationDegrees;
+  timeFormat: TimeFormat;
 }
 
 const AlertContent: React.FC<AlertContentProps> = ({
@@ -186,6 +190,7 @@ const AlertContent: React.FC<AlertContentProps> = ({
   isExiting,
   remainingMs,
   rotationDegrees,
+  timeFormat,
 }) => {
   const bgColor     = getAlertBackgroundColor(alert);
   const textColor   = getTextColor(bgColor);
@@ -195,6 +200,11 @@ const AlertContent: React.FC<AlertContentProps> = ({
 
   const isPortrait = rotationDegrees === 90 || rotationDegrees === 270;
   const messageLineClamp = isPortrait ? 12 : 5;
+
+  /* Live clock */
+  const currentTime = useCurrentTime();
+  const timeStr24h = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
+  const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
 
   const overlayClasses = [
     'emergency-overlay',
@@ -214,7 +224,7 @@ const AlertContent: React.FC<AlertContentProps> = ({
     >
       {/* ---- HEADER ---- */}
       <div
-        className="emergency-zone-tint flex items-center justify-between px-[5vw]"
+        className="emergency-zone-tint grid grid-cols-3 items-center px-[5vw]"
         style={{ height: '12%', minHeight: 0 }}
       >
         {/* Left: icon + category label */}
@@ -223,12 +233,22 @@ const AlertContent: React.FC<AlertContentProps> = ({
           <span className="emergency-category-label">{meta.label}</span>
         </div>
 
+        {/* Centre: live clock */}
+        <div className="flex items-baseline justify-center gap-[0.4vw]">
+          <span className="emergency-clock" style={{ color: textColor }}>{timeMain}</span>
+          {timePeriod != null && (
+            <span style={{ fontSize: '2.2vw', fontWeight: 500, opacity: 0.75, color: textColor }}>{timePeriod}</span>
+          )}
+        </div>
+
         {/* Right: countdown (hidden for janazah) */}
-        {meta.showCountdownInHeader && (
-          <span className="emergency-countdown">
-            {formatCountdown(remainingMs)}
-          </span>
-        )}
+        <div className="flex justify-end">
+          {meta.showCountdownInHeader && (
+            <span className="emergency-countdown">
+              {formatCountdown(remainingMs)}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ---- BODY ---- */}
@@ -305,6 +325,8 @@ const EmergencyAlertOverlay: React.FC = () => {
     window.addEventListener(ORIENTATION_FORCE_EVENT, handler);
     return () => window.removeEventListener(ORIENTATION_FORCE_EVENT, handler);
   }, []);
+
+  const timeFormat = useAppSelector(selectTimeFormat);
 
   const uiRotationDegrees = useAppSelector((s: RootState) => s.ui.rotationDegrees);
   const rotationDegrees: RotationDegrees =
@@ -404,6 +426,7 @@ const EmergencyAlertOverlay: React.FC = () => {
       isExiting={isExiting}
       remainingMs={remainingMs}
       rotationDegrees={rotationDegrees}
+      timeFormat={timeFormat}
     />
   );
 

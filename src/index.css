@@ -478,6 +478,15 @@ html, body {
   font-size: 1.75vw;
 }
 
+.emergency-clock {
+  font-size: 5vw;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
 .emergency-countdown {
   font-size: 1.6vw;
   font-weight: 600;
