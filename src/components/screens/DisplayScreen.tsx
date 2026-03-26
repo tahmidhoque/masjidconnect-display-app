@@ -424,6 +424,18 @@ const DisplayScreenInner: React.FC = () => {
       case 'jamaat-soon':
         return <SilentPhonesGraphic landscapeSplit={!isPortrait} />;
       case 'in-prayer':
+        // post-jamaat delay: jamaat has finished — return to carousel but keep prayer highlighted
+        if (inPrayerSubPhase === 'post-jamaat') {
+          return (
+            <ContentCarousel
+              key={carouselKey}
+              items={carouselItems}
+              interval={carouselInterval}
+              compact={isPortrait}
+            />
+          );
+        }
+        // jamaat subphase: show calm "Jamaat in progress" screen
         return (
           <InPrayerScreen
             prayerName={phasePrayerName}

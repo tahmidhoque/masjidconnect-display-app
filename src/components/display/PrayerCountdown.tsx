@@ -151,9 +151,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
   /* ---- In-prayer: name in left half, status in right half (same midline as countdown) ---- */
   if (phase === 'in-prayer') {
+    // post-jamaat: jamaat has finished — show "[prayerName] prayer" static (no countdown, no in-progress)
+    // jamaat: show "Jamaat in progress"
     const statusText =
       inPrayerSubPhase === 'post-jamaat'
-        ? 'In progress'
+        ? 'prayer'
         : `${jamaatLabel} in progress`;
     return (
       <div className={outerClass}>
