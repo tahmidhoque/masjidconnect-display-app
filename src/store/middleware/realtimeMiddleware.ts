@@ -222,11 +222,11 @@ export const realtimeMiddleware: Middleware = (api: any) => {
     unsubs.push(
       realtimeService.on<any>('command', async (cmd) => {
         const commandId = cmd.commandId || cmd.id || `cmd-${Date.now()}`;
-        const commandType = cmd.type;
+        const commandType = cmd.type ?? cmd.command;
         try {
           await remoteControlService.handleCommand({
             commandId,
-            type: cmd.type,
+            type: commandType,
             payload: cmd.payload,
             timestamp: cmd.timestamp || new Date().toISOString(),
           });
@@ -392,15 +392,15 @@ export const realtimeMiddleware: Middleware = (api: any) => {
     // Sync service heartbeat commands
     unsubs.push(
       syncService.on<any>('command:received', async (cmd) => {
+        const commandType = cmd.type ?? cmd.command;
         await remoteControlService.handleCommand({
           commandId: cmd.commandId || cmd.id || `cmd-${Date.now()}`,
-          type: cmd.type,
+          type: commandType,
           payload: cmd.payload,
           timestamp: cmd.timestamp || new Date().toISOString(),
         });
         // When commands arrive via HTTP heartbeat (no WebSocket), we must still trigger
         // refetch and orientation updates — only the WebSocket listener did this before.
-        const commandType = cmd.type;
         if (commandType === 'CLEAR_CACHE' || commandType === 'RELOAD_CONTENT') {
           import('../slices/contentSlice').then(({ refreshAllContent }) => {
             (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));

@@ -9,6 +9,8 @@
 import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
+import storageService from './storageService';
+import credentialService from './credentialService';
 import { isPiPlatform } from '../config/platform';
 import type { RemoteCommand as ApiRemoteCommand } from '../api/models';
 
@@ -174,9 +176,15 @@ class RemoteControlService {
   /** Handle a command from heartbeat or WebSocket */
   public async handleCommand(cmd: RemoteCommand | ApiRemoteCommand): Promise<RemoteCommandResponse> {
     const commandId = (cmd as any).commandId || `cmd-${Date.now()}`;
-    const type = cmd.type;
+    const raw = cmd as { type?: string; command?: string };
+    const type = raw.type ?? raw.command;
     const timestamp = (cmd as any).timestamp || new Date().toISOString();
     const payload = (cmd as any).payload;
+
+    if (!type) {
+      logger.warn('[RemoteControl] Command missing type/command', { commandId });
+      return { commandId, success: false, error: 'Missing command type', timestamp };
+    }
 
     // Deduplicate
     if (this.processedIds.has(commandId)) {
@@ -258,7 +266,9 @@ class RemoteControlService {
   /**
    * Clear all local app storage and reload — same behaviour as remote FACTORY_RESET.
    * Used when the screen no longer exists server-side (e.g. invalid screen token on WebSocket).
-   * Cache API failures must not block navigation; some environments reject `caches` or hang.
+   * Unregisters service workers after clearing caches so Workbox is not left controlling the
+   * origin with an empty precache (which can yield a blank white page on the next load).
+   * Cache API / SW failures must not block navigation.
    */
   public async performFactoryReset(): Promise<void> {
     logger.warn('[RemoteControl] Factory reset — clearing storage and reloading');
@@ -270,9 +280,24 @@ class RemoteControlService {
       });
     }
     try {
+      credentialService.clearCredentials();
+    } catch (e) {
+      logger.warn('[RemoteControl] credential clear failed (continuing)', { error: String(e) });
+    }
+    try {
+      await storageService.clear();
+    } catch (e) {
+      logger.warn('[RemoteControl] IndexedDB storage clear failed (continuing)', { error: String(e) });
+    }
+    try {
       localStorage.clear();
     } catch (e) {
       logger.warn('[RemoteControl] localStorage.clear failed (continuing)', { error: String(e) });
+    }
+    try {
+      sessionStorage.clear();
+    } catch (e) {
+      logger.warn('[RemoteControl] sessionStorage.clear failed (continuing)', { error: String(e) });
     }
     try {
       if (typeof caches !== 'undefined' && typeof caches.keys === 'function') {
@@ -284,18 +309,26 @@ class RemoteControlService {
         error: String(e),
       });
     }
-
-    const hardReload = (): void => {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('_fr', String(Date.now()));
-        window.location.replace(url.toString());
-      } catch (e) {
-        logger.warn('[RemoteControl] location.replace failed, using reload', { error: String(e) });
-        window.location.reload();
+    try {
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+        logger.info('[RemoteControl] Service workers unregistered for factory reset');
       }
-    };
-    queueMicrotask(hardReload);
+    } catch (e) {
+      logger.warn('[RemoteControl] Service worker unregister failed (continuing)', {
+        error: String(e),
+      });
+    }
+
+    /** Same path as current app, no query string — avoids ?_fr= and works with non-root deploys. */
+    const nextUrl = `${window.location.origin}${window.location.pathname}`;
+    try {
+      window.location.replace(nextUrl);
+    } catch (e) {
+      logger.warn('[RemoteControl] location.replace failed, using reload', { error: String(e) });
+      window.location.reload();
+    }
   }
 
   private async executeCommand(type: string, payload?: unknown): Promise<void> {

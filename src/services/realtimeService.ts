@@ -341,8 +341,20 @@ class RealtimeService {
     this.socket.on('screen:orientation', (data: unknown) => this.emit('orientation:change', data));
 
     // Commands: server sends screen:command (generic) and screen:command:${type}
-    const forwardCommand = (data: unknown, type?: string) => {
-      const payload = data && typeof data === 'object' ? { ...(data as object), type } : { type };
+    // Some backends use `command` instead of `type` on the generic event — normalise so middleware always sees `type`.
+    const forwardCommand = (data: unknown, typeFromEvent?: string) => {
+      const base =
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? { ...(data as Record<string, unknown>) }
+          : {};
+      const fromPayload =
+        typeof base.type === 'string'
+          ? base.type
+          : typeof base.command === 'string'
+            ? base.command
+            : undefined;
+      const type = typeFromEvent ?? fromPayload;
+      const payload = { ...base, type };
       this.notifyCommandReceived();
       this.emit('command', payload);
     };
