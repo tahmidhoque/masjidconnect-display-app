@@ -11,7 +11,7 @@
 
 import React, { useMemo } from 'react';
 import type { TimeFormat } from '@/api/models';
-import { useCurrentTime } from '../../hooks/useCurrentTime';
+import useMasjidTime from '../../hooks/useMasjidTime';
 import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 
 interface HeaderProps {
@@ -45,22 +45,32 @@ const Header: React.FC<HeaderProps> = ({
   timeFormat = '12h',
   hijriDateAdjustment = 0,
 }) => {
-  const currentTime = useCurrentTime();
+  // Use masjid-timezone time so the clock is correct when the Pi runs in UTC.
+  const now = useMasjidTime();
 
-  const hours = currentTime.getHours();
-  const minutes = currentTime.getMinutes();
-  const seconds = currentTime.getSeconds();
+  const hours = now.hour();
+  const minutes = now.minute();
+  const seconds = now.second();
 
   const timeStr24h = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
   const secStr = String(seconds).padStart(2, '0');
-  const dateLine1 = DAYS[currentTime.getDay()];
-  const dateLine2 = `${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
+  const dateLine1 = DAYS[now.day()];
+  const dateLine2 = `${now.date()} ${MONTHS[now.month()]} ${now.year()}`;
 
-  const calendarDate = currentTime.getDate();
+  const calendarDate = now.date();
+  const calendarMonth = now.month();
+  const calendarYear = now.year();
+  // Build a Date whose local-time getters (getFullYear/getMonth/getDate) reflect
+  // the masjid's calendar date, so calculateApproximateHijriDate returns the right
+  // Hijri date even when the Pi runs in UTC.
+  const masjidCalendarDate = useMemo(
+    () => new Date(calendarYear, calendarMonth, calendarDate),
+    [calendarYear, calendarMonth, calendarDate],
+  );
   const hijriDate = useMemo(
-    () => calculateApproximateHijriDate(undefined, hijriDateAdjustment),
-    [calendarDate, hijriDateAdjustment],
+    () => calculateApproximateHijriDate(masjidCalendarDate, hijriDateAdjustment),
+    [masjidCalendarDate, hijriDateAdjustment],
   );
 
   const rightDateContent = useMemo(() => {

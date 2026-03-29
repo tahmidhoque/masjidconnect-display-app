@@ -27,7 +27,14 @@ export SRCROOT="${SOURCE_DIR}"
 # Disable SBOM generation to avoid syft/curl SSL errors in Docker build env (IGconf_sbom_enable=n).
 ./rpi-image-gen build -S "$SOURCE_DIR" -c "$CONFIG_PATH" -- IGconf_sbom_enable=n
 
-IMG=$(find work -name "*.img" -type f | head -1)
+# Prefer the named disk image (from image.name in YAML); fall back to the largest .img if not found.
+# rpi-image-gen also writes small intermediate .img files (kernel_2712.img, boot partition, etc.)
+# so a bare wildcard search would grab the wrong file.
+IMG=$(find work -name "masjidconnect-display.img" -type f | head -1)
+if [ -z "$IMG" ]; then
+  echo "masjidconnect-display.img not found; falling back to largest .img under work/"
+  IMG=$(find work -name "*.img" -type f -printf '%s %p\n' | sort -rn | awk 'NR==1{print $2}')
+fi
 if [ -z "$IMG" ]; then
   echo "No .img file found under work/"
   find work -type f 2>/dev/null || true

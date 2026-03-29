@@ -636,14 +636,16 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Helper function to determine current prayer - memoized
   const calculateCurrentPrayer = useCallback(
     (prayersList: { name: string; time: string }[]) => {
+      const tz = masjidTimezone || defaultMasjidTimezone;
       const now = new Date();
       let currentPrayer = null;
 
-      // Convert time strings to Date objects for today
+      // Convert time strings to Date objects in the masjid timezone so "now"
+      // and prayer instants are compared in the same zone.
       const prayerTimes = prayersList.map((p) => ({
         name: p.name,
         time: p.time,
-        date: parseTimeString(p.time),
+        date: parseTimeString(p.time, now, tz),
       }));
 
       // Sort by time
@@ -664,7 +666,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
       return currentPrayer;
     },
-    [],
+    [masjidTimezone],
   );
 
   // Helper function to determine current and next prayer accurately - memoized
@@ -676,8 +678,10 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       let currentIndex = -1;
       let nextIndex = -1;
 
-      // Get current time for comparison
-      const now = dayjs();
+      // Get current time in the masjid timezone so HH:mm comparison is against
+      // wall-clock prayer strings, not device-local time (Pi runs in UTC).
+      const tz = masjidTimezone || defaultMasjidTimezone;
+      const now = dayjs().tz(tz);
       const currentTimeStr = now.format("HH:mm");
 
       logger.debug(
@@ -936,7 +940,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
       return { currentIndex, nextIndex };
     },
-    [],
+    [masjidTimezone],
   );
 
   // Update formatted prayer times for display
@@ -1033,7 +1037,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     if (Object.values(prayerRecord).some((time) => time)) {
       // Only calculate if we have at least one valid time
       try {
-        const { name } = getNextPrayerTime(new Date(), prayerRecord);
+        const { name } = getNextPrayerTime(new Date(), prayerRecord, masjidTimezone || defaultMasjidTimezone);
         nextPrayerName = name;
 
         // Store in ref for later comparisons
@@ -1225,6 +1229,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         getCurrentForbiddenWindow(
           tomorrowData as unknown as PrayerTimes,
           new Date(),
+          masjidTimezone || defaultMasjidTimezone,
         ) ?? null,
       );
       applyStripJummahState();
@@ -1250,8 +1255,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       // Get the next prayer object
       const nextPrayer = prayers[nextIndex];
 
-      // Current time for comparison
-      const now = dayjs();
+      // Current time in masjid timezone for comparison
+      const tz = masjidTimezone || defaultMasjidTimezone;
+      const now = dayjs().tz(tz);
       const currentTimeStr = now.format("HH:mm");
 
       // If next prayer has jamaat time and it's after the adhan time and current time is between adhan and jamaat
@@ -1262,7 +1268,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         nextPrayer.jamaat > currentTimeStr
       ) {
         // Countdown to jamaat time
-        nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.jamaat);
+        nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.jamaat, false, {}, tz);
         logger.info(
           `Showing countdown to ${nextPrayer.name} jamaat time (${nextPrayer.jamaat})`,
         );
@@ -1274,7 +1280,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         const [prayerHours, prayerMinutes] = nextPrayer.time
           .split(":")
           .map(Number);
-        const prayerTime = dayjs()
+        const prayerTime = dayjs().tz(tz)
           .hour(prayerHours)
           .minute(prayerMinutes)
           .second(0)
@@ -1290,18 +1296,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           logger.info(
             `Prayer time ${nextPrayer.time} is in the past, adjusting to tomorrow`,
           );
-          nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time, true); // Pass flag to force tomorrow
+          nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time, true, {}, tz);
         } else {
           // Special handling for after midnight scenario with Isha prayer
           if (now.hour() < 6 && nextPrayer.name === "Fajr") {
-            // Use the utility function directly
-            nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
+            nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time, false, {}, tz);
             logger.info(
               `Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time}) - early morning hours`,
             );
           } else {
             // Regular countdown to adhan time
-            nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time);
+            nextPrayer.timeUntil = getTimeUntilNextPrayer(nextPrayer.time, false, {}, tz);
             logger.info(
               `Showing countdown to ${nextPrayer.name} adhan time (${nextPrayer.time})`,
             );
@@ -1321,7 +1326,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
 
     // Compute forbidden (makruh) window for voluntary prayer
     setForbiddenPrayer(
-      getCurrentForbiddenWindow(todayData as PrayerTimes, new Date()) ?? null,
+      getCurrentForbiddenWindow(todayData as PrayerTimes, new Date(), masjidTimezone || defaultMasjidTimezone) ?? null,
     );
 
     // Set Jumuah time if it's Friday — use nowDayjs.day() directly to avoid stale closure
@@ -1356,8 +1361,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   // Initial loading of data
   useEffect(() => {
     try {
-      // Set current date
-      const date = dayjs();
+      // Set current date in the masjid timezone so the displayed date and
+      // Friday detection are correct when the Pi runs in UTC.
+      const date = dayjs().tz(masjidTimezone || defaultMasjidTimezone);
       setCurrentDate(date.format("dddd, MMMM D, YYYY"));
 
       // Check if today is Friday (5 for dayjs)

@@ -92,14 +92,27 @@ export const formatTimeToDisplay = (
 export const parseTimeString = (
   timeString: string,
   referenceDate: Date = new Date(),
+  timezone?: string,
 ): Date => {
   if (!timeString) return new Date();
 
   try {
-    // Use dayjs
     const [hours, minutes] = timeString.split(":").map(Number);
 
     if (isNaN(hours) || isNaN(minutes)) return new Date();
+
+    // When a timezone is provided, build the time in that zone so the returned
+    // Date instant correctly represents "HH:mm in <timezone>" rather than
+    // "HH:mm in the device's local timezone".
+    if (timezone) {
+      const base = dayjs(referenceDate).tz(timezone);
+      return base
+        .hour(hours)
+        .minute(minutes)
+        .second(0)
+        .millisecond(0)
+        .toDate();
+    }
 
     const timeDayjs = dayjs(referenceDate)
       .hour(hours)
@@ -109,7 +122,10 @@ export const parseTimeString = (
 
     return timeDayjs.toDate();
   } catch (error) {
-    console.error("Error parsing time string:", error);
+    logger.error("[dateUtils] Error parsing time string", {
+      error: error instanceof Error ? error.message : String(error),
+      timeString,
+    });
     return new Date();
   }
 };
@@ -224,6 +240,7 @@ export const convertTo24Hour = (timeString: string): string => {
 export const getNextPrayerTime = (
   currentTime: Date,
   prayerTimes: Record<string, string>,
+  timezone?: string,
 ): { name: string; time: string } => {
   // Define prayers to skip in countdown
   const SKIP_PRAYERS = ["Sunrise"];
@@ -246,7 +263,11 @@ export const getNextPrayerTime = (
   // Sort prayers by time
   prayers.sort((a, b) => a.time.localeCompare(b.time));
 
-  const currentDayjs = dayjs(currentTime);
+  // Express "now" in the masjid timezone so the HH:mm comparison is against
+  // wall-clock prayer strings rather than device-local time.
+  const currentDayjs = timezone
+    ? dayjs(currentTime).tz(timezone)
+    : dayjs(currentTime);
   const currentTimeString = currentDayjs.format("HH:mm");
 
   // Find the next prayer whose adhan hasn't passed yet
@@ -276,11 +297,16 @@ export interface GetTimeUntilNextPrayerOptions {
  * Calculate time until next prayer using dayjs.
  * Default (no options): always shows 2 units — hours+minutes when ≥1h, minutes+seconds when <1h.
  * Numbers are unpadded (e.g. 1h 0m, 5h 19m 20s) for clarity.
+ *
+ * @param timezone - Optional IANA timezone (e.g. "Europe/London"). When provided, "now" and
+ *   the constructed prayer datetime are both expressed in that zone so comparisons are correct
+ *   when the device runs in a different timezone (e.g. UTC on a Raspberry Pi).
  */
 export const getTimeUntilNextPrayer = (
   nextPrayerTime: string,
   forceTomorrow: boolean = false,
   options: GetTimeUntilNextPrayerOptions = {},
+  timezone?: string,
 ): string => {
   if (!nextPrayerTime) return "";
 
@@ -289,7 +315,9 @@ export const getTimeUntilNextPrayer = (
     includeSeconds || includeSecondsWhenUnderMinutes != null;
 
   try {
-    const now = dayjs();
+    // Use masjid timezone when provided so the diff is against wall-clock
+    // prayer strings, not device-local time.
+    const now = timezone ? dayjs().tz(timezone) : dayjs();
 
     const [prayerHours, prayerMinutes] = nextPrayerTime.split(":").map(Number);
 
@@ -305,7 +333,9 @@ export const getTimeUntilNextPrayer = (
       return "";
     }
 
-    let prayerDayjs = dayjs()
+    // Build the prayer datetime in the same zone as "now" so .isBefore / .diff
+    // comparisons are zone-consistent.
+    let prayerDayjs = (timezone ? dayjs().tz(timezone) : dayjs())
       .hour(prayerHours)
       .minute(prayerMinutes)
       .second(0)

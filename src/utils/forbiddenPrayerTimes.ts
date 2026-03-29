@@ -7,8 +7,13 @@
  */
 
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import type { PrayerTimes } from "@/api/models";
 import { parseTimeString } from "./dateUtils";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 /** Minutes after sunrise when the first forbidden window ends (IslamQA: 12–15 min; we use 15). */
 const SUNRISE_BUFFER_MINUTES = 15;
@@ -91,15 +96,20 @@ export function getForbiddenPrayerWindows(
 /**
  * Checks if the current time falls within any forbidden window.
  * Returns state with reason and endsAt when in a forbidden period, or null otherwise.
+ *
+ * @param timezone - Optional IANA timezone (e.g. "Europe/London"). When provided, the
+ *   HH:mm of `now` is expressed in that zone so comparisons against prayer strings are
+ *   correct when the device runs in a different timezone (e.g. UTC on a Raspberry Pi).
  */
 export function getCurrentForbiddenWindow(
   today: PrayerTimes | null | undefined,
   now: Date,
+  timezone?: string,
 ): CurrentForbiddenState | null {
   const windows = getForbiddenPrayerWindows(today);
   if (windows.length === 0) return null;
 
-  const nowDayjs = dayjs(now);
+  const nowDayjs = timezone ? dayjs(now).tz(timezone) : dayjs(now);
   const nowHHmm = nowDayjs.format("HH:mm");
 
   for (const w of windows) {

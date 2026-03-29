@@ -16,13 +16,14 @@
 
 import React, { useMemo } from 'react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
-import { useCurrentTime } from '../../hooks/useCurrentTime';
+import useMasjidTime from '../../hooks/useMasjidTime';
 import { getTimeUntilNextPrayer, toMinutesFromMidnight } from '../../utils/dateUtils';
 import type { PrayerPhase } from '../../hooks/usePrayerPhase';
 import CountdownDisplay from './CountdownDisplay';
 import { useAppSelector } from '../../store/hooks';
-import { selectDisplaySettings } from '../../store/slices/contentSlice';
+import { selectDisplaySettings, selectMasjidTimezone } from '../../store/slices/contentSlice';
 import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
+import { defaultMasjidTimezone } from '../../config/environment';
 
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
@@ -49,7 +50,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   variant = 'default',
 }) => {
   const { nextPrayer, isJumuahToday } = usePrayerTimesContext();
-  const currentTime = useCurrentTime();
+  // Use masjid-local time so comparisons against prayer strings are correct
+  // when the Pi's system timezone is UTC.
+  const now = useMasjidTime();
+  const masjidTz = useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   /**
@@ -60,7 +64,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const targetTime = useMemo(() => {
     if (!nextPrayer) return null;
 
-    const nowMin = currentTime.getHours() * 60 + currentTime.getMinutes() + currentTime.getSeconds() / 60;
+    const nowMin = now.hour() * 60 + now.minute() + now.second() / 60;
     const adhanMin = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
     const jamaatMin = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
 
@@ -90,15 +94,18 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
     // Adhan is still in the future today
     return { time: nextPrayer.time, forceTomorrow: false };
-  }, [nextPrayer, currentTime]);
+  }, [nextPrayer, now]);
 
   /**
-   * Live countdown string, recomputed every second via currentTime.
+   * Live countdown string, recomputed every second via now (masjid tz).
+   * `now` is intentionally listed as a dependency even though it is not referenced
+   * in the function body — it acts as a 1-second tick trigger so the string refreshes.
    */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const liveCountdown = useMemo(() => {
     if (!targetTime) return nextPrayer ? '0s' : '';
-    return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow);
-  }, [targetTime, currentTime, nextPrayer]);
+    return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow, {}, masjidTz);
+  }, [targetTime, now, nextPrayer, masjidTz]);
 
   const countingToJamaat = isCountingToJamaat(targetTime, nextPrayer?.jamaat);
   const displayName = useMemo(() => {
