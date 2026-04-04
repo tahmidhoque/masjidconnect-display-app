@@ -1,0 +1,40 @@
+# =============================================================================
+# MasjidConnect WiFi Boot-Partition Config — systemd service
+#
+# Reads WiFi credentials from the FAT32 /boot/firmware partition early in
+# boot (before networking starts) so users can change WiFi without SSH or
+# the setup hotspot — just drop a file on the SD card from any computer.
+#
+# Place one of these on the boot partition (accessible from Windows/macOS):
+#
+#   /boot/firmware/masjidconnect-wifi.conf   ← recommended (simple format)
+#   /boot/firmware/wpa_supplicant.conf       ← advanced (wpa_supplicant format)
+#
+# Simple format:
+#   SSID=YourNetworkName
+#   PASSWORD=YourPassword
+#   COUNTRY=GB
+#
+# The file is deleted after being read so credentials are not left on the
+# boot partition and do not re-apply on every reboot.
+# =============================================================================
+
+[Unit]
+Description=MasjidConnect WiFi Boot Config Apply
+# Run before networking so credentials are in place before wpa_supplicant starts
+Before=network-pre.target wpa_supplicant@wlan0.service systemd-networkd.service
+After=local-fs.target
+# Only activate when at least one config file is present on the boot partition
+ConditionPathExists=|/boot/firmware/masjidconnect-wifi.conf
+ConditionPathExists=|/boot/firmware/wpa_supplicant.conf
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/bin/bash /opt/masjidconnect/deploy/wifi-apply-bootconf.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=sysinit.target

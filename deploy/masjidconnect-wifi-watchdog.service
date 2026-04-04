@@ -1,0 +1,27 @@
+# =============================================================================
+# MasjidConnect WiFi Watchdog — systemd service
+#
+# Monitors WiFi connectivity and attempts automatic recovery when the
+# connection drops. Essential for 24/7 kiosk displays on Raspberry Pi.
+#
+# Install:
+#   sudo cp deploy/masjidconnect-wifi-watchdog.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable masjidconnect-wifi-watchdog
+#   sudo systemctl start masjidconnect-wifi-watchdog
+# =============================================================================
+
+[Unit]
+Description=MasjidConnect WiFi Watchdog
+After=network.target wpa_supplicant@wlan0.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /opt/masjidconnect/deploy/wifi-watchdog.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

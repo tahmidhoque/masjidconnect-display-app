@@ -93,6 +93,8 @@ chmod +x "${APP_DIR}/deploy/kiosk.sh"
 chmod +x "${APP_DIR}/deploy/server.mjs"
 chmod +x "${APP_DIR}/deploy/show-wifi-setup.sh"
 chmod +x "${APP_DIR}/deploy/update-from-github.sh" "${APP_DIR}/deploy/install-release.sh" 2>/dev/null || true
+chmod +x "${APP_DIR}/deploy/wifi-watchdog.sh" 2>/dev/null || true
+chmod +x "${APP_DIR}/deploy/wifi-apply-bootconf.sh" 2>/dev/null || true
 
 # Allow SERVICE_USER to run self-update script without password (FORCE_UPDATE from admin portal)
 echo "${SERVICE_USER} ALL=(ALL) NOPASSWD: ${APP_DIR}/deploy/update-from-github.sh" > /etc/sudoers.d/99-masjidconnect-update
@@ -110,12 +112,42 @@ sed -e "s/^User=.*/User=${SERVICE_USER}/" \
     -e "s/^Group=.*/Group=${SERVICE_USER}/" \
     -e "s|/home/pi/|/home/${SERVICE_USER}/|g" \
     "${KIOSK_SVC}" > /etc/systemd/system/masjidconnect-kiosk.service
+# Install WiFi watchdog service if present
+WATCHDOG_SVC="${SOURCE_DIR}/deploy/masjidconnect-wifi-watchdog.service"
+if [ -f "${WATCHDOG_SVC}" ]; then
+  cp "${WATCHDOG_SVC}" /etc/systemd/system/masjidconnect-wifi-watchdog.service
+fi
+BOOTCONF_SVC="${SOURCE_DIR}/deploy/masjidconnect-wifi-bootconf.service"
+if [ -f "${BOOTCONF_SVC}" ]; then
+  cp "${BOOTCONF_SVC}" /etc/systemd/system/masjidconnect-wifi-bootconf.service
+fi
+# Install RPi 5 RTC sync service if present (no-op on Pi 3/4 via ConditionPathExists=/dev/rtc0)
+RTC_SVC="${SOURCE_DIR}/deploy/masjidconnect-rtc-sync.service"
+if [ -f "${RTC_SVC}" ]; then
+  cp "${RTC_SVC}" /etc/systemd/system/masjidconnect-rtc-sync.service
+  # Create fake-hwclock drop-in so it is skipped on Pi 5 where /dev/rtc0 is present
+  mkdir -p /etc/systemd/system/fake-hwclock.service.d
+  cat > /etc/systemd/system/fake-hwclock.service.d/rtc-override.conf <<'DROPIN_EOF'
+[Unit]
+# Skip fake-hwclock when the Raspberry Pi 5 hardware RTC (/dev/rtc0) is present.
+ConditionPathNotExists=/dev/rtc0
+DROPIN_EOF
+fi
 systemctl daemon-reload
 
 # Enable services to start on boot
 echo "Enabling services to start on boot..."
 systemctl enable masjidconnect-display.service
 systemctl enable masjidconnect-kiosk.service
+if [ -f /etc/systemd/system/masjidconnect-wifi-watchdog.service ]; then
+  systemctl enable masjidconnect-wifi-watchdog.service
+fi
+if [ -f /etc/systemd/system/masjidconnect-wifi-bootconf.service ]; then
+  systemctl enable masjidconnect-wifi-bootconf.service
+fi
+if [ -f /etc/systemd/system/masjidconnect-rtc-sync.service ]; then
+  systemctl enable masjidconnect-rtc-sync.service
+fi
 
 # Start services now
 echo "Starting services..."

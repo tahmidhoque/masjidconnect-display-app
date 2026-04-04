@@ -112,13 +112,20 @@ HOTSPOT_SCRIPT="/opt/masjidconnect/deploy/wifi-hotspot.sh"
 WIFI_SETUP_SERVER="/opt/masjidconnect/deploy/wifi-setup-server.mjs"
 
 have_connectivity() {
-  if curl -sf --connect-timeout 4 -o /dev/null "https://portal.masjidconnect.co.uk" 2>/dev/null; then
+  if curl -sf --connect-timeout 3 --max-time 4 -o /dev/null "https://portal.masjidconnect.co.uk" 2>/dev/null; then
     return 0
   fi
-  if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+  if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
     return 0
   fi
   return 1
+}
+
+# Check whether any non-loopback network interface has a default route.
+# Returns 1 if there is clearly no network path — used to skip the boot
+# connectivity loop early rather than waiting for curl/ping to timeout.
+any_interface_routable() {
+  ip route show default 2>/dev/null | grep -q .
 }
 
 # Mark that we've had successful connectivity (persists across reboots).
@@ -140,8 +147,37 @@ log "  route: $(ip route show default 2>/dev/null | head -1 || echo none)"
 log "  rfkill: $(rfkill list 2>/dev/null | head -5 || echo 'rfkill unavailable')"
 log "  iw dev: $(iw dev 2>/dev/null | head -5 || echo 'none')"
 
-# Allow a couple of seconds for the network stack to settle after X starts
-sleep 2
+# Check if wpa_supplicant is actively trying to authenticate on a given interface.
+wpa_is_connecting() {
+  systemctl is-active "wpa_supplicant@${1:-wlan0}.service" >/dev/null 2>&1
+}
+
+# Wait for WiFi to authenticate before checking connectivity.
+# 5GHz networks take 5–15+ seconds; the original 2-second wait caused false
+# "offline" detection, which triggered the hotspot and killed wpa_supplicant.
+# Exit early if no network interface has a route (no point waiting).
+BOOT_CONNECTIVITY=false
+for boot_attempt in $(seq 1 10); do
+  if have_connectivity; then
+    BOOT_CONNECTIVITY=true
+    log "Connectivity confirmed on boot (attempt $boot_attempt/10)"
+    break
+  fi
+  # Fast exit: if there is no routable interface and wpa_supplicant is not
+  # actively connecting, there is nothing to wait for.
+  WPA_IFACE=$(iw dev 2>/dev/null | awk '/^\tInterface / {print $2; exit}')
+  if ! any_interface_routable && { [ -z "$WPA_IFACE" ] || ! wpa_is_connecting "$WPA_IFACE"; }; then
+    log "  boot wait $boot_attempt/10: no routable interface and no wpa_supplicant — skipping remaining wait"
+    break
+  fi
+  if [ -n "$WPA_IFACE" ] && wpa_is_connecting "$WPA_IFACE"; then
+    log "  boot wait $boot_attempt/10: wpa_supplicant active on $WPA_IFACE, auth in progress..."
+  else
+    log "  boot wait $boot_attempt/10: no connectivity yet"
+  fi
+  sleep 2
+done
+[ "$BOOT_CONNECTIVITY" = false ] && log "No connectivity after boot wait"
 
 # Force Wi-Fi setup for testing (skip connectivity check):
 #   ssh pi@<Pi-IP> "touch /tmp/masjidconnect-force-wifi-setup && sudo reboot"
@@ -156,7 +192,7 @@ FORCE_WIFI_SETUP=false
 INSTRUCTIONS_PID=""
 NOWIFI_PID=""
 
-if [ "$FORCE_WIFI_SETUP" = true ] || ! have_connectivity; then
+if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
   [ "$FORCE_WIFI_SETUP" = false ] && log "No internet — starting Wi-Fi setup"
   rm -f "$WIFI_FLAG"
 
@@ -187,15 +223,29 @@ if [ "$FORCE_WIFI_SETUP" = true ] || ! have_connectivity; then
 
     if [ -n "$WLAN_IFACE" ] && [ -f "$HOTSPOT_SCRIPT" ] && [ -f "$WIFI_SETUP_SERVER" ]; then
       export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
-      log "Parallel: starting background hotspot on $WLAN_IFACE"
+      log "Parallel: WiFi offline — deferring hotspot; giving wpa_supplicant 60s to reconnect"
       touch "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
       (
+        # Wait up to 60s for wpa_supplicant to finish authenticating.
+        # 5GHz auth + DHCP can take 15–30s; this avoids killing wpa_supplicant
+        # prematurely by starting the hotspot (which switches to AP mode).
+        for deferred_check in $(seq 1 30); do
+          if have_connectivity; then
+            log "Parallel: WiFi recovered after $((deferred_check * 2))s — hotspot not needed"
+            mkdir -p "$WIFI_STATE_DIR" 2>/dev/null || true
+            touch "$WIFI_CONNECTED_MARKER" 2>/dev/null || true
+            rm -f "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
+            exit 0
+          fi
+          sleep 2
+        done
+        log "Parallel: WiFi not recovered after 60s — starting hotspot on $WLAN_IFACE"
         sudo "$HOTSPOT_SCRIPT" scan "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
         sudo "$HOTSPOT_SCRIPT" start "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
         sleep 1
         sudo "$WIFI_SETUP_SERVER" --ap-mode --iface="$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1
       ) &
-      log "Parallel: hotspot and setup server running in background"
+      log "Parallel: deferred hotspot launcher running in background"
     else
       log "Parallel: no wlan interface, skipping background hotspot"
       rm -f "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true

@@ -4,3 +4,8 @@
 # SSID=YourNetworkName
 # PASSWORD=YourWiFiPassword
 # COUNTRY=GB
+#
+# Optional: set the system timezone so prayer times display correctly with DST.
+# Use IANA timezone names: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+# Examples: Europe/London, America/New_York, Asia/Karachi, Asia/Dhaka, Asia/Dubai
+# TIMEZONE=Europe/London

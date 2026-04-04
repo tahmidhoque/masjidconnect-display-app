@@ -11,6 +11,7 @@ import type { RootState, AppDispatch } from '../store';
 import { initializeFromStorage, requestPairingCode } from '../store/slices/authSlice';
 import { refreshAllContent } from '../store/slices/contentSlice';
 import { setInitializing, setInitializationStage, setLoadingMessage } from '../store/slices/uiSlice';
+import credentialService from '../services/credentialService';
 import logger from '../utils/logger';
 
 export interface LoadingTask {
@@ -109,7 +110,11 @@ export const useAppLoader = (): AppLoaderState => {
     const credentialsTask = tasks.find((t) => t.id === 'credentials');
     if (!credentialsTask || credentialsTask.status === 'loading' || credentialsTask.status === 'pending') return;
 
-    if (isAuthenticated) {
+    // Guard: if credentials exist in any storage layer, treat as authenticated
+    // even if Redux state is inconsistent (e.g. stale rehydration).
+    const hasStoredCredentials = isAuthenticated || credentialService.hasCredentials();
+
+    if (hasStoredCredentials) {
       logger.info('[AppLoader] Authenticated, loading data');
       updateTask('pairing-code', { status: 'skipped', progress: 100 });
       setPhase('loading');

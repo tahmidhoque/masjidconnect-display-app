@@ -219,7 +219,7 @@ export const checkPairingStatus = createAsyncThunk(
  */
 export const initializeFromStorage = createAsyncThunk(
   'auth/initializeFromStorage',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
       logger.info('[Auth] Initialising from storage');
 
@@ -228,7 +228,27 @@ export const initializeFromStorage = createAsyncThunk(
       credentialService.debugLogState();
 
       // Check for existing credentials
-      const credentials = credentialService.getCredentials();
+      let credentials = credentialService.getCredentials();
+
+      // Fallback: if credentialService has nothing, check the rehydrated Redux
+      // state (populated by Redux Persist). Credentials may exist there if the
+      // credential service's localStorage keys were lost but the persist store
+      // survived. Re-save them so future boots are fast.
+      if (!credentials || !credentials.apiKey || !credentials.screenId) {
+        const rehydrated = (getState() as { auth: AuthState }).auth;
+        if (rehydrated.apiKey && rehydrated.screenId) {
+          logger.warn('[Auth] credentialService empty but Redux state has credentials — recovering', {
+            screenId: rehydrated.screenId,
+          });
+          const recovered = {
+            apiKey: rehydrated.apiKey,
+            screenId: rehydrated.screenId,
+            masjidId: rehydrated.masjidId ?? undefined,
+          };
+          credentialService.saveCredentials(recovered);
+          credentials = recovered;
+        }
+      }
 
       if (credentials && credentials.apiKey && credentials.screenId) {
         logger.info('[Auth] Valid credentials found', {
@@ -450,6 +470,15 @@ const authSlice = createSlice({
           state.pairingCode = action.payload.pairingData.pairingCode;
           state.pairingCodeExpiresAt = action.payload.pairingData.expiresAt;
           state.isPairing = true;
+        } else {
+          // Neither credentials nor valid pairing data found — clear any stale
+          // pairing flags that may have survived via Redux Persist rehydration.
+          state.isPairing = false;
+          state.pairingCode = null;
+          state.pairingCodeExpiresAt = null;
+          state.pairingOrientation = null;
+          state.isPairingCodeExpired = false;
+          state.isPolling = false;
         }
 
         state.lastUpdated = new Date().toISOString();

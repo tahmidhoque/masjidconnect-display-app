@@ -12,6 +12,8 @@
 # X-Env-Var-wifi_ssid: Optional. WiFi SSID to bake into image (or use wifi.conf in source root).
 # X-Env-Var-wifi_password: Optional. WiFi passphrase (or use wifi.conf).
 # X-Env-Var-wifi_country: Optional. Two-letter country code (e.g. GB). Default GB.
+# X-Env-Var-timezone: Optional. IANA timezone (e.g. Europe/London, America/New_York). Default UTC.
+# X-Env-Var-timezone-Desc: Sets the system timezone so DST is applied correctly. Overridable at runtime via TIMEZONE= in /boot/firmware/masjidconnect-wifi.conf.
 # METAEND
 ---
 mmdebstrap:
@@ -37,6 +39,8 @@ mmdebstrap:
     - hostapd
     - dnsmasq
     - raspi-config
+    - tzdata
+    - fake-hwclock
   customize-hooks:
     # Install Node.js 20 from NodeSource (build host needs network)
     - |
@@ -119,6 +123,76 @@ mmdebstrap:
     - chroot $1 systemctl disable dnsmasq.service 2>/dev/null || true
     - chroot $1 systemctl mask hostapd.service 2>/dev/null || true
     - chroot $1 systemctl mask dnsmasq.service 2>/dev/null || true
+    # NTP time synchronisation
+    # systemd-timesyncd ships inside the systemd package (already present in bookworm-minbase)
+    # but is not always enabled in minimal images. Enable it explicitly so the Pi always syncs
+    # time from the internet immediately after connecting to WiFi.
+    - chroot $1 systemctl enable systemd-timesyncd.service 2>/dev/null || true
+    # Write a robust NTP config: use the NTP pool with multiple fallbacks.
+    # This is critical for prayer time accuracy — an incorrect clock means wrong prayer times.
+    - |
+      mkdir -p "$1/etc/systemd"
+      printf '%s\n' \
+        '[Time]' \
+        '# Primary NTP pool — resolves to multiple servers for redundancy' \
+        'NTP=0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org' \
+        '# Fallback servers if pool is unreachable' \
+        'FallbackNTP=time.cloudflare.com time.google.com ntp.ubuntu.com' \
+        '# Tolerate up to 5s of root distance (higher = more tolerant of poor-quality sources)' \
+        'RootDistanceMaxSec=5' \
+        '# How quickly to poll on a fresh boot vs steady-state (seconds)' \
+        'PollIntervalMinSec=32' \
+        'PollIntervalMaxSec=2048' \
+        > "$1/etc/systemd/timesyncd.conf"
+    # fake-hwclock: saves the current time to disk hourly and on shutdown.
+    # On next boot the Pi starts with the saved time rather than the epoch (1970),
+    # which prevents a massive clock jump when NTP syncs — important for avoiding
+    # brief periods where prayer times appear wildly wrong before internet connects.
+    # Drop-in: skip fake-hwclock on RPi 5 where a real hardware RTC (/dev/rtc0) is
+    # present — the RTC keeps time accurately so fake-hwclock is redundant and would
+    # overwrite the accurate RTC time with its (potentially stale) saved timestamp.
+    - |
+      mkdir -p "$1/etc/systemd/system/fake-hwclock.service.d"
+      printf '%s\n' \
+        '[Unit]' \
+        '# Skip fake-hwclock when the Raspberry Pi 5 hardware RTC (/dev/rtc0) is present.' \
+        '# The real RTC is more accurate; fake-hwclock is only needed on Pi 3/4 (no RTC).' \
+        'ConditionPathNotExists=/dev/rtc0' \
+        > "$1/etc/systemd/system/fake-hwclock.service.d/rtc-override.conf"
+    - chroot $1 systemctl enable fake-hwclock.service 2>/dev/null || true
+    # RPi 5 RTC sync: read the hardware RTC into the system clock at boot.
+    # ConditionPathExists=/dev/rtc0 makes this a no-op on Pi 3/4 (no RTC).
+    # After NTP syncs, the Linux kernel automatically writes the corrected time
+    # back to the RTC every 11 minutes via its built-in "11-minute mode".
+    - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-rtc-sync.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-rtc-sync.service $1/etc/systemd/system/ || true'
+    - chroot $1 systemctl enable masjidconnect-rtc-sync.service 2>/dev/null || true
+    # Timezone: set the system timezone. Correct timezone is required for DST (daylight saving)
+    # to be applied automatically — NTP always provides UTC, the OS converts using the timezone.
+    # Default: UTC. Override at build time with IGconf_masjidconnect_timezone (e.g. Europe/London).
+    # Can also be changed at runtime by placing TIMEZONE=<zone> in /boot/firmware/masjidconnect-wifi.conf.
+    - |
+      TZ="${IGconf_masjidconnect_timezone:-UTC}"
+      # Guard: reject empty or metadata placeholder values
+      case "$TZ" in "Optional."*|""|"UTC") TZ="UTC" ;; esac
+      if [ "$TZ" != "UTC" ]; then
+        if chroot "$1" timedatectl set-timezone "$TZ" 2>/dev/null; then
+          echo "Timezone set to $TZ"
+        elif [ -f "$1/usr/share/zoneinfo/$TZ" ]; then
+          ln -sf "/usr/share/zoneinfo/$TZ" "$1/etc/localtime"
+          echo "$TZ" > "$1/etc/timezone"
+          echo "Timezone set to $TZ (via symlink)"
+        else
+          echo "WARNING: Unknown timezone '$TZ' — leaving as UTC"
+        fi
+      fi
+    # WiFi boot-partition config: apply credentials dropped on FAT32 /boot/firmware before networking starts
+    - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-wifi-bootconf.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-wifi-bootconf.service $1/etc/systemd/system/ || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/wifi-apply-bootconf.sh 2>/dev/null || true'
+    - chroot $1 systemctl enable masjidconnect-wifi-bootconf.service 2>/dev/null || true
+    # WiFi watchdog: monitors connectivity and auto-recovers WiFi after disconnections
+    - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-wifi-watchdog.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-wifi-watchdog.service $1/etc/systemd/system/ || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/wifi-watchdog.sh 2>/dev/null || true'
+    - chroot $1 systemctl enable masjidconnect-wifi-watchdog.service 2>/dev/null || true
     # Custom boot splash: copy rpi-image/assets/splash.png into Plymouth pix theme and set as default
     - |
       if [ -f "${SRCROOT}/assets/splash.png" ]; then
@@ -162,6 +236,7 @@ mmdebstrap:
         mkdir -p "$1/etc/systemd/network"
         printf '[Match]\nName=wlan0\n\n[Network]\nDHCP=yes\n' > "$1/etc/systemd/network/25-wlan0.network"
         chroot "$1" systemctl enable wpa_supplicant@wlan0.service
+        chroot "$1" systemctl enable systemd-networkd.service
       fi
     # Allow first user (pi) to run WiFi setup server, hotspot script, and kill/pkill as root without password.
     - |
