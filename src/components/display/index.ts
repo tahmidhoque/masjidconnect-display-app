@@ -11,6 +11,8 @@ export { default as IslamicPattern } from './IslamicPattern';
 export { default as JumuahBar } from './JumuahBar';
 export { default as RamadanPattern } from './RamadanPattern';
 export { default as SilentPhonesGraphic } from './SilentPhonesGraphic';
+export { default as TomorrowsJamaatChangeSlide } from './TomorrowsJamaatChangeSlide';
+export { default as JamaatSoonSlot } from './JamaatSoonSlot';
 export { default as InPrayerScreen } from './InPrayerScreen';
 export { default as ForbiddenPrayerNotice } from './ForbiddenPrayerNotice';
 export { default as EventSlide } from './EventSlide';

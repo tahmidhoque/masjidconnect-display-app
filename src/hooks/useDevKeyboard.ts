@@ -21,7 +21,16 @@
  *   Ctrl + Shift + F  — Toggle forbidden-prayer notice (show fake / auto)
  *   Ctrl + Shift + P  — Cycle highlighted prayer (Fajr → … → Isha → auto)
  *   Ctrl + Shift + T  — Toggle "show tomorrow's list" (simulate after Isha for testing)
+ *   Ctrl + Alt + Shift + M
+ *                     — Cycle fake "tomorrow's jamaat changed" override
+ *                       (Zuhr → Asr → Isha → off) for testing JamaatSoonSlot.
+ *                       Uses Alt as well as Shift to avoid Chrome's
+ *                       Ctrl+Shift+M (profile picker) interception.
  *   Escape            — Clear current alert
+ *
+ * Console fallbacks (when a browser shortcut is intercepted):
+ *   window.__devCyclePhase()              — same as Ctrl+Shift+J
+ *   window.__devCycleTomorrowChange()     — same as Ctrl+Alt+Shift+M
  */
 
 import { useEffect } from 'react';
@@ -39,6 +48,10 @@ import {
   SHOW_TOMORROW_LIST_FORCE_EVENT,
 } from './usePrayerTimes';
 import { CAROUSEL_ADVANCE_EVENT } from '../components/display/ContentCarousel';
+import {
+  TOMORROW_JAMAAT_CHANGE_FORCE_EVENT,
+  type TomorrowJamaatChangeForce,
+} from '../components/display/JamaatSoonSlot';
 import logger from '../utils/logger';
 import dayjs from 'dayjs';
 
@@ -54,6 +67,10 @@ export const ORIENTATION_FORCE_EVENT = 'orientation-force-change';
 declare global {
   interface Window {
     __ORIENTATION_FORCE?: Orientation | undefined;
+    /** Console fallback — same effect as Ctrl+Shift+J */
+    __devCyclePhase?: () => void;
+    /** Console fallback — same effect as Ctrl+Alt+Shift+M */
+    __devCycleTomorrowChange?: () => void;
   }
 }
 
@@ -157,6 +174,61 @@ function toggleOrientationForce(): void {
  * Show: sets a fake "forbidden until [now+5min]" state so the notice appears without changing system time.
  * Auto: clears override so the real computed value is used.
  */
+/**
+ * Cycle the fake "tomorrow's jamaat changed" override on `window`.
+ * Four states: undefined → Zuhr 13:35 → Asr 16:45 → Isha 21:30 → undefined …
+ *
+ * When set, JamaatSoonSlot bypasses its eligibility / diff checks and
+ * renders the TomorrowsJamaatChangeSlide alongside SilentPhonesGraphic
+ * regardless of real prayer data. Combine with Ctrl+Shift+J (force
+ * jamaat-soon phase) to verify the alternation.
+ */
+const TOMORROW_JAMAAT_CHANGE_CYCLE: (TomorrowJamaatChangeForce | undefined)[] = [
+  { prayerName: 'Zuhr', tomorrow: '13:35' },
+  { prayerName: 'Asr', tomorrow: '16:45' },
+  { prayerName: 'Isha', tomorrow: '21:30' },
+  undefined,
+];
+
+function toggleTomorrowJamaatChangeForce(): void {
+  const current = window.__TOMORROW_JAMAAT_CHANGE_FORCE;
+  const currentIdx = TOMORROW_JAMAAT_CHANGE_CYCLE.findIndex(
+    (entry) =>
+      (entry === undefined && current === undefined) ||
+      (entry !== undefined &&
+        current !== undefined &&
+        entry.prayerName === current.prayerName &&
+        entry.tomorrow === current.tomorrow),
+  );
+  const nextIdx = (currentIdx + 1) % TOMORROW_JAMAAT_CHANGE_CYCLE.length;
+  const next = TOMORROW_JAMAAT_CHANGE_CYCLE[nextIdx];
+
+  window.__TOMORROW_JAMAAT_CHANGE_FORCE = next;
+  const label = next ? `${next.prayerName} → ${next.tomorrow}` : 'auto-detect';
+  logger.info(`[DevKeyboard] Tomorrow jamaat change force: ${label}`);
+
+  /**
+   * Convenience: when activating the override we also pin the prayer phase
+   * to `jamaat-soon` so the slot is actually rendered. When cycling back
+   * to "off", clear the phase override so the display returns to live data.
+   * Without this the user would have to remember to also press Ctrl+Shift+J,
+   * which is the most common reason "the dev shortcut doesn't work".
+   */
+  if (next) {
+    if (window.__PRAYER_PHASE_FORCE !== 'jamaat-soon') {
+      window.__PRAYER_PHASE_FORCE = 'jamaat-soon';
+      window.dispatchEvent(new Event(PRAYER_PHASE_FORCE_EVENT));
+      logger.info('[DevKeyboard] Auto-forced prayer phase: jamaat-soon');
+    }
+  } else if (window.__PRAYER_PHASE_FORCE === 'jamaat-soon') {
+    window.__PRAYER_PHASE_FORCE = undefined;
+    window.dispatchEvent(new Event(PRAYER_PHASE_FORCE_EVENT));
+    logger.info('[DevKeyboard] Cleared auto-forced prayer phase');
+  }
+
+  window.dispatchEvent(new Event(TOMORROW_JAMAAT_CHANGE_FORCE_EVENT));
+}
+
 function toggleForbiddenPrayerForce(): void {
   if (window.__FORBIDDEN_PRAYER_FORCE !== undefined && window.__FORBIDDEN_PRAYER_FORCE !== null) {
     window.__FORBIDDEN_PRAYER_FORCE = undefined;
@@ -202,12 +274,42 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+F': 'Toggle forbidden-prayer notice (show fake / auto)',
       'Ctrl+Shift+P': 'Cycle highlighted prayer (Fajr → … → auto)',
       'Ctrl+Shift+T': "Toggle show tomorrow's list (simulate after Isha)",
+      'Ctrl+Alt+Shift+M': 'Cycle fake tomorrow jamaat change (Zuhr → Asr → Isha → off)',
       'Escape': 'Clear current alert',
     });
 
+    /**
+     * Console fallbacks — always available in dev, immune to browser
+     * shortcut interception. Call from DevTools, e.g.:
+     *   __devCycleTomorrowChange()
+     *   __devCyclePhase()
+     */
+    window.__devCyclePhase = togglePrayerPhaseForce;
+    window.__devCycleTomorrowChange = toggleTomorrowJamaatChangeForce;
+    // eslint-disable-next-line no-console
+    console.log(
+      '%cConsole fallbacks: __devCyclePhase(), __devCycleTomorrowChange()',
+      'color: #93c5fd; font-style: italic',
+    );
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + Alt + Shift + M — separate combo so Chrome's Ctrl+Shift+M
+      // (profile picker) cannot swallow it. Checked before the generic
+      // Ctrl+Shift block so altKey doesn't disqualify it.
+      if (
+        e.ctrlKey &&
+        e.shiftKey &&
+        e.altKey &&
+        !e.metaKey &&
+        (e.key === 'M' || e.key === 'm' || e.code === 'KeyM')
+      ) {
+        e.preventDefault();
+        toggleTomorrowJamaatChangeForce();
+        return;
+      }
+
       // Ctrl + Shift + key → special actions
-      if (e.ctrlKey && e.shiftKey && !e.metaKey) {
+      if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey) {
         // Ramadan mode toggle (R or r)
         if (e.key === 'R' || e.key === 'r') {
           e.preventDefault();
@@ -292,7 +394,11 @@ const useDevKeyboard = (): void => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      delete window.__devCyclePhase;
+      delete window.__devCycleTomorrowChange;
+    };
   }, [dispatch]);
 };
 

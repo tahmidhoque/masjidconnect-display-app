@@ -38,7 +38,7 @@ import {
   ContentCarousel,
   IslamicPattern,
   JumuahBar,
-  SilentPhonesGraphic,
+  JamaatSoonSlot,
   InPrayerScreen,
 } from '../display';
 
@@ -412,7 +412,9 @@ const DisplayScreenInner: React.FC = () => {
 
   /**
    * Content slot: swapped based on the current prayer phase.
-   *   jamaat-soon — phones-off prohibition graphic
+   *   jamaat-soon — phones-off graphic, alternated with a "tomorrow's jamaat is changing"
+   *                 slide for Zuhr / Asr / Isha when tomorrow's time differs (handled
+   *                 inside JamaatSoonSlot)
    *   in-prayer   — calm "Jamaat in progress" screen
    *   otherwise   — normal content carousel
    */
@@ -426,7 +428,7 @@ const DisplayScreenInner: React.FC = () => {
   const contentSlot = useMemo(() => {
     switch (prayerPhase) {
       case 'jamaat-soon':
-        return <SilentPhonesGraphic landscapeSplit={!isPortrait} />;
+        return <JamaatSoonSlot landscapeSplit={!isPortrait} />;
       case 'in-prayer':
         // post-jamaat delay: jamaat has finished — return to carousel but keep prayer highlighted
         if (inPrayerSubPhase === 'post-jamaat') {
