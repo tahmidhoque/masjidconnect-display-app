@@ -144,17 +144,22 @@ known_wifi_offline() {
 # Log network state for diagnostics
 log "Network state at X start:"
 log "  route: $(ip route show default 2>/dev/null | head -1 || echo none)"
-log "  rfkill: $(rfkill list 2>/dev/null | head -5 || echo 'rfkill unavailable')"
-log "  iw dev: $(iw dev 2>/dev/null | head -5 || echo 'none')"
+log "  rfkill: $(rfkill list 2>/dev/null | head -10 || echo 'rfkill unavailable')"
+log "  iw dev: $(iw dev 2>/dev/null | head -10 || echo 'none')"
+log "  NM active: $(systemctl is-active NetworkManager 2>/dev/null || echo 'not-running')"
+log "  NM general: $(nmcli general status 2>/dev/null | head -3 | tr '\n' '|' || echo 'unavailable')"
+log "  NM devices: $(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | tr '\n' '|' || echo 'unavailable')"
+log "  wpa_supplicant: $(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo 'unknown')"
+log "  networkd: $(systemctl is-active systemd-networkd 2>/dev/null || echo 'not-running')"
 
-# Check if wpa_supplicant is actively trying to authenticate on a given interface.
-wpa_is_connecting() {
-  systemctl is-active "wpa_supplicant@${1:-wlan0}.service" >/dev/null 2>&1
+# Check if NetworkManager is actively trying to connect on a wireless interface.
+nm_is_connecting() {
+  nmcli -t -f STATE dev 2>/dev/null | grep -qE 'connecting|config|ip-config'
 }
 
 # Wait for WiFi to authenticate before checking connectivity.
 # 5GHz networks take 5–15+ seconds; the original 2-second wait caused false
-# "offline" detection, which triggered the hotspot and killed wpa_supplicant.
+# "offline" detection, which triggered the hotspot before NM finished connecting.
 # Exit early if no network interface has a route (no point waiting).
 BOOT_CONNECTIVITY=false
 for boot_attempt in $(seq 1 10); do
@@ -163,15 +168,14 @@ for boot_attempt in $(seq 1 10); do
     log "Connectivity confirmed on boot (attempt $boot_attempt/10)"
     break
   fi
-  # Fast exit: if there is no routable interface and wpa_supplicant is not
+  # Fast exit: if there is no routable interface and NetworkManager is not
   # actively connecting, there is nothing to wait for.
-  WPA_IFACE=$(iw dev 2>/dev/null | awk '/^\tInterface / {print $2; exit}')
-  if ! any_interface_routable && { [ -z "$WPA_IFACE" ] || ! wpa_is_connecting "$WPA_IFACE"; }; then
-    log "  boot wait $boot_attempt/10: no routable interface and no wpa_supplicant — skipping remaining wait"
+  if ! any_interface_routable && ! nm_is_connecting; then
+    log "  boot wait $boot_attempt/10: no routable interface and NM not connecting — skipping remaining wait"
     break
   fi
-  if [ -n "$WPA_IFACE" ] && wpa_is_connecting "$WPA_IFACE"; then
-    log "  boot wait $boot_attempt/10: wpa_supplicant active on $WPA_IFACE, auth in progress..."
+  if nm_is_connecting; then
+    log "  boot wait $boot_attempt/10: NetworkManager connecting, auth in progress..."
   else
     log "  boot wait $boot_attempt/10: no connectivity yet"
   fi
@@ -223,12 +227,12 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
 
     if [ -n "$WLAN_IFACE" ] && [ -f "$HOTSPOT_SCRIPT" ] && [ -f "$WIFI_SETUP_SERVER" ]; then
       export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
-      log "Parallel: WiFi offline — deferring hotspot; giving wpa_supplicant 60s to reconnect"
+      log "Parallel: WiFi offline — deferring hotspot; giving NM 60s to reconnect"
       touch "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
       (
-        # Wait up to 60s for wpa_supplicant to finish authenticating.
-        # 5GHz auth + DHCP can take 15–30s; this avoids killing wpa_supplicant
-        # prematurely by starting the hotspot (which switches to AP mode).
+        # Wait up to 60s for NetworkManager to finish authenticating.
+        # 5GHz auth + DHCP can take 15–30s; this avoids switching to AP mode
+        # prematurely which would interrupt an in-progress connection.
         for deferred_check in $(seq 1 30); do
           if have_connectivity; then
             log "Parallel: WiFi recovered after $((deferred_check * 2))s — hotspot not needed"
@@ -240,6 +244,12 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
           sleep 2
         done
         log "Parallel: WiFi not recovered after 60s — starting hotspot on $WLAN_IFACE"
+        # Set per-PHY regulatory domain before hotspot start (brcmfmac CLM fix)
+        REGDOM="${WIFI_COUNTRY:-GB}"
+        iw reg set "$REGDOM" 2>/dev/null || true
+        _PHY=$(iw dev "$WLAN_IFACE" info 2>/dev/null | awk '/wiphy/ {print "phy" $2}' || echo "phy0")
+        iw phy "$_PHY" reg set "$REGDOM" 2>/dev/null || true
+        sleep 1
         sudo "$HOTSPOT_SCRIPT" scan "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
         sudo "$HOTSPOT_SCRIPT" start "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
         sleep 1
@@ -316,13 +326,71 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
     export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
     log "Using interface: $WIFI_HOTSPOT_IFACE"
 
+    # Detailed NM diagnostics before AP startup — captures the state that determines
+    # whether the hotspot will work. Visible via: cat /tmp/kiosk.log
+    log "NM pre-hotspot diagnostics:"
+    log "  NM active: $(systemctl is-active NetworkManager 2>/dev/null || echo 'not-running')"
+    log "  wpa_supplicant enabled: $(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo 'unknown')"
+    log "  device state: $(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | grep -E "(${WIFI_HOTSPOT_IFACE}|wifi)" | tr '\n' '|' || echo 'unavailable')"
+    log "  NM managed: $(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep "^${WIFI_HOTSPOT_IFACE}:" | cut -d: -f2 || echo 'unavailable')"
+    log "  networkd active: $(systemctl is-active systemd-networkd 2>/dev/null || echo 'not-running')"
+    log "  reg domain: $(iw reg get 2>/dev/null | grep 'country' | head -1 || echo 'unavailable')"
+
+    # Set regulatory domain before starting the hotspot.
+    # brcmfmac (Broadcom WiFi on RPi) requires BOTH steps:
+    #   1. `iw reg set GB`     — kernel cfg80211 regulatory domain
+    #   2. `iw phy phy0 reg set GB` — per-PHY nl80211 command that propagates into
+    #      the brcmfmac firmware CLM (Country Locale Matrix). Without this the CLM
+    #      stays at country 99 ("unset"), disabling AP beacon transmission silently.
+    REGDOM="${WIFI_COUNTRY:-GB}"
+    iw reg set "$REGDOM" 2>/dev/null || true
+    PHY_NAME=$(iw dev "$WIFI_HOTSPOT_IFACE" info 2>/dev/null | awk '/wiphy/ {print "phy" $2}' || echo "phy0")
+    if iw phy "$PHY_NAME" reg set "$REGDOM" 2>/dev/null; then
+      log "Per-PHY (${PHY_NAME}) CLM set to ${REGDOM}"
+    else
+      log "iw phy reg set failed (non-fatal) — will retry inside hotspot script"
+    fi
+    sleep 1
+    log "  reg domain after set: $(iw reg get 2>/dev/null | tr '\n' ' ' || echo 'unavailable')"
+
+    # Warn on known failure conditions so they appear in logs before the hotspot fails
+    WPA_STATE=$(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo "unknown")
+    if [ "$WPA_STATE" = "masked" ]; then
+      log "WARNING: wpa_supplicant.service is masked — AP mode will FAIL. Attempting unmask..."
+      systemctl unmask wpa_supplicant.service 2>/dev/null || true
+    fi
+    IFACE_MANAGED=$(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep "^${WIFI_HOTSPOT_IFACE}:" | cut -d: -f2 || echo "")
+    if [ "${IFACE_MANAGED}" = "unmanaged" ]; then
+      log "WARNING: ${WIFI_HOTSPOT_IFACE} is unmanaged by NM — attempting to set managed..."
+      nmcli device set "$WIFI_HOTSPOT_IFACE" managed yes 2>/dev/null || true
+      sleep 2
+    fi
+
     log "Pre-scanning networks..."
     sudo "$HOTSPOT_SCRIPT" scan "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 \
       || log "  scan failed (non-fatal)"
 
     log "Starting MasjidConnect-Setup hotspot..."
-    sudo "$HOTSPOT_SCRIPT" start "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 \
-      || log "  hotspot start failed (non-fatal)"
+    HOTSPOT_OK=false
+    for hotspot_attempt in 1 2; do
+      if sudo "$HOTSPOT_SCRIPT" start "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1; then
+        HOTSPOT_OK=true
+        log "  hotspot started on attempt $hotspot_attempt"
+        break
+      fi
+      log "  hotspot start attempt $hotspot_attempt failed — retrying in 3s"
+      sleep 3
+    done
+    if [ "$HOTSPOT_OK" = false ]; then
+      log "ERROR: hotspot failed after 2 attempts — AP will not be visible"
+      log "  iw dev: $(iw dev 2>/dev/null | head -10 || echo 'empty')"
+      log "  rfkill: $(rfkill list 2>/dev/null | head -10 || echo 'unavailable')"
+      log "  NM devices: $(nmcli -t -f DEVICE,TYPE,STATE,CONNECTION dev 2>/dev/null | tr '\n' '|' || echo 'unavailable')"
+      log "  NM general: $(nmcli general status 2>/dev/null | head -4 | tr '\n' '|' || echo 'unavailable')"
+      log "  wpa_supplicant: $(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo 'unknown') / active=$(systemctl is-active wpa_supplicant.service 2>/dev/null || echo 'unknown')"
+      log "  networkd: $(systemctl is-active systemd-networkd 2>/dev/null || echo 'not-running')"
+      log "  HINT: Ctrl+Alt+F2 for a debug console. Run: cat /tmp/kiosk.log | grep -i error"
+    fi
     sleep 1
 
     # Start setup server in AP mode (port 80, all interfaces).

@@ -72,6 +72,43 @@ done
 
 mkdir -p "$OUT_DIR"
 
+# Pre-download package tarballs that rpi-image-gen fetches at build time.
+# Docker Desktop on macOS cannot download large files from GitHub CDN during `docker run`
+# (connection is cut at ~32 KB). We download them here on the host (where networking is
+# healthy) and COPY them into the image so vfetch finds them in cache and skips download.
+PKG_CACHE_DIR="${SCRIPT_DIR}/pkg-cache"
+mkdir -p "$PKG_CACHE_DIR"
+
+pkg_cache_download() {
+  local filename="$1" url="$2" expected_sha="$3"
+  local dest="${PKG_CACHE_DIR}/${filename}"
+  if [ ! -f "$dest" ]; then
+    echo "Downloading ${filename} to host cache..."
+    curl -fsSL -o "$dest" "$url" \
+      || { echo "ERROR: failed to download ${filename}"; rm -f "$dest"; exit 1; }
+    local actual_sha
+    actual_sha=$(shasum -a 256 "$dest" | awk '{print $1}')
+    if [ "$actual_sha" != "$expected_sha" ]; then
+      echo "ERROR: sha256 mismatch for ${filename}"
+      echo "  expected: ${expected_sha}"
+      echo "  got:      ${actual_sha}"
+      rm -f "$dest"
+      exit 1
+    fi
+    echo "  -> $dest (verified)"
+  else
+    echo "Using cached ${filename}"
+  fi
+}
+
+# Use codeload.github.com (source archive) — the release asset CDN fails on many
+# networks due to proxy/VPN cutting connections at ~32 KB from the end of the file.
+# The source archive extracts identically to zstd-1.5.7/ and builds the same way.
+pkg_cache_download \
+  "zstd-1.5.7.tar.gz" \
+  "https://codeload.github.com/facebook/zstd/tar.gz/refs/tags/v1.5.7" \
+  "37d7284556b20954e56e1ca85b80226768902e2edabd3b649e9e72c0c9012ee3"
+
 echo "Building Docker image..."
 docker build -f "${SCRIPT_DIR}/Dockerfile" -t "$IMAGE_TAG" .
 

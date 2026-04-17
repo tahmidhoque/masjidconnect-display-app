@@ -80,7 +80,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
 }) => {
-  const { todaysPrayerTimes, isJumuahToday } = usePrayerTimesContext();
+  const { todaysPrayerTimes } = usePrayerTimesContext();
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   const adhanLabel = resolveTerminology(terminology, 'adhan', 'Start');
@@ -175,12 +175,10 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`text-prayer font-medium ${isNext ? 'text-emerald-light' : 'text-text-primary'}`}>
-                    {isJumuahToday && prayer.name === 'Zuhr'
-                      ? resolveTerminology(terminology, 'jummah', prayer.name)
-                      : (() => {
-                          const key = prayerRowNameToTerminologyKey(prayer.name);
-                          return key ? resolveTerminology(terminology, key, prayer.name) : prayer.name;
-                        })()}
+                    {(() => {
+                      const key = prayerRowNameToTerminologyKey(prayer.name);
+                      return key ? resolveTerminology(terminology, key, prayer.name) : prayer.name;
+                    })()}
                   </span>
                   {ramadanLabel && (
                     <span className="text-caption text-gold/75 font-normal italic">{ramadanLabel}</span>

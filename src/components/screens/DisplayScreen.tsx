@@ -44,6 +44,7 @@ import {
 
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
+import useJamaatBuzzer from '../../hooks/useJamaatBuzzer';
 import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
 import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
@@ -368,6 +369,9 @@ const DisplayScreenInner: React.FC = () => {
 
   /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
   const { phase: prayerPhase, prayerName: phasePrayerName, inPrayerSubPhase } = usePrayerPhase();
+
+  /* ---- Jamaat buzzer: plays a short sound once when jamaat begins ---- */
+  useJamaatBuzzer();
 
   /* ---- Forbidden (makruh) time for voluntary prayer ---- */
   const { forbiddenPrayer, tomorrowsJamaats } = usePrayerTimesContext();

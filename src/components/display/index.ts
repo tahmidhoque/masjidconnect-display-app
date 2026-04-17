@@ -1,3 +1,4 @@
+export { default as ConnectionBanner } from './ConnectionBanner';
 export { default as EmergencyAlertOverlay } from './EmergencyAlertOverlay';
 export { default as Header } from './Header';
 export { default as Footer } from './Footer';
@@ -13,3 +14,4 @@ export { default as SilentPhonesGraphic } from './SilentPhonesGraphic';
 export { default as InPrayerScreen } from './InPrayerScreen';
 export { default as ForbiddenPrayerNotice } from './ForbiddenPrayerNotice';
 export { default as EventSlide } from './EventSlide';
+export { default as WifiSettingsOverlay } from './WifiSettingsOverlay';

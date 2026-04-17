@@ -1,29 +1,25 @@
 #!/usr/bin/env bash
 # =============================================================================
-# MasjidConnect — WiFi Boot-Partition Config Apply
+# MasjidConnect — WiFi Boot-Partition Config Apply (NetworkManager edition)
 #
-# Runs as a oneshot systemd service very early in boot (before networking
-# starts). If the user has placed a WiFi credentials file on the FAT32 boot
-# partition (accessible from any OS without SSH), it reads the credentials,
-# writes the wpa_supplicant config, and enables the right services so the Pi
-# connects automatically on this and every subsequent boot.
+# Runs as a oneshot systemd service early in boot (before networking starts).
+# If the user has placed a WiFi credentials file on the FAT32 boot partition
+# (accessible from any OS without SSH), it reads the credentials, creates a
+# NetworkManager connection profile, and the Pi connects automatically.
 #
-# The source file is DELETED after being applied so it does not re-apply on
-# every reboot (and so credentials are not left sitting on the boot partition).
+# The source file is DELETED after being applied so credentials are not left
+# sitting on the boot partition.
 #
 # Supported file locations (checked in order):
 #
-#   /boot/firmware/masjidconnect-wifi.conf   ← simple key=value format (recommended)
-#   /boot/firmware/wpa_supplicant.conf       ← standard wpa_supplicant format (advanced)
+#   /boot/firmware/masjidconnect-wifi.conf   <- simple key=value (recommended)
+#   /boot/firmware/wpa_supplicant.conf       <- legacy wpa_supplicant format
 #
 # Simple format (masjidconnect-wifi.conf):
 #   SSID=MyNetworkName
 #   PASSWORD=MyPassword
 #   COUNTRY=GB
-#
-# The COUNTRY code is optional and defaults to GB. Use your two-letter ISO 3166
-# country code (e.g. US, FR, DE, AE, SA, PK, BD) for correct 5GHz channel
-# selection. An incorrect country code will prevent 5GHz networks from working.
+#   TIMEZONE=Europe/London
 #
 # Must run as root.
 # =============================================================================
@@ -35,8 +31,9 @@ SIMPLE_CONF="${BOOT_DIR}/masjidconnect-wifi.conf"
 WPA_CONF="${BOOT_DIR}/wpa_supplicant.conf"
 
 IFACE="wlan0"
-WPA_DEST="/etc/wpa_supplicant/wpa_supplicant-${IFACE}.conf"
-NETWORKD_CONF="/etc/systemd/network/25-${IFACE}.network"
+NM_CON_DIR="/etc/NetworkManager/system-connections"
+NM_CON_NAME="masjidconnect-wifi"
+NM_CON_FILE="${NM_CON_DIR}/${NM_CON_NAME}.nmconnection"
 WIFI_STATE_DIR="/var/lib/masjidconnect"
 WIFI_CONNECTED_MARKER="${WIFI_STATE_DIR}/wifi-connected-once"
 
@@ -58,7 +55,7 @@ if [ -f "$SIMPLE_CONF" ]; then
 elif [ -f "$WPA_CONF" ]; then
   SOURCE_FILE="$WPA_CONF"
   SOURCE_FORMAT="wpa"
-  log "Found: $WPA_CONF (wpa_supplicant format)"
+  log "Found: $WPA_CONF (legacy wpa_supplicant format)"
 fi
 
 if [ -z "$SOURCE_FILE" ]; then
@@ -92,32 +89,79 @@ if [ "$SOURCE_FORMAT" = "simple" ]; then
 
   log "Applying credentials: SSID=${WIFI_SSID} COUNTRY=${WIFI_COUNTRY}"
 
-  mkdir -p /etc/wpa_supplicant
-  # Write header
-  printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=%s\n\n' \
-    "$WIFI_COUNTRY" > "$WPA_DEST"
+  # Remove any existing profile with the same name
+  nmcli con delete "$NM_CON_NAME" 2>/dev/null || true
 
-  if [ -n "$WIFI_PASSWORD" ]; then
-    # Derive PSK properly (same as wpa_passphrase)
-    printf '%s' "$WIFI_PASSWORD" | wpa_passphrase "$WIFI_SSID" - >> "$WPA_DEST"
-  else
-    # Open network
-    printf 'network={\n\tssid="%s"\n\tkey_mgmt=NONE\n}\n' \
-      "$(printf '%s' "$WIFI_SSID" | sed 's/\\/\\\\/g; s/"/\\"/g')" >> "$WPA_DEST"
-  fi
-  chmod 600 "$WPA_DEST"
+  # Write NetworkManager connection file directly (NM may not be running yet at boot)
+  mkdir -p "$NM_CON_DIR"
+  cat > "$NM_CON_FILE" <<NMEOF
+[connection]
+id=${NM_CON_NAME}
+type=wifi
+autoconnect=true
+autoconnect-priority=100
+
+[wifi]
+mode=infrastructure
+ssid=${WIFI_SSID}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=${WIFI_PASSWORD}
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+NMEOF
+  chmod 600 "$NM_CON_FILE"
+  log "Wrote NM connection profile: $NM_CON_FILE"
+
+  # Set WiFi regulatory domain
+  iw reg set "$WIFI_COUNTRY" 2>/dev/null || true
 
 elif [ "$SOURCE_FORMAT" = "wpa" ]; then
-  log "Applying wpa_supplicant.conf directly"
-  mkdir -p /etc/wpa_supplicant
-  # Ensure ctrl_interface points to the correct location for wpa_supplicant@<iface>
-  if grep -q 'ctrl_interface' "$SOURCE_FILE"; then
-    sed 's|ctrl_interface=.*|ctrl_interface=/run/wpa_supplicant|' "$SOURCE_FILE" > "$WPA_DEST"
-  else
-    printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\n\n' > "$WPA_DEST"
-    cat "$SOURCE_FILE" >> "$WPA_DEST"
+  # Legacy format: extract SSID and PSK from wpa_supplicant.conf, create NM profile
+  log "Converting wpa_supplicant.conf to NetworkManager profile"
+  WPA_SSID=$(grep -oP 'ssid="?\K[^"]+' "$SOURCE_FILE" | head -1)
+  WPA_PSK=$(grep -oP 'psk="?\K[^"]+' "$SOURCE_FILE" | head -1)
+  WPA_COUNTRY=$(grep -oP 'country=\K\w+' "$SOURCE_FILE" | head -1)
+
+  if [ -z "$WPA_SSID" ]; then
+    log "ERROR: Could not extract SSID from $SOURCE_FILE — aborting"
+    rm -f "$SOURCE_FILE"
+    exit 1
   fi
-  chmod 600 "$WPA_DEST"
+
+  nmcli con delete "$NM_CON_NAME" 2>/dev/null || true
+
+  mkdir -p "$NM_CON_DIR"
+  cat > "$NM_CON_FILE" <<NMEOF
+[connection]
+id=${NM_CON_NAME}
+type=wifi
+autoconnect=true
+autoconnect-priority=100
+
+[wifi]
+mode=infrastructure
+ssid=${WPA_SSID}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=${WPA_PSK}
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+NMEOF
+  chmod 600 "$NM_CON_FILE"
+
+  [ -n "${WPA_COUNTRY:-}" ] && iw reg set "$WPA_COUNTRY" 2>/dev/null || true
+  log "Converted and wrote NM connection profile"
 fi
 
 # ---------------------------------------------------------------------------
@@ -136,18 +180,10 @@ if [ -n "${WIFI_TIMEZONE:-}" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Ensure systemd-networkd DHCP config exists for this interface
+# Tell NetworkManager to reload connections (if it's running)
 # ---------------------------------------------------------------------------
-mkdir -p /etc/systemd/network
-printf '[Match]\nName=%s\n\n[Network]\nDHCP=yes\n' "$IFACE" > "$NETWORKD_CONF"
-log "Wrote $NETWORKD_CONF"
-
-# ---------------------------------------------------------------------------
-# Enable services so WiFi connects on this and every subsequent boot
-# ---------------------------------------------------------------------------
-systemctl enable "wpa_supplicant@${IFACE}.service" 2>/dev/null || true
-systemctl enable systemd-networkd.service 2>/dev/null || true
-log "Enabled wpa_supplicant@${IFACE} and systemd-networkd"
+nmcli con reload 2>/dev/null || true
+log "Reloaded NetworkManager connections"
 
 # ---------------------------------------------------------------------------
 # Reset the connectivity marker so the kiosk boot sequence validates the new
@@ -158,7 +194,6 @@ log "Reset wifi-connected marker"
 
 # ---------------------------------------------------------------------------
 # Delete the source file so credentials don't persist on the boot partition
-# and the service does not re-apply on every reboot.
 # ---------------------------------------------------------------------------
 rm -f "$SOURCE_FILE"
 log "Deleted $SOURCE_FILE"

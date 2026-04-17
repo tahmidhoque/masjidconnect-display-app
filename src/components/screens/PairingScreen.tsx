@@ -20,7 +20,7 @@ import {
   checkPairingStatus,
   setPairingCodeExpired,
 } from '../../store/slices/authSlice';
-import { IslamicPattern } from '../display';
+import { IslamicPattern, ConnectionBanner } from '../display';
 import { getAdminBaseUrl, getPairingUrl } from '../../utils/adminUrlUtils';
 import logoGold from '../../assets/logos/logo-gold.svg';
 import logoBlue from '../../assets/logos/logo-notext-blue.svg';
@@ -379,6 +379,11 @@ const PairingScreen: React.FC = () => {
             <span className="text-text-secondary">Waiting for pairing…</span>
           </div>
         </div>
+      </div>
+
+      {/* Connection status banner at bottom */}
+      <div className="absolute bottom-4 left-4 right-4 z-10 flex justify-center">
+        <ConnectionBanner />
       </div>
     </div>
   );

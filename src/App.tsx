@@ -18,8 +18,10 @@ import { getLastError, getLogHistory } from './utils/logger';
 import { setOffline } from './store/slices/uiSlice';
 import useAppLoader from './hooks/useAppLoader';
 import useDevKeyboard from './hooks/useDevKeyboard';
+import useWifiKeyboard from './hooks/useWifiKeyboard';
+import useWifiStatus from './hooks/useWifiStatus';
 import { OrientationWrapper } from './components/layout';
-import { EmergencyAlertOverlay } from './components/display';
+import { EmergencyAlertOverlay, WifiSettingsOverlay } from './components/display';
 import logger from './utils/logger';
 
 /* ------------------------------------------------------------------
@@ -225,6 +227,12 @@ const App: React.FC = () => {
   /** Dev-only keyboard shortcuts (Alt+1–7 for alerts, Escape to clear) */
   useDevKeyboard();
 
+  /** Production WiFi keyboard shortcut (Ctrl+Shift+W) */
+  useWifiKeyboard();
+
+  /** WiFi status polling (Pi-only, dispatches to uiSlice) */
+  useWifiStatus();
+
   /** Online / Offline listener */
   useEffect(() => {
     dispatch(setOffline(!navigator.onLine));
@@ -259,6 +267,7 @@ const App: React.FC = () => {
     >
       <div className="fullscreen bg-midnight gpu-accelerated">
         <AppRoutes />
+        <WifiSettingsOverlay />
         <EmergencyAlertOverlay />
         {showDebug && (
           <div className="fixed bottom-0 left-0 right-0 z-[9998] max-h-[40vh] overflow-auto bg-black/90 text-white p-3 font-mono text-xs border-t border-white/20">

@@ -10,8 +10,9 @@
  *      instructions page at /instructions for the Pi's own display, and
  *      handles captive-portal probe URLs so phones auto-open the setup page.
  *
- * Must run as root (or with CAP_NET_ADMIN etc.) to run iw and write
- * /etc/wpa_supplicant. Typically started via sudo from xinitrc-kiosk.
+ * Must run as root (or with CAP_NET_ADMIN etc.) to run nmcli/iw.
+ * Typically started via sudo from xinitrc-kiosk.
+ * NetworkManager is always running — the hotspot uses NM's built-in AP mode.
  *
  * Usage:
  *   sudo /opt/masjidconnect/deploy/wifi-setup-server.mjs                          # local mode
@@ -25,8 +26,6 @@
 import { createServer } from 'node:http';
 import { execSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
-import { pbkdf2Sync } from 'node:crypto';
-
 // Parse CLI args — preferred over env vars because sudo strips arbitrary env vars.
 // Fall back to env vars for backwards compatibility with any direct invocations.
 const _args = process.argv.slice(2);
@@ -59,7 +58,7 @@ const PORT = AP_MODE ? 80 : parseInt(process.env.WIFI_SETUP_PORT || '3002', 10);
 const HOST = AP_MODE ? '0.0.0.0' : '127.0.0.1';
 const FLAG_FILE = '/tmp/masjidconnect-wifi-done';
 const WIFI_CONNECTED_MARKER = '/var/lib/masjidconnect/wifi-connected-once';
-const WPA_CONF = `/etc/wpa_supplicant/wpa_supplicant-${IFACE}.conf`;
+const NM_CON_NAME = 'masjidconnect-wifi';
 const SCAN_CACHE = '/tmp/masjidconnect-wifi-scan.json';
 const HOTSPOT_SCRIPT = '/opt/masjidconnect/deploy/wifi-hotspot.sh';
 const CONNECT_STATUS_FILE = '/tmp/masjidconnect-wifi-connect-status.json';
@@ -127,23 +126,25 @@ function handleScan() {
     return { ssids: ['TestNetwork1', 'TestNetwork2', 'MyWiFi-5G', 'HiddenNetworkTest'], _dev: true };
   }
 
-  // In AP mode, wlan0 is running hostapd so live scan is impossible — use cached results
+  // In AP mode, the interface is running as AP — use cached results from pre-scan.
+  // wifi-hotspot.sh writes objects ({ssid, signal, security}); normalise to plain strings.
   if (AP_MODE && existsSync(SCAN_CACHE)) {
     try {
       const cached = JSON.parse(readFileSync(SCAN_CACHE, 'utf8'));
-      return { ssids: cached.ssids || [], cached: true };
+      const raw = cached.ssids || [];
+      const ssids = raw.map(s => (typeof s === 'string' ? s : s.ssid)).filter(Boolean);
+      return { ssids, cached: true };
     } catch { /* fall through to live scan */ }
   }
 
   try {
-    const out = run(`iw dev ${IFACE} scan 2>/dev/null`, { allowFail: true });
+    // Trigger rescan then list
+    run(`nmcli dev wifi rescan ifname ${IFACE} 2>/dev/null`, { allowFail: true });
+    const out = run(`nmcli -t -f SSID dev wifi list ifname ${IFACE} 2>/dev/null`, { allowFail: true });
     const ssids = new Set();
     for (const line of out.split('\n')) {
-      const m = line.match(/^\s*SSID:\s*(.+)$/);
-      if (m) {
-        const ssid = m[1].trim();
-        if (ssid) ssids.add(ssid);
-      }
+      const ssid = line.trim();
+      if (ssid) ssids.add(ssid);
     }
     return { ssids: [...ssids].sort() };
   } catch {
@@ -152,30 +153,58 @@ function handleScan() {
 }
 
 /**
- * Derive WPA-PSK (PMK) from passphrase and SSID (same as wpa_passphrase).
- * Uses PBKDF2-HMAC-SHA1, 4096 iterations, 32-byte key.
+ * Create a NetworkManager keyfile connection profile for the given WiFi network.
+ *
+ * Uses the NM keyfile format (written directly to disk) instead of
+ * `nmcli con add` shell command interpolation. This is critical because:
+ *   - Passwords containing $, ", !, \, backticks, or spaces break the shell
+ *     command even with quoting, causing silent connection failures.
+ *   - SSIDs with special characters suffer the same issue.
+ *   - Writing the keyfile directly is immune to shell injection and handles
+ *     any valid UTF-8 SSID or password without escaping.
+ *
+ * NM reloads connections via `nmcli con reload` after the file is written.
  */
-function derivePskHex(passphrase, ssid) {
-  const key = pbkdf2Sync(passphrase, ssid, 4096, 32, 'sha1');
-  return key.toString('hex');
-}
+function writeNmConnection(ssidTrimmed, pass) {
+  const NM_CON_DIR = '/etc/NetworkManager/system-connections';
+  const NM_CON_FILE = `${NM_CON_DIR}/${NM_CON_NAME}.nmconnection`;
 
-/**
- * Write wpa_supplicant configuration file.
- * Shared between local and AP mode connect handlers.
- */
-function writeWpaConfig(ssidTrimmed, pass, countryCode) {
-  const header = `ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=${countryCode}\n\n`;
-  let networkBlock = `network={\n\tssid="${ssidTrimmed.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`;
+  // Remove any stale file on disk first. Do NOT use `nmcli con delete` here
+  // while the hotspot is active — deleting then reloading with autoconnect=true
+  // causes NM to immediately try to activate the station profile on the same
+  // interface that is running the AP, tearing down the hotspot prematurely.
+  try { unlinkSync(NM_CON_FILE); } catch { /* non-fatal — file may not exist */ }
+
+  mkdirSync(NM_CON_DIR, { recursive: true });
+
+  // Build the keyfile. The psk is written as raw text (no shell escaping) so
+  // all printable characters including $, ", !, \ work without any escaping.
+  let content = '[connection]\n';
+  content += `id=${NM_CON_NAME}\n`;
+  content += 'type=wifi\n';
+  // autoconnect=false while the AP is still running. apModeConnectAsync will
+  // enable autoconnect and reload NM only after the AP has been torn down.
+  // This prevents NM from racing to activate the station profile on wlan0
+  // while the hotspot AP is still using that same interface.
+  content += 'autoconnect=false\n';
+  content += 'autoconnect-priority=100\n\n';
+  content += '[wifi]\n';
+  content += 'mode=infrastructure\n';
+  content += `ssid=${ssidTrimmed}\n\n`;
+
   if (pass.length > 0) {
-    const pskHex = derivePskHex(pass, ssidTrimmed);
-    networkBlock += `\tpsk=${pskHex}\n`;
-  } else {
-    networkBlock += '\tkey_mgmt=NONE\n';
+    content += '[wifi-security]\n';
+    content += 'key-mgmt=wpa-psk\n';
+    content += `psk=${pass}\n\n`;
   }
-  networkBlock += '}\n';
-  mkdirSync('/etc/wpa_supplicant', { recursive: true });
-  writeFileSync(WPA_CONF, header + networkBlock, { mode: 0o600 });
+
+  content += '[ipv4]\nmethod=auto\n\n';
+  content += '[ipv6]\nmethod=auto\n';
+
+  writeFileSync(NM_CON_FILE, content, { mode: 0o600 });
+  // Do NOT call `nmcli con reload` here — the AP is still active.
+  // apModeConnectAsync handles reload after the AP is stopped.
+  process.stderr.write(`[wifi-setup] Keyfile staged (AP still up): ${NM_CON_FILE}\n`);
 }
 
 /**
@@ -196,9 +225,9 @@ function checkConnectivity() {
   }
 }
 
-/** POST /api/connect — write wpa_supplicant config and connect */
+/** POST /api/connect — create NetworkManager profile and connect */
 function handleConnect(body) {
-  const { ssid, password = '', country = 'GB' } = body;
+  const { ssid, password = '' } = body;
   if (!ssid || typeof ssid !== 'string' || !ssid.trim()) {
     return { ok: false, error: 'Please select or enter a network name' };
   }
@@ -207,15 +236,12 @@ function handleConnect(body) {
   }
   const pass = typeof password === 'string' ? password : String(password || '').trim();
   const ssidTrimmed = ssid.trim();
-  const countryCode = String(country || 'GB').toUpperCase().slice(0, 2);
 
   try {
-    writeWpaConfig(ssidTrimmed, pass, countryCode);
+    writeNmConnection(ssidTrimmed, pass);
 
     if (!AP_MODE) {
-      ensureNetworkdDhcp();
-      enableWifiOnBoot();
-      run(`systemctl restart wpa_supplicant@${IFACE}.service`);
+      run(`nmcli con up "${NM_CON_NAME}"`, { allowFail: true });
       return { ok: true };
     }
 
@@ -223,7 +249,7 @@ function handleConnect(body) {
     connectingInProgress = true;
     lastConnectError = '';
 
-    // Fire-and-forget: stop AP, start wpa_supplicant, poll for connectivity
+    // Fire-and-forget: stop AP, restart NM, activate the profile, poll for connectivity
     setTimeout(() => apModeConnectAsync(), 2000);
 
     return { ok: true, apMode: true, message: 'Connecting… The hotspot will disappear shortly. Please reconnect to your normal Wi-Fi.' };
@@ -233,105 +259,148 @@ function handleConnect(body) {
 }
 
 /**
- * Ensure a systemd-networkd .network file exists for the wireless interface
- * so that DHCP runs automatically after wpa_supplicant authenticates.
- */
-function ensureNetworkdDhcp() {
-  const netFile = `/etc/systemd/network/25-${IFACE}.network`;
-  const content = [
-    '[Match]',
-    `Name=${IFACE}`,
-    '',
-    '[Network]',
-    'DHCP=yes',
-    '',
-  ].join('\n');
-  try {
-    mkdirSync('/etc/systemd/network', { recursive: true });
-    writeFileSync(netFile, content, { mode: 0o644 });
-    process.stderr.write(`[wifi-setup] Wrote ${netFile}\n`);
-  } catch (e) {
-    process.stderr.write(`[wifi-setup] Could not write ${netFile}: ${e.message}\n`);
-  }
-}
-
-/**
- * Enable wpa_supplicant and networkd so Wi-Fi auto-connects on next boot.
+ * Ensure NetworkManager is enabled for WiFi auto-connect on boot.
+ * NM handles DHCP internally — no separate networkd config needed.
  */
 function enableWifiOnBoot() {
-  run(`systemctl enable wpa_supplicant@${IFACE}.service`, { allowFail: true });
-  run('systemctl enable systemd-networkd.service', { allowFail: true });
-  process.stderr.write(`[wifi-setup] Enabled wpa_supplicant@${IFACE} and systemd-networkd for next boot\n`);
+  run('systemctl enable NetworkManager.service', { allowFail: true });
+  process.stderr.write(`[wifi-setup] Ensured NetworkManager is enabled for next boot\n`);
 }
 
 /**
  * AP mode: asynchronous connect sequence.
- * Tears down the hotspot, starts wpa_supplicant + DHCP, polls for connectivity.
- * On failure, restarts the AP so the user can retry.
+ *
+ * Steps:
+ *   1. Tear down the NM AP connection (interface switches back to station mode)
+ *   2. Re-apply the per-PHY regulatory domain — brcmfmac CLM may reset on mode
+ *      transition; without this, station-mode auth on 2.4 GHz channels can fail
+ *   3. Wait for the interface to reach a connectable state (up to 15s)
+ *   4. Trigger an NM WiFi rescan so the target SSID appears in the scan cache
+ *   5. Activate the pre-saved station profile
+ *   6. Poll for connectivity (up to 60s for WPA handshake + DHCP)
+ *   7. On success: write flag file and tear down server
+ *   8. On failure: restart hotspot so the user can retry from their phone
  */
 async function apModeConnectAsync() {
   try {
-    process.stderr.write('[wifi-setup] AP mode: stopping hotspot, starting wpa_supplicant...\n');
+    process.stderr.write('[wifi-setup] AP mode: stopping hotspot, connecting via NetworkManager...\n');
 
-    // 1. Stop the hotspot and restore the interface to managed mode
+    // 1. Tear down the NM AP connection — NM stays running, interface switches back
     run(`${HOTSPOT_SCRIPT} stop ${IFACE}`, { allowFail: true });
+
+    // Allow NM to process the AP teardown before we touch the interface
+    await sleep(3000);
+
+    // 1b. Now it is safe to reload NM connections. The keyfile was written with
+    //     autoconnect=false so NM won't race to activate the station profile on
+    //     wlan0 while the AP was still running. After the AP is gone, we reload
+    //     and enable autoconnect so NM knows about the profile.
+    run(`nmcli con delete "${NM_CON_NAME}" 2>/dev/null`, { allowFail: true });
+    await sleep(500);
+    // Re-enable autoconnect in the staged keyfile now that the AP is down
+    const NM_CON_FILE = `/etc/NetworkManager/system-connections/${NM_CON_NAME}.nmconnection`;
+    try {
+      let content = readFileSync(NM_CON_FILE, 'utf8');
+      content = content.replace('autoconnect=false', 'autoconnect=true');
+      writeFileSync(NM_CON_FILE, content, { mode: 0o600 });
+    } catch (e) {
+      process.stderr.write(`[wifi-setup] WARNING: could not update autoconnect in keyfile: ${e.message}\n`);
+    }
+    run('nmcli con reload', { allowFail: true });
+    process.stderr.write('[wifi-setup] NM connections reloaded with station profile\n');
     await sleep(1000);
 
-    // 2. Ensure DHCP is configured for this interface (systemd-networkd)
-    ensureNetworkdDhcp();
+    // 2. Re-apply regulatory domain at kernel and firmware (CLM) level.
+    //    brcmfmac resets its CLM country during mode transitions; re-applying GB
+    //    here ensures station-mode authentication works on 2.4 GHz channels.
+    run('iw reg set GB 2>/dev/null', { allowFail: true });
+    // Apply to all phys (avoids hardcoding phy0 on multi-radio devices)
+    run(
+      'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
+      '  iw phy "$phy" reg set GB 2>/dev/null || true; ' +
+      'done',
+      { allowFail: true },
+    );
+    process.stderr.write('[wifi-setup] Regulatory domain re-applied (GB)\n');
+    await sleep(1000);
 
-    // 3. Restart systemd-networkd so it picks up the new .network file
-    run('systemctl restart systemd-networkd.service', { allowFail: true });
-    await sleep(500);
+    // 3. Wait for the interface to leave AP mode and reach a connectable state.
+    //    NM switches the interface asynchronously; polling avoids a race where
+    //    `nmcli con up` is called while the interface is still in AP mode.
+    let stationReady = false;
+    for (let i = 0; i < 15; i++) {
+      const devOut = run('nmcli -t -f DEVICE,STATE dev 2>/dev/null', { allowFail: true }) || '';
+      const line = devOut.split('\n').find(l => l.startsWith(`${IFACE}:`)) || '';
+      const state = line.split(':')[1] || '';
+      process.stderr.write(`[wifi-setup] Interface state: "${state}" (${i + 1}/15)\n`);
+      if (state && state !== 'unavailable' && state !== 'unmanaged') {
+        stationReady = true;
+        break;
+      }
+      await sleep(1000);
+    }
+    if (!stationReady) {
+      process.stderr.write('[wifi-setup] WARNING: interface did not reach station state — proceeding anyway\n');
+    }
 
-    // 4. Start wpa_supplicant to authenticate with the configured network
-    run(`systemctl restart wpa_supplicant@${IFACE}.service`, { allowFail: true });
+    // 4. Trigger an NM WiFi rescan. The interface was in AP mode so NM's scan
+    //    cache is stale — without a rescan, `nmcli con up` may fail to find the
+    //    target SSID and report "no network with SSID found".
+    run(`nmcli dev wifi rescan ifname ${IFACE} 2>/dev/null`, { allowFail: true });
+    await sleep(4000);
 
-    // 5. Also try dhcpcd/dhclient as fallback DHCP clients (one of these
-    //    usually exists on RPi OS; they're harmless if systemd-networkd
-    //    is already handling DHCP).
-    await sleep(2000);
-    run(`dhcpcd ${IFACE} 2>/dev/null`, { allowFail: true });
-    run(`dhclient ${IFACE} 2>/dev/null`, { allowFail: true });
+    // 5. Activate the station profile. NM may already be auto-connecting
+    //    (autoconnect=true in the keyfile) — use allowFail so a "profile already
+    //    activated" or "another profile activated" error does not abort the flow.
+    //    Timeout: 30s — if NM cannot authenticate within 30s, the connectivity
+    //    poll loop below handles the failure gracefully.
+    process.stderr.write(`[wifi-setup] Activating profile "${NM_CON_NAME}"...\n`);
+    run(`nmcli con up "${NM_CON_NAME}"`, { allowFail: true, timeout: 30_000 });
 
-    // 6. Poll for connectivity — allow up to 45 seconds for WPA auth + DHCP
-    process.stderr.write('[wifi-setup] Waiting for connectivity...\n');
+    // 6. Poll for internet connectivity — allow up to 60s for WPA + DHCP
+    process.stderr.write('[wifi-setup] Polling for connectivity (max 60s)...\n');
     let connected = false;
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 60; i++) {
       await sleep(1000);
       if (checkConnectivity()) {
         connected = true;
-        process.stderr.write(`[wifi-setup] Connected after ${i + 1}s\n`);
+        process.stderr.write(`[wifi-setup] Internet confirmed after ${i + 1}s\n`);
         break;
       }
     }
 
     if (connected) {
+      // 7. Success
       process.stderr.write('[wifi-setup] AP mode: connected to Wi-Fi!\n');
       connectingInProgress = false;
       lastConnectError = '';
 
-      // Persist: enable services so Wi-Fi reconnects automatically on next boot
       enableWifiOnBoot();
 
-      // Mark that we've had successful connectivity (for xinitrc state machine)
       try {
         mkdirSync('/var/lib/masjidconnect', { recursive: true });
         writeFileSync(WIFI_CONNECTED_MARKER, '1');
       } catch { /* non-fatal */ }
 
-      try {
-        unlinkSync(WIFI_HOTSPOT_ACTIVE_MARKER);
-      } catch { /* non-fatal */ }
+      try { unlinkSync(WIFI_HOTSPOT_ACTIVE_MARKER); } catch { /* non-fatal */ }
       writeFileSync(FLAG_FILE, '1');
       writeFileSync(CONNECT_STATUS_FILE, JSON.stringify({ connected: true }));
     } else {
-      process.stderr.write('[wifi-setup] AP mode: connection failed, restarting AP...\n');
+      // 8. Failure — restart AP so the user can retry from their phone
+      process.stderr.write('[wifi-setup] AP mode: connection failed — restarting hotspot\n');
       connectingInProgress = false;
       lastConnectError = 'Could not connect to the selected network. Please check the password and try again.';
       writeFileSync(CONNECT_STATUS_FILE, JSON.stringify({ connected: false, error: lastConnectError }));
 
-      // Restart the AP so the user can retry
+      // Re-apply regulatory domain before restarting AP (required for broadcast)
+      run('iw reg set GB 2>/dev/null', { allowFail: true });
+      run(
+        'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
+        '  iw phy "$phy" reg set GB 2>/dev/null || true; ' +
+        'done',
+        { allowFail: true },
+      );
+      await sleep(500);
       run(`${HOTSPOT_SCRIPT} scan ${IFACE}`, { allowFail: true });
       await sleep(500);
       run(`${HOTSPOT_SCRIPT} start ${IFACE}`, { allowFail: true });
@@ -341,7 +410,15 @@ async function apModeConnectAsync() {
     lastConnectError = 'An error occurred: ' + (e.message || String(e)).slice(0, 200);
     process.stderr.write(`[wifi-setup] AP mode connect error: ${lastConnectError}\n`);
 
+    // Best-effort AP restart so the user isn't left with nothing
     try {
+      run('iw reg set GB 2>/dev/null', { allowFail: true });
+      run(
+        'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
+        '  iw phy "$phy" reg set GB 2>/dev/null || true; ' +
+        'done',
+        { allowFail: true },
+      );
       run(`${HOTSPOT_SCRIPT} start ${IFACE}`, { allowFail: true });
     } catch { /* best effort */ }
   }

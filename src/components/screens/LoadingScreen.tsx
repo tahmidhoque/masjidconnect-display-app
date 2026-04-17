@@ -12,7 +12,7 @@
 
 import React from 'react';
 import type { LoadingTask } from '../../hooks/useAppLoader';
-import { IslamicPattern } from '../display';
+import { IslamicPattern, ConnectionBanner } from '../display';
 import logoNotextGold from '../../assets/logos/logo-notext-gold.svg';
 
 interface LoadingScreenProps {
@@ -81,6 +81,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ progress, message, tasks 
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Connection status banner at bottom */}
+      <div className="absolute bottom-4 left-4 right-4 z-10 flex justify-center">
+        <ConnectionBanner />
       </div>
     </div>
   );

@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# MasjidConnect — WiFi Watchdog
+# MasjidConnect — WiFi Watchdog (NetworkManager edition)
 #
-# Persistent background service that monitors WiFi connectivity and attempts
-# automatic recovery when the connection drops. Designed for 24/7 kiosk
-# operation on Raspberry Pi where manual intervention is not feasible.
-#
-# Recovery strategy (escalating):
-#   1. rfkill unblock + restart wpa_supplicant (covers soft-block / driver glitch)
-#   2. Restart systemd-networkd (covers DHCP lease expiry)
-#   3. Full interface reset (ip link down/up) + wpa_supplicant restart
+# Persistent background service that monitors WiFi connectivity and assists
+# NetworkManager with edge-case recovery. NM handles most reconnection natively;
+# this watchdog covers rfkill soft-blocks and extended outages that may need
+# the hotspot to be started for user reconfiguration.
 #
 # Must run as root. Intended to be run via systemd (masjidconnect-wifi-watchdog.service).
 # =============================================================================
@@ -22,18 +18,16 @@ WIFI_STATE_DIR="/var/lib/masjidconnect"
 WIFI_CONNECTED_MARKER="${WIFI_STATE_DIR}/wifi-connected-once"
 WIFI_HOTSPOT_ACTIVE_MARKER="/tmp/masjidconnect-hotspot-active"
 
-# Consecutive offline checks before attempting recovery
 OFFLINE_THRESHOLD=2
-# Consecutive offline checks before logging escalation warning
 ESCALATION_THRESHOLD=6
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [wifi-watchdog] $*" >> "$LOG" 2>/dev/null || true; }
 : >> "$LOG" 2>/dev/null || true
 
-log "WiFi watchdog started (poll=${POLL_INTERVAL}s)"
+log "WiFi watchdog started (poll=${POLL_INTERVAL}s, backend=NetworkManager)"
 
 # ---------------------------------------------------------------------------
-# Connectivity check — same logic as xinitrc-kiosk
+# Connectivity check — same as xinitrc-kiosk
 # ---------------------------------------------------------------------------
 have_connectivity() {
   if curl -sf --connect-timeout 4 -o /dev/null "https://portal.masjidconnect.co.uk" 2>/dev/null; then
@@ -46,67 +40,41 @@ have_connectivity() {
 }
 
 # ---------------------------------------------------------------------------
-# Find the wireless interface
-# ---------------------------------------------------------------------------
-find_wlan_iface() {
-  local iface
-  iface=$(iw dev 2>/dev/null | awk '/^\tInterface / {print $2; exit}')
-  [ -n "$iface" ] && { echo "$iface"; return 0; }
-
-  for f in /sys/class/net/*/wireless; do
-    [ -e "$f" ] || continue
-    iface=$(basename "$(dirname "$f")")
-    echo "$iface"; return 0
-  done
-
-  for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -E '^(wlan|wlp|wlx)'); do
-    echo "$iface"; return 0
-  done
-
-  return 1
-}
-
-# ---------------------------------------------------------------------------
-# Check if a wpa_supplicant config exists (WiFi was previously configured)
+# Check if any WiFi connection profile is saved in NetworkManager
 # ---------------------------------------------------------------------------
 wifi_is_configured() {
-  local iface="${1:-wlan0}"
-  [ -f "/etc/wpa_supplicant/wpa_supplicant-${iface}.conf" ]
+  nmcli -t -f TYPE con show 2>/dev/null | grep -q '802-11-wireless'
 }
 
 # ---------------------------------------------------------------------------
 # Recovery actions (escalating severity)
 # ---------------------------------------------------------------------------
 recover_level_1() {
-  local iface="$1"
-  log "Recovery L1: rfkill unblock + restart wpa_supplicant@${iface}"
+  log "Recovery L1: ensure WiFi radio is on, trigger NM rescan"
   rfkill unblock wifi 2>/dev/null || true
   rfkill unblock wlan 2>/dev/null || true
-  rfkill unblock all  2>/dev/null || true
-  systemctl restart "wpa_supplicant@${iface}.service" 2>/dev/null || true
+  nmcli radio wifi on 2>/dev/null || true
+  nmcli dev wifi rescan 2>/dev/null || true
 }
 
 recover_level_2() {
-  local iface="$1"
-  log "Recovery L2: restart systemd-networkd (DHCP renewal)"
-  systemctl restart systemd-networkd.service 2>/dev/null || true
-  # Fallback DHCP clients
-  dhcpcd "$iface" 2>/dev/null || true
-  dhclient "$iface" 2>/dev/null || true
+  log "Recovery L2: restart NetworkManager"
+  systemctl restart NetworkManager.service 2>/dev/null || true
 }
 
 recover_level_3() {
-  local iface="$1"
-  log "Recovery L3: full interface reset + wpa_supplicant restart"
+  local iface
+  iface=$(nmcli -t -f DEVICE,TYPE dev 2>/dev/null | awk -F: '$2 == "wifi" {print $1; exit}')
+  log "Recovery L3: full interface reset on ${iface:-wlan0}"
+  iface="${iface:-wlan0}"
+  nmcli dev disconnect "$iface" 2>/dev/null || true
   ip link set "$iface" down 2>/dev/null || true
   sleep 1
   ip link set "$iface" up 2>/dev/null || true
-  sleep 1
   rfkill unblock wifi 2>/dev/null || true
-  rfkill unblock all  2>/dev/null || true
-  systemctl restart "wpa_supplicant@${iface}.service" 2>/dev/null || true
-  sleep 2
-  systemctl restart systemd-networkd.service 2>/dev/null || true
+  nmcli radio wifi on 2>/dev/null || true
+  sleep 1
+  systemctl restart NetworkManager.service 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -124,19 +92,14 @@ while true; do
     continue
   fi
 
-  # Skip if WiFi was never configured (first-time setup hasn't happened yet)
-  IFACE=$(find_wlan_iface 2>/dev/null || true)
-  if [ -z "$IFACE" ]; then
-    continue
-  fi
-  if ! wifi_is_configured "$IFACE"; then
+  # Skip if WiFi was never configured
+  if ! wifi_is_configured; then
     continue
   fi
 
   if have_connectivity; then
     if [ "$offline_count" -gt 0 ]; then
       log "Connectivity restored after ${offline_count} offline checks (recovery_cycle=$recovery_cycle)"
-      # Update the connectivity marker
       mkdir -p "$WIFI_STATE_DIR" 2>/dev/null || true
       touch "$WIFI_CONNECTED_MARKER" 2>/dev/null || true
     fi
@@ -153,19 +116,17 @@ while true; do
     continue
   fi
 
-  # Determine recovery level based on how many cycles we've attempted
   recovery_cycle=$((recovery_cycle + 1))
 
   case "$recovery_cycle" in
     1|2)
-      recover_level_1 "$IFACE"
+      recover_level_1
       ;;
     3|4)
-      recover_level_2 "$IFACE"
+      recover_level_2
       ;;
     *)
-      recover_level_3 "$IFACE"
-      # Cap the cycle counter to avoid overflow on very long outages
+      recover_level_3
       [ "$recovery_cycle" -gt 100 ] && recovery_cycle=5
       ;;
   esac

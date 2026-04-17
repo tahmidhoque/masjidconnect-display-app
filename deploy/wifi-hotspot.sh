@@ -3,210 +3,290 @@
 # MasjidConnect — Wi-Fi Hotspot (AP) lifecycle manager
 #
 # Creates a temporary open hotspot so users can configure Wi-Fi from their phone.
-# Uses hostapd for the access point and dnsmasq for DHCP + captive-portal DNS.
+# Uses NetworkManager's built-in AP mode (nmcli connection add type wifi mode ap)
+# which works on all Raspberry Pi models including Pi 5 (brcmfmac PCIe driver).
+# NM handles hostapd and DHCP internally — no need to stop NM or manage
+# hostapd/dnsmasq directly.
 #
 # Commands:
-#   scan   — scan nearby networks (wlan must be in managed mode) and cache results
+#   scan   — scan nearby networks and cache results as JSON (NM must manage iface)
 #   start  — bring up the AP with SSID "MasjidConnect-Setup"
-#   stop   — tear down AP and restore interface to managed mode
-#   status — print whether the AP is currently running
+#   stop   — tear down AP and return interface to station mode
+#   status — print "running" or "stopped"
 #
 # Must run as root.
 # Usage:  sudo /opt/masjidconnect/deploy/wifi-hotspot.sh <scan|start|stop|status> [<iface>]
 # =============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
-# ---------------------------------------------------------------------------
-# Binary resolution — bypass PATH entirely.
-# sudo's secure_path in /etc/sudoers overrides any PATH the script exports,
-# so we cannot rely on PATH at all. Find each binary by directly searching
-# the filesystem locations where Debian/RPi OS installs them.
-# ---------------------------------------------------------------------------
-_require() {
-  local name="$1"
-  for d in /usr/sbin /sbin /usr/bin /bin /usr/local/sbin /usr/local/bin; do
-    [ -x "$d/$name" ] && { echo "$d/$name"; return 0; }
-  done
-  echo "$(date '+%Y-%m-%d %H:%M:%S') [wifi-hotspot] FATAL: '$name' not found — is it installed?" >&2
-  exit 1
-}
-
-_find() {
-  local name="$1"
-  for d in /usr/sbin /sbin /usr/bin /bin /usr/local/sbin /usr/local/bin; do
-    [ -x "$d/$name" ] && { echo "$d/$name"; return 0; }
-  done
-  echo ""
-}
-
-IP=$(_require ip)
-IW=$(_require iw)
-HOSTAPD=$(_require hostapd)
-DNSMASQ=$(_require dnsmasq)
-SYSTEMCTL=$(_require systemctl)
-KILLALL=$(_find killall)   # optional — use kill if absent
-
-log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [wifi-hotspot] $*"; }
-
-# Interface: prefer positional arg $2, then env var, then default wlan0.
-# Using an arg avoids sudo env-var restrictions (sudo strips arbitrary env vars).
 IFACE="${2:-${WIFI_HOTSPOT_IFACE:-wlan0}}"
-AP_IP="192.168.4.1"
-AP_NETMASK="255.255.255.0"
-AP_CIDR="${AP_IP}/24"
-DHCP_RANGE_START="192.168.4.2"
-DHCP_RANGE_END="192.168.4.20"
-DHCP_LEASE="24h"
 AP_SSID="MasjidConnect-Setup"
-AP_CHANNEL="6"
-
-HOSTAPD_CONF="/tmp/masjidconnect-hostapd.conf"
-DNSMASQ_CONF="/tmp/masjidconnect-dnsmasq.conf"
-PID_FILE="/tmp/masjidconnect-hotspot.pid"
+AP_IP="192.168.4.1"
+AP_CHANNEL=6
+COUNTRY="${WIFI_COUNTRY:-GB}"
 SCAN_CACHE="/tmp/masjidconnect-wifi-scan.json"
+PID_FILE="/tmp/masjidconnect-hotspot.pid"
+# NM connection name for the hotspot profile
+AP_CON_NAME="MasjidConnect-Hotspot"
+LOG="/tmp/kiosk.log"
 
-log "Resolved: ip=$IP iw=$IW hostapd=$HOSTAPD dnsmasq=$DNSMASQ"
+# Ensure the log file exists and is world-writable so root and pi can both append
+touch "$LOG" 2>/dev/null || true
+chmod a+rw "$LOG" 2>/dev/null || true
+
+log()     { echo "$(date '+%Y-%m-%d %H:%M:%S') [wifi-hotspot] $*"         | tee -a "$LOG" 2>/dev/null || true; }
+log_err() { echo "$(date '+%Y-%m-%d %H:%M:%S') [wifi-hotspot] ERROR: $*"  | tee -a "$LOG" >&2 2>/dev/null || true; }
 
 # ---------------------------------------------------------------------------
-# scan — enumerate nearby SSIDs while interface is still in managed/station mode
+# scan — enumerate nearby SSIDs while interface is in NM-managed/station mode
 # ---------------------------------------------------------------------------
 do_scan() {
   log "Scanning for networks on ${IFACE}..."
 
-  $IP link set "$IFACE" up 2>/dev/null || true
+  # Set regulatory domain before scanning.
+  # Without the per-PHY set, brcmfmac CLM stays at country 99 which restricts
+  # visible channels — many 2.4 GHz networks will be hidden from scan results.
+  if command -v iw &>/dev/null; then
+    iw reg set "$COUNTRY" 2>/dev/null || true
+    local SCAN_PHY
+    SCAN_PHY=$(iw dev "$IFACE" info 2>/dev/null | awk '/wiphy/ {print "phy" $2}' || echo "phy0")
+    iw phy "$SCAN_PHY" reg set "$COUNTRY" 2>/dev/null || true
+    sleep 0.5
+    log "Scan regulatory domain: $(iw reg get 2>/dev/null | tr '\n' ' ' || echo unavailable)"
+  fi
+
+  nmcli radio wifi on 2>/dev/null || true
   sleep 1
 
-  # Run two scans — the first triggers the driver to cycle all channels
-  # (both 2.4 GHz and 5 GHz); the second picks up results that arrived
-  # late. Merging both gives the most complete picture.
-  local raw1 raw2
-  raw1=$($IW dev "$IFACE" scan 2>/dev/null || true)
+  # Two-pass rescan — first pass wakes the radio, second captures networks that
+  # only appear after the channel list is fully populated (common with brcmfmac).
+  nmcli dev wifi rescan ifname "$IFACE" 2>/dev/null || true
+  sleep 3
+  nmcli dev wifi rescan ifname "$IFACE" 2>/dev/null || true
   sleep 2
-  raw2=$($IW dev "$IFACE" scan 2>/dev/null || true)
 
-  local ssids
-  ssids=$(printf '%s\n%s' "$raw1" "$raw2" \
-    | awk '/^[[:space:]]*SSID:/ { line=$0; sub(/^[[:space:]]*SSID:[[:space:]]*/, "", line); if (length(line) > 0) print line }' \
-    | sort -u \
-    | awk '
-      BEGIN { printf "[" }
-      NR > 1 { printf "," }
-      {
-        gsub(/\\/, "\\\\")
-        gsub(/"/, "\\\"")
-        printf "\"%s\"", $0
-      }
-      END { printf "]" }
-    ')
+  local raw
+  raw=$(nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list ifname "$IFACE" 2>/dev/null || true)
 
-  [ -z "$ssids" ] && ssids="[]"
+  # Build JSON array of unique non-empty SSIDs
+  local json
+  json=$(echo "$raw" | awk -F: '
+    NF >= 1 && $1 != "" && !seen[$1]++ {
+      ssid = $1; signal = $2; security = $3
+      gsub(/\\/, "\\\\", ssid);    gsub(/"/, "\\\"", ssid)
+      gsub(/\\/, "\\\\", security); gsub(/"/, "\\\"", security)
+      list = list (count++ ? "," : "") "{\"ssid\":\"" ssid "\",\"signal\":" (signal+0) ",\"security\":\"" security "\"}"
+    }
+    END { printf "[%s]", list }
+  ')
 
-  echo "{\"ssids\":${ssids}}" > "$SCAN_CACHE"
-  log "Cached $(echo "$ssids" | grep -o '"' | wc -l | awk '{print int($1/2)}') network(s) to ${SCAN_CACHE}"
+  [ -z "$json" ] && json="[]"
+  echo "{\"ssids\":${json}}" > "$SCAN_CACHE"
+  log "Cached $(echo "$json" | grep -o '"ssid"' | wc -l) networks to ${SCAN_CACHE}"
 }
 
 # ---------------------------------------------------------------------------
-# start — bring up hostapd + dnsmasq as an open AP
+# start — bring up a NetworkManager AP connection for the setup hotspot.
+#
+# Uses the NM keyfile approach (write connection profile to disk, reload NM,
+# then activate) rather than `nmcli connection add` via D-Bus. This is more
+# reliable because:
+#   - `nmcli connection add type wifi mode ap` via D-Bus fails if wpa_supplicant
+#     has not yet been D-Bus-activated by NM (common on first boot).
+#   - Writing a keyfile and calling `nmcli con reload` does not require D-Bus
+#     for the add step — only the subsequent `nmcli con up` needs it, and by
+#     that point wpa_supplicant is already running and registered.
+#   - This is the same approach used by wifi-apply-bootconf.sh (proven reliable).
+#   - All nmcli errors are captured to variables and written via log_err(),
+#     avoiding the `2>>"$LOG"` redirect that can fail with permission denied.
 # ---------------------------------------------------------------------------
 do_start() {
-  if [ -f "$PID_FILE" ]; then
-    log "Hotspot already running (PID file exists) — stopping first."
-    do_stop
-  fi
-
   log "Starting hotspot on ${IFACE} (SSID: ${AP_SSID})..."
 
-  # Stop any conflicting services
-  $SYSTEMCTL stop "wpa_supplicant@${IFACE}.service" 2>/dev/null || true
-  $SYSTEMCTL stop wpa_supplicant.service 2>/dev/null || true
-  if [ -n "$KILLALL" ]; then
-    "$KILLALL" wpa_supplicant 2>/dev/null || true
-  fi
+  # Unblock any rfkill soft-block
+  rfkill unblock wifi 2>/dev/null || true
+  rfkill unblock wlan 2>/dev/null || true
   sleep 0.5
 
-  # Put interface into AP mode
-  $IP link set "$IFACE" down 2>/dev/null || true
-  $IW dev "$IFACE" set type __ap 2>/dev/null || true
-  $IP addr flush dev "$IFACE" 2>/dev/null || true
-  $IP addr add "$AP_CIDR" dev "$IFACE" 2>/dev/null || true
-  $IP link set "$IFACE" up 2>/dev/null || true
+  # Ensure NetworkManager is running
+  if ! systemctl is-active --quiet NetworkManager 2>/dev/null; then
+    log "NetworkManager not running — starting it..."
+    systemctl start NetworkManager 2>/dev/null || true
+    sleep 3
+  fi
 
-  # Write hostapd config
-  cat > "$HOSTAPD_CONF" <<HOSTAPD_EOF
-interface=${IFACE}
-driver=nl80211
-ssid=${AP_SSID}
-hw_mode=g
-channel=${AP_CHANNEL}
-wmm_enabled=0
-auth_algs=1
-wpa=0
-HOSTAPD_EOF
+  # ---------------------------------------------------------------------------
+  # Pre-flight diagnostics and recovery
+  # ---------------------------------------------------------------------------
+  log "Pre-flight: NM general: $(nmcli general status 2>/dev/null | head -3 | tr '\n' '|' || echo 'unavailable')"
+  log "Pre-flight: devices: $(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | tr '\n' '|' || echo 'unavailable')"
 
-  # Write dnsmasq config — all DNS resolves to AP_IP (captive portal)
-  cat > "$DNSMASQ_CONF" <<DNSMASQ_EOF
-interface=${IFACE}
-bind-interfaces
-dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${AP_NETMASK},${DHCP_LEASE}
-address=/#/${AP_IP}
-DNSMASQ_EOF
+  # wpa_supplicant must NOT be masked — NM D-Bus-activates it for AP mode.
+  if command -v wpa_supplicant &>/dev/null; then
+    WPA_STATE=$(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo "unknown")
+    log "Pre-flight: wpa_supplicant: ${WPA_STATE}"
+    if [ "$WPA_STATE" = "masked" ]; then
+      log "WARNING: wpa_supplicant is masked — attempting unmask before AP start..."
+      systemctl unmask wpa_supplicant.service 2>/dev/null || true
+      sleep 1
+    fi
+  else
+    log_err "wpa_supplicant binary not found — install wpasupplicant"
+    return 1
+  fi
 
-  $HOSTAPD -B "$HOSTAPD_CONF" -P /tmp/masjidconnect-hostapd.pid
+  # Ensure the interface is managed by NM
+  IFACE_STATE=$(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep "^${IFACE}:" | cut -d: -f2 || echo "")
+  log "Pre-flight: ${IFACE} state: '${IFACE_STATE}'"
+  if [ "${IFACE_STATE}" = "unmanaged" ]; then
+    log "WARNING: ${IFACE} unmanaged — attempting nmcli device set managed yes..."
+    nmcli device set "$IFACE" managed yes 2>/dev/null || true
+    sleep 2
+    IFACE_STATE=$(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep "^${IFACE}:" | cut -d: -f2 || echo "")
+    log "Pre-flight: ${IFACE} state after fix: '${IFACE_STATE}'"
+  fi
+  if [ -z "${IFACE_STATE}" ]; then
+    log_err "Interface ${IFACE} not in NM device list"
+    log_err "  rfkill: $(rfkill list 2>/dev/null || echo unavailable)"
+    log_err "  iw dev: $(iw dev 2>/dev/null | head -6 || echo unavailable)"
+    return 1
+  fi
+
+  # Set regulatory domain — required for AP mode on 2.4 GHz channels.
+  #
+  # Two-step approach is required for brcmfmac (Broadcom WiFi on RPi):
+  #   1. `iw reg set` — sets the kernel cfg80211 regulatory domain
+  #   2. `iw phy <phy> reg set` — sends an nl80211 per-PHY command that
+  #      brcmfmac intercepts and propagates into the firmware's CLM
+  #      (Country Locale Matrix). Without this second command the CLM
+  #      stays at country 99 ("unset"), which silently disables AP beacon
+  #      transmission even though `nmcli con up` reports success.
+  if command -v iw &>/dev/null; then
+    iw reg set "$COUNTRY" 2>/dev/null \
+      && log "Kernel regulatory domain set to ${COUNTRY}" \
+      || log "iw reg set (kernel) failed (non-fatal)"
+    # Derive the phy name from the interface (e.g. wlan0 → phy0)
+    local PHY
+    PHY=$(iw dev "$IFACE" info 2>/dev/null | awk '/wiphy/ {print "phy" $2}' || echo "phy0")
+    iw phy "$PHY" reg set "$COUNTRY" 2>/dev/null \
+      && log "Per-PHY (${PHY}) CLM regulatory domain set to ${COUNTRY}" \
+      || log "iw phy reg set failed (non-fatal)"
+    sleep 1
+    log "Regulatory state after set: $(iw reg get 2>/dev/null | tr '\n' ' ' || echo unavailable)"
+  fi
+
+  # ---------------------------------------------------------------------------
+  # Remove any stale hotspot connection profile from a previous run
+  # ---------------------------------------------------------------------------
+  nmcli connection delete "$AP_CON_NAME" 2>/dev/null || true
+  local NM_CON_DIR="/etc/NetworkManager/system-connections"
+  local NM_CON_FILE="${NM_CON_DIR}/${AP_CON_NAME}.nmconnection"
+  rm -f "$NM_CON_FILE" 2>/dev/null || true
+  sleep 0.5
+
+  # ---------------------------------------------------------------------------
+  # Write the AP connection as an NM keyfile instead of using `nmcli connection add`.
+  #
+  # `nmcli connection add type wifi mode ap` calls NM's D-Bus AddConnection method
+  # which fails if wpa_supplicant hasn't been D-Bus-activated yet (common on first
+  # boot). Writing the keyfile directly and using `nmcli con reload` bypasses the
+  # D-Bus add step entirely — only the subsequent `nmcli con up` needs D-Bus, and
+  # by that point NM has had time to activate wpa_supplicant.
+  #
+  # Open AP: no [wifi-security] section. Adding key-mgmt=none creates a WEP
+  # section that Bookworm's wpa_supplicant rejects (WEP compiled out).
+  # ---------------------------------------------------------------------------
+  log "Writing AP keyfile to ${NM_CON_FILE}..."
+  mkdir -p "$NM_CON_DIR"
+  # Use printf to avoid heredoc issues in constrained environments
+  printf '[connection]\nid=%s\ntype=wifi\nautoconnect=false\n\n[wifi]\nmode=ap\nssid=%s\nband=bg\nchannel=%s\n\n[ipv4]\nmethod=shared\naddress1=%s/24\n\n[ipv6]\nmethod=disabled\n' \
+    "$AP_CON_NAME" "$AP_SSID" "$AP_CHANNEL" "$AP_IP" > "$NM_CON_FILE"
+  if [ ! -s "$NM_CON_FILE" ]; then
+    log_err "Failed to write AP keyfile — filesystem issue?"
+    return 1
+  fi
+  chmod 600 "$NM_CON_FILE"
+  log "Keyfile written ($(wc -c < "$NM_CON_FILE") bytes)"
+
+  # Reload NM connection profiles to pick up the new keyfile
+  log "Reloading NM connections..."
+  local RELOAD_ERR
+  RELOAD_ERR=$(nmcli con reload 2>&1) || true
+  log "NM reload: ${RELOAD_ERR:-ok}"
   sleep 1
 
-  $DNSMASQ -C "$DNSMASQ_CONF" --pid-file=/tmp/masjidconnect-dnsmasq.pid --log-facility=/tmp/masjidconnect-dnsmasq.log
+  # Activate the AP connection
+  log "Activating AP connection..."
+  local UP_ERR
+  if ! UP_ERR=$(nmcli connection up "$AP_CON_NAME" 2>&1); then
+    log_err "nmcli connection up failed: ${UP_ERR}"
+    log_err "  NM devices: $(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | tr '\n' '|' || echo unavailable)"
+    log_err "  wpa_supplicant active: $(systemctl is-active wpa_supplicant.service 2>/dev/null || echo unknown)"
+    log_err "  NM journal: $(journalctl -u NetworkManager -n 10 --no-pager 2>/dev/null | tail -10 | tr '\n' '|' || echo unavailable)"
+    nmcli connection delete "$AP_CON_NAME" 2>/dev/null || true
+    rm -f "$NM_CON_FILE" 2>/dev/null || true
+    return 1
+  fi
+  log "nmcli connection up: ok"
 
-  local hostapd_pid dnsmasq_pid
-  hostapd_pid=$(cat /tmp/masjidconnect-hostapd.pid 2>/dev/null || echo "")
-  dnsmasq_pid=$(cat /tmp/masjidconnect-dnsmasq.pid 2>/dev/null || echo "")
-  echo "${hostapd_pid}:${dnsmasq_pid}" > "$PID_FILE"
+  # Poll until the interface enters AP mode (NM switches it asynchronously)
+  log "Waiting for ${IFACE} to enter AP mode..."
+  local ap_ready=false
+  local i
+  for i in $(seq 1 20); do
+    if iw dev "$IFACE" info 2>/dev/null | grep -q "type AP"; then
+      log "Interface in AP mode after ${i}s"
+      ap_ready=true
+      break
+    fi
+    sleep 1
+  done
+  if [ "$ap_ready" = false ]; then
+    log_err "Timed out waiting for AP mode — SSID will not broadcast"
+    log_err "  iw dev: $(iw dev 2>/dev/null | head -10 || echo unavailable)"
+    log_err "  NM active cons: $(nmcli con show --active 2>/dev/null | head -5 | tr '\n' '|' || echo unavailable)"
+    log_err "  NM journal: $(journalctl -u NetworkManager -n 15 --no-pager 2>/dev/null | tail -15 | tr '\n' '|' || echo unavailable)"
+  fi
 
-  log "Hotspot running — hostapd PID=${hostapd_pid}, dnsmasq PID=${dnsmasq_pid}"
-  log "AP IP: ${AP_IP}, SSID: ${AP_SSID}"
+  local mode
+  mode=$(iw dev "$IFACE" info 2>/dev/null | awk '/type/ {print $2}' || echo "unknown")
+  local ip
+  ip=$(ip -4 addr show dev "$IFACE" 2>/dev/null | awk '/inet / {print $2}' | head -1)
+  log "Hotspot done — SSID: ${AP_SSID}, mode: ${mode}, IP: ${ip:-unknown}"
+  echo "$$" > "$PID_FILE"
 }
 
 # ---------------------------------------------------------------------------
-# stop — tear down AP, restore interface to managed mode
+# stop — tear down the NM AP connection and return to station mode.
+# NM is kept running throughout — no restart needed.
 # ---------------------------------------------------------------------------
 do_stop() {
   log "Stopping hotspot..."
 
-  if [ -f /tmp/masjidconnect-hostapd.pid ]; then
-    kill "$(cat /tmp/masjidconnect-hostapd.pid)" 2>/dev/null || true
-    rm -f /tmp/masjidconnect-hostapd.pid
-  fi
-  if [ -n "$KILLALL" ]; then
-    "$KILLALL" hostapd 2>/dev/null || true
-  fi
+  nmcli connection down "$AP_CON_NAME" 2>/dev/null || true
+  sleep 1
+  nmcli connection delete "$AP_CON_NAME" 2>/dev/null || true
+  # Remove keyfile so NM doesn't try to activate it on next reload
+  rm -f "/etc/NetworkManager/system-connections/${AP_CON_NAME}.nmconnection" 2>/dev/null || true
+  rm -f "$PID_FILE"
 
-  if [ -f /tmp/masjidconnect-dnsmasq.pid ]; then
-    kill "$(cat /tmp/masjidconnect-dnsmasq.pid)" 2>/dev/null || true
-    rm -f /tmp/masjidconnect-dnsmasq.pid
-  fi
-
-  rm -f "$PID_FILE" "$HOSTAPD_CONF" "$DNSMASQ_CONF"
-
-  $IP link set "$IFACE" down 2>/dev/null || true
-  $IP addr flush dev "$IFACE" 2>/dev/null || true
-  $IW dev "$IFACE" set type managed 2>/dev/null || true
-  $IP link set "$IFACE" up 2>/dev/null || true
-
-  log "Hotspot stopped, ${IFACE} restored to managed mode"
+  log "Hotspot stopped — NM station mode restored"
 }
 
 # ---------------------------------------------------------------------------
-# status — report whether hotspot is active
+# status — report whether the NM AP connection is currently active
 # ---------------------------------------------------------------------------
 do_status() {
-  if [ -f "$PID_FILE" ]; then
-    local pids
-    pids=$(cat "$PID_FILE")
-    local hostapd_pid="${pids%%:*}"
-    if [ -n "$hostapd_pid" ] && kill -0 "$hostapd_pid" 2>/dev/null; then
-      echo "running"
-      exit 0
-    fi
+  # Check if the AP NM connection is active
+  if nmcli -t -f NAME,STATE con show --active 2>/dev/null | grep -q "^${AP_CON_NAME}:activated"; then
+    echo "running"
+    exit 0
+  fi
+  # Fallback: check if interface is physically in AP mode
+  if iw dev "$IFACE" info 2>/dev/null | grep -q "type AP"; then
+    echo "running"
+    exit 0
   fi
   echo "stopped"
   exit 0

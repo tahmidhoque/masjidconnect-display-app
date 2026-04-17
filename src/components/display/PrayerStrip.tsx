@@ -2,8 +2,9 @@
  * PrayerStrip
  *
  * Landscape-only horizontal bar: optional Imsak row, then clock and dates (left),
- * prayer cue cards, and an optional countdown row. Jumuah-specific times are not
- * shown in landscape (portrait uses JumuahBar).
+ * prayer cue cards, and an optional countdown row. Jumuah-specific times are
+ * surfaced via JumuahBar in portrait only; landscape strip always labels the
+ * Friday slot as Zuhr.
  *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
@@ -77,7 +78,7 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
   countdownSlot = null,
 }) => {
   const currentTime = useCurrentTime();
-  const { todaysPrayerTimes, isJumuahToday } = usePrayerTimesContext();
+  const { todaysPrayerTimes } = usePrayerTimesContext();
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   const timeStr24h = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
@@ -139,9 +140,6 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
             const isSunrise = prayer.name === 'Sunrise';
             const displayName = (() => {
               const fallback = DISPLAY_NAMES[prayer.name] ?? prayer.name;
-              if (isJumuahToday && prayer.name === 'Zuhr') {
-                return resolveTerminology(terminology, 'jummah', fallback);
-              }
               const key = prayerRowNameToTerminologyKey(prayer.name);
               return key ? resolveTerminology(terminology, key, fallback) : fallback;
             })();

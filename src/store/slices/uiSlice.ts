@@ -57,6 +57,16 @@ export interface UIState {
   // Pending restart/reload (from remote command with countdown) — show on-screen countdown
   pendingRestart: { at: number; label: string } | null;
 
+  // WiFi status (from /internal/wifi/status on Pi). Not persisted.
+  wifiStatus: {
+    state: string;
+    ssid: string;
+    signal: number;
+    ip: string;
+    hotspotActive: boolean;
+  } | null;
+  showWifiSettings: boolean;
+
   // Self-update status (from FORCE_UPDATE + /internal/update-status). Not persisted.
   updatePhase:
     | "idle"
@@ -96,6 +106,8 @@ const initialState: UIState = {
   preventContextMenu: true,
   preventKeyboardShortcuts: true,
   pendingRestart: null,
+  wifiStatus: null,
+  showWifiSettings: false,
   updatePhase: "idle",
   updateMessage: "",
   updateRestartAt: null,
@@ -267,6 +279,17 @@ const uiSlice = createSlice({
       state.pendingRestart = null;
     },
 
+    setWifiStatus: (
+      state,
+      action: PayloadAction<UIState["wifiStatus"]>,
+    ) => {
+      state.wifiStatus = action.payload;
+    },
+
+    setShowWifiSettings: (state, action: PayloadAction<boolean>) => {
+      state.showWifiSettings = action.payload;
+    },
+
     // Self-update status (FORCE_UPDATE flow)
     setUpdateStatus: (
       state,
@@ -311,6 +334,8 @@ const uiSlice = createSlice({
       state.renderCount = 0;
       state.lastRenderTime = null;
       state.pendingRestart = null;
+      state.wifiStatus = null;
+      state.showWifiSettings = false;
       state.updatePhase = "idle";
       state.updateMessage = "";
       state.updateRestartAt = null;
@@ -345,6 +370,8 @@ export const {
   setPreventKeyboardShortcuts,
   setPendingRestart,
   clearPendingRestart,
+  setWifiStatus,
+  setShowWifiSettings,
   setUpdateStatus,
   clearUpdateStatus,
   resetUIState,
@@ -399,6 +426,10 @@ export const selectUpdateMessage = (state: { ui: UIState }) =>
   state.ui.updateMessage;
 export const selectUpdateRestartAt = (state: { ui: UIState }) =>
   state.ui.updateRestartAt;
+export const selectWifiStatus = (state: { ui: UIState }) =>
+  state.ui.wifiStatus;
+export const selectShowWifiSettings = (state: { ui: UIState }) =>
+  state.ui.showWifiSettings;
 
 // Computed selectors
 export const selectOfflineDuration = (state: { ui: UIState }) => {

@@ -58,6 +58,8 @@ yarn-error.log*
 
 # Docker-built RPi image output
 rpi-image/out/
+# Host-downloaded package tarballs (binary, not for git)
+rpi-image/pkg-cache/
 # WiFi credentials (optional build-time config)
 rpi-image/wifi.conf
 # SSH keys and secrets (optional build-time; never commit)
