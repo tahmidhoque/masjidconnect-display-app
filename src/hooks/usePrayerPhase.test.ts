@@ -70,11 +70,10 @@ function renderPhase(initialState?: Parameters<typeof createTestStore>[0]) {
     },
   });
   const wrapper = ({ children }: { children: React.ReactNode }) =>
-    React.createElement(
-      AllTheProviders,
-      { preloadedState: store.getState() },
+    React.createElement(AllTheProviders, {
+      preloadedState: store.getState(),
       children,
-    );
+    });
   return renderHook(() => usePrayerPhase(), { wrapper });
 }
 
