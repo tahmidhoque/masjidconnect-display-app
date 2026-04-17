@@ -392,6 +392,45 @@ describe('getNextPrayerTime', () => {
     expect(withTz.name).toBe('Zuhr');
     expect(withTz.time).toBe('12:15');
   });
+
+  // ---- Unpadded / 12h prayer string regressions --------------------------
+  // Previously string-based comparisons sorted "9:30" after "10:00" and
+  // missed PM Maghrib "7:45". The numeric `toMinutesFromMidnight` path
+  // handles both correctly.
+
+  it('selects Zuhr when Asr time is unpadded ("3:30"), not the lexically earliest string', () => {
+    const unpadded = {
+      fajr: '5:30',
+      sunrise: '6:45',
+      zuhr: '12:15',
+      asr: '3:30',  // PM as 24h would be 15:30; here it's literally 3:30 → 03:30
+      maghrib: '18:20',
+      isha: '19:45',
+    };
+    // 14:00 UTC = 14:00 London (winter): Zuhr (12:15) passed, Asr "3:30" is
+    // really 03:30 (parsed as 3 → 3*60+30 = 210). So Asr has technically
+    // already "passed" today — next non-skip prayer in numeric order is
+    // Maghrib (18:20). Old string-compare logic would erroneously select Asr
+    // because "3:30" > "14:00" string-wise.
+    const now = new Date('2026-01-15T14:00:00.000Z');
+    const result = getNextPrayerTime(now, unpadded, 'Europe/London');
+    expect(result.name).toBe('Maghrib');
+  });
+
+  it('parses unpadded morning times correctly when sorting (e.g. "9:30")', () => {
+    const unpadded = {
+      fajr: '5:30',
+      sunrise: '6:45',
+      zuhr: '9:30', // unpadded — should be parsed as 09:30
+      asr: '15:30',
+      maghrib: '18:20',
+      isha: '19:45',
+    };
+    // 09:00 London — Zuhr (09:30) is next.
+    const now = new Date('2026-01-15T09:00:00.000Z');
+    const result = getNextPrayerTime(now, unpadded, 'Europe/London');
+    expect(result.name).toBe('Zuhr');
+  });
 });
 
 // ---------------------------------------------------------------------------

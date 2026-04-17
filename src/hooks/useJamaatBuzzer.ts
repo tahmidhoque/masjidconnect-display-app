@@ -27,7 +27,10 @@ import { useEffect, useRef } from 'react';
 import usePrayerPhase from './usePrayerPhase';
 import { usePrayerTimesContext } from '../contexts/PrayerTimesContext';
 import { useBuzzerSettings } from './useBuzzerSettings';
-import { toMinutesFromMidnight } from '../utils/dateUtils';
+import { nowMinutesInTz, toMinutesFromMidnight } from '../utils/dateUtils';
+import { useAppSelector } from '../store/hooks';
+import { selectMasjidTimezone } from '../store/slices/contentSlice';
+import { defaultMasjidTimezone } from '../config/environment';
 import logger from '../utils/logger';
 
 /** Public so the settings overlay's "Test sound" button can play the same file. */
@@ -109,6 +112,8 @@ export function useJamaatBuzzer(): void {
   const { phase, prayerName, inPrayerSubPhase } = usePrayerPhase();
   const { currentPrayer, nextPrayer } = usePrayerTimesContext();
   const { enabled, volume } = useBuzzerSettings();
+  const masjidTz =
+    useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevRef = useRef<{ phase?: string; sub?: string; prayer?: string }>({});
@@ -156,9 +161,9 @@ export function useJamaatBuzzer(): void {
     if (jamaatStr) {
       const jamaatMin = toMinutesFromMidnight(jamaatStr, prayerName);
       if (jamaatMin >= 0) {
-        const now = new Date();
-        const nowMin =
-          now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        // Compare in masjid wall-clock minutes; using `Date.getHours()` here
+        // would be wrong when the device runs in UTC (e.g. the Pi kiosk).
+        const nowMin = nowMinutesInTz(new Date(), masjidTz);
         const elapsedSec = (nowMin - jamaatMin) * 60;
         if (elapsedSec < 0 || elapsedSec > SAFETY_WINDOW_SEC) {
           logger.info('[JamaatBuzzer] Skipped — outside safety window', {
@@ -193,7 +198,7 @@ export function useJamaatBuzzer(): void {
          * user may unlock audio (e.g. via the test button) and a future tick
          * could try again. */
       });
-  }, [phase, inPrayerSubPhase, prayerName, enabled, currentPrayer, nextPrayer]);
+  }, [phase, inPrayerSubPhase, prayerName, enabled, currentPrayer, nextPrayer, masjidTz]);
 }
 
 export default useJamaatBuzzer;

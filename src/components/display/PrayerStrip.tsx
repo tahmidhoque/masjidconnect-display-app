@@ -13,7 +13,7 @@ import React, { useMemo } from 'react';
 import { Sunrise } from 'lucide-react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
-import { useCurrentTime } from '../../hooks/useCurrentTime';
+import useMasjidTime from '../../hooks/useMasjidTime';
 import {
   calculateApproximateHijriDate,
   getTimeDisplayParts,
@@ -77,18 +77,20 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
   tomorrowsJamaats = null,
   countdownSlot = null,
 }) => {
-  const currentTime = useCurrentTime();
+  // Masjid-tz wall clock — never device-local. The Pi runs in UTC so reading
+  // `Date.getHours()` directly would show the wrong time on the strip.
+  const now = useMasjidTime();
   const { todaysPrayerTimes } = usePrayerTimesContext();
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
-  const timeStr24h = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
+  const timeStr24h = now.format('HH:mm');
   const { main: timeMain, period: timePeriod } = getTimeDisplayParts(
     timeStr24h,
     timeFormat,
   );
-  const dayName = DAYS[currentTime.getDay()];
-  const dateStr = `${currentTime.getDate()} ${MONTHS[currentTime.getMonth()]} ${currentTime.getFullYear()}`;
-  const calendarDate = currentTime.getDate();
+  const dayName = DAYS[now.day()];
+  const dateStr = `${now.date()} ${MONTHS[now.month()]} ${now.year()}`;
+  const calendarDate = now.date();
   const hijriDate = useMemo(
     () => calculateApproximateHijriDate(undefined, hijriDateAdjustment),
     [calendarDate, hijriDateAdjustment],

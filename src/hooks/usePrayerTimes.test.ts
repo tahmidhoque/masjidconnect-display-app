@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -110,6 +110,66 @@ describe('usePrayerTimes', () => {
       const isha = result.current.todaysPrayerTimes.find((p) => p.name === 'Isha');
       expect(isha).toBeDefined();
       expect(isha?.jamaat).toBe('20:15');
+    });
+  });
+
+  describe('next-prayer selection regression (10am scenario)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('selects Zuhr as next prayer at 10am masjid-tz with realistic UK times', async () => {
+      // 10:00 BST on 2026-06-15 (during BST). Pre-rewrite, the late-night
+      // branch + string-compare selection could mis-select Fajr at this hour
+      // when the device tz differed from the masjid tz. With the unified
+      // numeric selection Zuhr (12:15) is the only valid pick.
+      vi.setSystemTime(new Date('2026-06-15T09:00:00.000Z')); // 10:00 BST
+
+      const todayLondon = dayjs.tz('2026-06-15', TEST_TZ).format('YYYY-MM-DD');
+      const prayerTimes = {
+        date: todayLondon,
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '12:30',
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+      };
+
+      const store = createTestStore();
+      const contentState = store.getState().content;
+      const storeWithTimes = createTestStore({
+        content: {
+          ...contentState,
+          prayerTimes,
+          masjidTimezone: TEST_TZ,
+          timeFormat: '24h',
+        },
+      });
+      const preloaded = storeWithTimes.getState();
+      const wrapper = ({ children }: { children: React.ReactNode }) =>
+        React.createElement(
+          AllTheProviders,
+          { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+          children,
+        );
+
+      const { result } = renderHook(() => usePrayerTimes(), { wrapper });
+
+      await waitFor(
+        () => {
+          expect(result.current.nextPrayer?.name).toBe('Zuhr');
+        },
+        { timeout: 2000 },
+      );
     });
   });
 

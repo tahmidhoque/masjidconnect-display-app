@@ -211,6 +211,23 @@ export const toMinutesFromMidnight = (
   return min;
 };
 
+/**
+ * Wall-clock minutes-from-midnight in a given IANA timezone.
+ *
+ * The Pi runs in UTC but prayer times in storage are masjid-local wall-clock
+ * strings; using `Date.getHours()` from the device gives the wrong number of
+ * minutes when device tz ≠ masjid tz. This helper returns the same masjid-local
+ * minute value that `toMinutesFromMidnight` produces for prayer strings, so
+ * comparisons between "now" and a prayer time are always apples-to-apples.
+ *
+ * Includes seconds so the value advances smoothly between minute boundaries
+ * (matches what the existing `nowMinutes` callers expect).
+ */
+export const nowMinutesInTz = (now: Date, tz: string): number => {
+  const local = dayjs(now).tz(tz);
+  return local.hour() * 60 + local.minute() + local.second() / 60;
+};
+
 // Convert 12-hour time string to 24-hour time string using dayjs
 export const convertTo24Hour = (timeString: string): string => {
   if (!timeString) return "";
@@ -245,7 +262,9 @@ export const getNextPrayerTime = (
   // Define prayers to skip in countdown
   const SKIP_PRAYERS = ["Sunrise"];
 
-  // Create prayers array with all prayers
+  // Create prayers array with all prayers, annotated with minutes-from-midnight
+  // so we never depend on string compares (which break for unpadded "9:30" or
+  // 12h Maghrib/Isha values like "7:45").
   const allPrayers = [
     { name: "Fajr", time: prayerTimes.fajr },
     { name: "Sunrise", time: prayerTimes.sunrise },
@@ -253,26 +272,27 @@ export const getNextPrayerTime = (
     { name: "Asr", time: prayerTimes.asr },
     { name: "Maghrib", time: prayerTimes.maghrib },
     { name: "Isha", time: prayerTimes.isha },
-  ].filter((prayer) => prayer.time); // Only include prayers with valid times
+  ]
+    .filter((prayer) => prayer.time)
+    .map((prayer) => ({
+      ...prayer,
+      minutes: toMinutesFromMidnight(prayer.time, prayer.name),
+    }))
+    .filter((prayer) => prayer.minutes >= 0);
 
   // Filter out prayers that should be skipped for the countdown
   const prayers = allPrayers.filter(
     (prayer) => !SKIP_PRAYERS.includes(prayer.name),
   );
 
-  // Sort prayers by time
-  prayers.sort((a, b) => a.time.localeCompare(b.time));
+  prayers.sort((a, b) => a.minutes - b.minutes);
 
-  // Express "now" in the masjid timezone so the HH:mm comparison is against
-  // wall-clock prayer strings rather than device-local time.
-  const currentDayjs = timezone
-    ? dayjs(currentTime).tz(timezone)
-    : dayjs(currentTime);
-  const currentTimeString = currentDayjs.format("HH:mm");
+  // Express "now" in the masjid timezone so the comparison is against
+  // wall-clock prayer minutes rather than device-local time.
+  const nowMin = nowMinutesInTz(currentTime, timezone || dayjs.tz.guess());
 
-  // Find the next prayer whose adhan hasn't passed yet
   for (const prayer of prayers) {
-    if (prayer.time > currentTimeString) {
+    if (prayer.minutes > nowMin) {
       return { name: prayer.name, time: prayer.time };
     }
   }

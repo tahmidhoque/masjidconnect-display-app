@@ -35,14 +35,19 @@ interface PrayerCountdownProps {
 }
 
 /**
- * Whether we are currently counting down to jamaat (between adhan and jamaat).
+ * Minutes BEFORE jamaat that we flip to the "Jamaat in" countdown label.
+ * Mirrors `JAMAAT_LEAD_MIN` in `usePrayerPhase` so the countdown label and
+ * silent-phones screen always swap together (also covers A == J and A within
+ * the lead window — the previous heuristic missed those cases).
  */
-function isCountingToJamaat(
-  targetTime: { time: string } | null,
-  jamaat: string | undefined,
-): boolean {
-  return Boolean(targetTime && jamaat && targetTime.time === jamaat);
-}
+const JAMAAT_LEAD_MIN = 5;
+
+type CountdownTarget = {
+  time: string;
+  forceTomorrow: boolean;
+  /** Whether the target time is the prayer's jamaat (vs adhan). */
+  target: 'jamaat' | 'adhan';
+};
 
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   phase,
@@ -57,43 +62,53 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
   /**
-   * Determine the target time string (HH:mm) to count down to.
-   * If the next prayer's adhan has passed but jamaat hasn't, count to jamaat.
-   * Otherwise count to adhan.
+   * Determine what to count down to. Mirrors the `usePrayerPhase` rule so the
+   * countdown label and the silent-phones screen always agree.
+   *
+   *   - Before adhan, outside the lead window → count down to ADHAN
+   *   - Inside the lead window (`now >= J − JAMAAT_LEAD_MIN`) → count down to
+   *     JAMAAT, even when adhan hasn't fired yet (handles A == J and
+   *     A within JAMAAT_LEAD_MIN of J)
+   *   - Adhan passed, before jamaat → count down to JAMAAT
+   *   - At/past jamaat → null (DisplayScreen swaps to in-prayer phase)
+   *   - Adhan passed, no jamaat in payload → tomorrow's adhan (covers the
+   *     after-Isha → tomorrow's Fajr branch in usePrayerTimes)
    */
-  const targetTime = useMemo(() => {
+  const targetTime = useMemo<CountdownTarget | null>(() => {
     if (!nextPrayer) return null;
 
     const nowMin = now.hour() * 60 + now.minute() + now.second() / 60;
-    const adhanMin = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
-    const jamaatMin = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
+    const A = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
+    const J = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
 
-    // Between adhan and jamaat — count down to jamaat (numeric comparison avoids "9:45" vs "19:45" string issues)
-    if (adhanMin >= 0 && jamaatMin >= 0 && nowMin >= adhanMin && nowMin < jamaatMin) {
-      return { time: nextPrayer.jamaat!, forceTomorrow: false };
+    if (A < 0 && J < 0) return null;
+
+    // Before adhan today
+    if (A >= 0 && nowMin < A) {
+      // Lead window flip (only fires when A >= J − JAMAAT_LEAD_MIN, i.e. when
+      // adhan and jamaat are within the lead window or equal)
+      if (J >= 0 && nowMin >= J - JAMAAT_LEAD_MIN) {
+        return { time: nextPrayer.jamaat!, forceTomorrow: false, target: 'jamaat' };
+      }
+      return { time: nextPrayer.time, forceTomorrow: false, target: 'adhan' };
     }
 
-    // Past this prayer's jamaat — show 0s until nextPrayer advances (avoids 23h loop).
-    // Only when jamaat is "today" (afternoon/evening) or we're in morning; else nextPrayer is e.g. Fajr and we're in evening → count to tomorrow's Fajr.
-    const isPastThisPrayerJamaat =
-      adhanMin >= 0 && jamaatMin >= 0 && nowMin >= adhanMin && nowMin >= jamaatMin &&
-      (jamaatMin >= 12 * 60 || nowMin < 12 * 60);
-    if (isPastThisPrayerJamaat) {
+    // Adhan passed (or missing) but jamaat still upcoming today
+    if (J >= 0 && nowMin < J) {
+      return { time: nextPrayer.jamaat!, forceTomorrow: false, target: 'jamaat' };
+    }
+
+    // At/past jamaat — let DisplayScreen show in-prayer screen.
+    if (J >= 0 && nowMin >= J) {
       return null;
     }
 
-    // Adhan has passed but no jamaat (or missing data) — show 0s until nextPrayer advances.
-    if (adhanMin >= 0 && nowMin >= adhanMin && jamaatMin < 0) {
-      return null;
+    // No jamaat in payload, adhan already passed → tomorrow's adhan.
+    if (A >= 0) {
+      return { time: nextPrayer.time, forceTomorrow: true, target: 'adhan' };
     }
 
-    // If adhan has passed today (and jamaat too, or no jamaat), this is tomorrow's prayer
-    if (adhanMin >= 0 && nowMin >= adhanMin) {
-      return { time: nextPrayer.time, forceTomorrow: true };
-    }
-
-    // Adhan is still in the future today
-    return { time: nextPrayer.time, forceTomorrow: false };
+    return null;
   }, [nextPrayer, now]);
 
   /**
@@ -107,7 +122,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow, {}, masjidTz);
   }, [targetTime, now, nextPrayer, masjidTz]);
 
-  const countingToJamaat = isCountingToJamaat(targetTime, nextPrayer?.jamaat);
+  const countingToJamaat = targetTime?.target === 'jamaat';
   const displayName = useMemo(() => {
     if (!nextPrayer?.name) return '';
     if (nextPrayer.name === 'Zuhr' && isJumuahToday) {

@@ -6,11 +6,21 @@
  * that drives what the display shows (carousel, phones-off graphic,
  * or in-prayer calm screen).
  *
- * Phases:
+ * Phase rule (J = jamaat minutes-from-midnight, A = adhan minutes-from-midnight,
+ * `JAMAAT_LEAD_MIN` = silent-phones lead time):
  *   countdown-adhan  — Normal display. Carousel visible, counting down to adhan.
- *   countdown-jamaat — Adhan passed, carousel visible, counting down to jamaat (> 5 min).
- *   jamaat-soon      — Within 5 min of jamaat. Phones-off graphic replaces carousel.
- *   in-prayer        — Jamaat reached. Calm screen for A + B minutes (displaySettings: jamaat-in-progress + post-jamaat delay).
+ *   countdown-jamaat — Adhan passed, still > JAMAAT_LEAD_MIN to jamaat.
+ *   jamaat-soon      — Within JAMAAT_LEAD_MIN of jamaat (regardless of adhan).
+ *                      Phones-off graphic replaces carousel — fires for the full
+ *                      lead window even when adhan == jamaat or A is inside the
+ *                      lead window.
+ *   in-prayer        — Jamaat reached. Calm screen for `jamaatProgressMin`
+ *                      (sub-phase 'jamaat') then `delayMin` (sub-phase
+ *                      'post-jamaat') sourced from displaySettings.
+ *
+ * All comparisons happen in masjid-local minutes-from-midnight via
+ * `nowMinutesInTz` + `toMinutesFromMidnight`, so the phase machine works
+ * correctly when the device runs in a different timezone (Pi kiosk in UTC).
  *
  * Supports a dev override via window.__PRAYER_PHASE_FORCE so keyboard
  * shortcuts can force any phase for testing (same pattern as Ramadan toggle).
@@ -19,10 +29,14 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { usePrayerTimesContext } from '../contexts/PrayerTimesContext';
 import { useCurrentTime } from './useCurrentTime';
-import { toMinutesFromMidnight } from '../utils/dateUtils';
+import { nowMinutesInTz, toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
 import { useAppSelector } from '@/store/hooks';
-import { selectDisplaySettings } from '@/store/slices/contentSlice';
+import {
+  selectDisplaySettings,
+  selectMasjidTimezone,
+} from '@/store/slices/contentSlice';
+import { defaultMasjidTimezone } from '@/config/environment';
 import {
   jamaatPhaseMinutesForDisplayPrayer,
   postJamaatDelayMinutes,
@@ -51,8 +65,12 @@ export interface PrayerPhaseData {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-/** How many minutes before jamaat to show the phones-off graphic */
-const JAMAAT_SOON_THRESHOLD_MIN = 5;
+/**
+ * Minutes BEFORE jamaat that the silent-phones / jamaat-soon screen shows.
+ * Independent of adhan: even when adhan == jamaat (or within this window),
+ * the silent-phones graphic still fires for the full lead time.
+ */
+const JAMAAT_LEAD_MIN = 5;
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
@@ -72,17 +90,6 @@ declare global {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-/**
- * Convert a Date into total minutes since midnight.
- */
-function nowMinutes(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Hook                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -90,6 +97,8 @@ export const usePrayerPhase = (): PrayerPhaseData => {
   const { nextPrayer, currentPrayer } = usePrayerTimesContext();
   const currentTime = useCurrentTime();
   const displaySettings = useAppSelector(selectDisplaySettings);
+  const masjidTz =
+    useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
 
   /* ---- Dev force flag as reactive state ---- */
   const [forceFlag, setForceFlag] = useState<PrayerPhase | undefined>(
@@ -101,7 +110,8 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       setForceFlag(window.__PRAYER_PHASE_FORCE);
     };
     window.addEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
-    return () => window.removeEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
+    return () =>
+      window.removeEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
   }, []);
 
   /* ---- Defensive debug: log when current prayer has no jamaat (helps diagnose production) ---- */
@@ -120,135 +130,122 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     }
   }, [currentPrayer?.name, currentPrayer?.jamaat]);
 
-  /* ---- Phase calculation ---- */
+  /* ---- Phase calculation (single source of truth, anchored on J) ---- */
   const phaseData = useMemo((): PrayerPhaseData => {
     // Dev override takes priority
     if (forceFlag) {
       const name = nextPrayer?.name ?? currentPrayer?.name ?? null;
-      logger.debug(`[PrayerPhase] Dev override active: ${forceFlag}`);
       return { phase: forceFlag, prayerName: name };
     }
 
-    // Default phase
     const defaultResult: PrayerPhaseData = {
       phase: 'countdown-adhan',
       prayerName: nextPrayer?.name ?? null,
     };
 
-    const now = nowMinutes(currentTime);
-
-    // === In-prayer window: past current prayer's jamaat but within A + B (displaySettings) ===
-    // Use currentPrayer so we stay on "Jamaat in progress" for the full duration even after
-    // nextPrayer has already advanced to the next salaat (avoids carousel flashing back after ~0.5s).
+    const now = nowMinutesInTz(currentTime, masjidTz);
     const delayMin = postJamaatDelayMinutes(displaySettings);
-    if (currentPrayer?.jamaat) {
-      const jamaatProgressMin = jamaatPhaseMinutesForDisplayPrayer(
+
+    /**
+     * Resolve the in-prayer window (J ≤ now ≤ J + progress + delay) for a
+     * given prayer. Returns null when the prayer or its jamaat is missing or
+     * we're outside the window. Reused for both the `currentPrayer` and
+     * `nextPrayer` paths so the screen stays on "Jamaat in progress" even
+     * after `nextPrayer` advances to the following salaat.
+     */
+    const resolveInPrayer = (
+      prayerName: string | undefined,
+      jamaat: string | undefined,
+    ): PrayerPhaseData | null => {
+      if (!prayerName || !jamaat) return null;
+      const J = toMinutesFromMidnight(jamaat, prayerName);
+      if (J < 0 || now < J) return null;
+      const progress = jamaatPhaseMinutesForDisplayPrayer(
         displaySettings,
-        currentPrayer.name,
+        prayerName,
       );
-      const totalWindowMin = jamaatProgressMin + delayMin;
-      const currentJamaatMin = toMinutesFromMidnight(currentPrayer.jamaat, currentPrayer.name);
-      if (currentJamaatMin >= 0 && now >= currentJamaatMin) {
-        const minutesSinceJamaat = now - currentJamaatMin;
-        if (minutesSinceJamaat <= totalWindowMin) {
-          const inPrayerSubPhase: 'jamaat' | 'post-jamaat' =
-            minutesSinceJamaat <= jamaatProgressMin ? 'jamaat' : 'post-jamaat';
-          logger.debug(
-            `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${currentPrayer.name} jamaat (${inPrayerSubPhase})`,
-          );
-          return { phase: 'in-prayer', prayerName: currentPrayer.name, inPrayerSubPhase };
-        }
-        // Diagnostic: if minutesSinceJamaat is unexpectedly large (>1h), may indicate time parsing bug
-        if (minutesSinceJamaat > 60) {
-          logger.warn('[PrayerPhase] Past jamaat but minutesSinceJamaat unexpectedly large — possible time format mismatch', {
-            prayerName: currentPrayer.name,
-            jamaat: currentPrayer.jamaat,
-            minutesSinceJamaat: Math.round(minutesSinceJamaat),
-            nowMinutes: Math.round(now),
-            jamaatMinutes: currentJamaatMin,
-          });
-        }
-      }
-    }
+      const totalWindow = progress + delayMin;
+      const elapsed = now - J;
+      if (elapsed > totalWindow) return null;
+      const sub: 'jamaat' | 'post-jamaat' =
+        elapsed <= progress ? 'jamaat' : 'post-jamaat';
+      return { phase: 'in-prayer', prayerName, inPrayerSubPhase: sub };
+    };
+
+    // 1) Stay on in-prayer for the just-finished prayer (currentPrayer is set
+    //    by usePrayerTimes for the entire window so the screen doesn't flash
+    //    back to the carousel after nextPrayer advances).
+    const currentInPrayer = resolveInPrayer(
+      currentPrayer?.name,
+      currentPrayer?.jamaat,
+    );
+    if (currentInPrayer) return currentInPrayer;
 
     if (!nextPrayer) return defaultResult;
 
-    const adhanMin = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
-    const jamaatMin = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
+    const A = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
+    const J = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
 
-    // If we don't have valid adhan time, fall back to default
-    if (adhanMin < 0) return defaultResult;
+    // 2) At/just-past jamaat for nextPrayer (in case currentPrayer hasn't
+    //    advanced yet) — same window calculation as above.
+    const nextInPrayer = resolveInPrayer(nextPrayer.name, nextPrayer.jamaat);
+    if (nextInPrayer) return nextInPrayer;
 
-    // Determine the prayer name for context.
-    // When between adhan and jamaat, or post-jamaat, use the "next" prayer's name
-    // (which is actually the current one being prayed — usePrayerTimes sets nextIndex
-    // to the same prayer when between adhan and jamaat).
-    const prayerName = nextPrayer.name;
+    if (A < 0 && J < 0) return defaultResult;
 
-    // No jamaat time available — just count down to adhan
-    if (jamaatMin < 0) {
-      return { phase: 'countdown-adhan', prayerName };
+    // 3) When jamaat is missing, only the adhan countdown applies.
+    if (J < 0) {
+      return now < A
+        ? { phase: 'countdown-adhan', prayerName: nextPrayer.name }
+        : { phase: 'countdown-adhan', prayerName: nextPrayer.name };
     }
 
-    // === At or just past jamaat: in-prayer from nextPrayer's jamaat time ===
-    // Ensures we show in-prayer as soon as we reach jamaat even if currentPrayer hasn't updated.
-    if (jamaatMin >= 0 && now >= jamaatMin) {
-      const jamaatProgressMin = jamaatPhaseMinutesForDisplayPrayer(
-        displaySettings,
-        nextPrayer.name,
+    /**
+     * Clamp A so a malformed `A > J` payload doesn't break the rule.
+     * When A is missing we treat it as J (no adhan-only countdown phase).
+     */
+    const Aeff = A < 0 || A > J ? J : A;
+    if (A >= 0 && A > J) {
+      logger.warn(
+        '[PrayerPhase] Adhan after jamaat in payload — clamping A=J',
+        { prayer: nextPrayer.name, adhan: nextPrayer.time, jamaat: nextPrayer.jamaat },
       );
-      const totalWindowMin = jamaatProgressMin + delayMin;
-      const minutesSinceJamaat = now - jamaatMin;
-      if (minutesSinceJamaat <= totalWindowMin) {
-        const inPrayerSubPhase: 'jamaat' | 'post-jamaat' =
-          minutesSinceJamaat <= jamaatProgressMin ? 'jamaat' : 'post-jamaat';
-        logger.debug(
-          `[PrayerPhase] in-prayer: ${minutesSinceJamaat.toFixed(1)} min since ${nextPrayer.name} jamaat (nextPrayer-based, ${inPrayerSubPhase})`,
-        );
-        return { phase: 'in-prayer', prayerName: nextPrayer.name, inPrayerSubPhase };
-      }
-      // Diagnostic: if minutesSinceJamaat is unexpectedly large (>1h), may indicate time parsing bug (e.g. 12h format)
-      if (minutesSinceJamaat > 60) {
-        logger.warn('[PrayerPhase] Past jamaat but minutesSinceJamaat unexpectedly large — possible time format mismatch', {
-          prayerName: nextPrayer.name,
-          jamaat: nextPrayer.jamaat,
-          minutesSinceJamaat: Math.round(minutesSinceJamaat),
-          nowMinutes: Math.round(now),
-          jamaatMinutes: jamaatMin,
-        });
-      }
     }
 
-    // === Adhan has NOT yet passed ===
-    if (now < adhanMin) {
-      return { phase: 'countdown-adhan', prayerName };
+    // 4) Within the silent-phones lead window — fires regardless of A so the
+    //    screen still shows when adhan == jamaat or A is inside the window.
+    if (now >= J - JAMAAT_LEAD_MIN && now < J) {
+      return { phase: 'jamaat-soon', prayerName: nextPrayer.name };
     }
 
-    // === Between adhan and jamaat ===
-    if (now >= adhanMin && now < jamaatMin) {
-      const minutesToJamaat = jamaatMin - now;
-
-      // At or past jamaat (rounding / boundary): show in-prayer, not jamaat-soon
-      if (minutesToJamaat <= 0) {
-        logger.debug(
-          `[PrayerPhase] in-prayer: at or past jamaat (minutesToJamaat=${minutesToJamaat.toFixed(2)})`,
-        );
-        return { phase: 'in-prayer', prayerName, inPrayerSubPhase: 'jamaat' };
-      }
-
-      if (minutesToJamaat <= JAMAAT_SOON_THRESHOLD_MIN) {
-        logger.debug(
-          `[PrayerPhase] jamaat-soon: ${minutesToJamaat.toFixed(1)} min to jamaat`,
-        );
-        return { phase: 'jamaat-soon', prayerName };
-      }
-
-      return { phase: 'countdown-jamaat', prayerName };
+    // 5) Adhan passed but more than the lead window remaining → countdown to jamaat.
+    if (now >= Aeff && now < J - JAMAAT_LEAD_MIN) {
+      return { phase: 'countdown-jamaat', prayerName: nextPrayer.name };
     }
 
-    // Past jamaat and past in-prayer window — back to normal countdown for next salaat
+    // 6) Default — counting down to adhan.
     return { phase: 'countdown-adhan', prayerName: nextPrayer.name };
-  }, [nextPrayer, currentPrayer, currentTime, forceFlag, displaySettings]);
+  }, [nextPrayer, currentPrayer, currentTime, forceFlag, displaySettings, masjidTz]);
+
+  /* ---- Transition-gated diagnostic log ----
+   * Fires once per phase/sub-phase/prayer change so we can trace incorrect
+   * phase resolution without flooding the console every tick.
+   */
+  const lastTransitionRef = useRef<string>('');
+  useEffect(() => {
+    const key = `${phaseData.phase}|${phaseData.inPrayerSubPhase ?? ''}|${phaseData.prayerName ?? ''}`;
+    if (lastTransitionRef.current === key) return;
+    lastTransitionRef.current = key;
+    const now = nowMinutesInTz(currentTime, masjidTz);
+    logger.debug('[PrayerPhase] Transition', {
+      phase: phaseData.phase,
+      sub: phaseData.inPrayerSubPhase,
+      prayer: phaseData.prayerName,
+      A: nextPrayer ? toMinutesFromMidnight(nextPrayer.time, nextPrayer.name) : null,
+      J: nextPrayer ? toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name) : null,
+      nowMin: Math.round(now),
+    });
+  }, [phaseData, currentTime, masjidTz, nextPrayer]);
 
   return phaseData;
 };
