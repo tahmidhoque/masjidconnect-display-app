@@ -13,7 +13,10 @@
  *     refresh during the jamaat sub-phase from replaying the sound.
  *   - 5-second safety window: if the device boots / mounts more than 5 s after
  *     the actual jamaat time, the buzz is suppressed (no late blast). The
- *     prayer is still marked as buzzed so we do not retry on every tick.
+ *     prayer is still marked as buzzed so we do not retry on every tick. On
+ *     Fridays the safety window is anchored on `jummahJamaat` (via
+ *     `getEffectiveJamaat`) so the Zuhr slot beeps for Jumu'ah, not the
+ *     regular `zuhrJamaat`.
  *   - Disabled / silent when `useBuzzerSettings().enabled === false`.
  *
  * The sound asset is served from `/public/sounds/jamaat-buzzer.mp3`. On the
@@ -31,6 +34,7 @@ import { nowMinutesInTz, toMinutesFromMidnight } from '../utils/dateUtils';
 import { useAppSelector } from '../store/hooks';
 import { selectMasjidTimezone } from '../store/slices/contentSlice';
 import { defaultMasjidTimezone } from '../config/environment';
+import { getEffectiveJamaat } from '../utils/jumuahJamaat';
 import logger from '../utils/logger';
 
 /** Public so the settings overlay's "Test sound" button can play the same file. */
@@ -110,7 +114,8 @@ export function playBuzzerPreview(volume: number): Promise<void> {
  */
 export function useJamaatBuzzer(): void {
   const { phase, prayerName, inPrayerSubPhase } = usePrayerPhase();
-  const { currentPrayer, nextPrayer } = usePrayerTimesContext();
+  const { currentPrayer, nextPrayer, isJumuahToday, jumuahTime } =
+    usePrayerTimesContext();
   const { enabled, volume } = useBuzzerSettings();
   const masjidTz =
     useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
@@ -153,10 +158,24 @@ export function useJamaatBuzzer(): void {
 
     /* Resolve jamaat HH:mm string for the prayer that just entered jamaat phase.
      * Prefer `currentPrayer` (during the in-prayer window it is set to the
-     * praying prayer); fall back to `nextPrayer` for the moment of transition. */
-    const jamaatStr =
-      (currentPrayer?.name === prayerName ? currentPrayer.jamaat : undefined) ??
-      (nextPrayer?.name === prayerName ? nextPrayer.jamaat : undefined);
+     * praying prayer); fall back to `nextPrayer` for the moment of transition.
+     *
+     * On Fridays the phase machine substitutes `jummahJamaat` for the Zuhr slot
+     * via `getEffectiveJamaat` (see `usePrayerPhase`), so we MUST apply the same
+     * substitution here. Otherwise the safety-window arithmetic compares the
+     * Jumu'ah moment against the regular `zuhrJamaat`, which suppresses the
+     * legitimate Jumu'ah beep and risks firing against the wrong Friday time. */
+    const candidatePrayer =
+      currentPrayer?.name === prayerName
+        ? currentPrayer
+        : nextPrayer?.name === prayerName
+          ? nextPrayer
+          : undefined;
+    const jamaatStr = getEffectiveJamaat(
+      candidatePrayer,
+      isJumuahToday,
+      jumuahTime,
+    );
 
     if (jamaatStr) {
       const jamaatMin = toMinutesFromMidnight(jamaatStr, prayerName);
@@ -198,7 +217,17 @@ export function useJamaatBuzzer(): void {
          * user may unlock audio (e.g. via the test button) and a future tick
          * could try again. */
       });
-  }, [phase, inPrayerSubPhase, prayerName, enabled, currentPrayer, nextPrayer, masjidTz]);
+  }, [
+    phase,
+    inPrayerSubPhase,
+    prayerName,
+    enabled,
+    currentPrayer,
+    nextPrayer,
+    masjidTz,
+    isJumuahToday,
+    jumuahTime,
+  ]);
 }
 
 export default useJamaatBuzzer;
