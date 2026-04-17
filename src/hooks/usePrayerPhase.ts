@@ -41,6 +41,7 @@ import {
   jamaatPhaseMinutesForDisplayPrayer,
   postJamaatDelayMinutes,
 } from '@/utils/displaySettingsJamaat';
+import { getEffectiveJamaat } from '@/utils/jumuahJamaat';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -94,7 +95,8 @@ declare global {
 /* ------------------------------------------------------------------ */
 
 export const usePrayerPhase = (): PrayerPhaseData => {
-  const { nextPrayer, currentPrayer } = usePrayerTimesContext();
+  const { nextPrayer, currentPrayer, isJumuahToday, jumuahTime } =
+    usePrayerTimesContext();
   const currentTime = useCurrentTime();
   const displaySettings = useAppSelector(selectDisplaySettings);
   const masjidTz =
@@ -172,23 +174,38 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       return { phase: 'in-prayer', prayerName, inPrayerSubPhase: sub };
     };
 
+    // On Fridays the live phase machine targets `jummahJamaat` for the Zuhr
+    // slot (countdown + in-prayer + jamaat-soon all anchor on it). The panel
+    // continues to display `zuhrJamaat`; this only swaps the J value used by
+    // the phase calculation. See `getEffectiveJamaat` for the exact rule.
+    const currentEffectiveJamaat = getEffectiveJamaat(
+      currentPrayer ?? undefined,
+      isJumuahToday,
+      jumuahTime,
+    );
+    const nextEffectiveJamaat = getEffectiveJamaat(
+      nextPrayer ?? undefined,
+      isJumuahToday,
+      jumuahTime,
+    );
+
     // 1) Stay on in-prayer for the just-finished prayer (currentPrayer is set
     //    by usePrayerTimes for the entire window so the screen doesn't flash
     //    back to the carousel after nextPrayer advances).
     const currentInPrayer = resolveInPrayer(
       currentPrayer?.name,
-      currentPrayer?.jamaat,
+      currentEffectiveJamaat,
     );
     if (currentInPrayer) return currentInPrayer;
 
     if (!nextPrayer) return defaultResult;
 
     const A = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
-    const J = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
+    const J = toMinutesFromMidnight(nextEffectiveJamaat, nextPrayer.name);
 
     // 2) At/just-past jamaat for nextPrayer (in case currentPrayer hasn't
     //    advanced yet) — same window calculation as above.
-    const nextInPrayer = resolveInPrayer(nextPrayer.name, nextPrayer.jamaat);
+    const nextInPrayer = resolveInPrayer(nextPrayer.name, nextEffectiveJamaat);
     if (nextInPrayer) return nextInPrayer;
 
     if (A < 0 && J < 0) return defaultResult;
@@ -208,7 +225,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     if (A >= 0 && A > J) {
       logger.warn(
         '[PrayerPhase] Adhan after jamaat in payload — clamping A=J',
-        { prayer: nextPrayer.name, adhan: nextPrayer.time, jamaat: nextPrayer.jamaat },
+        { prayer: nextPrayer.name, adhan: nextPrayer.time, jamaat: nextEffectiveJamaat },
       );
     }
 
@@ -225,7 +242,16 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     // 6) Default — counting down to adhan.
     return { phase: 'countdown-adhan', prayerName: nextPrayer.name };
-  }, [nextPrayer, currentPrayer, currentTime, forceFlag, displaySettings, masjidTz]);
+  }, [
+    nextPrayer,
+    currentPrayer,
+    currentTime,
+    forceFlag,
+    displaySettings,
+    masjidTz,
+    isJumuahToday,
+    jumuahTime,
+  ]);
 
   /* ---- Transition-gated diagnostic log ----
    * Fires once per phase/sub-phase/prayer change so we can trace incorrect
@@ -237,15 +263,20 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     if (lastTransitionRef.current === key) return;
     lastTransitionRef.current = key;
     const now = nowMinutesInTz(currentTime, masjidTz);
+    const effectiveJamaat = getEffectiveJamaat(
+      nextPrayer ?? undefined,
+      isJumuahToday,
+      jumuahTime,
+    );
     logger.debug('[PrayerPhase] Transition', {
       phase: phaseData.phase,
       sub: phaseData.inPrayerSubPhase,
       prayer: phaseData.prayerName,
       A: nextPrayer ? toMinutesFromMidnight(nextPrayer.time, nextPrayer.name) : null,
-      J: nextPrayer ? toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name) : null,
+      J: nextPrayer ? toMinutesFromMidnight(effectiveJamaat, nextPrayer.name) : null,
       nowMin: Math.round(now),
     });
-  }, [phaseData, currentTime, masjidTz, nextPrayer]);
+  }, [phaseData, currentTime, masjidTz, nextPrayer, isJumuahToday, jumuahTime]);
 
   return phaseData;
 };

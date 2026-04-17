@@ -231,6 +231,17 @@ html, body {
   text-align: left;
 }
 
+/* Portrait countdown: drop the 12ch reserve so digits sit flush against the
+   label, letting the LABEL + digits centre as a single phrase. Tabular-nums
+   keeps individual digit ticks stable; segment crossings (e.g. 59s → 1m 0s)
+   are infrequent and the small shift is acceptable for cohesive reading. */
+.prayer-countdown-portrait .countdown-stable {
+  min-width: 0;
+  max-width: 100%;
+  width: auto;
+  text-align: left;
+}
+
 /* Countdown unit labels (h, m, s) — smaller than numbers so digits stay clear at a distance. */
 .countdown-unit {
   font-size: 0.6em;
@@ -695,6 +706,53 @@ html, body {
   font-weight: 800;
 }
 
+/* ============================================================
+   Portrait prayer panel typography — larger, more readable times.
+   Scoped under [data-orientation="portrait"] so landscape strip is
+   unaffected. Tabular numerals + tightened tracking keep digits crisp.
+   ============================================================ */
+[data-orientation="portrait"] .text-prayer-name {
+  font-size: clamp(1.65rem, 2.1rem, 2.45rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+[data-orientation="portrait"] .text-prayer-time-adhan {
+  font-size: clamp(1.7rem, 2.15rem, 2.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+[data-orientation="portrait"] .text-prayer-time-jamaat {
+  font-size: clamp(1.95rem, 2.45rem, 2.85rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+[data-orientation="portrait"] .text-prayer-time-tomorrow {
+  font-size: clamp(1.45rem, 1.75rem, 2rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Column header labels in portrait — recede so times dominate */
+[data-orientation="portrait"] .text-prayer-col-label {
+  font-size: clamp(0.85rem, 1rem, 1.15rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 
 /* ============================================================
    Layout utilities
@@ -769,14 +827,15 @@ html, body {
   position: relative;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
   border-radius: 0.5rem;
-  padding: 0.75rem 1.25rem;
+  padding: 0.5rem 1.25rem;
 }
 
-/* Portrait countdown row — label/status between body and subheading to save vertical space */
+/* Portrait countdown row — label sized at ~45–50% of the digits so the row
+ * reads as a balanced pair rather than a giant number with a tiny caption. */
 .countdown-container .prayer-countdown-label,
 .countdown-container .prayer-countdown-status {
-  font-size: clamp(0.88rem, 1.05rem, 1.2rem);
-  line-height: 1.25;
+  font-size: clamp(1.15rem, 1.45rem, 1.75rem);
+  line-height: 1.2;
 }
 
 /* Gold accent line */

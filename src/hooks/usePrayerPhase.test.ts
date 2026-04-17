@@ -37,14 +37,16 @@ interface MockPrayer {
 }
 const mockNextRef: { value: MockPrayer | null } = { value: null };
 const mockCurrentRef: { value: MockPrayer | null } = { value: null };
+const mockIsJumuahTodayRef: { value: boolean } = { value: false };
+const mockJumuahTimeRef: { value: string | null } = { value: null };
 
 vi.mock('../contexts/PrayerTimesContext', () => ({
   usePrayerTimesContext: () => ({
     nextPrayer: mockNextRef.value,
     currentPrayer: mockCurrentRef.value,
     todaysPrayerTimes: [],
-    isJumuahToday: false,
-    jumuahTime: null,
+    isJumuahToday: mockIsJumuahTodayRef.value,
+    jumuahTime: mockJumuahTimeRef.value,
     jumuahDisplayTime: null,
     jumuahKhutbahTime: null,
     jumuahKhutbahRaw: null,
@@ -92,6 +94,8 @@ describe('usePrayerPhase', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockNextRef.value = null;
     mockCurrentRef.value = null;
+    mockIsJumuahTodayRef.value = false;
+    mockJumuahTimeRef.value = null;
   });
 
   afterEach(() => {
@@ -173,6 +177,68 @@ describe('usePrayerPhase', () => {
       setMasjidTime('15:30');
       const { result } = renderPhase();
       expect(result.current.phase).toBe('countdown-adhan');
+    });
+  });
+
+  /**
+   * On Fridays the Zuhr slot is replaced by Jumu'ah for the live phase machine.
+   * `nextPrayer.name` is still 'Zuhr' (the panel keeps the Zuhr row), but
+   * `jumuahTime` from the API takes over as the J anchor for countdown,
+   * jamaat-soon, and in-prayer transitions. These tests pin that behaviour.
+   */
+  describe('Friday — Jumu\u2019ah jamaat overrides Zuhr jamaat', () => {
+    beforeEach(() => {
+      // zuhrJamaat = 13:30, jummahJamaat = 13:45 — the two diverge so the test
+      // distinguishes which one drove the phase decision.
+      mockNextRef.value = { name: 'Zuhr', time: '13:00', jamaat: '13:30' };
+      mockIsJumuahTodayRef.value = true;
+      mockJumuahTimeRef.value = '13:45';
+    });
+
+    it('stays on countdown-jamaat past Zuhr jamaat when Jumuah is later', () => {
+      // 13:35 — past zuhrJamaat (13:30) but before Jumuah lead window (13:40).
+      // Old behaviour would have entered in-prayer here against zuhrJamaat.
+      setMasjidTime('13:35');
+      const { result } = renderPhase();
+      expect(result.current.phase).toBe('countdown-jamaat');
+      expect(result.current.prayerName).toBe('Zuhr');
+    });
+
+    it('flips to jamaat-soon at Jumuah J - 5 (not Zuhr J - 5)', () => {
+      setMasjidTime('13:40'); // Jumuah J - 5
+      const { result } = renderPhase();
+      expect(result.current.phase).toBe('jamaat-soon');
+    });
+
+    it('enters in-prayer at Jumuah jamaat, not Zuhr jamaat', () => {
+      setMasjidTime('13:45');
+      const { result } = renderPhase();
+      expect(result.current.phase).toBe('in-prayer');
+      expect(result.current.inPrayerSubPhase).toBe('jamaat');
+      // prayerName stays 'Zuhr' — DisplayScreen swaps it to the API-driven
+      // Jumu'ah label before passing to InPrayerScreen.
+      expect(result.current.prayerName).toBe('Zuhr');
+    });
+
+    it('uses currentPrayer.jamaat → Jumuah substitution for the in-prayer window', () => {
+      // Simulate post-jamaat: usePrayerTimes has advanced nextPrayer to Asr
+      // but kept currentPrayer = Zuhr for the duration of the window.
+      mockCurrentRef.value = { name: 'Zuhr', time: '13:00', jamaat: '13:30' };
+      mockNextRef.value = { name: 'Asr', time: '17:00', jamaat: '17:15' };
+      setMasjidTime('13:50'); // 5 min after Jumuah jamaat
+      const { result } = renderPhase();
+      expect(result.current.phase).toBe('in-prayer');
+      expect(result.current.prayerName).toBe('Zuhr');
+    });
+
+    it('falls back to zuhrJamaat when jumuahTime is missing on a Friday', () => {
+      // Defensive: API hasn't supplied jummahJamaat for this Friday — we must
+      // not blank the countdown; fall through to the regular Zuhr jamaat.
+      mockJumuahTimeRef.value = null;
+      setMasjidTime('13:30');
+      const { result } = renderPhase();
+      expect(result.current.phase).toBe('in-prayer');
+      expect(result.current.prayerName).toBe('Zuhr');
     });
   });
 

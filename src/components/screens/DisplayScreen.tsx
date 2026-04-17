@@ -48,6 +48,7 @@ import useJamaatBuzzer from '../../hooks/useJamaatBuzzer';
 import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
 import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
+import { resolveTerminology } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -374,9 +375,21 @@ const DisplayScreenInner: React.FC = () => {
   useJamaatBuzzer();
 
   /* ---- Forbidden (makruh) time for voluntary prayer ---- */
-  const { forbiddenPrayer, tomorrowsJamaats } = usePrayerTimesContext();
+  const { forbiddenPrayer, tomorrowsJamaats, isJumuahToday } = usePrayerTimesContext();
   const timeFormat = useAppSelector(selectTimeFormat);
   const displaySettings = useAppSelector(selectDisplaySettings);
+
+  /**
+   * On Fridays the in-prayer screen for the Zuhr slot must read "Jumu'ah" so
+   * the congregation sees "Jumu'ah Jamaat in progress" rather than "Zuhr".
+   * The label string itself is API-driven via `displaySettings.terminology`
+   * (key: `jummah`); we only swap when the phase has resolved to the Zuhr
+   * slot on a Friday so non-Zuhr prayers and non-Friday days are unchanged.
+   */
+  const inPrayerScreenName =
+    isJumuahToday && phasePrayerName === 'Zuhr'
+      ? resolveTerminology(displaySettings?.terminology, 'jummah', 'Jumuah')
+      : phasePrayerName;
 
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
@@ -444,7 +457,7 @@ const DisplayScreenInner: React.FC = () => {
         // jamaat subphase: show calm "Jamaat in progress" screen
         return (
           <InPrayerScreen
-            prayerName={phasePrayerName}
+            prayerName={inPrayerScreenName}
             statusMessage={inPrayerSubPhase}
             landscapeSplit={!isPortrait}
           />
@@ -459,7 +472,7 @@ const DisplayScreenInner: React.FC = () => {
           />
         );
     }
-  }, [prayerPhase, phasePrayerName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey, isPortrait]);
+  }, [prayerPhase, inPrayerScreenName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey, isPortrait]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;

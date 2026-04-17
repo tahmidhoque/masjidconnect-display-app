@@ -23,6 +23,7 @@ import CountdownDisplay from './CountdownDisplay';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings, selectMasjidTimezone } from '../../store/slices/contentSlice';
 import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
+import { getEffectiveJamaat } from '../../utils/jumuahJamaat';
 import { defaultMasjidTimezone } from '../../config/environment';
 
 interface PrayerCountdownProps {
@@ -54,12 +55,20 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   inPrayerSubPhase,
   variant = 'default',
 }) => {
-  const { nextPrayer, isJumuahToday } = usePrayerTimesContext();
+  const { nextPrayer, isJumuahToday, jumuahTime } = usePrayerTimesContext();
   // Use masjid-local time so comparisons against prayer strings are correct
   // when the Pi's system timezone is UTC.
   const now = useMasjidTime();
   const masjidTz = useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+
+  /**
+   * On Fridays, the countdown must target `jummahJamaat` even though
+   * `nextPrayer` is still the Zuhr slot (the panel keeps the Zuhr row anchored
+   * to its own jamaat — `JumuahBar` displays the Friday time separately).
+   * `getEffectiveJamaat` is the single source of truth for that swap.
+   */
+  const effectiveJamaat = getEffectiveJamaat(nextPrayer, isJumuahToday, jumuahTime);
 
   /**
    * Determine what to count down to. Mirrors the `usePrayerPhase` rule so the
@@ -79,7 +88,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
     const nowMin = now.hour() * 60 + now.minute() + now.second() / 60;
     const A = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
-    const J = toMinutesFromMidnight(nextPrayer.jamaat, nextPrayer.name);
+    const J = toMinutesFromMidnight(effectiveJamaat, nextPrayer.name);
 
     if (A < 0 && J < 0) return null;
 
@@ -88,14 +97,14 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       // Lead window flip (only fires when A >= J − JAMAAT_LEAD_MIN, i.e. when
       // adhan and jamaat are within the lead window or equal)
       if (J >= 0 && nowMin >= J - JAMAAT_LEAD_MIN) {
-        return { time: nextPrayer.jamaat!, forceTomorrow: false, target: 'jamaat' };
+        return { time: effectiveJamaat!, forceTomorrow: false, target: 'jamaat' };
       }
       return { time: nextPrayer.time, forceTomorrow: false, target: 'adhan' };
     }
 
     // Adhan passed (or missing) but jamaat still upcoming today
     if (J >= 0 && nowMin < J) {
-      return { time: nextPrayer.jamaat!, forceTomorrow: false, target: 'jamaat' };
+      return { time: effectiveJamaat!, forceTomorrow: false, target: 'jamaat' };
     }
 
     // At/past jamaat — let DisplayScreen show in-prayer screen.
@@ -109,7 +118,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     }
 
     return null;
-  }, [nextPrayer, now]);
+  }, [nextPrayer, now, effectiveJamaat]);
 
   /**
    * Live countdown string, recomputed every second via now (masjid tz).
@@ -147,29 +156,34 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
   const isStrip = variant === 'strip';
   /**
-   * Split row: vertical midline of the container — label flush right in the left
-   * half, digits flush left in the right half (portrait and landscape strip).
+   * Strip layout: 2-col grid with label flush right and digits flush left, meeting at the centre.
+   * Portrait layout: inline flex centred as one text block — label and digits share a baseline
+   *   so they read as a single phrase ("Maghrib Jamaat in 12m 34s"). Width-stability is provided
+   *   by `.countdown-stable` (min-width: 12ch, text-align: center) so the centred group does not
+   *   jitter as the digits tick.
    */
-  /** `prayer-countdown-row` scopes CSS overrides for `.countdown-stable` (min-width / alignment). */
+  /** `prayer-countdown-row` scopes CSS overrides for `.countdown-stable` (min-width / alignment) on the strip. */
   const splitGridClass =
     'prayer-countdown-row grid grid-cols-2 w-full max-w-full min-w-0 items-center gap-x-4';
+  const portraitRowClass =
+    'prayer-countdown-portrait flex w-full max-w-full min-w-0 items-center justify-center flex-nowrap gap-x-3 whitespace-nowrap';
   const outerClass = isStrip
     ? splitGridClass
-    : `countdown-container ${splitGridClass}`;
+    : `countdown-container ${portraitRowClass}`;
 
   const labelClass = isStrip
     ? 'text-countdown-strip-label text-text-primary uppercase font-bold tracking-wider text-right min-w-0'
-    : 'prayer-countdown-label text-text-secondary uppercase font-semibold text-right min-w-0 tracking-wider';
+    : 'prayer-countdown-label text-text-secondary uppercase font-semibold tracking-wider';
   const digitsClass = isStrip
     ? 'text-countdown-strip-digits text-gold font-extrabold'
     : 'text-countdown text-gold';
 
   const inPrayerLabelClass = isStrip
     ? 'text-countdown-strip-label text-text-muted uppercase font-bold text-right min-w-0'
-    : 'prayer-countdown-label text-text-muted uppercase font-medium text-right min-w-0 tracking-wider';
+    : 'prayer-countdown-label text-text-muted uppercase font-medium tracking-wider';
   const inPrayerValueClass = isStrip
     ? 'text-countdown-strip-label font-bold text-text-primary text-left min-w-0'
-    : 'prayer-countdown-status font-bold text-text-primary text-left min-w-0';
+    : 'prayer-countdown-status font-bold text-text-primary';
 
   /* ---- In-prayer: name in left half, status in right half (same midline as countdown) ---- */
   if (phase === 'in-prayer') {
@@ -191,11 +205,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     <div className={outerClass}>
       <span className={labelClass}>{countdownLabel}</span>
       {liveCountdown ? (
-        <span className={`${digitsClass} text-left min-w-0`}>
+        <span className={`${digitsClass} ${isStrip ? 'text-left min-w-0' : ''}`}>
           <CountdownDisplay value={liveCountdown} className={digitsClass} />
         </span>
       ) : (
-        <span className="min-w-0" aria-hidden />
+        <span className={isStrip ? 'min-w-0' : ''} aria-hidden />
       )}
     </div>
   );
