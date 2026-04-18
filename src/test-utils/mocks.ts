@@ -93,10 +93,6 @@ export function setOnline(online: boolean): void {
   });
 }
 
-export function waitFor(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // ---------------------------------------------------------------------------
 // LocalForage mock factory (for API client tests)
 // ---------------------------------------------------------------------------

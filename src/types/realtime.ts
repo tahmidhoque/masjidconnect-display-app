@@ -5,33 +5,15 @@
  * These types define the structure of events sent and received via Socket.io.
  */
 
+import type { EmergencyAlert } from '@/api/models';
+
 /**
  * Emergency alert payload received from WebSocket (v2 contract).
- * category + urgency are the canonical fields for driving visual style.
+ * Derived from {@link EmergencyAlert} so the WebSocket payload stays in sync
+ * with the canonical model. `masjidId` is optional here because the WebSocket
+ * payload may omit it — middleware fills it in from the connection context.
  */
-export interface EmergencyAlertData {
-  id: string;
-  action: "show" | "clear";
-
-  // Content
-  title: string;
-  message: string;
-
-  // Classification (v2)
-  category: "safety" | "facility" | "janazah" | "schedule" | "community" | "custom";
-  urgency: "critical" | "high" | "medium";
-  /** Only non-null when category === 'custom' */
-  color: string | null;
-
-  // Timing
-  createdAt: string;
-  expiresAt: string;
-  timing?: {
-    duration: number;
-    remaining: number;
-    autoCloseAt: string;
-  };
-}
+type EmergencyAlertData = Omit<EmergencyAlert, 'masjidId'> & { masjidId?: string };
 
 /**
  * Four supported screen orientations (admin-configured).
@@ -50,7 +32,7 @@ export type RotationDegrees = 0 | 90 | 180 | 270;
  * Screen orientation payload from WebSocket event `screen:orientation`.
  * When rotationDegrees is present it MUST be used; when absent, derive from orientation (§3.3).
  */
-export interface ScreenOrientationData {
+interface ScreenOrientationData {
   id: string;
   orientation: ScreenOrientation;
   updatedAt: string;
@@ -61,7 +43,7 @@ export interface ScreenOrientationData {
 /**
  * Remote command data received from WebSocket
  */
-export interface RemoteCommandData {
+interface RemoteCommandData {
   commandId: string;
   command: string;
   payload?: Record<string, unknown>;
@@ -72,7 +54,7 @@ export interface RemoteCommandData {
 /**
  * Heartbeat metrics sent to the server (legacy — prefer HeartbeatPayload)
  */
-export interface HeartbeatMetrics {
+interface HeartbeatMetrics {
   cpuUsage?: number;
   memoryUsage?: number;
   networkLatency?: number;
@@ -133,7 +115,7 @@ export interface HeartbeatAck {
 /**
  * Connection configuration for WebSocket
  */
-export interface RealtimeConnectionConfig {
+interface RealtimeConnectionConfig {
   serverUrl: string;
   screenId: string;
   masjidId: string;
@@ -143,7 +125,7 @@ export interface RealtimeConnectionConfig {
 /**
  * Event handlers for realtime events
  */
-export interface RealtimeEventHandlers {
+interface RealtimeEventHandlers {
   onConnect?: () => void;
   onDisconnect?: (reason: string) => void;
   onReconnect?: (attemptNumber: number) => void;
@@ -159,12 +141,12 @@ export interface RealtimeEventHandlers {
 /**
  * Connection status for realtime service
  */
-export type RealtimeConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
+type RealtimeConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 
 /**
  * Detailed connection status with metadata
  */
-export interface RealtimeConnectionState {
+interface RealtimeConnectionState {
   status: RealtimeConnectionStatus;
   isConnected: boolean;
   reconnectAttempts: number;
@@ -176,7 +158,7 @@ export interface RealtimeConnectionState {
 /**
  * Command acknowledgement payload
  */
-export interface CommandAcknowledgement {
+interface CommandAcknowledgement {
   commandId: string;
   commandType: string;
   success: boolean;
@@ -186,7 +168,7 @@ export interface CommandAcknowledgement {
 /**
  * Error report payload
  */
-export interface ErrorReport {
+interface ErrorReport {
   errorType: string;
   message: string;
   errorCode?: string;
@@ -196,7 +178,7 @@ export interface ErrorReport {
 /**
  * Sync request payload
  */
-export interface SyncRequest {
+interface SyncRequest {
   type: "full" | "partial";
   lastSyncTime?: string;
 }
@@ -204,7 +186,7 @@ export interface SyncRequest {
 /**
  * Status update payload
  */
-export interface StatusUpdate {
+interface StatusUpdate {
   status: "ONLINE" | "BUSY" | "OFFLINE";
   oldStatus?: string;
 }
@@ -212,7 +194,7 @@ export interface StatusUpdate {
 /**
  * Content change notification payload
  */
-export interface ContentChangeNotification {
+interface ContentChangeNotification {
   contentId: string;
   contentType: string;
 }

@@ -11,7 +11,7 @@
  * This module is the single source of truth for that substitution so the
  * countdown component, phase hook, and any future consumer stay in lockstep.
  */
-export interface PrayerWithJamaat {
+interface PrayerWithJamaat {
   name: string;
   jamaat?: string;
 }

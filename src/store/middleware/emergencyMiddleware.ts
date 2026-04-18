@@ -5,8 +5,8 @@
  * Handles alert state synchronisation between the service and Redux.
  */
 
-import { Middleware } from '@reduxjs/toolkit';
-import type { AppDispatch } from '../index';
+import { Middleware, UnknownAction, PayloadAction } from '@reduxjs/toolkit';
+import type { AppDispatch, RootState } from '../index';
 import emergencyAlertService from '../../services/emergencyAlertService';
 import {
   setCurrentAlert,
@@ -23,7 +23,7 @@ import logger from '../../utils/logger';
 
 let listenersSetup = false;
 
-export const emergencyMiddleware: Middleware = (api: any) => {
+export const emergencyMiddleware: Middleware<object, RootState> = (api) => {
   const setupListeners = () => {
     if (listenersSetup) return;
     listenersSetup = true;
@@ -36,14 +36,20 @@ export const emergencyMiddleware: Middleware = (api: any) => {
 
   setupListeners();
 
-  return (next) => (action: any) => {
+  return (next) => (action) => {
     const result = next(action);
+
+    if (!action || typeof action !== 'object' || !('type' in action)) {
+      return result;
+    }
+
+    const typedAction = action as UnknownAction;
     const state = api.getState();
 
-    switch (action.type) {
+    switch (typedAction.type) {
       case 'emergency/initializeEmergencyService/fulfilled': {
         if (selectIsAuthenticated(state)) {
-          api.dispatch(connectToEmergencyService());
+          (api.dispatch as AppDispatch)(connectToEmergencyService());
         }
         break;
       }
@@ -54,10 +60,11 @@ export const emergencyMiddleware: Middleware = (api: any) => {
         break;
       }
       case 'emergency/connectToEmergencyService/rejected': {
+        const rejected = typedAction as PayloadAction<string | undefined>;
         api.dispatch(setConnectionStatus({
           isConnected: false,
           isConnecting: false,
-          error: action.payload as string,
+          error: rejected.payload ?? null,
         }));
         break;
       }
@@ -71,7 +78,8 @@ export const emergencyMiddleware: Middleware = (api: any) => {
         break;
       }
       case 'emergency/setEnabled': {
-        const isEnabled = action.payload;
+        const setEnabledAction = typedAction as PayloadAction<boolean>;
+        const isEnabled = setEnabledAction.payload;
         const isAuth = selectIsAuthenticated(state);
         if (isEnabled && isAuth) {
           (api.dispatch as AppDispatch)(initializeEmergencyService(apiUrl));

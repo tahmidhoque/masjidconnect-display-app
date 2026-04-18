@@ -175,11 +175,11 @@ class RemoteControlService {
 
   /** Handle a command from heartbeat or WebSocket */
   public async handleCommand(cmd: RemoteCommand | ApiRemoteCommand): Promise<RemoteCommandResponse> {
-    const commandId = (cmd as any).commandId || `cmd-${Date.now()}`;
+    const commandId = ('commandId' in cmd ? cmd.commandId : undefined) || `cmd-${Date.now()}`;
     const raw = cmd as { type?: string; command?: string };
     const type = raw.type ?? raw.command;
-    const timestamp = (cmd as any).timestamp || new Date().toISOString();
-    const payload = (cmd as any).payload;
+    const timestamp = ('timestamp' in cmd ? cmd.timestamp : undefined) || new Date().toISOString();
+    const payload = 'payload' in cmd ? cmd.payload : undefined;
 
     if (!type) {
       logger.warn('[RemoteControl] Command missing type/command', { commandId });

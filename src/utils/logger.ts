@@ -6,7 +6,7 @@
  * Development: all levels are output.
  */
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogEntry {
   timestamp: string;
