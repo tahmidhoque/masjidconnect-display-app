@@ -79,9 +79,17 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
    *     JAMAAT, even when adhan hasn't fired yet (handles A == J and
    *     A within JAMAAT_LEAD_MIN of J)
    *   - Adhan passed, before jamaat → count down to JAMAAT
-   *   - At/past jamaat → null (DisplayScreen swaps to in-prayer phase)
-   *   - Adhan passed, no jamaat in payload → tomorrow's adhan (covers the
-   *     after-Isha → tomorrow's Fajr branch in usePrayerTimes)
+   *   - At/past jamaat AND phase === 'in-prayer' → null (the in-prayer render
+   *     branch above takes over and shows "Jamaat in progress")
+   *   - At/past jamaat AND phase !== 'in-prayer' → tomorrow's adhan. This
+   *     covers the after-Isha → tomorrow's Fajr branch in `usePrayerTimes`,
+   *     which swaps `nextPrayer` to tomorrow's record but keeps the time as
+   *     an HH:mm string (e.g. "05:00") that compares as "in the past" to
+   *     today's wall-clock minute count. Without this branch the countdown
+   *     would freeze at "0s" between the end of the in-prayer window and
+   *     midnight.
+   *   - Adhan passed, no jamaat in payload → tomorrow's adhan (legacy
+   *     fallback; the after-Isha case above handles the common path).
    */
   const targetTime = useMemo<CountdownTarget | null>(() => {
     if (!nextPrayer) return null;
@@ -107,8 +115,20 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       return { time: effectiveJamaat!, forceTomorrow: false, target: 'jamaat' };
     }
 
-    // At/past jamaat — let DisplayScreen show in-prayer screen.
+    // At/past jamaat. Two possibilities:
+    //   (a) Active in-prayer window — DisplayScreen passes phase='in-prayer'
+    //       and the early-return branch above renders "Jamaat in progress".
+    //       Returning null avoids a transient stale countdown during the tick
+    //       between jamaat ringing and the phase machine catching up.
+    //   (b) After-Isha → tomorrow's Fajr (or any wrap-around). The hook has
+    //       already swapped `nextPrayer` to the next-day record but the time
+    //       strings are still HH:mm form, so they read as "in the past"
+    //       relative to today's `nowMin`. Count down to tomorrow's adhan.
     if (J >= 0 && nowMin >= J) {
+      if (phase === 'in-prayer') return null;
+      if (A >= 0) {
+        return { time: nextPrayer.time, forceTomorrow: true, target: 'adhan' };
+      }
       return null;
     }
 
@@ -118,7 +138,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     }
 
     return null;
-  }, [nextPrayer, now, effectiveJamaat]);
+  }, [nextPrayer, now, effectiveJamaat, phase]);
 
   /**
    * Live countdown string, recomputed every second via now (masjid tz).
