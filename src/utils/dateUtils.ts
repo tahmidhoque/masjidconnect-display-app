@@ -306,7 +306,7 @@ export const getNextPrayerTime = (
 };
 
 /** Options for countdown display. */
-export interface GetTimeUntilNextPrayerOptions {
+interface GetTimeUntilNextPrayerOptions {
   /** When true, include seconds (e.g. 07h 05m 12s). Default false. */
   includeSeconds?: boolean;
   /** When set, include seconds only when remaining time is ≤ this many minutes (e.g. 5 for last 5 mins). */

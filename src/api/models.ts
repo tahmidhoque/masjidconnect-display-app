@@ -682,7 +682,7 @@ export interface EmergencyAlert {
     remaining: number; // Remaining time in milliseconds (calculated by server)
     autoCloseAt: string; // ISO date string when alert should auto-close
   };
-  action?: "show" | "clear"; // Action to perform with this alert
+  action?: "show" | "clear" | "hide" | "cancel"; // Action to perform with this alert
   /** Kept for backward compatibility with old-format alerts during migration */
   colorScheme?: string;
 }

@@ -3,6 +3,10 @@ import { EmergencyAlert, AlertCategory, AlertUrgency } from "../../api/models";
 import emergencyAlertService from "../../services/emergencyAlertService";
 import logger from "../../utils/logger";
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // State interface
 export interface EmergencyState {
   // Current alert
@@ -77,12 +81,12 @@ export const initializeEmergencyService = createAsyncThunk(
         baseURL,
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[Emergency] Error initializing emergency service", {
         error,
       });
       return rejectWithValue(
-        error.message || "Failed to initialize emergency service",
+        getErrorMessage(error) || "Failed to initialize emergency service",
       );
     }
   },
@@ -105,12 +109,12 @@ export const connectToEmergencyService = createAsyncThunk(
       return {
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[Emergency] Error connecting to emergency service", {
         error,
       });
       return rejectWithValue(
-        error.message || "Failed to connect to emergency service",
+        getErrorMessage(error) || "Failed to connect to emergency service",
       );
     }
   },
@@ -128,12 +132,12 @@ export const disconnectFromEmergencyService = createAsyncThunk(
       return {
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[Emergency] Error disconnecting from emergency service", {
         error,
       });
       return rejectWithValue(
-        error.message || "Failed to disconnect from emergency service",
+        getErrorMessage(error) || "Failed to disconnect from emergency service",
       );
     }
   },
@@ -156,7 +160,7 @@ export const clearExpiredAlert = createAsyncThunk(
       }
 
       return null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[Emergency] Error clearing expired alert", { error });
       throw error;
     }

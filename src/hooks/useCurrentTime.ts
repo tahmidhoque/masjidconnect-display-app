@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import logger from '@/utils/logger';
 
 /**
  * Global time manager to prevent multiple timer conflicts
@@ -52,7 +53,7 @@ class GlobalTimeManager {
         try {
           callback(this.currentTime);
         } catch (error) {
-          console.error("Error in time subscriber callback:", error);
+          logger.error('[GlobalTimeManager] Subscriber callback failed', { error: error instanceof Error ? error.message : String(error) });
         }
       });
     };
@@ -99,7 +100,7 @@ class GlobalTimeManager {
         try {
           callback(this.currentTime);
         } catch (error) {
-          console.error("Error in forced time update:", error);
+          logger.error('[GlobalTimeManager] Subscriber callback failed', { error: error instanceof Error ? error.message : String(error) });
         }
       });
     }
@@ -168,31 +169,5 @@ export const useTimeManagerStats = () => {
 
 // Export for direct access if needed
 export { globalTimeManager };
-
-// ✅ DISABLED: Auto-run time manager logs (was causing console spam)
-// Uncomment the lines below if you need to debug time management
-/*
-if (import.meta.env.DEV) {
-  setTimeout(() => {
-    console.log('⏰ Centralized Time Manager Active');
-    console.log('💡 Run showTimeManagerStats() to see timer statistics');
-    console.log('💡 This replaces all individual component timers');
-    
-    // Make utilities available globally
-    (window as any).showTimeManagerStats = () => {
-      console.group('⏰ Time Manager Statistics');
-      console.log('Active subscribers:', globalTimeManager.getSubscriberCount());
-      console.log('Current time:', globalTimeManager.getCurrentTime().toLocaleTimeString());
-      console.log('Timer centralized: ✅ (prevents conflicts)');
-      console.groupEnd();
-    };
-    
-    (window as any).forceTimeUpdate = () => {
-      globalTimeManager.forceUpdate();
-      console.log('🔄 Forced time update');
-    };
-  }, 3000);
-}
-*/
 
 export default useCurrentTime;

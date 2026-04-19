@@ -33,6 +33,10 @@ import {
   buildUrl,
   buildUrlWithParams,
 } from './endpoints';
+import type {
+  RequestPairingCodeResponse as PairingCodeResponse,
+  PairedCredentialsResponse as BasePairedCredentialsResponse,
+} from './models';
 
 // ============================================================================
 // Types
@@ -62,14 +66,6 @@ export interface DeviceInfo {
 }
 
 /**
- * Pairing code response
- */
-export interface PairingCodeResponse {
-  pairingCode: string;
-  expiresAt: string;
-}
-
-/**
  * Pairing status response
  */
 export interface PairingStatusResponse {
@@ -79,15 +75,16 @@ export interface PairingStatusResponse {
 }
 
 /**
- * Paired credentials response
+ * Paired credentials response.
+ *
+ * Extends the canonical {@link BasePairedCredentialsResponse} (apiKey, screenId, masjidId)
+ * with optional metadata fields the apiClient surfaces from the pairing flow. These are
+ * marked optional because consumers (see authSlice) already guard with truthy checks.
  */
-export interface PairedCredentialsResponse {
-  apiKey: string;
-  screenId: string;
-  masjidId: string;
-  masjidName: string;
-  screenName: string;
-  orientation: string;
+export interface PairedCredentialsResponse extends BasePairedCredentialsResponse {
+  masjidName?: string;
+  screenName?: string;
+  orientation?: string;
 }
 
 /**

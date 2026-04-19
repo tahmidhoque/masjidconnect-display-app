@@ -22,7 +22,7 @@ class EmergencyAlertService {
   /** Set an emergency alert (called by middleware when WebSocket event received) */
   public setAlert(alertData: EmergencyAlert): void {
     // If action is "clear" or "hide", clear instead
-    if ((alertData as any).action === 'clear' || (alertData as any).action === 'hide') {
+    if (alertData.action === 'clear' || alertData.action === 'hide') {
       this.clearAlert();
       return;
     }

@@ -1,12 +1,18 @@
 /**
  * ConnectionBanner
  *
- * A persistent, colour-coded banner that shows WiFi and WebSocket connectivity
- * status. Visible on all screens (Loading, Pairing, Display) but only when
- * there is an issue — hidden when everything is connected.
+ * A persistent, colour-coded indicator that shows WiFi and WebSocket
+ * connectivity status. Visible on all screens (Loading, Pairing, Display).
+ *
+ * Two render modes:
+ *  - Dot only (no message): a small coloured dot, used for the healthy state
+ *    so the user can confirm "all good" at a glance without screen clutter.
+ *  - Pill: the full coloured chip (icon + message + tinted background) used
+ *    whenever there's something to communicate.
  *
  * States:
- *  - Green (hidden): WiFi + WS connected
+ *  - Green (dot only): WiFi + WS connected
+ *  - Green (pill): "Up to date" after a successful update check
  *  - Orange: reconnecting, weak signal, or update in progress
  *  - Red: WiFi disconnected, no internet, or no adapter
  *  - Blue: hotspot active (user reconfiguring WiFi)
@@ -28,7 +34,7 @@ import {
 /** Delay before showing the banner to prevent startup flash */
 const DISPLAY_DELAY_MS = 5_000;
 
-type BannerVariant = 'hidden' | 'green' | 'orange' | 'red' | 'blue';
+type BannerVariant = 'green' | 'orange' | 'red' | 'blue';
 
 interface BannerState {
   variant: BannerVariant;
@@ -174,46 +180,68 @@ const ConnectionBanner: React.FC = () => {
       };
     }
 
-    return { variant: 'hidden', icon: null, message: '' };
+    return { variant: 'green', icon: null, message: '' };
   }, [
     status, wifiStatus, updatePhase, updateMessage, updateSecondsLeft,
     pendingRestart, restartSecondsLeft,
   ]);
 
-  if (!canShow || bannerState.variant === 'hidden') return null;
+  if (!canShow) return null;
 
-  const bgClass = {
+  const dotColour: Record<BannerVariant, string> = {
+    green: 'bg-alert-green',
+    orange: 'bg-alert-orange',
+    red: 'bg-alert-red',
+    blue: 'bg-[#3b82f6]',
+  };
+
+  // Dot-only mode: healthy state with nothing to say. Render a small coloured
+  // dot so users can confirm connectivity at a glance without screen clutter.
+  if (!bannerState.message) {
+    const dotLabel: Record<BannerVariant, string> = {
+      green: 'Connected',
+      orange: 'Connection warning',
+      red: 'Disconnected',
+      blue: 'WiFi setup mode',
+    };
+    return (
+      <span
+        className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${dotColour[bannerState.variant]} animate-fade-in`}
+        role="status"
+        aria-label={dotLabel[bannerState.variant]}
+      />
+    );
+  }
+
+  const bgClass: Record<BannerVariant, string> = {
     green: 'bg-alert-green/15 border-alert-green/30',
     orange: 'bg-alert-orange/15 border-alert-orange/30',
     red: 'bg-alert-red/15 border-alert-red/30',
     blue: 'bg-[#3b82f6]/15 border-[#3b82f6]/30',
-    hidden: '',
-  }[bannerState.variant];
+  };
 
-  const textClass = {
+  const textClass: Record<BannerVariant, string> = {
     green: 'text-alert-green',
     orange: 'text-alert-orange',
     red: 'text-alert-red',
     blue: 'text-[#93c5fd]',
-    hidden: '',
-  }[bannerState.variant];
+  };
 
-  const iconColour = {
+  const iconColour: Record<BannerVariant, string> = {
     green: 'text-alert-green',
     orange: 'text-alert-orange',
     red: 'text-alert-red',
     blue: 'text-[#93c5fd]',
-    hidden: '',
-  }[bannerState.variant];
+  };
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${bgClass} animate-fade-in`}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${bgClass[bannerState.variant]} animate-fade-in`}
       role="status"
       aria-live="polite"
     >
-      <span className={iconColour}>{bannerState.icon}</span>
-      <span className={`text-caption font-medium truncate ${textClass}`}>
+      <span className={iconColour[bannerState.variant]}>{bannerState.icon}</span>
+      <span className={`text-caption font-medium truncate ${textClass[bannerState.variant]}`}>
         {bannerState.message}
       </span>
     </div>

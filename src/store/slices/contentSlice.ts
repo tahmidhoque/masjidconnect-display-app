@@ -402,6 +402,55 @@ const extractMasjidName = (content: ScreenContent | null): string => {
   return DEFAULT_MASJID_NAME;
 };
 
+// Detect whether the screenContent envelope (or its nested `data` object) explicitly
+// carries a `scheduledPlaylists` key, and return its array form. Preserving the
+// "key was present" signal lets callers distinguish "API omitted the field" (leave
+// existing state alone) from "API sent an empty/absent assignment list" (clear it).
+function pickScheduledPlaylists(
+  screenContent: ScreenContent | null | undefined,
+): {
+  hasScheduledPlaylistsKey: boolean;
+  scheduledPlaylistsArray: ScheduledPlaylistAssignment[] | null | undefined;
+} {
+  const contentAny = screenContent as unknown as {
+    scheduledPlaylists?: ScheduledPlaylistAssignment[] | null;
+    data?: { scheduledPlaylists?: ScheduledPlaylistAssignment[] | null };
+  } | null;
+  const hasScheduledPlaylistsKey = Boolean(
+    (contentAny && 'scheduledPlaylists' in contentAny) ||
+      (contentAny?.data && 'scheduledPlaylists' in contentAny.data),
+  );
+  const scheduledPlaylistsRaw = hasScheduledPlaylistsKey
+    ? (contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null)
+    : undefined;
+  const scheduledPlaylistsArray = hasScheduledPlaylistsKey
+    ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
+    : undefined;
+  return { hasScheduledPlaylistsKey, scheduledPlaylistsArray };
+}
+
+// Resolve the schedule payload from a screenContent envelope by trying the
+// historical key locations in priority order. Different API versions and
+// migration phases have placed the schedule under several fields, so this
+// fallback chain is the single source of truth for that lookup.
+function pickSchedulePayloadFromScreenContent(
+  screenContent: ScreenContent | null | undefined,
+): unknown | undefined {
+  const contentAny = screenContent as unknown as {
+    schedule?: unknown;
+    data?: { schedule?: unknown; playlist?: unknown };
+    playlist?: unknown;
+    assignedSchedule?: { schedule?: unknown };
+  } | null;
+  return (
+    contentAny?.schedule ??
+    contentAny?.data?.schedule ??
+    contentAny?.playlist ??
+    contentAny?.assignedSchedule?.schedule ??
+    contentAny?.data?.playlist
+  );
+}
+
 // Async thunks
 export const refreshContent = createAsyncThunk(
   "content/refreshContent",
@@ -458,19 +507,7 @@ export const refreshContent = createAsyncThunk(
       }
 
       // Prefer schedule from the content we just synced (API may embed it under various paths); fall back to separate key
-      const contentAny = content as unknown as {
-        schedule?: unknown;
-        scheduledPlaylists?: ScheduledPlaylistAssignment[];
-        data?: { schedule?: unknown; playlist?: unknown; scheduledPlaylists?: ScheduledPlaylistAssignment[] };
-        playlist?: unknown;
-        assignedSchedule?: { schedule?: unknown };
-      };
-      const scheduleFromContent =
-        contentAny?.schedule ??
-        contentAny?.data?.schedule ??
-        contentAny?.playlist ??
-        contentAny?.assignedSchedule?.schedule ??
-        contentAny?.data?.playlist;
+      const scheduleFromContent = pickSchedulePayloadFromScreenContent(content);
       const scheduleFromStorage = await storageService.get<any>('schedule');
       const scheduleData = scheduleFromContent ?? scheduleFromStorage;
       const schedule = scheduleData ? normalizeScheduleData(scheduleData) : null;
@@ -478,15 +515,7 @@ export const refreshContent = createAsyncThunk(
       const eventsData = await storageService.get<any>('events');
       const events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
 
-      const hasScheduledPlaylistsKey =
-        (contentAny && 'scheduledPlaylists' in contentAny) ||
-        (contentAny?.data && 'scheduledPlaylists' in contentAny.data);
-      const scheduledPlaylistsRaw = hasScheduledPlaylistsKey
-        ? (contentAny?.scheduledPlaylists ?? contentAny?.data?.scheduledPlaylists ?? null)
-        : undefined;
-      const scheduledPlaylistsArray = hasScheduledPlaylistsKey
-        ? (Array.isArray(scheduledPlaylistsRaw) && scheduledPlaylistsRaw.length > 0 ? scheduledPlaylistsRaw : null)
-        : undefined;
+      const { hasScheduledPlaylistsKey, scheduledPlaylistsArray } = pickScheduledPlaylists(content);
 
       // Extract masjid information
       const masjidName = extractMasjidName(content);

@@ -209,13 +209,18 @@ export const useRamadanMode = (): RamadanModeData => {
     [imsakTime, timeFormat],
   );
 
+  /* ---- Shared "now" in local HH:mm form (used by both fasting + Suhoor checks) ---- */
+  const nowHHmmLocal = useMemo<string>(
+    () =>
+      `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`,
+    [currentTime],
+  );
+
   /* ---- Fasting state ---- */
   const isFastingHours = useMemo(() => {
     if (!isRamadan || !suhoorEndTime || !iftarTime) return false;
-
-    const nowHHmm = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
-    return nowHHmm >= suhoorEndTime && nowHHmm < iftarTime;
-  }, [isRamadan, suhoorEndTime, iftarTime, currentTime]);
+    return nowHHmmLocal >= suhoorEndTime && nowHHmmLocal < iftarTime;
+  }, [isRamadan, suhoorEndTime, iftarTime, nowHHmmLocal]);
 
   /* ---- Live countdowns (recomputed every second via currentTime) ---- */
   const timeToIftar = useMemo(() => {
@@ -225,12 +230,10 @@ export const useRamadanMode = (): RamadanModeData => {
 
   const timeToSuhoorEnd = useMemo(() => {
     if (!isRamadan || !imsakTime) return null;
-
-    const nowHHmm = `${String(currentTime.getHours()).padStart(2, '0')}:${String(currentTime.getMinutes()).padStart(2, '0')}`;
     // Only show countdown between midnight and Imsak — after Imsak, Suhoor is over
-    if (nowHHmm >= imsakTime) return null;
+    if (nowHHmmLocal >= imsakTime) return null;
     return getTimeUntilNextPrayer(imsakTime, false);
-  }, [isRamadan, imsakTime, currentTime]);
+  }, [isRamadan, imsakTime, nowHHmmLocal]);
 
   /* ---- Theme attribute side effect ---- */
   const applyTheme = useCallback((active: boolean) => {

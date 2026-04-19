@@ -160,8 +160,8 @@ const WifiSettingsOverlay: React.FC = () => {
       const res = await fetch('/internal/wifi/saved', { signal: AbortSignal.timeout(5_000) });
       const data = await res.json();
       setSavedProfiles(data.profiles || []);
-    } catch {
-      /* non-fatal */
+    } catch (e) {
+      logger.debug('[WifiOverlay] saved profiles unavailable', { error: e instanceof Error ? e.message : String(e) });
     }
   }, []);
 
