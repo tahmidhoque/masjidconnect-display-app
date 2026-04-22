@@ -50,10 +50,15 @@ interface PrayerTimesPanelProps {
 }
 
 /** Time column cell class. Width is owned by the parent grid template
- *  (rowGridClass below) so columns stay aligned regardless of font size. */
+ *  (rowGridClass below) so columns stay aligned regardless of font size.
+ *  Default is right-aligned; portrait + 12h uses the LEFT-aligned variant
+ *  (TIME_COL_CLASS_LEFT) to keep the whole section visually anchored left
+ *  when the am/pm suffix would otherwise add visual weight on the right. */
 const TIME_COL_CLASS = 'block text-right tabular-nums';
+const TIME_COL_CLASS_LEFT = 'block text-left tabular-nums';
 
-/** Renders time as main (e.g. "5:39") with optional small am/pm subtext. Use inside a right-aligned column. */
+/** Renders time as main (e.g. "5:39") with optional small am/pm subtext.
+ *  The wrapping column controls horizontal alignment via TIME_COL_CLASS{_LEFT}. */
 const TimeWithPeriod: React.FC<{
   timeString: string;
   timeFormat: TimeFormat;
@@ -103,6 +108,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
     ? 'grid grid-cols-[1fr_7rem_8rem_7rem] gap-x-4 items-center'
     : 'grid grid-cols-[1fr_7.5rem_8.5rem] gap-x-4 items-center';
 
+  // Portrait + 12h: left-align time columns so the whole section reads as
+  // anchored to the left edge. All other combinations keep the default
+  // right-aligned columns.
+  const timeColClass =
+    compact && timeFormat === '12h' ? TIME_COL_CLASS_LEFT : TIME_COL_CLASS;
+
   return (
     <div
       className={`flex flex-col flex-1 min-h-0 overflow-hidden px-4 ${
@@ -122,10 +133,10 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
             compact
           />
         </div>
-        <span className={`text-prayer-col-label text-text-secondary ${TIME_COL_CLASS}`}>{adhanLabel}</span>
-        <span className={`text-prayer-col-label text-gold/85 ${TIME_COL_CLASS}`}>{jamaatLabel}</span>
+        <span className={`text-prayer-col-label text-text-secondary ${timeColClass}`}>{adhanLabel}</span>
+        <span className={`text-prayer-col-label text-gold/85 ${timeColClass}`}>{jamaatLabel}</span>
         {showTomorrowCol && (
-          <span className={`text-prayer-col-label text-gold/75 ${TIME_COL_CLASS}`}>{`Tomorrow's ${jamaatLabel}`}</span>
+          <span className={`text-prayer-col-label text-gold/75 ${timeColClass}`}>{`Tomorrow's ${jamaatLabel}`}</span>
         )}
       </div>
 
@@ -145,15 +156,15 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   </div>
                   {showTomorrowCol ? (
                     <>
-                      <span className={TIME_COL_CLASS}>
+                      <span className={timeColClass}>
                         <TimeWithPeriod
                           timeString={imsakTime ?? ''}
                           timeFormat={timeFormat}
                           className="text-prayer text-gold/70"
                         />
                       </span>
-                      <span className={TIME_COL_CLASS}>—</span>
-                      <span className={TIME_COL_CLASS}>—</span>
+                      <span className={timeColClass}>—</span>
+                      <span className={timeColClass}>—</span>
                     </>
                   ) : (
                     <div className="col-span-2 flex justify-center">
@@ -188,14 +199,14 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
 
                 {prayer.jamaat ? (
                   <>
-                    <span className={TIME_COL_CLASS}>
+                    <span className={timeColClass}>
                       <TimeWithPeriod
                         timeString={prayer.time}
                         timeFormat={timeFormat}
                         className={`text-prayer-time-adhan ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
                       />
                     </span>
-                    <span className={TIME_COL_CLASS}>
+                    <span className={timeColClass}>
                       <TimeWithPeriod
                         timeString={prayer.jamaat}
                         timeFormat={timeFormat}
@@ -203,7 +214,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                       />
                     </span>
                     {showTomorrowCol && (
-                      <span className={TIME_COL_CLASS}>
+                      <span className={timeColClass}>
                         <TimeWithPeriod
                           timeString={tomorrowsJamaats?.[prayer.name] ?? ''}
                           timeFormat={timeFormat}
@@ -214,15 +225,15 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   </>
                 ) : showTomorrowCol ? (
                   <>
-                    <span className={TIME_COL_CLASS}>
+                    <span className={timeColClass}>
                       <TimeWithPeriod
                         timeString={prayer.time}
                         timeFormat={timeFormat}
                         className={`text-prayer-time-adhan ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
                       />
                     </span>
-                    <span className={TIME_COL_CLASS}>—</span>
-                    <span className={TIME_COL_CLASS}>—</span>
+                    <span className={timeColClass}>—</span>
+                    <span className={timeColClass}>—</span>
                   </>
                 ) : (
                   <div className="col-span-2 flex justify-center">
