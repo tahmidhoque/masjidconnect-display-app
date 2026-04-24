@@ -129,4 +129,56 @@ describe('resolveTomorrowChange', () => {
     };
     expect(resolveTomorrowChange('Zuhr', '13:15', fridayMap)).toBeNull();
   });
+
+  describe('Friday → Saturday (today is Jumuah-substituted)', () => {
+    // When today is Friday the Zuhr row is rewritten with the Jumuah
+    // congregational time; the underlying weekday Zuhr lives on
+    // `alternateJamaat`. Tomorrow (Saturday) is a plain Zuhr row. Comparing
+    // the displayed Jumuah time against tomorrow's Zuhr would always differ
+    // and fire the slide during the silence-your-phones window even when
+    // the regular Zuhr jamaat hasn't actually changed.
+    const saturdayMap = {
+      Zuhr: { jamaat: '14:00' },
+      Asr: { jamaat: '16:45' },
+      Isha: { jamaat: '21:30' },
+    };
+
+    it('returns null when the underlying weekday Zuhr is unchanged', () => {
+      // Today: Jumuah 13:30, regular Zuhr would have been 14:00.
+      // Tomorrow: regular Zuhr 14:00 (same). No real change → no slide.
+      expect(
+        resolveTomorrowChange('Zuhr', '13:30', saturdayMap, true, '14:00'),
+      ).toBeNull();
+    });
+
+    it("returns the Zuhr change when tomorrow's regular Zuhr actually differs", () => {
+      // Today: Jumuah 13:30, regular Zuhr 14:00.
+      // Tomorrow: regular Zuhr 14:15 (genuinely different schedule).
+      const changedMap = { ...saturdayMap, Zuhr: { jamaat: '14:15' } };
+      expect(
+        resolveTomorrowChange('Zuhr', '13:30', changedMap, true, '14:00'),
+      ).toEqual({ prayerName: 'Zuhr', tomorrow: '14:15' });
+    });
+
+    it('falls back to today.jamaat when alternateJamaat is missing', () => {
+      // Defensive: if upstream ever drops alternateJamaat we should still
+      // return null rather than crash, and we shouldn't silently announce a
+      // bogus change.
+      expect(
+        resolveTomorrowChange('Zuhr', '13:30', saturdayMap, true, undefined),
+      ).toBeNull();
+      expect(
+        resolveTomorrowChange('Zuhr', '13:30', saturdayMap, true, null),
+      ).toBeNull();
+    });
+
+    it('does not affect Asr/Isha rows on Friday', () => {
+      // Only the Zuhr slot gets the Jumuah substitution; the isJumuah flag
+      // on nextPrayer travels with it, so an Asr/Isha next-prayer is never
+      // flagged. The standard diff still applies.
+      expect(
+        resolveTomorrowChange('Asr', '16:30', saturdayMap, false, undefined),
+      ).toEqual({ prayerName: 'Asr', tomorrow: '16:45' });
+    });
+  });
 });

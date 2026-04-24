@@ -68,21 +68,42 @@ export function normaliseHHmm(value: string | undefined | null): string | null {
  * entry is Jumuah (Friday Zuhr replaced by the Jumuah congregational time),
  * the returned `prayerName` is `'Jumuah'` so the slide labels itself
  * accurately rather than saying "Zuhr".
+ *
+ * Friday → Saturday note: on Fridays the Zuhr slot is rewritten by
+ * `applyJummahSubstitution` so `todayJamaat` is the Jumuah congregational
+ * time, with the underlying weekday Zuhr preserved on `todayAlternateJamaat`.
+ * Comparing the displayed Jumuah time against tomorrow's regular Zuhr would
+ * always differ and falsely trigger the slide. When today's slot is Jumuah
+ * but tomorrow's slot is plain Zuhr (i.e. tomorrow is not also a Friday),
+ * compare the two underlying weekday Zuhr times instead so the slide only
+ * shows when the regular Zuhr jamaat itself is changing.
  */
 export function resolveTomorrowChange(
   prayerName: string | null | undefined,
   todayJamaat: string | null | undefined,
   tomorrowsJamaats: TomorrowsJamaatsMap | undefined,
+  todayIsJumuah?: boolean,
+  todayAlternateJamaat?: string | null,
 ): { prayerName: string; tomorrow: string } | null {
   if (!prayerName || !TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has(prayerName)) {
     return null;
   }
-  const today = normaliseHHmm(todayJamaat);
   const entry = tomorrowsJamaats?.[prayerName];
   const tomorrowRaw = entry?.jamaat;
   const tomorrow = normaliseHHmm(tomorrowRaw);
-  if (!today || !tomorrow) return null;
+  if (!tomorrow) return null;
+
+  // Friday-aware comparison: if today's slot has been substituted with
+  // Jumuah but tomorrow's slot is a plain Zuhr, compare the underlying
+  // weekday Zuhr times so a Jumuah-vs-Zuhr mismatch doesn't falsely fire.
+  const useAlternateForToday =
+    todayIsJumuah === true && entry?.isJumuah !== true;
+  const today = useAlternateForToday
+    ? normaliseHHmm(todayAlternateJamaat)
+    : normaliseHHmm(todayJamaat);
+  if (!today) return null;
   if (today === tomorrow) return null;
+
   return {
     prayerName: entry?.isJumuah ? 'Jumuah' : prayerName,
     tomorrow: tomorrowRaw as string,
@@ -146,8 +167,17 @@ const JamaatSoonSlot: React.FC<JamaatSoonSlotProps> = ({
       nextPrayer?.name,
       nextPrayer?.jamaat,
       tomorrowsJamaats,
+      nextPrayer?.isJumuah,
+      nextPrayer?.alternateJamaat,
     );
-  }, [forceFlag, nextPrayer?.name, nextPrayer?.jamaat, tomorrowsJamaats]);
+  }, [
+    forceFlag,
+    nextPrayer?.name,
+    nextPrayer?.jamaat,
+    nextPrayer?.isJumuah,
+    nextPrayer?.alternateJamaat,
+    tomorrowsJamaats,
+  ]);
 
   /* Cycling state: 0 = phones graphic, 1 = tomorrow-change slide. */
   const [activeIdx, setActiveIdx] = useState(0);
