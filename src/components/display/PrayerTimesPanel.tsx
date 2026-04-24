@@ -120,6 +120,12 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   // right-aligned columns.
   const timeColClass =
     compact && timeFormat === '12h' ? TIME_COL_CLASS_LEFT : TIME_COL_CLASS;
+  // Tomorrow's Jamaat cell uses a flex column wrapper to stack an optional
+  // mismatch sublabel under the time, so its horizontal alignment is set via
+  // `items-*` instead of `text-*`. Mirror the column alignment so the cell
+  // doesn't fight the rest of the section in portrait + 12h.
+  const tomorrowItemsAlignClass =
+    compact && timeFormat === '12h' ? 'items-start' : 'items-end';
 
   return (
     <div
@@ -241,7 +247,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                             ? zuhrLabel
                             : null;
                       return (
-                        <span className={`${timeColClass} flex flex-col items-end`}>
+                        <span className={`${timeColClass} flex flex-col ${tomorrowItemsAlignClass}`}>
                           <TimeWithPeriod
                             timeString={tomorrowJamaat}
                             timeFormat={timeFormat}
