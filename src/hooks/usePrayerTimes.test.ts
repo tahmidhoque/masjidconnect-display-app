@@ -292,6 +292,94 @@ describe('usePrayerTimes', () => {
       );
     });
 
+    it('reverts the Zuhr row to regular Zuhr times after the Jumuah jamaat window has passed', async () => {
+      // jummahJamaat = 13:15 → in-prayer window (10m progress + 10m delay =
+      // 20m default) ends at 13:35. zuhrJamaat = 12:30 (already past at any
+      // post-Jumuah time). Test at 13:40: Jumuah is fully done and the
+      // panel/strip should read the Zuhr slot as a normal past prayer
+      // (12:15 / 12:30) rather than continuing to highlight a stale
+      // "Jumuah 13:15". Next-prayer must still resolve to Asr because the
+      // revert only fires AFTER calculatePrayersAccurately has used the
+      // substituted Jumuah times.
+      const friday = nextFridayAt(13, 40);
+      vi.setSystemTime(friday.toDate());
+
+      const prayerTimes = {
+        date: friday.format('YYYY-MM-DD'),
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '12:30',
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        jummahKhutbah: '13:00',
+        jummahJamaat: '13:15',
+      } as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          expect(result.current.isJumuahToday).toBe(true);
+          expect(result.current.nextPrayer?.name).toBe('Asr');
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow).toBeDefined();
+          expect(zuhrRow?.time).toBe('12:15');
+          expect(zuhrRow?.jamaat).toBe('12:30');
+          expect(zuhrRow?.isJumuah).toBeFalsy();
+          expect(zuhrRow?.alternateJamaat).toBeUndefined();
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it('keeps the Zuhr row showing Jumuah times while the Jumuah jamaat window is still active', async () => {
+      // At 13:25 we're inside the Jumuah window (jamaat 13:15 + 20m → 13:35).
+      // The row must still read as Jumuah so the in-prayer phase, panel
+      // highlight, and alternateJamaat subtext all stay correct.
+      const friday = nextFridayAt(13, 25);
+      vi.setSystemTime(friday.toDate());
+
+      const prayerTimes = {
+        date: friday.format('YYYY-MM-DD'),
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '12:30',
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        jummahKhutbah: '13:00',
+        jummahJamaat: '13:15',
+      } as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow?.isJumuah).toBe(true);
+          expect(zuhrRow?.jamaat).toBe('13:15');
+          expect(zuhrRow?.time).toBe('13:00');
+          expect(zuhrRow?.alternateJamaat).toBe('12:30');
+        },
+        { timeout: 2000 },
+      );
+    });
+
     it('falls back to regular Zuhr times on Fridays when jummahJamaat is missing', async () => {
       const friday = nextFridayAt(11, 0);
       vi.setSystemTime(friday.toDate());

@@ -197,6 +197,12 @@ function buildTomorrowsJamaats(
  *
  * Returns silently when `jummahJamaat` is missing — the regular Zuhr times
  * remain in place rather than blanking the row.
+ *
+ * NOTE: This substitution is reverted by `updateFormattedPrayerTimes` once
+ * the Jumuah in-prayer window has elapsed, so the Zuhr row reads as a normal
+ * past prayer for the rest of Friday. Next-prayer selection still benefits
+ * from the substitution because the revert happens AFTER
+ * `calculatePrayersAccurately` runs.
  */
 function applyJummahSubstitution(
   zuhrRow: FormattedPrayerTime,
@@ -1079,9 +1085,31 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // `calculatePrayersAccurately` advances to Asr after the Jumuah window
     // ends (not after a stale `zuhrJamaat` that may fall after `jummahJamaat`)
     // and so the countdown / phase machine target the correct jamaat.
+    //
+    // We snapshot the original Zuhr values BEFORE substituting so that, once
+    // the Jumuah in-prayer window has elapsed, we can revert the row's
+    // display back to the regular Zuhr times. By that point Jumuah is in the
+    // past (the user has prayed it), Asr is already pinned as next, and
+    // showing a stale "Jumuah" highlight on a past row reads worse than
+    // letting the slot fall back into the normal Zuhr appearance for the
+    // remainder of the day.
+    let zuhrRevertSnapshot: {
+      time: string;
+      jamaat?: string;
+      jamaatTime?: string;
+      displayTime: string;
+      displayJamaat?: string;
+    } | null = null;
     if (isFridayToday) {
       const zuhrRow = prayers.find((p) => p.name === "Zuhr");
       if (zuhrRow) {
+        zuhrRevertSnapshot = {
+          time: zuhrRow.time,
+          jamaat: zuhrRow.jamaat,
+          jamaatTime: zuhrRow.jamaatTime,
+          displayTime: zuhrRow.displayTime,
+          displayJamaat: zuhrRow.displayJamaat,
+        };
         applyJummahSubstitution(zuhrRow, todayData, timeFormat);
       }
     }
@@ -1092,6 +1120,38 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     const { currentIndex, nextIndex: initialNextIndex } =
       calculatePrayersAccurately(prayers, displaySettings ?? null);
     let nextIndex = initialNextIndex;
+
+    // Friday-only display revert: now that next-prayer selection is locked,
+    // if the Jumuah in-prayer window has fully elapsed (jamaat + jamaat
+    // progress + post-jamaat delay), restore the Zuhr row to its original
+    // values so the panel/strip read it as a normal past Zuhr — same
+    // "Jamaat in progress" boundary the rest of the system uses.
+    if (isFridayToday && zuhrRevertSnapshot) {
+      const zuhrRow = prayers.find((p) => p.name === "Zuhr");
+      if (zuhrRow?.isJumuah && zuhrRow.jamaat) {
+        const jumuahJamaatMin = toMinutesFromMidnight(
+          zuhrRow.jamaat,
+          "Zuhr",
+        );
+        const totalWindowMin = totalJamaatPhaseWindowForDisplayPrayer(
+          displaySettings ?? null,
+          "Zuhr",
+        );
+        const nowMin = nowMinutesInTz(new Date(), tz);
+        if (
+          jumuahJamaatMin >= 0 &&
+          nowMin - jumuahJamaatMin > totalWindowMin
+        ) {
+          zuhrRow.time = zuhrRevertSnapshot.time;
+          zuhrRow.jamaat = zuhrRevertSnapshot.jamaat;
+          zuhrRow.jamaatTime = zuhrRevertSnapshot.jamaatTime;
+          zuhrRow.displayTime = zuhrRevertSnapshot.displayTime;
+          zuhrRow.displayJamaat = zuhrRevertSnapshot.displayJamaat;
+          zuhrRow.isJumuah = false;
+          zuhrRow.alternateJamaat = undefined;
+        }
+      }
+    }
 
     // Dev: override next highlighted prayer (cycle via Ctrl+Shift+P)
     if (import.meta.env.DEV && typeof window.__NEXT_PRAYER_INDEX === "number") {
