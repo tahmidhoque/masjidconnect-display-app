@@ -369,6 +369,26 @@ html, body {
   letter-spacing: 0.06em;
 }
 
+/* Portrait title — bumped above text-heading so it stays balanced with the
+ * calendar motif above it and the gold time below it. The motif provides
+ * visual weight; this rule prevents the surrounding copy from feeling
+ * undersized in the tall portrait carousel band. */
+.tomorrows-jamaat-change-title {
+  font-size: clamp(1.6rem, 2.1rem, 2.5rem);
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+}
+
+/* Portrait calendar motif — sized to match SilentPhonesGraphic's
+ * prohibition SVG (11rem) so both slot variants share the same visual
+ * rhythm in the carousel band. Clamped down for narrow displays so the
+ * motif never crowds the title/time stack on small portrait viewports. */
+.tomorrows-jamaat-change-motif {
+  width: clamp(8rem, 11rem, 13rem);
+  height: clamp(8rem, 11rem, 13rem);
+}
+
 /* In-prayer — landscape split column typography */
 .in-prayer-screen--split .in-prayer-screen-split-name {
   font-size: clamp(1.75rem, 2.35rem, 3rem);

@@ -193,12 +193,21 @@ const TomorrowsJamaatChangeSlide: React.FC<
   }
 
   return (
-    <div className="panel flex flex-col items-center justify-center h-full min-h-0 max-h-full overflow-hidden gap-y-8 text-center">
+    <div className="panel flex flex-col items-center justify-center h-full min-h-0 max-h-full overflow-hidden gap-y-7 text-center">
+      {/*
+        Visual anchor — mirrors SilentPhonesGraphic's prohibition SVG so the
+        portrait carousel band feels balanced rather than text-collapsed in
+        the centre with large empty margins. The motif's gold "tomorrow"
+        cell + arrow reinforce the message before any copy is read.
+      */}
+      <div className="shrink-0 text-text-primary tomorrows-jamaat-change-motif">
+        <TomorrowCalendarMotif className="w-full h-full drop-shadow-lg" />
+      </div>
       <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
         From tomorrow
       </span>
-      <div className="flex flex-col items-center gap-y-4 max-w-lg w-full min-w-0">
-        <h2 className="text-heading text-text-primary font-bold leading-snug">
+      <div className="flex flex-col items-center gap-y-4 max-w-2xl w-full min-w-0">
+        <h2 className="tomorrows-jamaat-change-title text-text-primary font-bold leading-snug">
           {displayPrayerName} {jamaatLabel} will be at
         </h2>
         <span className="inline-flex items-baseline gap-x-3 text-gold font-extrabold tabular-nums leading-none tomorrows-jamaat-change-time">
@@ -210,9 +219,6 @@ const TomorrowsJamaatChangeSlide: React.FC<
           ) : null}
         </span>
       </div>
-      <p className="text-body text-text-secondary leading-relaxed font-semibold max-w-md">
-        Please make a note of the new time
-      </p>
     </div>
   );
 };
