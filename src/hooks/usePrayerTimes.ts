@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PrayerTimes, type DisplaySettings } from "../api/models";
+import { PrayerTimes, type DisplaySettings, type TimeFormat } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
@@ -56,10 +56,44 @@ interface FormattedPrayerTime {
   isCurrent: boolean;
   timeUntil: string;
   jamaatTime?: string;
+  /**
+   * True when the row is the Friday Zuhr slot replaced by Jumuah. Consumers
+   * use this to relabel the row from "Zuhr" to "Jumuah" via the existing
+   * `jummah` terminology key.
+   */
+  isJumuah?: boolean;
+  /**
+   * When `isJumuah`, the original `zuhrJamaat` for the same day (HH:mm).
+   * Preserved as informational data — the UI deliberately doesn't render a
+   * regular Zuhr time alongside today's Jumuah jamaat (Jumuah replaces the
+   * Zuhr congregational prayer in the mosque), but downstream logic such as
+   * the JamaatSoonSlot diff can still consult it.
+   */
+  alternateJamaat?: string;
 }
 
-/** Map of prayer name to jamaat time for the "tomorrow" relative to displayed date. */
-export type TomorrowsJamaatsMap = Record<string, string> | null;
+/**
+ * One entry in {@link TomorrowsJamaatsMap}. Friday's Zuhr slot returns the
+ * Jumuah congregational time as the primary `jamaat` and sets `isJumuah` so
+ * the panel/strip can render a small "Jumuah" subtext under the time, making
+ * clear that tomorrow's Zuhr-slot jamaat is actually the Jumuah prayer.
+ *
+ * `alternateJamaat` carries the regular `zuhrJamaat` for the same day. The UI
+ * does not render it (Jumuah is the only mosque congregational prayer on
+ * Fridays), but it stays on the entry for downstream consumers such as the
+ * JamaatSoonSlot diff that may need the original Zuhr time.
+ */
+export interface TomorrowsJamaatEntry {
+  /** Primary jamaat time in HH:mm. Friday Zuhr → `jummahJamaat`. */
+  jamaat: string;
+  /** True when the entry represents Jumuah replacing Zuhr (Friday only). */
+  isJumuah?: boolean;
+  /** When `isJumuah`, the regular `zuhrJamaat` for the same day (HH:mm). */
+  alternateJamaat?: string;
+}
+
+/** Map of prayer name to tomorrow's jamaat info for the displayed date. */
+export type TomorrowsJamaatsMap = Record<string, TomorrowsJamaatEntry> | null;
 
 interface PrayerTimesHook {
   todaysPrayerTimes: FormattedPrayerTime[];
@@ -105,20 +139,92 @@ function getJamaatTime(data: Record<string, unknown>, lowerName: string): string
   return typeof snake === "string" ? snake : undefined;
 }
 
-/** Build tomorrow's jamaats map from a day's prayer data. Returns null if no valid jamaats. */
-function buildTomorrowsJamaats(dayData: PrayerTimes | null): TomorrowsJamaatsMap {
+/**
+ * Build tomorrow's jamaats map from a day's prayer data.
+ *
+ * When `isFridayDay` is true and the day has `jummahJamaat`, the Zuhr entry
+ * reports the Jumuah congregational time as primary and sets `isJumuah` so
+ * the panel/strip render a small "Jumuah" label under the time. The regular
+ * `zuhrJamaat` is preserved on `alternateJamaat` for downstream consumers.
+ *
+ * Returns null if no valid jamaats.
+ */
+function buildTomorrowsJamaats(
+  dayData: PrayerTimes | null,
+  isFridayDay: boolean,
+): TomorrowsJamaatsMap {
   if (!dayData || typeof dayData !== "object") return null;
   const data = dayData as unknown as Record<string, unknown>;
-  const map: Record<string, string> = {};
+  const map: Record<string, TomorrowsJamaatEntry> = {};
   let hasAny = false;
+  const jummahJamaat =
+    typeof data.jummahJamaat === "string" ? data.jummahJamaat : undefined;
   for (const name of PRAYERS_WITH_JAMAAT) {
     const jamaat = getJamaatTime(data, name.toLowerCase());
+    if (name === "Zuhr" && isFridayDay && jummahJamaat) {
+      map[name] = {
+        jamaat: jummahJamaat,
+        isJumuah: true,
+        alternateJamaat: jamaat || undefined,
+      };
+      hasAny = true;
+      continue;
+    }
     if (jamaat) {
-      map[name] = jamaat;
+      map[name] = { jamaat };
       hasAny = true;
     }
   }
   return hasAny ? map : null;
+}
+
+/**
+ * Friday Jumuah replaces Zuhr in the mosque congregational prayer.
+ *
+ * When the API exposes a separate `jummahJamaat` for the day (and optionally
+ * `jummahKhutbah`), substitute the Zuhr row's times in place so every
+ * downstream consumer — `calculatePrayersAccurately` for next-prayer
+ * selection, `PrayerCountdown` for the live target, `usePrayerPhase` for the
+ * in-prayer window, and the prayer panel — sees the Jumuah times for the
+ * Zuhr slot. This avoids the prior split where the panel showed `zuhrJamaat`
+ * while the countdown targeted `jummahJamaat`, which left a stale countdown
+ * window when `zuhrJamaat` fell after `jummahJamaat`.
+ *
+ * `time` (treated as the slot start, i.e. the adhan equivalent for selection)
+ * becomes `jummahKhutbah` when present, otherwise it collapses to
+ * `jummahJamaat` (no adhan-only countdown — straight into the jamaat
+ * countdown). `jamaat` is always replaced with `jummahJamaat`.
+ *
+ * Returns silently when `jummahJamaat` is missing — the regular Zuhr times
+ * remain in place rather than blanking the row.
+ */
+function applyJummahSubstitution(
+  zuhrRow: FormattedPrayerTime,
+  dayData: unknown,
+  timeFormat: TimeFormat,
+): void {
+  if (!dayData || typeof dayData !== "object") return;
+  const rec = dayData as Record<string, unknown>;
+  const jamaat =
+    typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : undefined;
+  if (!jamaat) return;
+  const khutbah =
+    typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : undefined;
+  const slotStart = khutbah ?? jamaat;
+  // Capture the regular zuhrJamaat before overwriting. The UI no longer
+  // renders this alongside today's Jumuah jamaat (Jumuah is the only mosque
+  // congregational prayer on Fridays), but the value is preserved on the row
+  // for downstream consumers that may need the original solar-noon Zuhr.
+  const originalZuhrJamaat = zuhrRow.jamaat;
+  zuhrRow.time = slotStart;
+  zuhrRow.jamaat = jamaat;
+  zuhrRow.jamaatTime = jamaat;
+  zuhrRow.displayTime = formatTimeToDisplay(slotStart, timeFormat);
+  zuhrRow.displayJamaat = formatTimeToDisplay(jamaat, timeFormat);
+  zuhrRow.isJumuah = true;
+  if (originalZuhrJamaat) {
+    zuhrRow.alternateJamaat = originalZuhrJamaat;
+  }
 }
 
 /** Parse YYYY-MM-DD to that calendar day in masjid timezone (noon avoids DST edge cases). */
@@ -819,7 +925,13 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // API returns { data: [ day0, day1, ... ] }; resolve today/tomorrow by date field
     // so we show correct day when offline at midnight (data[0] may be yesterday).
     const tz = masjidTimezone || defaultMasjidTimezone;
-    const todayInMasjidTz = dayjs().tz(tz).format("YYYY-MM-DD");
+    const nowInMasjidTz = dayjs().tz(tz);
+    const todayInMasjidTz = nowInMasjidTz.format("YYYY-MM-DD");
+    /**
+     * Friday detection used to drive the Jumuah-replaces-Zuhr substitution
+     * (see `applyJummahSubstitution`). dayjs `day()` returns 5 for Friday.
+     */
+    const isFridayToday = nowInMasjidTz.day() === 5;
 
     let tomorrowData: PrayerTimes | null = null;
     let dayAfterTomorrowData: PrayerTimes | null = null;
@@ -896,6 +1008,19 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     prayerRecord.maghrib = extractTime("maghrib");
     prayerRecord.isha = extractTime("isha");
 
+    // Friday: Jumuah replaces Zuhr for the diagnostic next-prayer name. Use
+    // `jummahKhutbah` as the slot start when present so the wall-clock
+    // comparison in `getNextPrayerTime` matches the substituted row built
+    // below; falls through to `jummahJamaat` so the slot collapses to the
+    // jamaat time rather than blanking when khutbah is missing.
+    if (isFridayToday) {
+      const jummahJamaat = extractTime("jummahJamaat");
+      if (jummahJamaat) {
+        const jummahKhutbah = extractTime("jummahKhutbah");
+        prayerRecord.zuhr = jummahKhutbah || jummahJamaat;
+      }
+    }
+
     if (Object.values(prayerRecord).some((time) => time)) {
       // Only calculate if we have at least one valid time
       try {
@@ -949,6 +1074,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         logger.error(`Error processing prayer ${name}`, { error });
       }
     });
+
+    // Friday: Jumuah replaces Zuhr in the mosque. Substitute at the source so
+    // `calculatePrayersAccurately` advances to Asr after the Jumuah window
+    // ends (not after a stale `zuhrJamaat` that may fall after `jummahJamaat`)
+    // and so the countdown / phase machine target the correct jamaat.
+    if (isFridayToday) {
+      const zuhrRow = prayers.find((p) => p.name === "Zuhr");
+      if (zuhrRow) {
+        applyJummahSubstitution(zuhrRow, todayData, timeFormat);
+      }
+    }
 
     prayersCountRef.current = prayers.length;
 
@@ -1045,9 +1181,24 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     if (!needTomorrowList) {
       setCurrentDate(nowDayjs.format("dddd, MMMM D, YYYY"));
       setIsJumuahToday(nowDayjs.day() === 5);
-      setTomorrowsJamaats(buildTomorrowsJamaats(tomorrowData));
+      // tomorrow's column reflects nowDayjs + 1 day; flag Friday so the Zuhr
+      // entry surfaces Jumuah as primary with regular Zuhr as alternate.
+      setTomorrowsJamaats(
+        buildTomorrowsJamaats(
+          tomorrowData,
+          nowDayjs.add(1, "day").day() === 5,
+        ),
+      );
     } else if (needTomorrowList && tomorrowData) {
-      setTomorrowsJamaats(buildTomorrowsJamaats(dayAfterTomorrowData));
+      // After-Isha branch: displayed list is tomorrow, so the "tomorrow column"
+      // shows day-after-tomorrow. Friday flag is for that day, not the
+      // displayed Friday (already handled below via applyJummahSubstitution).
+      setTomorrowsJamaats(
+        buildTomorrowsJamaats(
+          dayAfterTomorrowData,
+          nowDayjs.add(2, "day").day() === 5,
+        ),
+      );
       // Build displayed list from tomorrow's day in the API data array (data[1])
       const prayersFromTomorrow: FormattedPrayerTime[] = [];
       PRAYER_NAMES.forEach((name) => {
@@ -1074,6 +1225,18 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           jamaatTime: jamaat,
         });
       });
+      // Tomorrow falls on Friday: substitute Jumuah for Zuhr in the displayed
+      // list so the panel shows the Friday congregational time and the in-app
+      // selection for the Zuhr slot stays consistent with today's-Friday path.
+      const isFridayTomorrow = nowDayjs.add(1, "day").day() === 5;
+      if (isFridayTomorrow) {
+        const zuhrRowTomorrow = prayersFromTomorrow.find(
+          (p) => p.name === "Zuhr",
+        );
+        if (zuhrRowTomorrow) {
+          applyJummahSubstitution(zuhrRowTomorrow, tomorrowData, timeFormat);
+        }
+      }
       const fajrFromTomorrow = prayersFromTomorrow.find((p) => p.name === "Fajr");
       if (fajrFromTomorrow) {
         fajrFromTomorrow.timeUntil = getTimeUntilNextPrayer(
@@ -1149,8 +1312,16 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       applyStripJummahState();
       return;
     } else {
-      // needTomorrowList but no tomorrowData — fall through with today's list
-      setTomorrowsJamaats(buildTomorrowsJamaats(tomorrowData));
+      // needTomorrowList but no tomorrowData — fall through with today's list.
+      // Pass the Friday flag for the displayed-tomorrow date so the Zuhr entry
+      // surfaces Jumuah + alternate when applicable (matches the regular
+      // branch above).
+      setTomorrowsJamaats(
+        buildTomorrowsJamaats(
+          tomorrowData,
+          nowDayjs.add(1, "day").day() === 5,
+        ),
+      );
     }
 
     // Apply the calculated flags

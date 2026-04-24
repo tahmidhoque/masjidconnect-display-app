@@ -2,9 +2,14 @@
  * PrayerStrip
  *
  * Landscape-only horizontal bar: optional Imsak row, then clock and dates (left),
- * prayer cue cards, and an optional countdown row. Jumuah-specific times are
- * surfaced via JumuahBar in portrait only; landscape strip always labels the
- * Friday slot as Zuhr.
+ * prayer cue cards, and an optional countdown row. On Fridays the Zuhr slot
+ * carries `isJumuah` from the data hook and is relabelled "Jumuah" here via
+ * the existing terminology key — Jumuah replaces the Zuhr congregational
+ * prayer in the mosque, so we deliberately do NOT surface the regular
+ * `zuhrJamaat` under today's Jumuah cue card. The Tomorrow row carries a
+ * small subtext ("Jumuah" or "Zuhr") whenever the prayer type of tomorrow's
+ * jamaat differs from today's row label so users can tell at a glance what
+ * tomorrow's time is for.
  *
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
@@ -82,6 +87,13 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
   const now = useMasjidTime();
   const { todaysPrayerTimes } = usePrayerTimesContext();
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  // Tiny subtext labels used under the Tomorrow row whenever the prayer type
+  // of tomorrow's jamaat differs from today's row label (e.g. today Mon–Thu
+  // tomorrow Fri shows "Jumuah" subtext; today Fri tomorrow Sat shows "Zuhr"
+  // subtext). Resolved through terminology so customised masjid labels are
+  // honoured.
+  const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
+  const zuhrLabel = resolveTerminology(terminology, 'zuhr', 'Zuhr');
 
   const timeStr24h = now.format('HH:mm');
   const { main: timeMain, period: timePeriod } = getTimeDisplayParts(
@@ -141,6 +153,12 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
             const isNext = prayer.isNext;
             const isSunrise = prayer.name === 'Sunrise';
             const displayName = (() => {
+              // Friday Zuhr slot is replaced by Jumuah upstream; relabel the
+              // card via the existing `jummah` terminology key so users don't
+              // see "Dhuhr"/"Zuhr" with Jumuah times.
+              if (prayer.isJumuah) {
+                return resolveTerminology(terminology, 'jummah', 'Jumuah');
+              }
               const fallback = DISPLAY_NAMES[prayer.name] ?? prayer.name;
               const key = prayerRowNameToTerminologyKey(prayer.name);
               return key ? resolveTerminology(terminology, key, fallback) : fallback;
@@ -211,20 +229,41 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
                   </span>
                 )}
 
-                {showTomorrowCol && (
-                  <div className="mt-0.5 w-full min-w-0 min-h-[1.35rem] flex items-center justify-center shrink-0">
-                    {prayer.jamaat && tomorrowsJamaats?.[prayer.name] ? (
-                      <span className="inline-flex flex-nowrap items-baseline gap-x-0.5 whitespace-nowrap text-prayer-strip-jamaat text-text-muted tabular-nums max-w-full">
-                        <span className="shrink-0">Tmw</span>
-                        <TimeWithPeriod
-                          timeString={tomorrowsJamaats[prayer.name]}
-                          timeFormat={timeFormat}
-                          className="shrink-0"
-                        />
-                      </span>
-                    ) : null}
-                  </div>
-                )}
+                {showTomorrowCol && (() => {
+                  const tomorrowEntry = tomorrowsJamaats?.[prayer.name];
+                  const tomorrowJamaat = tomorrowEntry?.jamaat;
+                  const todayIsJumuah = prayer.isJumuah === true;
+                  const tomorrowIsJumuah = tomorrowEntry?.isJumuah === true;
+                  // Show a subtext only when the tomorrow value's prayer
+                  // type differs from today's row label so users can see at
+                  // a glance what tomorrow's time is for.
+                  const mismatchLabel = !tomorrowJamaat || !prayer.jamaat
+                    ? null
+                    : tomorrowIsJumuah && !todayIsJumuah
+                      ? jummahLabel
+                      : todayIsJumuah && !tomorrowIsJumuah
+                        ? zuhrLabel
+                        : null;
+                  return (
+                    <div className="mt-0.5 w-full min-w-0 flex flex-col items-center justify-center shrink-0">
+                      {prayer.jamaat && tomorrowJamaat ? (
+                        <span className="inline-flex flex-nowrap items-baseline gap-x-0.5 whitespace-nowrap text-prayer-strip-jamaat text-text-muted tabular-nums max-w-full">
+                          <span className="shrink-0">Tmw</span>
+                          <TimeWithPeriod
+                            timeString={tomorrowJamaat}
+                            timeFormat={timeFormat}
+                            className="shrink-0"
+                          />
+                        </span>
+                      ) : null}
+                      {mismatchLabel ? (
+                        <span className="text-prayer-strip-jamaat text-text-muted/75 leading-tight whitespace-nowrap">
+                          {mismatchLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

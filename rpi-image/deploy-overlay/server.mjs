@@ -147,10 +147,15 @@ function getWifiStatus() {
 function parseNmcliWifiList(raw) {
   const seen = new Set();
   const networks = [];
+  // Private-use sentinel so SSID colons (escaped as \:) never collide with field separators.
+  const NMCLI_COLON_SENTINEL = '\uFFFE';
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     // nmcli -t uses : as separator; SSIDs with colons are escaped with \\:
-    const parts = line.replace(/\\:/g, '\x00').split(':').map(p => p.replace(/\x00/g, ':'));
+    const parts = line
+      .replace(/\\:/g, NMCLI_COLON_SENTINEL)
+      .split(':')
+      .map(p => p.replaceAll(NMCLI_COLON_SENTINEL, ':'));
     const ssid = (parts[0] || '').trim();
     if (!ssid || seen.has(ssid)) continue;
     seen.add(ssid);
@@ -210,7 +215,7 @@ function getWifiScan() {
 /**
  * Connect to a WiFi network using nmcli.
  */
-function connectWifi(ssid, password, security) {
+function connectWifi(ssid, password) {
   if (!ssid || typeof ssid !== 'string') {
     return { success: false, error: 'SSID is required' };
   }
@@ -383,8 +388,8 @@ const server = createServer((req, res) => {
       req.on('data', (chunk) => { body += chunk; });
       req.on('end', () => {
         try {
-          const { ssid, password, security } = JSON.parse(body || '{}');
-          const result = connectWifi(ssid, password, security);
+          const { ssid, password } = JSON.parse(body || '{}');
+          const result = connectWifi(ssid, password);
           res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
         } catch (e) {

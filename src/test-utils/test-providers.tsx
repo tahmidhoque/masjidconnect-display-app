@@ -4,14 +4,13 @@
 
 import React from 'react';
 import { Provider } from 'react-redux';
-import type { ReactElement, ReactNode } from 'react';
+import type { PropsWithChildren, ReactElement } from 'react';
 import type { TestRootState } from './mock-store';
 import { createTestStore } from './mock-store';
 
-interface AllTheProvidersProps {
-  children: ReactNode;
+type AllTheProvidersProps = PropsWithChildren<{
   preloadedState?: Partial<TestRootState>;
-}
+}>;
 
 /**
  * Wraps children with Redux Provider using a test store.

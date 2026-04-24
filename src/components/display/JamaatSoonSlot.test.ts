@@ -51,7 +51,14 @@ describe('TOMORROW_CHANGE_ELIGIBLE_PRAYERS', () => {
 });
 
 describe('resolveTomorrowChange', () => {
-  const map = { Fajr: '05:00', Zuhr: '13:35', Asr: '16:45', Maghrib: '18:30', Isha: '21:30' };
+  // TomorrowsJamaatsMap entries are now structured ({ jamaat, isJumuah?, alternateJamaat? }).
+  const map = {
+    Fajr: { jamaat: '05:00' },
+    Zuhr: { jamaat: '13:35' },
+    Asr: { jamaat: '16:45' },
+    Maghrib: { jamaat: '18:30' },
+    Isha: { jamaat: '21:30' },
+  };
 
   it('returns the change when Zuhr/Asr/Isha differ', () => {
     expect(resolveTomorrowChange('Zuhr', '13:30', map)).toEqual({
@@ -86,12 +93,40 @@ describe('resolveTomorrowChange', () => {
   it('returns null when today or tomorrow is missing', () => {
     expect(resolveTomorrowChange('Zuhr', undefined, map)).toBeNull();
     expect(resolveTomorrowChange('Zuhr', '13:30', null)).toBeNull();
-    expect(resolveTomorrowChange('Zuhr', '13:30', { Asr: '16:45' })).toBeNull();
+    expect(
+      resolveTomorrowChange('Zuhr', '13:30', { Asr: { jamaat: '16:45' } }),
+    ).toBeNull();
     expect(resolveTomorrowChange(null, '13:30', map)).toBeNull();
   });
 
   it('returns null when either value cannot be parsed', () => {
     expect(resolveTomorrowChange('Zuhr', 'noon', map)).toBeNull();
-    expect(resolveTomorrowChange('Zuhr', '13:30', { Zuhr: 'later' })).toBeNull();
+    expect(
+      resolveTomorrowChange('Zuhr', '13:30', { Zuhr: { jamaat: 'later' } }),
+    ).toBeNull();
+  });
+
+  it("relabels prayerName as 'Jumuah' when tomorrow's Zuhr entry is Jumuah", () => {
+    // Today is Thursday during Zuhr jamaat-soon; tomorrow's Zuhr slot is
+    // actually Jumuah. The slide must say "Jumuah" rather than "Zuhr" so
+    // attendees aren't misled.
+    const fridayMap = {
+      Zuhr: { jamaat: '13:15', isJumuah: true, alternateJamaat: '12:35' },
+      Asr: { jamaat: '16:45' },
+      Isha: { jamaat: '21:30' },
+    };
+    expect(resolveTomorrowChange('Zuhr', '12:30', fridayMap)).toEqual({
+      prayerName: 'Jumuah',
+      tomorrow: '13:15',
+    });
+  });
+
+  it("returns null when today's Zuhr matches tomorrow's Jumuah", () => {
+    // Edge case: regular Zuhr today happens to align with Jumuah time
+    // tomorrow. No change to announce.
+    const fridayMap = {
+      Zuhr: { jamaat: '13:15', isJumuah: true, alternateJamaat: '12:35' },
+    };
+    expect(resolveTomorrowChange('Zuhr', '13:15', fridayMap)).toBeNull();
   });
 });

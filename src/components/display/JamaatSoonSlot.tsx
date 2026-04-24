@@ -19,6 +19,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
+import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
 import SilentPhonesGraphic from './SilentPhonesGraphic';
 import TomorrowsJamaatChangeSlide from './TomorrowsJamaatChangeSlide';
 
@@ -62,22 +63,30 @@ export function normaliseHHmm(value: string | undefined | null): string | null {
 
 /**
  * Pure check: should the tomorrow-change slide be shown for this combo?
- * Returns the resolved tomorrow time when yes, null when no.
+ *
+ * Returns the resolved tomorrow time when yes, null when no. When tomorrow's
+ * entry is Jumuah (Friday Zuhr replaced by the Jumuah congregational time),
+ * the returned `prayerName` is `'Jumuah'` so the slide labels itself
+ * accurately rather than saying "Zuhr".
  */
 export function resolveTomorrowChange(
   prayerName: string | null | undefined,
   todayJamaat: string | null | undefined,
-  tomorrowsJamaats: Record<string, string> | null | undefined,
+  tomorrowsJamaats: TomorrowsJamaatsMap | undefined,
 ): { prayerName: string; tomorrow: string } | null {
   if (!prayerName || !TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has(prayerName)) {
     return null;
   }
   const today = normaliseHHmm(todayJamaat);
-  const tomorrowRaw = tomorrowsJamaats?.[prayerName];
+  const entry = tomorrowsJamaats?.[prayerName];
+  const tomorrowRaw = entry?.jamaat;
   const tomorrow = normaliseHHmm(tomorrowRaw);
   if (!today || !tomorrow) return null;
   if (today === tomorrow) return null;
-  return { prayerName, tomorrow: tomorrowRaw as string };
+  return {
+    prayerName: entry?.isJumuah ? 'Jumuah' : prayerName,
+    tomorrow: tomorrowRaw as string,
+  };
 }
 
 /* ------------------------------------------------------------------ */

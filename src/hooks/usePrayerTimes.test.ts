@@ -173,6 +173,328 @@ describe('usePrayerTimes', () => {
     });
   });
 
+  describe('Friday Jumuah replaces Zuhr', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Helper: pick the next Friday in TEST_TZ at the requested wall-clock time. */
+    const nextFridayAt = (hour: number, minute = 0) => {
+      let d = dayjs().tz(TEST_TZ);
+      while (d.day() !== 5) d = d.add(1, 'day');
+      return d.hour(hour).minute(minute).second(0).millisecond(0);
+    };
+
+    const mountHook = (prayerTimes: PrayerTimes) => {
+      const store = createTestStore();
+      const contentState = store.getState().content;
+      const storeWithTimes = createTestStore({
+        content: {
+          ...contentState,
+          prayerTimes,
+          masjidTimezone: TEST_TZ,
+          timeFormat: '24h',
+        },
+      });
+      const preloaded = storeWithTimes.getState();
+      const wrapper = ({ children }: { children: React.ReactNode }) =>
+        React.createElement(
+          AllTheProviders,
+          { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+          children,
+        );
+      return renderHook(() => usePrayerTimes(), { wrapper });
+    };
+
+    it('substitutes jummahKhutbah/jummahJamaat into the Zuhr row on Fridays', async () => {
+      // Pick 11:00 on the next Friday — well before any prayer slot.
+      const friday = nextFridayAt(11, 0);
+      vi.setSystemTime(friday.toDate());
+
+      const prayerTimes = {
+        date: friday.format('YYYY-MM-DD'),
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '13:45', // Regular Zuhr jamaat AFTER jumuah jamaat
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        jummahKhutbah: '13:00',
+        jummahJamaat: '13:15',
+      } as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          expect(result.current.isJumuahToday).toBe(true);
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow).toBeDefined();
+          expect(zuhrRow?.time).toBe('13:00');
+          expect(zuhrRow?.jamaat).toBe('13:15');
+          expect(zuhrRow?.jamaatTime).toBe('13:15');
+          // isJumuah flag drives the "Jumuah" relabel in the panel/strip and
+          // alternateJamaat lets the UI surface the regular zuhrJamaat as a
+          // small subtext for attendees who pray solar-noon Zuhr separately.
+          expect(zuhrRow?.isJumuah).toBe(true);
+          expect(zuhrRow?.alternateJamaat).toBe('13:45');
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it('advances next prayer to Asr after jummahJamaat in-prayer window ends (even when zuhrJamaat is later)', async () => {
+      // jummahJamaat = 13:15 → in-prayer window (10m progress + 10m delay = 20m
+      // default) ends at 13:35. zuhrJamaat = 14:00. Test at 13:40: well past
+      // the Jumuah window, but still before the regular zuhrJamaat. Without
+      // the substitution, calculatePrayersAccurately would see jamaatMin =
+      // 14:00 and treat us as "before Zuhr jamaat" → keep nextPrayer on Zuhr.
+      // With the fix, the row's jamaat is 13:15 (well past + outside window)
+      // → next advances to Asr.
+      const friday = nextFridayAt(13, 40);
+      vi.setSystemTime(friday.toDate());
+
+      const prayerTimes = {
+        date: friday.format('YYYY-MM-DD'),
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '14:00',
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        jummahKhutbah: '13:00',
+        jummahJamaat: '13:15',
+      } as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          expect(result.current.isJumuahToday).toBe(true);
+          expect(result.current.nextPrayer?.name).toBe('Asr');
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it('falls back to regular Zuhr times on Fridays when jummahJamaat is missing', async () => {
+      const friday = nextFridayAt(11, 0);
+      vi.setSystemTime(friday.toDate());
+
+      const prayerTimes = {
+        date: friday.format('YYYY-MM-DD'),
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '12:30',
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+      } as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow?.time).toBe('12:15');
+          expect(zuhrRow?.jamaat).toBe('12:30');
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it('does NOT substitute Jumuah times on non-Fridays', async () => {
+      // Find next Saturday (day === 6) at 11:00
+      let d = dayjs().tz(TEST_TZ);
+      while (d.day() !== 6) d = d.add(1, 'day');
+      const saturday = d.hour(11).minute(0).second(0).millisecond(0);
+      vi.setSystemTime(saturday.toDate());
+
+      const prayerTimes = {
+        date: saturday.format('YYYY-MM-DD'),
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat: '12:30',
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        // jummah fields present but should be ignored on Saturday
+        jummahKhutbah: '13:00',
+        jummahJamaat: '13:15',
+      } as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          expect(result.current.isJumuahToday).toBe(false);
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow?.time).toBe('12:15');
+          expect(zuhrRow?.jamaat).toBe('12:30');
+          expect(zuhrRow?.isJumuah).toBeUndefined();
+          expect(zuhrRow?.alternateJamaat).toBeUndefined();
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it("enriches tomorrow's Zuhr entry with Jumuah + alternate when tomorrow is Friday", async () => {
+      // Find next Thursday (day === 4) at 11:00; tomorrow is Friday.
+      let d = dayjs().tz(TEST_TZ);
+      while (d.day() !== 4) d = d.add(1, 'day');
+      const thursday = d.hour(11).minute(0).second(0).millisecond(0);
+      vi.setSystemTime(thursday.toDate());
+
+      const thursdayYmd = thursday.format('YYYY-MM-DD');
+      const fridayYmd = thursday.add(1, 'day').format('YYYY-MM-DD');
+
+      const buildDay = (
+        date: string,
+        zuhrJamaat: string,
+        jummah?: { jummahJamaat: string; jummahKhutbah?: string },
+      ) => ({
+        date,
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat,
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        ...(jummah ?? {}),
+      });
+
+      const prayerTimes = {
+        data: [
+          buildDay(thursdayYmd, '12:30'),
+          buildDay(fridayYmd, '12:35', {
+            jummahKhutbah: '13:00',
+            jummahJamaat: '13:15',
+          }),
+        ],
+      } as unknown as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          // Today is Thursday: Zuhr row stays regular, no Jumuah relabel.
+          expect(result.current.isJumuahToday).toBe(false);
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow?.isJumuah).toBeUndefined();
+          // Tomorrow's column for Zuhr exposes Jumuah as primary with the
+          // regular zuhrJamaat as alternate so the panel/strip can show both.
+          const tomorrowZuhr = result.current.tomorrowsJamaats?.['Zuhr'];
+          expect(tomorrowZuhr).toBeDefined();
+          expect(tomorrowZuhr?.jamaat).toBe('13:15');
+          expect(tomorrowZuhr?.isJumuah).toBe(true);
+          expect(tomorrowZuhr?.alternateJamaat).toBe('12:35');
+          // Other rows stay simple (no isJumuah / alternate fields).
+          const tomorrowAsr = result.current.tomorrowsJamaats?.['Asr'];
+          expect(tomorrowAsr?.jamaat).toBe('17:45');
+          expect(tomorrowAsr?.isJumuah).toBeUndefined();
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it("after-Isha on Thursday: tomorrow's Zuhr row carries isJumuah and alternateJamaat", async () => {
+      // Find next Thursday at 23:30 — well past Isha (22:45 / 23:00 jamaat)
+      // so the hook switches to displaying tomorrow's (Friday's) prayer list.
+      let d = dayjs().tz(TEST_TZ);
+      while (d.day() !== 4) d = d.add(1, 'day');
+      const thursdayLate = d.hour(23).minute(30).second(0).millisecond(0);
+      vi.setSystemTime(thursdayLate.toDate());
+
+      const thursdayYmd = thursdayLate.format('YYYY-MM-DD');
+      const fridayYmd = thursdayLate.add(1, 'day').format('YYYY-MM-DD');
+
+      const buildDay = (
+        date: string,
+        zuhrJamaat: string,
+        jummah?: { jummahJamaat: string; jummahKhutbah?: string },
+      ) => ({
+        date,
+        fajr: '03:30',
+        sunrise: '04:45',
+        zuhr: '12:15',
+        asr: '17:30',
+        maghrib: '21:20',
+        isha: '22:45',
+        fajrJamaat: '04:00',
+        zuhrJamaat,
+        asrJamaat: '17:45',
+        maghribJamaat: '21:25',
+        ishaJamaat: '23:00',
+        ...(jummah ?? {}),
+      });
+
+      const prayerTimes = {
+        data: [
+          buildDay(thursdayYmd, '12:30'),
+          buildDay(fridayYmd, '12:35', {
+            jummahKhutbah: '13:00',
+            jummahJamaat: '13:15',
+          }),
+        ],
+      } as unknown as PrayerTimes;
+
+      const { result } = mountHook(prayerTimes);
+
+      await waitFor(
+        () => {
+          // After Isha, the displayed list is tomorrow (Friday).
+          expect(result.current.isJumuahToday).toBe(true);
+          const zuhrRow = result.current.todaysPrayerTimes.find(
+            (p) => p.name === 'Zuhr',
+          );
+          expect(zuhrRow).toBeDefined();
+          expect(zuhrRow?.time).toBe('13:00');
+          expect(zuhrRow?.jamaat).toBe('13:15');
+          // The relabel + alternate-Zuhr subtext both depend on these flags.
+          expect(zuhrRow?.isJumuah).toBe(true);
+          expect(zuhrRow?.alternateJamaat).toBe('12:35');
+        },
+        { timeout: 2000 },
+      );
+    });
+  });
+
   it('exposes upcoming Friday jummah whenever week data includes a future Friday row', async () => {
     const dayRow = (date: string, jummah?: { jummahJamaat: string; jummahKhutbah: string }) => ({
       date,

@@ -93,6 +93,13 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
   const suhoorLabel = resolveTerminology(terminology, 'suhoor', 'Suhoor');
   const iftarLabel = resolveTerminology(terminology, 'iftar', 'Iftar');
+  // Used as a tiny subtext label under the Tomorrow column whenever the
+  // prayer type of the tomorrow value differs from today's row label —
+  // clarifies that 13:15 isn't Zuhr (today Mon–Thu, tomorrow Fri) or that
+  // 13:30 isn't another Jumuah (today Fri, tomorrow Sat). Resolved through
+  // terminology so customised masjid labels are honoured.
+  const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
+  const zuhrLabel = resolveTerminology(terminology, 'zuhr', 'Zuhr');
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
@@ -188,6 +195,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`text-prayer-name ${isNext ? 'text-emerald-light' : 'text-text-primary'}`}>
                     {(() => {
+                      // Friday Zuhr slot is replaced by Jumuah upstream; relabel
+                      // the row so users don't see "Zuhr" with Jumuah times.
+                      if (prayer.isJumuah) {
+                        return resolveTerminology(terminology, 'jummah', 'Jumuah');
+                      }
                       const key = prayerRowNameToTerminologyKey(prayer.name);
                       return key ? resolveTerminology(terminology, key, prayer.name) : prayer.name;
                     })()}
@@ -213,15 +225,36 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                         className={`text-prayer-time-jamaat ${isNext ? 'text-emerald-light' : 'text-gold'}`}
                       />
                     </span>
-                    {showTomorrowCol && (
-                      <span className={timeColClass}>
-                        <TimeWithPeriod
-                          timeString={tomorrowsJamaats?.[prayer.name] ?? ''}
-                          timeFormat={timeFormat}
-                          className="text-prayer-time-tomorrow text-gold/75"
-                        />
-                      </span>
-                    )}
+                    {showTomorrowCol && (() => {
+                      const tomorrowEntry = tomorrowsJamaats?.[prayer.name];
+                      const tomorrowJamaat = tomorrowEntry?.jamaat ?? '';
+                      const todayIsJumuah = prayer.isJumuah === true;
+                      const tomorrowIsJumuah = tomorrowEntry?.isJumuah === true;
+                      // Show a small subtext only when the tomorrow value's
+                      // prayer type differs from today's row label, so users
+                      // can see at a glance what tomorrow's time is for.
+                      const mismatchLabel = !tomorrowJamaat
+                        ? null
+                        : tomorrowIsJumuah && !todayIsJumuah
+                          ? jummahLabel
+                          : todayIsJumuah && !tomorrowIsJumuah
+                            ? zuhrLabel
+                            : null;
+                      return (
+                        <span className={`${timeColClass} flex flex-col items-end`}>
+                          <TimeWithPeriod
+                            timeString={tomorrowJamaat}
+                            timeFormat={timeFormat}
+                            className="text-prayer-time-tomorrow text-gold/75"
+                          />
+                          {mismatchLabel ? (
+                            <span className="text-caption text-text-muted/80 font-normal leading-tight mt-0.5">
+                              {mismatchLabel}
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    })()}
                   </>
                 ) : showTomorrowCol ? (
                   <>
