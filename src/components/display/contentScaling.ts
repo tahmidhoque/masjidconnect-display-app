@@ -117,23 +117,52 @@ const TIER_CONFIGS: Record<DensityTier, TierConfig> = {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Strip HTML tags and decode the most common entities so density
+ * classification counts visible characters only. Without this, a body
+ * like `<ul><li>Item</li></ul>` is measured as ~25 chars rather than 4
+ * and gets pushed into a smaller density tier than it deserves.
+ *
+ * This is a deliberately small, pure utility — the carousel still uses
+ * `sanitizeHtml` (DOMPurify) when rendering. Measurement does not need
+ * the security guarantees of a full parser.
+ */
+export function visibleTextLength(value: string | undefined | null): number {
+  if (!value) return 0;
+  // 1. Remove tags. 2. Collapse common whitespace. 3. Decode the handful
+  //    of entities that show up in announcement/event text.
+  const stripped = value
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped.length;
+}
+
+/**
  * Count the total visible characters across all text fields of a
- * carousel item. Fields that are absent or empty contribute 0.
+ * carousel item. HTML tags do not count — only the rendered text does,
+ * so equivalent items sent as plain `CUSTOM` text or as HTML
+ * `ANNOUNCEMENT` text classify into the same density tier.
  */
 function countChars(item: CarouselItem): number {
   let total = 0;
-  if (item.title) total += item.title.length;
-  if (item.body) total += item.body.length;
-  if (item.arabicBody) total += item.arabicBody.length;
-  if (item.transliteration) total += item.transliteration.length;
-  if (item.source) total += item.source.length;
+  total += visibleTextLength(item.title);
+  total += visibleTextLength(item.body);
+  total += visibleTextLength(item.arabicBody);
+  total += visibleTextLength(item.transliteration);
+  total += visibleTextLength(item.source);
 
   // Asma al-Husna: only the single selected name is shown, not the full list
   if (item.names && item.names.length > 0) {
     const sample = item.names[0];
-    total += (sample.arabic?.length ?? 0)
-           + (sample.transliteration?.length ?? 0)
-           + (sample.meaning?.length ?? 0);
+    total += visibleTextLength(sample.arabic)
+           + visibleTextLength(sample.transliteration)
+           + visibleTextLength(sample.meaning);
   }
 
   return total;
@@ -154,8 +183,26 @@ function countTextBlocks(item: CarouselItem): number {
 }
 
 /**
+ * Map an effective visible-character count to a density tier.
+ * Shared between every content type so that two items with the same
+ * visible text and block count classify the same way regardless of
+ * whether they came in as `ANNOUNCEMENT`, `CUSTOM`, or another type.
+ */
+function tierForChars(effectiveChars: number): DensityTier {
+  if (effectiveChars < TIER_THRESHOLDS.MINIMAL) return 1;
+  if (effectiveChars < TIER_THRESHOLDS.SHORT) return 2;
+  if (effectiveChars < TIER_THRESHOLDS.MEDIUM) return 3;
+  return 4;
+}
+
+/**
  * Classify a carousel item into one of four density tiers based on its
  * text content length, type, and number of distinct text blocks.
+ *
+ * Sizing is driven by visible content, not content type. Type-specific
+ * adjustments are only applied where the slide layout itself differs
+ * (Asma al-Husna, Dua) — never to make `ANNOUNCEMENT` and `CUSTOM`
+ * items with the same visible text render at radically different sizes.
  *
  * The tier drives the initial font-size multipliers and the min/max
  * bounds for the binary-search fit loop.
@@ -168,38 +215,18 @@ export function classifyContentDensity(item: CarouselItem): DensityTier {
   // Asma al-Husna is always minimal — single name display
   if (type === 'asma_al_husna') return 1;
 
+  // More blocks = denser layout. Each block beyond 2 adds ~40 effective chars.
+  const blockPenalty = Math.max(0, blocks - 2) * 40;
+  const effectiveChars = chars + blockPenalty;
+  const naturalTier = tierForChars(effectiveChars);
+
   // Dua: bump one tier larger (tier 4→3, 3→2, 2→1) — minimum was too small;
   // overflow uses auto-scroll instead of scaling down further.
   if (type === 'dua') {
-    const blockPenalty = Math.max(0, blocks - 2) * 40;
-    const effectiveChars = chars + blockPenalty;
-    let naturalTier: DensityTier = 4;
-    if (effectiveChars < TIER_THRESHOLDS.MINIMAL) naturalTier = 1;
-    else if (effectiveChars < TIER_THRESHOLDS.SHORT) naturalTier = 2;
-    else if (effectiveChars < TIER_THRESHOLDS.MEDIUM) naturalTier = 3;
     return Math.max(1, naturalTier - 1) as DensityTier;
   }
 
-  // Announcements: never use tier 1 or 2 — display-size fonts look out of place;
-  // tier 3 (standard sizing) is the floor so they match the rest of the app.
-  if (type === 'announcement') {
-    const blockPenalty = Math.max(0, blocks - 2) * 40;
-    const effectiveChars = chars + blockPenalty;
-    if (effectiveChars < TIER_THRESHOLDS.MINIMAL) return 3;
-    if (effectiveChars < TIER_THRESHOLDS.SHORT) return 3;
-    if (effectiveChars < TIER_THRESHOLDS.MEDIUM) return 3;
-    return 4;
-  }
-
-  // Adjust effective char count: more text blocks = denser visual layout
-  // Each extra block beyond 2 adds a penalty equivalent to ~40 chars
-  const blockPenalty = Math.max(0, blocks - 2) * 40;
-  const effectiveChars = chars + blockPenalty;
-
-  if (effectiveChars < TIER_THRESHOLDS.MINIMAL) return 1;
-  if (effectiveChars < TIER_THRESHOLDS.SHORT) return 2;
-  if (effectiveChars < TIER_THRESHOLDS.MEDIUM) return 3;
-  return 4;
+  return naturalTier;
 }
 
 /* ------------------------------------------------------------------ */

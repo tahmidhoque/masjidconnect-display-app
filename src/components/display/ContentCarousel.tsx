@@ -102,6 +102,20 @@ const FIT_RATIO = 0.92;
 const HEADROOM_THRESHOLD = 0.75;
 
 /**
+ * Portrait orientation gives the carousel a smaller content box (the
+ * prayer panel sits above it instead of beside it). Without a floor,
+ * the fit loop would happily shrink the same content far below its
+ * landscape sizing — which is exactly the drift admins were working
+ * around by duplicating playlists.
+ *
+ * In compact (portrait) mode, treat 85% of the tier's base multiplier
+ * as the lowest "readable" size before falling through to the existing
+ * safety-scale / auto-scroll fallbacks. The fit loop can still scale
+ * up freely; the floor only applies to fit-down.
+ */
+const COMPACT_READABLE_FLOOR_RATIO = 0.85;
+
+/**
  * Apply font sizes as CSS custom properties on a DOM element.
  * The carousel typography classes (.text-carousel-title etc.) read these.
  */
@@ -124,6 +138,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
    * extremely long items that hit the bottom of the fit loop.
    */
   const [safetyScale, setSafetyScale] = useState(1);
+  /**
+   * True once the binary-search fit loop has settled on a final font-size
+   * for the current slide. The slide is held at opacity 0 until this flips
+   * true, then the fade-in animation runs — so the user never sees the text
+   * grow visibly while the fit loop is still searching upwards.
+   */
+  const [isFitted, setIsFitted] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -206,6 +227,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     // Reset safety scale synchronously so the new slide never briefly shows
     // the previous slide's transform before the fit loop runs.
     setSafetyScale(1);
+    // Hide the new slide until the fit loop has settled — prevents the
+    // "text grows in" flash that was visible while the binary search ran.
+    setIsFitted(false);
     if (!content || !scalingResult) return;
     applyFontSizeProps(content, scalingResult.initialSizes);
   }, [activeIdx, scalingResult]);
@@ -226,6 +250,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     const content = contentRef.current;
     if (!container || !content || !scalingResult) {
       setNeedsScroll(false);
+      // Nothing to fit — reveal so the slide is never stuck invisible.
+      setIsFitted(true);
       return;
     }
 
@@ -241,10 +267,24 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       // equals clientWidth regardless of font size. Checking width would always
       // report "overflow" and force sizes down to tier minimum.
       const availH = ctr.clientHeight * FIT_RATIO;
-      if (availH <= 0) return;
+      if (availH <= 0) {
+        // Container hasn't been laid out yet (e.g. JSDOM, or pre-paint).
+        // Reveal the slide at base sizes — ResizeObserver will re-run the
+        // fit loop once the container actually has a size.
+        setIsFitted(true);
+        return;
+      }
 
       const { config, tier, bodyFontSizeMultiplier } = scalingResult;
-      let lo = config.minMultiplier;
+      // Generic text slides honour the compact (portrait) floor; event
+      // slides handle compact mode themselves via the `compact` prop.
+      const effectiveMin = compact && !isEventSlide
+        ? Math.max(
+            config.minMultiplier,
+            Math.min(config.baseMultiplier, config.baseMultiplier * COMPACT_READABLE_FLOOR_RATIO),
+          )
+        : config.minMultiplier;
+      let lo = effectiveMin;
       let hi = config.maxMultiplier;
       let bestMultiplier = config.baseMultiplier;
       let overflowsAtMin = false;
@@ -259,7 +299,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
 
         const naturalH = cnt.scrollHeight;
 
-        if (naturalH <= 0) return;
+        if (naturalH <= 0) {
+          setIsFitted(true);
+          return;
+        }
 
         const fitsH = naturalH <= availH;
 
@@ -274,12 +317,15 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
             // Good fit already — keep base sizes
             setSafetyScale(1);
             setNeedsScroll(false);
+            setIsFitted(true);
             logger.debug('[Carousel] Fit OK at base multiplier', { tier, multiplier: config.baseMultiplier });
             return;
           }
         } else {
-          // Content overflows — binary search downwards
-          lo = config.minMultiplier;
+          // Content overflows — binary search downwards, but never below
+          // the effective floor (raised in compact mode so portrait
+          // doesn't render the same content far smaller than landscape).
+          lo = effectiveMin;
           hi = config.baseMultiplier;
         }
 
@@ -315,6 +361,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                 setNeedsScroll(false);
                 logger.debug('[Carousel] Fit found', { tier, multiplier: bestMultiplier });
               }
+              setIsFitted(true);
             });
             return;
           }
@@ -334,7 +381,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
               lo = mid;
             } else {
               hi = mid;
-              if (mid <= config.minMultiplier + 0.01) {
+              if (mid <= effectiveMin + 0.01) {
                 overflowsAtMin = true;
               }
             }
@@ -363,7 +410,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       cancelAnimationFrame(fitLoopRafRef.current);
       observer.disconnect();
     };
-  }, [activeIdx, scalingResult]);
+  }, [activeIdx, scalingResult, compact, isEventSlide]);
 
   /**
    * Auto-scroll effect for content that overflows at minimum font sizes.
@@ -480,13 +527,18 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         ref={containerRef}
         className="flex-1 min-h-0 w-full overflow-hidden"
       >
-        {/* Animated crossfade wrapper */}
+        {/* Animated crossfade wrapper.
+            While the new slide is being measured by the fit loop we hold
+            it at opacity 0; once `isFitted` flips true we play the
+            standard fade-in. This prevents the visible "text grows in"
+            flash that happens when the binary search scales the multiplier
+            up over several frames. */}
         <div
           key={item.id}
           className={`
             w-full h-full gpu-accelerated flex flex-col items-stretch
             ${needsScroll ? 'justify-start' : 'justify-center'}
-            ${phase === 'in' ? 'animate-fade-in' : 'animate-fade-out'}
+            ${phase === 'in' ? (isFitted ? 'animate-fade-in' : 'opacity-0') : 'animate-fade-out'}
           `}
         >
           {/* Content wrapper — when needsScroll, fills container so scroll region has constrained height. */}
