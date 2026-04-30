@@ -184,6 +184,7 @@ function toggleOrientationForce(): void {
  * jamaat-soon phase) to verify the alternation.
  */
 const TOMORROW_JAMAAT_CHANGE_CYCLE: (TomorrowJamaatChangeForce | undefined)[] = [
+  { prayerName: 'Fajr', tomorrow: '04:30' },
   { prayerName: 'Zuhr', tomorrow: '13:35' },
   { prayerName: 'Asr', tomorrow: '16:45' },
   { prayerName: 'Isha', tomorrow: '21:30' },

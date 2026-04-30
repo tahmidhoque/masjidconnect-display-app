@@ -5,8 +5,8 @@
  *
  * Default behaviour: renders the existing SilentPhonesGraphic.
  *
- * When the next prayer is Zuhr / Asr / Isha AND tomorrow's jamaat time
- * for that prayer differs from today's, this slot alternates every
+ * When the next prayer is Fajr / Zuhr / Asr / Isha AND tomorrow's jamaat
+ * time for that prayer differs from today's, this slot alternates every
  * `CYCLE_MS` between the silent-phones graphic and a new
  * TomorrowsJamaatChangeSlide that announces the change. Fade animation
  * matches the carousel's crossfade for visual consistency.
@@ -27,8 +27,9 @@ import TomorrowsJamaatChangeSlide from './TomorrowsJamaatChangeSlide';
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-/** Prayers for which a tomorrow-change announcement is shown. */
+/** Prayers for which a tomorrow-change announcement is shown. Maghrib is excluded as it shifts daily. */
 export const TOMORROW_CHANGE_ELIGIBLE_PRAYERS: ReadonlySet<string> = new Set([
+  'Fajr',
   'Zuhr',
   'Asr',
   'Isha',
@@ -119,7 +120,7 @@ export const TOMORROW_JAMAAT_CHANGE_FORCE_EVENT =
   'tomorrow-jamaat-change-force-change';
 
 export interface TomorrowJamaatChangeForce {
-  prayerName: 'Zuhr' | 'Asr' | 'Isha';
+  prayerName: 'Fajr' | 'Zuhr' | 'Asr' | 'Isha';
   /** Tomorrow's jamaat time in HH:mm. */
   tomorrow: string;
 }

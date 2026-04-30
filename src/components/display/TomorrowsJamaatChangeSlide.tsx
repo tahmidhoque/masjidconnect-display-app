@@ -3,8 +3,8 @@
  *
  * Carousel-band slide shown alongside SilentPhonesGraphic during the
  * `jamaat-soon` window. Announces the next day's jamaat time when it
- * differs from today's — gated by JamaatSoonSlot to Zuhr / Asr / Isha
- * only.
+ * differs from today's — gated by JamaatSoonSlot to Fajr / Zuhr / Asr / Isha
+ * (Maghrib excluded as it shifts daily).
  *
  * `landscapeSplit` — landscape: 2×1 grid (calendar motif | copy) so the
  * motif stays large while the time remains the dominant element in the
@@ -26,7 +26,7 @@ import {
 import { getTimeDisplayParts } from '../../utils/dateUtils';
 
 export interface TomorrowsJamaatChangeSlideProps {
-  /** Prayer name (Zuhr | Asr | Isha) — slot enforces eligibility. */
+  /** Prayer name (Fajr | Zuhr | Asr | Isha) — slot enforces eligibility. */
   prayerName: string;
   /** Tomorrow's jamaat time in HH:mm (24-hour). */
   tomorrowTime: string;

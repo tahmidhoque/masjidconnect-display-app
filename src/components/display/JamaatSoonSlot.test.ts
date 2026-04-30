@@ -39,14 +39,14 @@ describe('normaliseHHmm', () => {
 });
 
 describe('TOMORROW_CHANGE_ELIGIBLE_PRAYERS', () => {
-  it('contains exactly Zuhr, Asr, Isha', () => {
+  it('contains exactly Fajr, Zuhr, Asr, Isha', () => {
+    expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Fajr')).toBe(true);
     expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Zuhr')).toBe(true);
     expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Asr')).toBe(true);
     expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Isha')).toBe(true);
-    expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Fajr')).toBe(false);
     expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Maghrib')).toBe(false);
     expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.has('Sunrise')).toBe(false);
-    expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.size).toBe(3);
+    expect(TOMORROW_CHANGE_ELIGIBLE_PRAYERS.size).toBe(4);
   });
 });
 
@@ -60,7 +60,11 @@ describe('resolveTomorrowChange', () => {
     Isha: { jamaat: '21:30' },
   };
 
-  it('returns the change when Zuhr/Asr/Isha differ', () => {
+  it('returns the change when Fajr/Zuhr/Asr/Isha differ', () => {
+    expect(resolveTomorrowChange('Fajr', '04:30', map)).toEqual({
+      prayerName: 'Fajr',
+      tomorrow: '05:00',
+    });
     expect(resolveTomorrowChange('Zuhr', '13:30', map)).toEqual({
       prayerName: 'Zuhr',
       tomorrow: '13:35',
@@ -76,16 +80,13 @@ describe('resolveTomorrowChange', () => {
   });
 
   it('returns null when today and tomorrow match (after normalisation)', () => {
-    expect(
-      resolveTomorrowChange('Zuhr', '13:35', map),
-    ).toBeNull();
-    expect(
-      resolveTomorrowChange('Zuhr', '13:35:00', map),
-    ).toBeNull();
+    expect(resolveTomorrowChange('Fajr', '05:00', map)).toBeNull();
+    expect(resolveTomorrowChange('Fajr', '05:00:00', map)).toBeNull();
+    expect(resolveTomorrowChange('Zuhr', '13:35', map)).toBeNull();
+    expect(resolveTomorrowChange('Zuhr', '13:35:00', map)).toBeNull();
   });
 
   it('returns null for ineligible prayers', () => {
-    expect(resolveTomorrowChange('Fajr', '04:30', map)).toBeNull();
     expect(resolveTomorrowChange('Maghrib', '18:00', map)).toBeNull();
     expect(resolveTomorrowChange('Sunrise', '06:30', map)).toBeNull();
   });
