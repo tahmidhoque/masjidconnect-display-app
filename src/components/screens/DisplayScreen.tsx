@@ -48,6 +48,7 @@ import useJamaatBuzzer from '../../hooks/useJamaatBuzzer';
 import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
 import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
+import { parseMediaFullscreenFlag } from '../../utils/mediaSlide';
 import { resolveTerminology } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
 
@@ -91,6 +92,38 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
 
   const content = item.content ?? item.contentItem?.content ?? {};
   const type = item.type ?? item.contentItem?.type ?? 'Content';
+
+  // --- MEDIA_SLIDE: poster / image / PDF — asset fills the slide (not legacy imageUrl banner) ---
+  if (typeof type === 'string' && type.toUpperCase() === 'MEDIA_SLIDE') {
+    const mediaUrl =
+      typeof content.mediaUrl === 'string' ? content.mediaUrl.trim() : '';
+    const mimeType =
+      typeof content.mimeType === 'string' ? content.mimeType.trim() : '';
+    const allowedMime = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'application/pdf',
+    ]);
+    if (mediaUrl === '' || !allowedMime.has(mimeType)) {
+      return [];
+    }
+    const mediaKind = mimeType === 'application/pdf' ? 'pdf' : 'image';
+    const titleRaw = item.title ?? item.contentItem?.title;
+    const title = typeof titleRaw === 'string' ? titleRaw : undefined;
+    const fullscreen = parseMediaFullscreenFlag(content.fullscreen);
+    return [{
+      id: item.id ?? `sched-${index}`,
+      type: 'MEDIA_SLIDE',
+      title,
+      duration: resolveItemDuration(item, content),
+      mediaUrl,
+      mediaKind,
+      fullscreen,
+    }];
+  }
+
   const isAsmaAlHusna =
     typeof type === 'string' && type.toUpperCase() === 'ASMA_AL_HUSNA';
 

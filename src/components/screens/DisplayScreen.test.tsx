@@ -167,4 +167,103 @@ describe('scheduleItemToCarouselItems', () => {
     expect(carouselItem.bodyIsHTML).toBeUndefined();
     expect(carouselItem.bodyFontSize).toBeUndefined();
   });
+
+  it('maps MEDIA_SLIDE with image/webp, fullscreen, and duration', () => {
+    const scheduleItem = {
+      id: 'ms-1',
+      order: 0,
+      type: 'MEDIA_SLIDE',
+      title: 'Ramadan poster',
+      duration: 25,
+      content: {
+        mediaUrl: 'https://example.com/poster.webp',
+        mimeType: 'image/webp',
+        storageKey: 'm/poster.webp',
+        fullscreen: true,
+      },
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    const ci = result[0];
+    expect(ci.type).toBe('MEDIA_SLIDE');
+    expect(ci.id).toBe('ms-1');
+    expect(ci.title).toBe('Ramadan poster');
+    expect(ci.mediaUrl).toBe('https://example.com/poster.webp');
+    expect(ci.mediaKind).toBe('image');
+    expect(ci.fullscreen).toBe(true);
+    expect(ci.duration).toBe(25);
+    expect(ci.imageUrl).toBeUndefined();
+  });
+
+  it('maps MEDIA_slide case-insensitively', () => {
+    const scheduleItem = {
+      id: 'ms-2',
+      order: 1,
+      type: 'media_slide',
+      title: 'Poster',
+      content: {
+        mediaUrl: 'https://example.com/a.jpg',
+        mimeType: 'image/jpeg',
+      },
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 1);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('MEDIA_SLIDE');
+    expect(result[0].mediaKind).toBe('image');
+  });
+
+  it('maps MEDIA_SLIDE PDF to mediaKind pdf', () => {
+    const scheduleItem = {
+      id: 'ms-pdf',
+      order: 0,
+      type: 'MEDIA_SLIDE',
+      title: 'Fundraising leaflet',
+      content: {
+        mediaUrl: 'https://example.com/doc.pdf',
+        mimeType: 'application/pdf',
+      },
+      duration: 40,
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    expect(result[0].mediaKind).toBe('pdf');
+    expect(result[0].duration).toBe(40);
+  });
+
+  it('returns empty array when MEDIA_SLIDE has missing mediaUrl', () => {
+    const scheduleItem = {
+      id: 'bad-1',
+      type: 'MEDIA_SLIDE',
+      content: { mimeType: 'image/png' },
+    };
+    expect(scheduleItemToCarouselItems(scheduleItem, 0)).toEqual([]);
+  });
+
+  it('returns empty array when MEDIA_SLIDE has invalid mimeType', () => {
+    const scheduleItem = {
+      id: 'bad-2',
+      type: 'MEDIA_SLIDE',
+      content: {
+        mediaUrl: 'https://example.com/x',
+        mimeType: 'application/octet-stream',
+      },
+    };
+    expect(scheduleItemToCarouselItems(scheduleItem, 0)).toEqual([]);
+  });
+
+  it('coerces fullscreen from string for MEDIA_SLIDE', () => {
+    const result = scheduleItemToCarouselItems(
+      {
+        id: 'ms-fs',
+        type: 'MEDIA_SLIDE',
+        content: {
+          mediaUrl: 'https://example.com/p.png',
+          mimeType: 'image/png',
+          fullscreen: 'true',
+        },
+      },
+      0,
+    );
+    expect(result[0].fullscreen).toBe(true);
+  });
 });

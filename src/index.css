@@ -170,6 +170,22 @@ html, body {
   animation: fadeOut var(--duration-crossfade) ease-in forwards;
 }
 
+/** Horizontal enter for fullscreen MEDIA_SLIDE — matches carousel crossfade timing. */
+@keyframes carouselEnterFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-carousel-enter-from-right {
+  animation: carouselEnterFromRight var(--duration-crossfade) ease-out forwards;
+}
+
 /* Subtle pulse for active prayer time */
 @keyframes subtlePulse {
   0%, 100% { opacity: 1; }

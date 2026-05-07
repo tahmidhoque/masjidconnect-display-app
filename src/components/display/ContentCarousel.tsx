@@ -22,7 +22,9 @@
  */
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import logger from '@/utils/logger';
+import { parseMediaFullscreenFlag } from '@/utils/mediaSlide';
 import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import {
   getScalingForItem,
@@ -33,9 +35,9 @@ import {
   AUTO_SCROLL_PAUSE_BOTTOM,
 } from './contentScaling';
 import type { FontSizeConfig } from './contentScaling';
+import MediaPdfPage from './MediaPdfPage';
 
 const EventSlide = lazy(() => import('./EventSlide'));
-
 /** Custom event fired by the dev keyboard shortcut (Ctrl+Shift+N) to skip to the next slide instantly. */
 export const CAROUSEL_ADVANCE_EVENT = 'carousel-advance';
 
@@ -76,6 +78,12 @@ export interface CarouselItem {
    * instead of the generic text layout.
    */
   event?: import('../../api/models').EventV2;
+  /** MEDIA_SLIDE: public asset URL (image or PDF) */
+  mediaUrl?: string;
+  /** MEDIA_SLIDE: derived from content.mimeType */
+  mediaKind?: 'image' | 'pdf';
+  /** MEDIA_SLIDE: true = object-cover; false = object-contain (images only) */
+  fullscreen?: boolean;
 }
 
 interface ContentCarouselProps {
@@ -145,6 +153,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
    * grow visibly while the fit loop is still searching upwards.
    */
   const [isFitted, setIsFitted] = useState(false);
+  /** True once MEDIA_SLIDE image/PDF has loaded — avoids enter animation before pixels exist (stops abrupt pop-in). */
+  const [mediaSlideAssetReady, setMediaSlideAssetReady] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -156,6 +166,21 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
 
   const safeItems = useMemo(() => (items.length > 0 ? items : []), [items]);
 
+  /** Stable identity for the active slide's media — avoids resetting preload when `items` is a new array reference each Redux render. */
+  const mediaPreloadKey = useMemo(() => {
+    if (safeItems.length === 0) return '';
+    const it = safeItems[Math.min(activeIdx, safeItems.length - 1)];
+    if (!it) return '';
+    const t = (it.type ?? '').toLowerCase();
+    const url = typeof it.mediaUrl === 'string' ? it.mediaUrl.trim() : '';
+    return `${it.id}|${t}|${url}|${it.mediaKind ?? ''}`;
+  }, [safeItems, activeIdx]);
+
+  const safeItemsRef = useRef(safeItems);
+  const activeIdxRef = useRef(activeIdx);
+  safeItemsRef.current = safeItems;
+  activeIdxRef.current = activeIdx;
+
   /** Advance to the next slide with a crossfade */
   const advance = useCallback(() => {
     if (safeItems.length <= 1) return;
@@ -166,6 +191,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       setPhase('in');
     }, 700);
   }, [safeItems.length]);
+
+  const onMediaAssetLoaded = useCallback(() => {
+    setMediaSlideAssetReady(true);
+  }, []);
 
   /** Per-item auto-advance: use current slide's duration (from API) or default interval */
   useEffect(() => {
@@ -206,15 +235,78 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     return () => window.removeEventListener(CAROUSEL_ADVANCE_EVENT, handler);
   }, [advance]);
 
+  /**
+   * Preload images off-DOM; PDFs rely on iframe onLoad in the portal.
+   * Depends on `mediaPreloadKey` only so parent re-renders with a fresh `items` array
+   * do not flip `mediaSlideAssetReady` back to false and leave slides permanently invisible.
+   */
+  useEffect(() => {
+    const it = safeItemsRef.current[activeIdxRef.current];
+    if (!it || it.type?.toLowerCase() !== 'media_slide') {
+      setMediaSlideAssetReady(true);
+      return;
+    }
+    const url = typeof it.mediaUrl === 'string' ? it.mediaUrl.trim() : '';
+    if (!url || (it.mediaKind !== 'image' && it.mediaKind !== 'pdf')) {
+      setMediaSlideAssetReady(true);
+      return;
+    }
+    setMediaSlideAssetReady(false);
+
+    let pdfRevealTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (it.mediaKind === 'image') {
+      const pre = new Image();
+      pre.onload = () => {
+        setMediaSlideAssetReady(true);
+      };
+      pre.onerror = () => {
+        setMediaSlideAssetReady(true);
+      };
+      pre.src = url;
+      if (pre.complete) {
+        setMediaSlideAssetReady(true);
+      }
+    } else {
+      /** PDF: iframe onLoad is primary; avoid an indefinite blank if the viewer never fires load (e.g. embed quirks). */
+      pdfRevealTimer = setTimeout(() => {
+        setMediaSlideAssetReady(true);
+        logger.warn('[ContentCarousel] PDF media slide: revealing after timeout (onLoad may not have fired)');
+      }, 15000);
+    }
+
+    return () => {
+      if (pdfRevealTimer) clearTimeout(pdfRevealTimer);
+    };
+  }, [mediaPreloadKey]);
+
   const currentItem = safeItems[activeIdx] ?? safeItems[0];
   const isEventSlide = !!currentItem?.event;
+
+  /** MEDIA_SLIDE: full-bleed image or PDF — no typography fit loop. */
+  const isMediaSlide = useMemo(() => {
+    const it = currentItem;
+    if (!it) return false;
+    if (it.type?.toLowerCase() !== 'media_slide') return false;
+    const url = typeof it.mediaUrl === 'string' ? it.mediaUrl.trim() : '';
+    if (!url) return false;
+    return it.mediaKind === 'image' || it.mediaKind === 'pdf';
+  }, [currentItem]);
+
+  /** Edge-to-edge stage for fullscreen posters — cancels layout padding (see LandscapeLayout / PortraitLayout). */
+  const isFullscreenMedia = useMemo(() => {
+    if (!isMediaSlide || !currentItem) return false;
+    if (!parseMediaFullscreenFlag(currentItem.fullscreen)) return false;
+    return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
+  }, [isMediaSlide, currentItem]);
 
   /** Compute the scaling result for the current item (memoised). Event slides use getScalingForEvent. */
   const scalingResult = useMemo(() => {
     if (!currentItem) return null;
+    if (isMediaSlide) return null;
     if (isEventSlide && currentItem.event) return getScalingForEvent(currentItem.event);
     return getScalingForItem(currentItem);
-  }, [currentItem, isEventSlide]);
+  }, [currentItem, isEventSlide, isMediaSlide]);
 
   /**
    * Apply the tier's initial font sizes synchronously before the browser paints.
@@ -230,9 +322,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     // Hide the new slide until the fit loop has settled — prevents the
     // "text grows in" flash that was visible while the binary search ran.
     setIsFitted(false);
+    if (isMediaSlide) {
+      setSafetyScale(1);
+      setIsFitted(true);
+      return;
+    }
     if (!content || !scalingResult) return;
     applyFontSizeProps(content, scalingResult.initialSizes);
-  }, [activeIdx, scalingResult]);
+  }, [activeIdx, scalingResult, isMediaSlide]);
 
   /**
    * Adaptive typography fit loop.
@@ -410,7 +507,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       cancelAnimationFrame(fitLoopRafRef.current);
       observer.disconnect();
     };
-  }, [activeIdx, scalingResult, compact, isEventSlide]);
+  }, [activeIdx, scalingResult, compact, isEventSlide, isMediaSlide, currentItem]);
 
   /**
    * Auto-scroll effect for content that overflows at minimum font sizes.
@@ -520,8 +617,102 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     ? (typeof selectedName.number === 'number' ? `Name ${selectedName.number} of 99` : undefined)
     : item.source;
 
+  /** In-flow shell hidden while portal paints fullscreen media over prayer strip + footer. */
+  const slideEnterAnimation = isFullscreenMedia
+    ? 'opacity-0 pointer-events-none'
+    : isMediaSlide
+      ? phase === 'out'
+        ? 'animate-fade-out'
+        : phase === 'in' && mediaSlideAssetReady
+          ? 'animate-fade-in'
+          : 'opacity-0'
+      : phase === 'in' && isFitted
+        ? 'animate-fade-in'
+        : phase === 'in'
+          ? 'opacity-0'
+          : 'animate-fade-out';
+
+  const portalMediaLayerClass =
+    phase === 'out'
+      ? 'animate-fade-out gpu-accelerated absolute inset-0 flex flex-col overflow-hidden'
+      : phase === 'in' && mediaSlideAssetReady
+        ? 'animate-carousel-enter-from-right gpu-accelerated absolute inset-0 flex flex-col overflow-hidden'
+        : 'pointer-events-none opacity-0 gpu-accelerated absolute inset-0 flex flex-col overflow-hidden';
+
+  const paginationDots =
+    safeItems.length > 1 ? (
+      <div
+        className="flex items-center justify-center gap-2"
+        data-carousel-pagination=""
+      >
+        {safeItems.map((_, i) => (
+          <span
+            key={i}
+            className={`
+                w-1.5 h-1.5 rounded-full transition-all duration-normal
+                ${i === activeIdx ? 'bg-emerald w-4' : 'bg-text-muted/30'}
+              `}
+          />
+        ))}
+      </div>
+    ) : null;
+
+  const fullscreenPortal =
+    typeof document !== 'undefined' &&
+    isFullscreenMedia &&
+    item.mediaUrl &&
+    createPortal(
+      /* Do not add `relative` here: it overrides `fixed` in Tailwind and collapses the overlay (absolute children do not give the box height). z-[9000] is below emergency (9999) and WiFi (9998). */
+      <div
+        data-fullscreen-media-overlay=""
+        className="fixed inset-0 z-[9000] flex min-h-0 w-full flex-col overflow-hidden bg-midnight gpu-accelerated"
+      >
+        <div
+          data-fullscreen-portal-media=""
+          className={portalMediaLayerClass}
+        >
+          {item.mediaKind === 'pdf' ? (
+            <MediaPdfPage
+              url={item.mediaUrl}
+              title={item.title ?? 'Poster'}
+              fit="contain"
+              className="absolute inset-0 min-h-0"
+              onReady={onMediaAssetLoaded}
+            />
+          ) : (
+            <div className="absolute inset-0 overflow-hidden">
+              <img
+                src={item.mediaUrl}
+                alt=""
+                className="gpu-accelerated h-full w-full object-cover object-center"
+                loading="eager"
+                decoding="async"
+                onLoad={onMediaAssetLoaded}
+                onError={onMediaAssetLoaded}
+              />
+            </div>
+          )}
+        </div>
+        {safeItems.length > 1 && (
+          <div
+            className="pointer-events-none absolute bottom-0 left-0 right-0 z-[9010] flex justify-center bg-gradient-to-t from-midnight-dark from-35% via-midnight/80 to-transparent pb-4 pt-12"
+            data-carousel-pagination="fullscreen"
+          >
+            <div
+              className="pointer-events-none mb-2 rounded-full border border-border/50 bg-midnight/90 px-4 py-2 shadow-[0_-8px_32px_rgba(0,0,0,0.55)]"
+            >
+              {paginationDots}
+            </div>
+          </div>
+        )}
+      </div>,
+      document.body,
+    );
+
   return (
-    <div className="flex flex-col h-full overflow-hidden relative w-full">
+    <>
+      {fullscreenPortal}
+      <div className="relative flex h-full w-full flex-col overflow-hidden">
       {/* Measurement container — always clip; content adapts via font sizes */}
       <div
         ref={containerRef}
@@ -536,15 +727,15 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         <div
           key={item.id}
           className={`
-            w-full h-full gpu-accelerated flex flex-col items-stretch
-            ${needsScroll ? 'justify-start' : 'justify-center'}
-            ${phase === 'in' ? (isFitted ? 'animate-fade-in' : 'opacity-0') : 'animate-fade-out'}
+            w-full h-full min-h-0 gpu-accelerated flex flex-col items-stretch
+            ${needsScroll || isMediaSlide ? 'justify-start' : 'justify-center'}
+            ${slideEnterAnimation}
           `}
         >
           {/* Content wrapper — when needsScroll, fills container so scroll region has constrained height. */}
           <div
             ref={contentRef}
-            className={`flex flex-col gap-4 min-w-0 w-full max-w-full ${needsScroll ? 'flex-1 min-h-0' : 'flex-shrink-0'}`}
+            className={`flex flex-col min-w-0 w-full max-w-full ${needsScroll || isMediaSlide ? 'flex-1 min-h-0' : 'flex-shrink-0'} ${isMediaSlide ? '' : 'gap-4'}`}
             style={safetyScale < 1 ? {
               transform: `scale(${safetyScale})`,
               transformOrigin: 'top center',
@@ -554,6 +745,41 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
               <Suspense fallback={null}>
                 <EventSlide event={item.event} compact={compact} />
               </Suspense>
+            ) : isMediaSlide && item.mediaUrl ? (
+              isFullscreenMedia ? (
+                <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
+              ) : (
+                <div className="flex flex-1 min-h-0 w-full flex-col">
+                  {item.mediaKind === 'pdf' ? (
+                    <MediaPdfPage
+                      url={item.mediaUrl}
+                      title={item.title ?? 'Poster'}
+                      fit="contain"
+                      className="min-h-0 w-full flex-1"
+                      onReady={onMediaAssetLoaded}
+                    />
+                  ) : (
+                    <div
+                      className={
+                        item.fullscreen === true
+                          ? 'flex-1 min-h-0 w-full relative overflow-hidden'
+                          : 'flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden'
+                      }
+                    >
+                      <img
+                        src={item.mediaUrl}
+                        alt=""
+                        className={
+                          item.fullscreen === true
+                            ? 'gpu-accelerated h-full w-full object-cover object-center'
+                            : 'gpu-accelerated max-h-full max-w-full object-contain'
+                        }
+                        onLoad={onMediaAssetLoaded}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
             ) : (
               <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col min-w-0 w-full">
                 {/* Scrollable text region — when needsScroll, flex-1 min-h-0 constrains height for scroll. */}
@@ -616,21 +842,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         </div>
       </div>
 
-      {/* Pagination dots */}
-      {safeItems.length > 1 && (
-        <div className="shrink-0 flex items-center justify-center gap-2 pt-1.5">
-          {safeItems.map((_, i) => (
-            <span
-              key={i}
-              className={`
-                w-1.5 h-1.5 rounded-full transition-all duration-normal
-                ${i === activeIdx ? 'bg-emerald w-4' : 'bg-text-muted/30'}
-              `}
-            />
-          ))}
+      {/* Pagination — in-flow when not viewport-fullscreen; fullscreen uses portal bar */}
+      {safeItems.length > 1 && !isFullscreenMedia && (
+        <div className="shrink-0 flex items-center justify-center pt-1.5">
+          {paginationDots}
         </div>
       )}
     </div>
+    </>
   );
 };
 

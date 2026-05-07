@@ -87,6 +87,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           redux: ['@reduxjs/toolkit', 'react-redux', 'redux-persist'],
           io: ['socket.io-client', 'axios'],
+          pdfjs: ['pdfjs-dist'],
         },
       },
     },

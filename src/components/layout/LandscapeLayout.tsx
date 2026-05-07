@@ -54,8 +54,8 @@ const LandscapeLayout: React.FC<LandscapeLayoutProps> = ({
         </div>
       ) : null}
 
-      {/* Content carousel — full width, fills remaining space; clip so phase slides never paint over top bar / strip */}
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden" aria-label="Announcements and content">
+      {/* Content carousel — flex-1; overflow visible so fullscreen posters can break out of px/pt padding */}
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col overflow-visible" aria-label="Announcements and content">
         {content}
       </main>
 

@@ -4,7 +4,29 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+
+vi.mock('./MediaPdfPage', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Vitest hoists mocks before ESM imports; need React in factory scope
+  const React = require('react') as typeof import('react');
+  return {
+    default: function MockMediaPdfPage({
+      url,
+      title,
+      onReady,
+    }: {
+      url: string;
+      title?: string;
+      onReady?: () => void;
+    }) {
+      React.useEffect(() => {
+        onReady?.();
+      }, [onReady]);
+      return <div data-media-pdf-page="" data-url={url} title={title ?? undefined} />;
+    },
+  };
+});
+
 import ContentCarousel from './ContentCarousel';
 
 beforeEach(() => {
@@ -135,5 +157,126 @@ describe('ContentCarousel', () => {
     expect(document.querySelector('ul')).toBeInTheDocument();
     expect(screen.getByText('Phone')).toBeInTheDocument();
     expect(screen.getByText('Email')).toBeInTheDocument();
+  });
+
+  it('renders MEDIA_SLIDE image with object-cover when fullscreen', () => {
+    const items = [
+      {
+        id: 'ms-img-1',
+        type: 'MEDIA_SLIDE',
+        title: 'Ramadan poster',
+        mediaUrl: 'https://cdn.example.com/poster.webp',
+        mediaKind: 'image' as const,
+        fullscreen: true,
+        duration: 25,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    const img = document.querySelector('img');
+    expect(img).toBeTruthy();
+    expect(img?.getAttribute('src')).toBe('https://cdn.example.com/poster.webp');
+    expect(img?.getAttribute('alt')).toBe('');
+    expect(img?.className).toContain('object-cover');
+  });
+
+  it('renders MEDIA_SLIDE image with object-contain when not fullscreen', () => {
+    const items = [
+      {
+        id: 'ms-img-2',
+        type: 'MEDIA_SLIDE',
+        title: 'Poster',
+        mediaUrl: 'https://cdn.example.com/a.png',
+        mediaKind: 'image' as const,
+        fullscreen: false,
+        duration: 20,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    const img = document.querySelector('img');
+    expect(img?.className).toContain('object-contain');
+  });
+
+  it('renders MEDIA_SLIDE PDF with the canvas viewer (not an iframe)', () => {
+    const items = [
+      {
+        id: 'ms-pdf',
+        type: 'MEDIA_SLIDE',
+        title: 'Fundraising leaflet',
+        mediaUrl: 'https://cdn.example.com/info.pdf',
+        mediaKind: 'pdf' as const,
+        duration: 40,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    const pdfRoot = document.querySelector('[data-media-pdf-page]');
+    expect(pdfRoot).toBeTruthy();
+    expect(pdfRoot?.getAttribute('data-url')).toBe('https://cdn.example.com/info.pdf');
+    expect(pdfRoot?.getAttribute('title')).toBe('Fundraising leaflet');
+    expect(document.querySelector('iframe')).not.toBeInTheDocument();
+  });
+
+  it('renders viewport fullscreen portal for fullscreen MEDIA_SLIDE in landscape', async () => {
+    const items = [
+      {
+        id: 'fs-1',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://example.com/p.jpg',
+        mediaKind: 'image' as const,
+        fullscreen: true,
+        duration: 15,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} compact={false} />);
+    expect(document.querySelector('[data-fullscreen-media-overlay]')).toBeTruthy();
+    const overlay = document.querySelector('[data-fullscreen-media-overlay]');
+    expect(overlay?.className).toContain('fixed');
+    expect(overlay?.className).toContain('inset-0');
+    const img = overlay?.querySelector('img');
+    expect(img).toBeTruthy();
+    fireEvent.load(img!);
+    const mediaLayer = document.querySelector('[data-fullscreen-portal-media]');
+    await waitFor(() => {
+      expect(mediaLayer?.className).toContain('animate-carousel-enter-from-right');
+    });
+  });
+
+  it('shows carousel dots at the bottom of the fullscreen portal when multiple slides', () => {
+    const items = [
+      {
+        id: 'fs-a',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://example.com/a.jpg',
+        mediaKind: 'image' as const,
+        fullscreen: true,
+        duration: 10,
+      },
+      {
+        id: 'fs-b',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://example.com/b.jpg',
+        mediaKind: 'image' as const,
+        fullscreen: true,
+        duration: 10,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} compact={false} />);
+    const bar = document.querySelector('[data-carousel-pagination="fullscreen"]');
+    expect(bar).toBeTruthy();
+    expect(bar?.querySelector('[data-carousel-pagination]')).toBeTruthy();
+  });
+
+  it('falls back to text layout when MEDIA_SLIDE row lacks mediaKind', () => {
+    const items = [
+      {
+        id: 'bad-ms',
+        type: 'MEDIA_SLIDE',
+        title: 'Broken',
+        mediaUrl: 'https://example.com/x.png',
+        duration: 10,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    expect(document.querySelector('img')).not.toBeInTheDocument();
+    expect(screen.getByText('Broken')).toBeInTheDocument();
   });
 });
