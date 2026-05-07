@@ -29,6 +29,8 @@ interface HeaderProps {
   timeFormat?: TimeFormat;
   /** Days to add to the calculated Hijri date (from displaySettings.hijriDateAdjustment) */
   hijriDateAdjustment?: number;
+  /** When false, hide trailing seconds in 24h mode (e.g. portrait header) */
+  showClockSeconds?: boolean;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -44,17 +46,18 @@ const Header: React.FC<HeaderProps> = ({
   ramadanTwoLines = false,
   timeFormat = '12h',
   hijriDateAdjustment = 0,
+  showClockSeconds = true,
 }) => {
   // Use masjid-timezone time so the clock is correct when the Pi runs in UTC.
   const now = useMasjidTime();
 
   const hours = now.hour();
   const minutes = now.minute();
-  const seconds = now.second();
 
   const timeStr24h = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
-  const secStr = String(seconds).padStart(2, '0');
+  const showSecondsInClock = timeFormat === '24h' && showClockSeconds;
+  const secStr = showSecondsInClock ? String(now.second()).padStart(2, '0') : '';
   const dateLine1 = DAYS[now.day()];
   const dateLine2 = `${now.date()} ${MONTHS[now.month()]} ${now.year()}`;
 
@@ -110,7 +113,7 @@ const Header: React.FC<HeaderProps> = ({
         {timePeriod != null && (
           <span className={`text-gold/90 align-baseline ${compact ? 'text-body font-normal' : 'text-subheading font-medium'}`}>{timePeriod}</span>
         )}
-        {timeFormat === '24h' && (
+        {showSecondsInClock && (
           <span className="text-caption text-gold/70 tabular-nums font-medium">{secStr}</span>
         )}
       </div>

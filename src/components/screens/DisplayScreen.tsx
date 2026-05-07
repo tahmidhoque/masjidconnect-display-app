@@ -522,6 +522,7 @@ const DisplayScreenInner: React.FC = () => {
       isRamadan={ramadan.isRamadan}
       ramadanDay={ramadan.ramadanDay}
       ramadanTwoLines={isPortrait}
+      showClockSeconds={!isPortrait}
       timeFormat={timeFormat}
       hijriDateAdjustment={hijriDateAdjustment}
     />
