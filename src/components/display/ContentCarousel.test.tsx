@@ -279,4 +279,37 @@ describe('ContentCarousel', () => {
     expect(document.querySelector('img')).not.toBeInTheDocument();
     expect(screen.getByText('Broken')).toBeInTheDocument();
   });
+
+  it('renders DONATION slide with QR when donationUrl is set', async () => {
+    const items = [
+      {
+        id: 'don-1',
+        type: 'DONATION',
+        title: 'Donate',
+        donationUrl: 'https://portal.example.org/donate/m?source=screen_qr',
+        donationShowWalletBadges: true,
+        duration: 30,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    await waitFor(() => {
+      expect(document.querySelector('svg')).toBeTruthy();
+    });
+  });
+
+  it('renders DONATION empty state when donationUrl is null', async () => {
+    const items = [
+      {
+        id: 'don-2',
+        type: 'DONATION',
+        title: 'Donate',
+        donationUrl: null as string | null,
+        duration: 20,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    await waitFor(() => {
+      expect(screen.getByText(/not available for this screen/i)).toBeInTheDocument();
+    });
+  });
 });

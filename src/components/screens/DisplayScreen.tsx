@@ -187,6 +187,94 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     }];
   }
 
+  // --- DONATION: QR + optional campaign thermometer (resolved content from API) ---
+  const isDonation = typeof type === 'string' && type.toUpperCase() === 'DONATION';
+  if (isDonation) {
+    const c = typeof content === 'object' && content !== null ? content : {};
+    const rawUrl = (c as { donationUrl?: unknown }).donationUrl;
+    let donationUrl: string | null = null;
+    if (typeof rawUrl === 'string') {
+      const t = rawUrl.trim();
+      donationUrl = t !== '' ? t : null;
+    } else if (rawUrl === null) {
+      donationUrl = null;
+    }
+
+    const rawDonTitle = item.title ?? item.contentItem?.title;
+    const title =
+      typeof rawDonTitle === 'string' &&
+      rawDonTitle.trim() !== '' &&
+      rawDonTitle !== 'No Title'
+        ? rawDonTitle
+        : 'Donate';
+
+    const layoutRaw = (c as { layout?: unknown }).layout;
+    const donationLayout: 'qr_focus' | 'progress_focus' =
+      layoutRaw === 'progress_focus' || layoutRaw === 'qr_focus' ? layoutRaw : 'qr_focus';
+
+    const inst = (c as { instructionText?: unknown }).instructionText;
+    const donationInstructionText =
+      typeof inst === 'string' && inst.trim() !== '' ? inst : undefined;
+
+    const showBadges = (c as { showWalletBadges?: unknown }).showWalletBadges;
+    const donationShowWalletBadges = showBadges !== false;
+
+    const showProg = (c as { showProgress?: unknown }).showProgress;
+    const donationShowProgress = showProg !== false;
+
+    const prov = (c as { donationProvider?: unknown }).donationProvider;
+    let donationProvider: 'STRIPE' | 'SUMUP' | null | undefined;
+    if (prov === 'STRIPE' || prov === 'SUMUP') {
+      donationProvider = prov;
+    } else if (prov === null) {
+      donationProvider = null;
+    }
+
+    const camp = (c as { campaign?: unknown }).campaign;
+    let donationCampaign: CarouselItem['donationCampaign'] = null;
+    if (camp && typeof camp === 'object' && camp !== null) {
+      const cm = camp as Record<string, unknown>;
+      const id = typeof cm.id === 'string' ? cm.id : '';
+      const campTitle = typeof cm.title === 'string' ? cm.title : '';
+      const targetAmount = typeof cm.targetAmount === 'number' ? cm.targetAmount : NaN;
+      const currentAmount = typeof cm.currentAmount === 'number' ? cm.currentAmount : NaN;
+      const currency = typeof cm.currency === 'string' ? cm.currency : '';
+      if (
+        id !== '' &&
+        campTitle !== '' &&
+        !Number.isNaN(targetAmount) &&
+        !Number.isNaN(currentAmount) &&
+        currency !== ''
+      ) {
+        donationCampaign = {
+          id,
+          title: campTitle,
+          targetAmount,
+          currentAmount,
+          currency,
+          ...(typeof cm.campaignType === 'string' ? { campaignType: cm.campaignType } : {}),
+          ...(cm.imageUrl === null || typeof cm.imageUrl === 'string'
+            ? { imageUrl: cm.imageUrl as string | null }
+            : {}),
+        };
+      }
+    }
+
+    return [{
+      id: item.id ?? `sched-${index}`,
+      type: 'DONATION',
+      title,
+      duration: resolveItemDuration(item, c),
+      donationUrl,
+      ...(donationInstructionText !== undefined ? { donationInstructionText } : {}),
+      donationShowWalletBadges,
+      donationLayout,
+      ...(donationProvider !== undefined ? { donationProvider } : {}),
+      donationShowProgress,
+      donationCampaign,
+    }];
+  }
+
   // --- Single-item fallback (all other types, or ASMA_AL_HUSNA without a names array) ---
 
   // Title: for Asma ul Husna with a flat single-name payload, prefer meaning as heading

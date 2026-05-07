@@ -266,4 +266,99 @@ describe('scheduleItemToCarouselItems', () => {
     );
     expect(result[0].fullscreen).toBe(true);
   });
+
+  it('maps DONATION with resolved content (PRD happy path)', () => {
+    const scheduleItem = {
+      id: 'don-1',
+      order: 0,
+      type: 'DONATION',
+      title: 'Ramadan Appeal',
+      duration: 45,
+      content: {
+        donationType: 'GENERAL',
+        showProgress: true,
+        donationUrl:
+          'https://portal.example.org/donate/my-mosque?campaign=clxxx&source=screen_qr',
+        instructionText: 'Scan to donate securely.',
+        showWalletBadges: true,
+        layout: 'qr_focus',
+        donationProvider: 'SUMUP',
+        campaign: {
+          id: 'clxxx',
+          title: 'Ramadan Appeal',
+          targetAmount: 10000,
+          currentAmount: 3250.5,
+          currency: 'GBP',
+        },
+      },
+    };
+    const result = scheduleItemToCarouselItems(scheduleItem, 0);
+    expect(result).toHaveLength(1);
+    const ci = result[0];
+    expect(ci.type).toBe('DONATION');
+    expect(ci.title).toBe('Ramadan Appeal');
+    expect(ci.donationUrl).toContain('donate/my-mosque');
+    expect(ci.donationInstructionText).toBe('Scan to donate securely.');
+    expect(ci.donationShowWalletBadges).toBe(true);
+    expect(ci.donationLayout).toBe('qr_focus');
+    expect(ci.donationProvider).toBe('SUMUP');
+    expect(ci.donationShowProgress).toBe(true);
+    expect(ci.donationCampaign?.id).toBe('clxxx');
+    expect(ci.donationCampaign?.targetAmount).toBe(10000);
+    expect(ci.duration).toBe(45);
+  });
+
+  it('maps DONATION when not donation-ready (donationUrl null)', () => {
+    const scheduleItem = {
+      id: 'don-2',
+      type: 'DONATION',
+      title: 'Donate',
+      content: {
+        donationUrl: null,
+        showWalletBadges: true,
+        layout: 'qr_focus',
+        donationProvider: null,
+        campaign: null,
+      },
+    };
+    const ci = scheduleItemToCarouselItems(scheduleItem, 0)[0];
+    expect(ci.type).toBe('DONATION');
+    expect(ci.donationUrl).toBeNull();
+    expect(ci.donationCampaign).toBeNull();
+  });
+
+  it('maps DONATION with progress_focus and showWalletBadges false', () => {
+    const scheduleItem = {
+      id: 'don-3',
+      type: 'DONATION',
+      title: 'Appeal',
+      content: {
+        donationUrl: 'https://portal.example.org/donate/x',
+        showWalletBadges: false,
+        layout: 'progress_focus',
+        campaign: {
+          id: 'c1',
+          title: 'Goal',
+          targetAmount: 500,
+          currentAmount: 100,
+          currency: 'GBP',
+        },
+      },
+    };
+    const ci = scheduleItemToCarouselItems(scheduleItem, 0)[0];
+    expect(ci.donationLayout).toBe('progress_focus');
+    expect(ci.donationShowWalletBadges).toBe(false);
+    expect(ci.donationCampaign?.title).toBe('Goal');
+  });
+
+  it('defaults DONATION title to Donate when missing', () => {
+    const scheduleItem = {
+      id: 'don-4',
+      type: 'DONATION',
+      content: {
+        donationUrl: 'https://example.org/donate/a',
+      },
+    };
+    expect(scheduleItemToCarouselItems(scheduleItem, 0)[0].title).toBe('Donate');
+  });
 });

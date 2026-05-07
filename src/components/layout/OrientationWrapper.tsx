@@ -25,6 +25,12 @@ const OrientationWrapper: React.FC<OrientationWrapperProps> = ({
     return (
       <div className="fixed inset-0 w-screen h-screen overflow-hidden">
         {children}
+        {/*
+         * Portal target for fullscreen media overlays. Sitting here (inside the
+         * no-rotation branch), a `position: fixed` child portalled into this div
+         * behaves like a normal `fixed inset-0` — covering the full physical viewport.
+         */}
+        <div id="orientation-portal-root" />
       </div>
     );
   }
@@ -47,6 +53,14 @@ const OrientationWrapper: React.FC<OrientationWrapperProps> = ({
         }}
       >
         {children}
+        {/*
+         * Portal target for fullscreen media overlays. Because this ancestor div
+         * has a CSS `transform`, a `position: fixed` child portalled here is
+         * contained by this transformed block (not the raw viewport). That means
+         * `fixed inset-0` covers the full *logical* display area in the configured
+         * orientation, rather than the physical screen rectangle.
+         */}
+        <div id="orientation-portal-root" />
       </div>
     </div>
   );

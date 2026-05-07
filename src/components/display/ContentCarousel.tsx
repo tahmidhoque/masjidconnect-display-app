@@ -38,6 +38,7 @@ import type { FontSizeConfig } from './contentScaling';
 import MediaPdfPage from './MediaPdfPage';
 
 const EventSlide = lazy(() => import('./EventSlide'));
+const DonationSlide = lazy(() => import('./DonationSlide'));
 /** Custom event fired by the dev keyboard shortcut (Ctrl+Shift+N) to skip to the next slide instantly. */
 export const CAROUSEL_ADVANCE_EVENT = 'carousel-advance';
 
@@ -84,6 +85,29 @@ export interface CarouselItem {
   mediaKind?: 'image' | 'pdf';
   /** MEDIA_SLIDE: true = object-cover; false = object-contain (images only) */
   fullscreen?: boolean;
+
+  /** DONATION: resolved public donation URL for QR — null when mosque is not donation-ready */
+  donationUrl?: string | null;
+  /** DONATION: subtitle under title */
+  donationInstructionText?: string;
+  /** DONATION: show Apple Pay / Google Pay marks (default true when omitted) */
+  donationShowWalletBadges?: boolean;
+  /** DONATION: visual emphasis */
+  donationLayout?: 'qr_focus' | 'progress_focus';
+  /** DONATION: processor hint for UI */
+  donationProvider?: 'STRIPE' | 'SUMUP' | null;
+  /** DONATION: show thermometer when campaign present (default true when omitted) */
+  donationShowProgress?: boolean;
+  /** DONATION: expanded campaign from API resolver */
+  donationCampaign?: {
+    id: string;
+    title: string;
+    targetAmount: number;
+    currentAmount: number;
+    currency: string;
+    campaignType?: string;
+    imageUrl?: string | null;
+  } | null;
 }
 
 interface ContentCarouselProps {
@@ -300,13 +324,20 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
   }, [isMediaSlide, currentItem]);
 
+  /** DONATION: fixed QR / thermometer layout — no typography fit loop. */
+  const isDonationSlide = useMemo(
+    () => currentItem?.type?.toLowerCase() === 'donation',
+    [currentItem],
+  );
+
   /** Compute the scaling result for the current item (memoised). Event slides use getScalingForEvent. */
   const scalingResult = useMemo(() => {
     if (!currentItem) return null;
     if (isMediaSlide) return null;
+    if (isDonationSlide) return null;
     if (isEventSlide && currentItem.event) return getScalingForEvent(currentItem.event);
     return getScalingForItem(currentItem);
-  }, [currentItem, isEventSlide, isMediaSlide]);
+  }, [currentItem, isDonationSlide, isEventSlide, isMediaSlide]);
 
   /**
    * Apply the tier's initial font sizes synchronously before the browser paints.
@@ -322,14 +353,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     // Hide the new slide until the fit loop has settled — prevents the
     // "text grows in" flash that was visible while the binary search ran.
     setIsFitted(false);
-    if (isMediaSlide) {
+    if (isMediaSlide || isDonationSlide) {
       setSafetyScale(1);
       setIsFitted(true);
       return;
     }
     if (!content || !scalingResult) return;
     applyFontSizeProps(content, scalingResult.initialSizes);
-  }, [activeIdx, scalingResult, isMediaSlide]);
+  }, [activeIdx, isDonationSlide, isMediaSlide, scalingResult]);
 
   /**
    * Adaptive typography fit loop.
@@ -507,7 +538,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       cancelAnimationFrame(fitLoopRafRef.current);
       observer.disconnect();
     };
-  }, [activeIdx, scalingResult, compact, isEventSlide, isMediaSlide, currentItem]);
+  }, [activeIdx, compact, currentItem, isDonationSlide, isEventSlide, isMediaSlide, scalingResult]);
 
   /**
    * Auto-scroll effect for content that overflows at minimum font sizes.
@@ -626,11 +657,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         : phase === 'in' && mediaSlideAssetReady
           ? 'animate-fade-in'
           : 'opacity-0'
-      : phase === 'in' && isFitted
-        ? 'animate-fade-in'
-        : phase === 'in'
-          ? 'opacity-0'
-          : 'animate-fade-out';
+      : isDonationSlide
+        ? phase === 'out'
+          ? 'animate-fade-out'
+          : phase === 'in'
+            ? 'animate-fade-in'
+            : 'opacity-0'
+        : phase === 'in' && isFitted
+          ? 'animate-fade-in'
+          : phase === 'in'
+            ? 'opacity-0'
+            : 'animate-fade-out';
 
   const portalMediaLayerClass =
     phase === 'out'
@@ -657,8 +694,24 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       </div>
     ) : null;
 
+  /**
+   * Portal target: the `#orientation-portal-root` div sits inside
+   * `OrientationWrapper`'s transformed container. When the screen is rotated
+   * (e.g. portrait = 90°), that ancestor has a CSS `transform`, which makes it
+   * the containing block for `position: fixed` children (per CSS spec). So
+   * `fixed inset-0` inside the portal covers the full *logical* display area
+   * (post-rotation) rather than the raw physical viewport.
+   *
+   * Falls back to `document.body` in test environments (JSDOM) where
+   * `OrientationWrapper` is not rendered.
+   */
+  const fullscreenPortalRoot =
+    typeof document !== 'undefined'
+      ? (document.getElementById('orientation-portal-root') ?? document.body)
+      : null;
+
   const fullscreenPortal =
-    typeof document !== 'undefined' &&
+    fullscreenPortalRoot &&
     isFullscreenMedia &&
     item.mediaUrl &&
     createPortal(
@@ -706,7 +759,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
           </div>
         )}
       </div>,
-      document.body,
+      fullscreenPortalRoot,
     );
 
   return (
@@ -735,7 +788,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
           {/* Content wrapper — when needsScroll, fills container so scroll region has constrained height. */}
           <div
             ref={contentRef}
-            className={`flex flex-col min-w-0 w-full max-w-full ${needsScroll || isMediaSlide ? 'flex-1 min-h-0' : 'flex-shrink-0'} ${isMediaSlide ? '' : 'gap-4'}`}
+            className={`flex flex-col min-w-0 w-full max-w-full ${needsScroll || isMediaSlide || isDonationSlide ? 'flex-1 min-h-0' : 'flex-shrink-0'} ${isMediaSlide ? '' : 'gap-4'}`}
             style={safetyScale < 1 ? {
               transform: `scale(${safetyScale})`,
               transformOrigin: 'top center',
@@ -744,6 +797,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
             {isEventSlide && item.event ? (
               <Suspense fallback={null}>
                 <EventSlide event={item.event} compact={compact} />
+              </Suspense>
+            ) : isDonationSlide ? (
+              <Suspense fallback={null}>
+                <DonationSlide item={item} compact={compact} />
               </Suspense>
             ) : isMediaSlide && item.mediaUrl ? (
               isFullscreenMedia ? (
