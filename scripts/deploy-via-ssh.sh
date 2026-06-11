@@ -8,6 +8,11 @@
 # Prerequisites:
 #   - SSH access to the Pi (key-based or password)
 #   - App already installed at /opt/masjidconnect (e.g. from a previous image or install.sh)
+#   - Either passwordless sudo for these commands, or an interactive terminal so sudo can
+#     prompt (this script uses ssh -tt for sudo for that reason).
+#
+# SSH host key changed (reimage / new SD / same IP, different Pi):
+#   ssh-keygen -R <hostname-or-ip>
 #
 # Usage:
 #   ./scripts/deploy-via-ssh.sh [user@]hostname
@@ -21,6 +26,12 @@
 # =============================================================================
 
 set -euo pipefail
+
+# Remote sudo needs a pseudo-TTY so OpenSSH can prompt for the sudo password (default on Raspberry Pi OS).
+# Use -tt so a TTY is allocated even when this script is run from environments without a local TTY.
+ssh_pi_sudo() {
+  ssh -tt "$PI_HOST" "$@"
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -89,11 +100,11 @@ echo ""
 
 echo "[2/4] Syncing dist/ to ${PI_HOST}:${APP_DIR}/dist/ ..."
 REMOTE_USER=$(ssh "$PI_HOST" whoami)
-ssh "$PI_HOST" "sudo mkdir -p ${APP_DIR}"
 rsync -avz --delete \
   dist/ \
   "${PI_HOST}:/tmp/masjidconnect-dist/"
-ssh "$PI_HOST" "sudo rm -rf ${APP_DIR}/dist.old && sudo mv ${APP_DIR}/dist ${APP_DIR}/dist.old 2>/dev/null || true; sudo mv /tmp/masjidconnect-dist ${APP_DIR}/dist && sudo chown -R ${REMOTE_USER}:${REMOTE_USER} ${APP_DIR}/dist"
+# Single sudo session: mkdir, swap dist into place, chown (one password prompt when required).
+ssh_pi_sudo "sudo bash -c 'mkdir -p ${APP_DIR} && rm -rf ${APP_DIR}/dist.old && (mv ${APP_DIR}/dist ${APP_DIR}/dist.old 2>/dev/null || true) && mv /tmp/masjidconnect-dist ${APP_DIR}/dist && chown -R ${REMOTE_USER}:${REMOTE_USER} ${APP_DIR}/dist'"
 echo "  dist/ deployed."
 echo ""
 
@@ -104,7 +115,7 @@ if [ "$DEPLOY_SCRIPTS" = true ]; then
   rsync -avz \
     deploy/ \
     "${PI_HOST}:/tmp/masjidconnect-deploy/"
-  ssh "$PI_HOST" "sudo mkdir -p ${APP_DIR}/deploy && sudo cp -r /tmp/masjidconnect-deploy/* ${APP_DIR}/deploy/ && sudo chmod +x ${APP_DIR}/deploy/*.sh ${APP_DIR}/deploy/xinitrc-kiosk 2>/dev/null; sudo chown -R ${REMOTE_USER}:${REMOTE_USER} ${APP_DIR}/deploy"
+  ssh_pi_sudo "sudo bash -c 'mkdir -p ${APP_DIR}/deploy && cp -r /tmp/masjidconnect-deploy/* ${APP_DIR}/deploy/ && chmod +x ${APP_DIR}/deploy/*.sh ${APP_DIR}/deploy/xinitrc-kiosk 2>/dev/null; chown -R ${REMOTE_USER}:${REMOTE_USER} ${APP_DIR}/deploy'"
   echo "  deploy/ updated."
   echo ""
 else
@@ -115,12 +126,12 @@ fi
 # --- Restart services ---------------------------------------------------------
 
 echo "[4/4] Restarting masjidconnect-display service..."
-ssh "$PI_HOST" "sudo systemctl restart masjidconnect-display.service"
+ssh_pi_sudo "sudo systemctl restart masjidconnect-display.service"
 echo "  masjidconnect-display restarted."
 
 if [ "$RESTART_KIOSK" = true ]; then
   echo "  Restarting masjidconnect-kiosk so Chromium reloads..."
-  ssh "$PI_HOST" "sudo systemctl restart masjidconnect-kiosk.service"
+  ssh_pi_sudo "sudo systemctl restart masjidconnect-kiosk.service"
   echo "  masjidconnect-kiosk restarted."
 else
   echo "  (Kiosk not restarted; page may reload on next navigation or use --restart-kiosk)"
