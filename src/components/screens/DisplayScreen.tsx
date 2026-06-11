@@ -28,12 +28,16 @@ import { selectMasjidName } from '../../store/slices/contentSlice';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
 import { orientationToLayoutMode, isPortraitLayout, parseScreenOrientation } from '../../utils/orientation';
-import { LandscapeLayout, PortraitLayout, OrientationWrapper, ReferenceViewport } from '../layout';
+import { LayoutRenderer, OrientationWrapper, ReferenceViewport } from '../layout';
+import type { RenderedZone } from '../layout';
+import { buildThemeStyle } from '../../utils/displayTheme';
+import type { LayoutZoneComponent } from '../../types/displayLayout';
 import {
   Header,
   Footer,
   PrayerTimesPanel,
   PrayerStrip,
+  PrayerSidebar,
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
@@ -47,7 +51,7 @@ import usePrayerPhase from '../../hooks/usePrayerPhase';
 import useJamaatBuzzer from '../../hooks/useJamaatBuzzer';
 import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
-import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
+import { selectTimeFormat, selectDisplaySettings, selectDisplayLayoutConfig } from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag } from '../../utils/mediaSlide';
 import { resolveTerminology } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
@@ -512,8 +516,17 @@ const DisplayScreenInner: React.FC = () => {
       ? resolveTerminology(displaySettings?.terminology, 'jummah', 'Jumuah')
       : phasePrayerName;
 
+  /* ---- Layout config (admin layout editor; falls back to built-in default) ---- */
+  const layoutConfig = useAppSelector(selectDisplayLayoutConfig);
+  const orientationLayout = isPortrait ? layoutConfig.portrait : layoutConfig.landscape;
+  const layoutStructure = orientationLayout.structure ?? 'stack';
+  const layoutStructureOptions = orientationLayout.structureOptions;
+  const headerInSidebar =
+    layoutStructure === 'sidebar-left' || layoutStructure === 'sidebar-right';
+
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
+
   const headerSlot = (
     <Header
       key={`header-hijri-${hijriDateAdjustment}`}
@@ -525,6 +538,7 @@ const DisplayScreenInner: React.FC = () => {
       showClockSeconds={!isPortrait}
       timeFormat={timeFormat}
       hijriDateAdjustment={hijriDateAdjustment}
+      layout={headerInSidebar ? 'vertical' : 'horizontal'}
     />
   );
 
@@ -599,52 +613,123 @@ const DisplayScreenInner: React.FC = () => {
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
 
-  const countdownSlot = countdown;
-
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
+
+  /**
+   * Custom theme colours (CSS-variable overrides on the layout root).
+   * Skipped while Ramadan mode is active — the seasonal green/gold palette
+   * (html[data-theme="ramadan"]) takes precedence over mosque customisation.
+   */
+  const themeStyle = useMemo(
+    () => (ramadan.isRamadan ? undefined : buildThemeStyle(layoutConfig.theme)),
+    [ramadan.isRamadan, layoutConfig.theme],
+  );
+
+  const prayerSidebarSlot = (
+    <PrayerSidebar
+      isRamadan={ramadan.isRamadan}
+      imsakTime={ramadan.imsakTime}
+      showImsak={displaySettings?.showImsak ?? false}
+      forbiddenPrayer={forbiddenPrayer}
+      timeFormat={timeFormat}
+      hijriDateAdjustment={hijriDateAdjustment}
+      showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+      tomorrowsJamaats={tomorrowsJamaats}
+      countdownSlot={
+        <PrayerCountdown
+          phase={prayerPhase}
+          inPrayerSubPhase={inPrayerSubPhase}
+          variant="strip"
+        />
+      }
+    />
+  );
+
+  const prayerStripSlot = (
+    <PrayerStrip
+      isRamadan={ramadan.isRamadan}
+      imsakTime={ramadan.imsakTime}
+      showImsak={displaySettings?.showImsak ?? false}
+      timeFormat={timeFormat}
+      hijriDateAdjustment={hijriDateAdjustment}
+      showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+      tomorrowsJamaats={tomorrowsJamaats}
+      clockPosition={layoutStructureOptions?.stripClockPosition ?? 'left'}
+      hideClock={headerInSidebar}
+      countdownSlot={
+        <PrayerCountdown
+          phase={prayerPhase}
+          inPrayerSubPhase={inPrayerSubPhase}
+          variant="strip"
+        />
+      }
+    />
+  );
+
+  /**
+   * Component registry: maps a zone's component type to its rendered node and
+   * any wrapper constraints carried over from the previous hardcoded layouts
+   * (strip min/max height, landscape footer chrome, carousel overflow).
+   */
+  const zoneRegistry: Record<
+    LayoutZoneComponent,
+    { node: React.ReactNode; className?: string; label?: string }
+  > = {
+    header: { node: headerSlot, label: 'Clock and dates' },
+    'prayer-panel': { node: prayerPanel, label: 'Prayer times' },
+    'prayer-sidebar': {
+      node: prayerSidebarSlot,
+      className: 'h-full min-h-0 flex flex-col',
+      label: 'Prayer times sidebar',
+    },
+    'prayer-strip': {
+      node: prayerStripSlot,
+      className: 'min-h-[8rem] max-h-[18rem]',
+      label: 'Prayer times',
+    },
+    'jumuah-bar': { node: <JumuahBar timeFormat={timeFormat} />, label: "Jumu'ah times" },
+    countdown: { node: countdown, label: 'Next prayer countdown' },
+    content: {
+      node: contentSlot,
+      className: 'relative overflow-visible',
+      label: 'Announcements and content',
+    },
+    footer: {
+      node: footerSlot,
+      className: isPortrait
+        ? ''
+        : 'landscape-footer min-h-[1.5rem] py-0.5 flex items-center',
+    },
+  };
+
+  const renderedZones: RenderedZone[] = orientationLayout.zones
+    .filter((zone) => zone.visible)
+    .map((zone) => {
+      const entry = zoneRegistry[zone.component];
+      return {
+        id: zone.id,
+        component: zone.component,
+        region: zone.region,
+        size: zone.size,
+        fontScale: zone.fontScale,
+        className: entry.className,
+        label: entry.label,
+        node: entry.node,
+      };
+    });
 
   return (
     <OrientationWrapper rotationDegrees={rotationDegrees}>
       <ReferenceViewport orientation={layoutMode}>
-        {isPortrait ? (
-          <PortraitLayout
-            header={headerSlot}
-            prayerSection={
-              <div className="flex flex-col gap-2 h-full">
-                {prayerPanel}
-                <JumuahBar timeFormat={timeFormat} />
-                {countdownSlot}
-              </div>
-            }
-            content={contentSlot}
-            footer={footerSlot}
-            background={bg}
-          />
-        ) : (
-          <LandscapeLayout
-            content={contentSlot}
-            prayerStrip={
-              <PrayerStrip
-                isRamadan={ramadan.isRamadan}
-                imsakTime={ramadan.imsakTime}
-                showImsak={displaySettings?.showImsak ?? false}
-                timeFormat={timeFormat}
-                hijriDateAdjustment={hijriDateAdjustment}
-                showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
-                tomorrowsJamaats={tomorrowsJamaats}
-                countdownSlot={
-                  <PrayerCountdown
-                    phase={prayerPhase}
-                    inPrayerSubPhase={inPrayerSubPhase}
-                    variant="strip"
-                  />
-                }
-              />
-            }
-            footer={footerSlot}
-            background={bg}
-          />
-        )}
+        <LayoutRenderer
+          orientation={isPortrait ? 'portrait' : 'landscape'}
+          structure={layoutStructure}
+          structureOptions={layoutStructureOptions}
+          zones={renderedZones}
+          spacingScale={orientationLayout.spacingScale}
+          background={bg}
+          themeStyle={themeStyle}
+        />
       </ReferenceViewport>
     </OrientationWrapper>
   );

@@ -494,6 +494,8 @@ export interface ScreenContent {
   lastUpdated: string;
   /** Display settings from admin portal (screen customisation). Bundled in content API response. */
   displaySettings?: DisplaySettings;
+  /** Display layout template (zones, ratios, theme) from the admin layout editor. Null = built-in layout. */
+  layout?: import("../types/displayLayout").ScreenLayoutPayload | null;
   // New fields for the updated API format
   data?: {
     masjid?: {
@@ -518,6 +520,7 @@ export interface ScreenContent {
     events?: Event[] | { data: Event[] };
     scheduledPlaylists?: ScheduledPlaylistAssignment[];
     displaySettings?: DisplaySettings;
+    layout?: import("../types/displayLayout").ScreenLayoutPayload | null;
   };
   events?: Event[] | { data: Event[] };
 }

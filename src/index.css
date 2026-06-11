@@ -751,6 +751,105 @@ html, body {
   font-weight: 800;
 }
 
+/* Strip tiles — vertical sidebar grid (1 or 2 columns), container-scaled type */
+.prayer-strip-tiles--vertical {
+  display: grid;
+  grid-template-columns: repeat(var(--tile-columns, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--tile-rows, 6), minmax(0, 1fr));
+  gap: 0.45rem;
+  padding: 0.45rem 0.55rem;
+  overflow: hidden;
+}
+
+.prayer-strip-tiles--vertical .prayer-cue-tile {
+  container-type: size;
+}
+
+/* Single-column fallback (rare) */
+.prayer-strip-tiles--vertical .prayer-cue-tile .text-prayer-strip-label {
+  font-size: clamp(0.62rem, 11cqh, 0.95rem);
+  line-height: 1.08;
+}
+
+.prayer-strip-tiles--vertical .prayer-cue-tile .text-prayer-strip-time {
+  font-size: clamp(0.72rem, 13cqh, 1.15rem);
+  line-height: 1.08;
+}
+
+.prayer-strip-tiles--vertical .prayer-cue-tile .text-prayer-strip-jamaat-primary {
+  font-size: clamp(0.95rem, 24cqh, 1.9rem);
+  line-height: 1.05;
+}
+
+.prayer-strip-tiles--vertical .prayer-cue-tile .text-prayer-strip-jamaat {
+  font-size: clamp(0.58rem, 9cqh, 0.82rem);
+  line-height: 1.05;
+}
+
+/* Two-column sidebar — larger tiles, distance-readable jamaat */
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-2 .prayer-cue-tile .text-prayer-strip-label {
+  font-size: clamp(0.72rem, 14cqh, 1.05rem);
+  line-height: 1.08;
+}
+
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-2 .prayer-cue-tile .text-prayer-strip-time {
+  font-size: clamp(0.85rem, 16cqh, 1.25rem);
+  line-height: 1.08;
+}
+
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-2 .prayer-cue-tile .text-prayer-strip-jamaat-primary {
+  font-size: clamp(1.15rem, 34cqh, 2.15rem);
+  line-height: 1.02;
+}
+
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-2 .prayer-cue-tile .text-prayer-strip-jamaat {
+  font-size: clamp(0.62rem, 10cqh, 0.88rem);
+  line-height: 1.05;
+}
+
+.prayer-cue-tile-sunrise {
+  width: min(1.35rem, 16cqh);
+  height: min(1.35rem, 16cqh);
+}
+
+.prayer-strip-tiles--cols-2 .prayer-cue-tile-sunrise {
+  width: min(1.5rem, 20cqh);
+  height: min(1.5rem, 20cqh);
+}
+
+/* Sidebar shell — clock + countdown */
+.prayer-sidebar .prayer-strip-clock-block .text-prayer-strip-clock {
+  font-size: clamp(1.85rem, 2.45rem, 2.9rem);
+  line-height: 1;
+}
+
+.prayer-sidebar .prayer-strip-clock-block .text-prayer-strip-label {
+  font-size: clamp(0.78rem, 0.92rem, 1.05rem);
+  line-height: 1.15;
+}
+
+.prayer-sidebar .prayer-strip-clock-block .text-prayer-strip-jamaat {
+  font-size: clamp(0.68rem, 0.8rem, 0.92rem);
+  line-height: 1.15;
+}
+
+.prayer-sidebar-countdown .text-countdown-strip-label {
+  font-size: clamp(0.72rem, 0.88rem, 1rem);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+}
+
+.prayer-sidebar-countdown .text-countdown-strip-digits {
+  font-size: clamp(1.05rem, 1.35rem, 1.55rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.prayer-sidebar-countdown .prayer-countdown-row {
+  gap: 0.35rem;
+}
+
 /* ============================================================
    Portrait prayer panel typography — larger, more readable times.
    Scoped under [data-orientation="portrait"] so landscape strip is

@@ -1,22 +1,23 @@
 /**
- * PrayerStrip
+ * PrayerSidebar
  *
- * Landscape horizontal bar: optional Imsak row, clock column, prayer cue tiles
- * in a row, optional countdown. Tiles share rendering with PrayerSidebar via
- * prayerStripTiles.tsx.
+ * Vertical column of strip cue tiles — same tiles as the landscape prayer strip,
+ * oriented top-to-bottom with a clock block above and countdown below.
  *
- * GPU-safe: no backdrop-filter, no box-shadow animations.
+ * GPU-safe: no backdrop-filter, no heavy box-shadow.
  */
 
 import React, { useMemo } from 'react';
+import useMasjidTime from '../../hooks/useMasjidTime';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
-import useMasjidTime from '../../hooks/useMasjidTime';
-import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 import type { TimeFormat } from '../../api/models';
+import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
 import { resolveTerminology } from '../../utils/prayerTerminology';
+import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
+import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
 import {
   PrayerCueTile,
   PrayerStripClockBlock,
@@ -31,30 +32,28 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-interface PrayerStripProps {
+interface PrayerSidebarProps {
   isRamadan?: boolean;
   imsakTime?: string | null;
   showImsak?: boolean;
+  forbiddenPrayer?: CurrentForbiddenState | null;
   timeFormat?: TimeFormat;
   hijriDateAdjustment?: number;
   showTomorrowJamaat?: boolean;
   tomorrowsJamaats?: TomorrowsJamaatsMap;
   countdownSlot?: React.ReactNode;
-  clockPosition?: 'left' | 'right';
-  hideClock?: boolean;
 }
 
-const PrayerStrip: React.FC<PrayerStripProps> = ({
+const PrayerSidebar: React.FC<PrayerSidebarProps> = ({
   isRamadan = false,
   imsakTime = null,
   showImsak = false,
+  forbiddenPrayer = null,
   timeFormat = '12h',
   hijriDateAdjustment = 0,
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
   countdownSlot = null,
-  clockPosition = 'left',
-  hideClock = false,
 }) => {
   const now = useMasjidTime();
   const { todaysPrayerTimes } = usePrayerTimesContext();
@@ -79,16 +78,16 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full animate-shimmer rounded-lg">
+      <div className="flex items-center justify-center h-full min-h-[12rem] animate-shimmer rounded-lg">
         <p className="text-text-muted text-body">Loading prayer times…</p>
       </div>
     );
   }
 
   return (
-    <div className="landscape-prayer-strip flex flex-col w-full min-h-0 rounded-lg">
+    <div className="landscape-prayer-strip prayer-sidebar flex flex-col h-full min-h-0 rounded-lg overflow-hidden">
       {showImsakRow && imsakTime && (
-        <div className="shrink-0 flex items-center justify-center py-2 px-4 bg-surface/30">
+        <div className="shrink-0 flex items-center justify-center py-2 px-3 bg-surface/30">
           <span className="text-prayer-strip-label text-gold/90 uppercase tracking-wider font-bold">
             Imsak{' '}
             <TimeWithPeriod timeString={imsakTime} timeFormat={timeFormat} className="tabular-nums" />
@@ -96,50 +95,59 @@ const PrayerStrip: React.FC<PrayerStripProps> = ({
         </div>
       )}
 
-      <div
-        className={`flex items-stretch flex-1 min-h-0 ${
-          clockPosition === 'right' ? 'flex-row-reverse' : ''
-        }`}
-      >
-        {!hideClock && (
-          <div className="shrink-0 w-[15%] min-w-[8rem] px-4 py-3">
-            <PrayerStripClockBlock
-              timeMain={timeMain}
-              timePeriod={timePeriod}
-              dayName={dayName}
-              dateStr={dateStr}
-              hijriDate={hijriDate}
-              align="start"
-            />
-          </div>
-        )}
-
-        <PrayerStripTileGrid orientation="horizontal" tileCount={todaysPrayerTimes.length}>
-          {todaysPrayerTimes.map((prayer) => (
-            <PrayerCueTile
-              key={prayer.name}
-              prayer={prayer}
-              displayName={resolveStripPrayerDisplayName(prayer, terminology)}
-              timeFormat={timeFormat}
-              orientation="horizontal"
-              isRamadan={isRamadan}
-              imsakTime={imsakTime}
-              showImsakInCard={showImsak && !!imsakTime && prayer.name === 'Fajr' && !showImsakRow}
-              showTomorrowCol={showTomorrowCol}
-              tomorrowsJamaats={tomorrowsJamaats}
-              jummahLabel={jummahLabel}
-              zuhrLabel={zuhrLabel}
-              iftarLabel={iftarLabel}
-            />
-          ))}
-        </PrayerStripTileGrid>
+      <div className="shrink-0 px-2.5 py-2 border-b border-white/10">
+        <PrayerStripClockBlock
+          timeMain={timeMain}
+          timePeriod={timePeriod}
+          dayName={dayName}
+          dateStr={dateStr}
+          hijriDate={hijriDate}
+          align="center"
+          ramadanLabel={isRamadan ? 'Ramadan Mubarak' : null}
+        />
       </div>
 
+      {forbiddenPrayer && (
+        <div className="shrink-0 px-2 pt-1.5">
+          <ForbiddenPrayerNotice
+            forbiddenPrayer={forbiddenPrayer}
+            timeFormat={timeFormat}
+            compact
+          />
+        </div>
+      )}
+
+      <PrayerStripTileGrid
+        orientation="vertical"
+        tileCount={todaysPrayerTimes.length}
+        columnCount={2}
+      >
+        {todaysPrayerTimes.map((prayer) => (
+          <PrayerCueTile
+            key={prayer.name}
+            prayer={prayer}
+            displayName={resolveStripPrayerDisplayName(prayer, terminology)}
+            timeFormat={timeFormat}
+            orientation="vertical"
+            isRamadan={isRamadan}
+            imsakTime={imsakTime}
+            showImsakInCard={showImsak && !!imsakTime && prayer.name === 'Fajr' && !showImsakRow}
+            showTomorrowCol={showTomorrowCol}
+            tomorrowsJamaats={tomorrowsJamaats}
+            jummahLabel={jummahLabel}
+            zuhrLabel={zuhrLabel}
+            iftarLabel={iftarLabel}
+          />
+        ))}
+      </PrayerStripTileGrid>
+
       {countdownSlot ? (
-        <div className="shrink-0 w-full min-w-0 py-2 px-4">{countdownSlot}</div>
+        <div className="prayer-sidebar-countdown shrink-0 w-full min-w-0 py-2 px-3 border-t border-white/10">
+          {countdownSlot}
+        </div>
       ) : null}
     </div>
   );
 };
 
-export default React.memo(PrayerStrip);
+export default React.memo(PrayerSidebar);

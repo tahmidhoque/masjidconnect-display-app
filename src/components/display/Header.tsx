@@ -31,6 +31,8 @@ interface HeaderProps {
   hijriDateAdjustment?: number;
   /** When false, hide trailing seconds in 24h mode (e.g. portrait header) */
   showClockSeconds?: boolean;
+  /** Horizontal bar (default) or vertical sidebar column. */
+  layout?: 'horizontal' | 'vertical';
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -47,6 +49,7 @@ const Header: React.FC<HeaderProps> = ({
   timeFormat = '12h',
   hijriDateAdjustment = 0,
   showClockSeconds = true,
+  layout = 'horizontal',
 }) => {
   // Use masjid-timezone time so the clock is correct when the Pi runs in UTC.
   const now = useMasjidTime();
@@ -82,6 +85,33 @@ const Header: React.FC<HeaderProps> = ({
     }
     return hijriDate;
   }, [isRamadan, ramadanDay, ramadanTwoLines, hijriDate]);
+
+  if (layout === 'vertical') {
+    return (
+      <div
+        className={`relative flex flex-col items-center justify-center h-full overflow-hidden rounded-lg px-3 py-4 gap-2 ${
+          compact ? 'py-3' : 'py-4'
+        }`}
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        <div className="flex flex-col items-center shrink-0 pointer-events-none">
+          <span className="text-clock text-gold leading-none">{timeMain}</span>
+          {timePeriod != null && (
+            <span className="text-gold/90 text-body font-medium">{timePeriod}</span>
+          )}
+        </div>
+        <div className="flex flex-col items-center text-center min-w-0">
+          <p className="text-body text-text-secondary font-semibold leading-tight">{dateLine1}</p>
+          <p className="text-caption text-text-secondary leading-tight">{dateLine2}</p>
+          <p className="text-caption text-text-muted mt-1 leading-tight">{rightDateContent}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
