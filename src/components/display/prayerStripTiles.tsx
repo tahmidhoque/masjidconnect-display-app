@@ -92,10 +92,14 @@ export const PrayerStripClockBlock: React.FC<PrayerStripClockBlockProps> = ({
           </span>
         )}
       </span>
-      <span className="text-prayer-strip-label text-text-secondary mt-1">
-        {dayName} {dateStr}
-      </span>
-      <span className="text-prayer-strip-jamaat text-text-muted mt-0.5">{hijriDate}</span>
+      {(dayName || dateStr) && (
+        <span className="text-prayer-strip-label text-text-secondary mt-1">
+          {[dayName, dateStr].filter(Boolean).join(' ')}
+        </span>
+      )}
+      {hijriDate ? (
+        <span className="text-prayer-strip-jamaat text-text-muted mt-0.5">{hijriDate}</span>
+      ) : null}
       {ramadanLabel && (
         <span className="text-prayer-strip-label text-gold/80 font-semibold mt-1">
           {ramadanLabel}

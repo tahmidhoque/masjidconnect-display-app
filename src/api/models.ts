@@ -328,6 +328,12 @@ export interface DisplaySettings {
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */
   showTomorrowJamaat: boolean;
+  /** Show Gregorian date in the clock / header area */
+  showDate?: boolean;
+  /** Show Hijri (Islamic) date in the clock / header area */
+  showHijriDate?: boolean;
+  /** Show masjid name in the clock / header area */
+  showMasjidName?: boolean;
   /** Minutes before Fajr for imsak/sehri. Use to compute imsak on the fly when pt.imsak is null. */
   imsakOffset: number;
   /** Days to add to the calculated Hijri date (e.g. +1 if API/local calc is 1 day behind). */

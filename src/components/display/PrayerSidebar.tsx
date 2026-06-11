@@ -1,18 +1,16 @@
 /**
  * PrayerSidebar
  *
- * Vertical column of strip cue tiles — same tiles as the landscape prayer strip,
- * oriented top-to-bottom with a clock block above and countdown below.
+ * Vertical 2-column grid of strip cue tiles with an optional compact strip clock
+ * on top when no separate `header` layout block is present.
  *
  * GPU-safe: no backdrop-filter, no heavy box-shadow.
  */
 
-import React, { useMemo } from 'react';
-import useMasjidTime from '../../hooks/useMasjidTime';
+import React from 'react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
 import type { TimeFormat } from '../../api/models';
-import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
 import { resolveTerminology } from '../../utils/prayerTerminology';
@@ -25,6 +23,8 @@ import {
   resolveStripPrayerDisplayName,
   TimeWithPeriod,
 } from './prayerStripTiles';
+import useMasjidTime from '../../hooks/useMasjidTime';
+import { calculateApproximateHijriDate, getTimeDisplayParts } from '../../utils/dateUtils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -33,6 +33,9 @@ const MONTHS = [
 ];
 
 interface PrayerSidebarProps {
+  /** When true, omit the built-in strip clock (a `header` block is in the layout). */
+  hideClock?: boolean;
+  masjidName?: string | null;
   isRamadan?: boolean;
   imsakTime?: string | null;
   showImsak?: boolean;
@@ -41,10 +44,15 @@ interface PrayerSidebarProps {
   hijriDateAdjustment?: number;
   showTomorrowJamaat?: boolean;
   tomorrowsJamaats?: TomorrowsJamaatsMap;
+  showDate?: boolean;
+  showHijriDate?: boolean;
+  showMasjidName?: boolean;
   countdownSlot?: React.ReactNode;
 }
 
 const PrayerSidebar: React.FC<PrayerSidebarProps> = ({
+  hideClock = false,
+  masjidName = null,
   isRamadan = false,
   imsakTime = null,
   showImsak = false,
@@ -53,6 +61,9 @@ const PrayerSidebar: React.FC<PrayerSidebarProps> = ({
   hijriDateAdjustment = 0,
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
+  showDate = true,
+  showHijriDate = true,
+  showMasjidName = false,
   countdownSlot = null,
 }) => {
   const now = useMasjidTime();
@@ -62,16 +73,6 @@ const PrayerSidebar: React.FC<PrayerSidebarProps> = ({
   const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
   const zuhrLabel = resolveTerminology(terminology, 'zuhr', 'Zuhr');
   const iftarLabel = resolveTerminology(terminology, 'iftar', 'Iftar');
-
-  const timeStr24h = now.format('HH:mm');
-  const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
-  const dayName = DAYS[now.day()];
-  const dateStr = `${now.date()} ${MONTHS[now.month()]} ${now.year()}`;
-  const calendarDate = now.date();
-  const hijriDate = useMemo(
-    () => calculateApproximateHijriDate(undefined, hijriDateAdjustment),
-    [calendarDate, hijriDateAdjustment],
-  );
 
   const showTomorrowCol = showTomorrowJamaat && !!tomorrowsJamaats;
   const showImsakRow = showImsak && !!imsakTime;
@@ -84,6 +85,32 @@ const PrayerSidebar: React.FC<PrayerSidebarProps> = ({
     );
   }
 
+  const stripClock = (() => {
+    const timeStr24h = now.format('HH:mm');
+    const { main: timeMain, period: timePeriod } = getTimeDisplayParts(timeStr24h, timeFormat);
+    const dayName = DAYS[now.day()];
+    const dateStr = `${now.date()} ${MONTHS[now.month()]} ${now.year()}`;
+    const hijriDate = calculateApproximateHijriDate(undefined, hijriDateAdjustment);
+    return (
+      <div className="shrink-0 px-2.5 py-2 border-b border-white/10">
+        {showMasjidName && masjidName?.trim() && (
+          <p className="text-prayer-strip-label font-bold text-gold/90 text-center truncate mb-1.5 px-1">
+            {masjidName.trim()}
+          </p>
+        )}
+        <PrayerStripClockBlock
+          timeMain={timeMain}
+          timePeriod={timePeriod}
+          dayName={showDate ? dayName : ''}
+          dateStr={showDate ? dateStr : ''}
+          hijriDate={showHijriDate ? hijriDate : ''}
+          align="center"
+          ramadanLabel={isRamadan && showHijriDate ? 'Ramadan Mubarak' : null}
+        />
+      </div>
+    );
+  })();
+
   return (
     <div className="landscape-prayer-strip prayer-sidebar flex flex-col h-full min-h-0 rounded-lg overflow-hidden">
       {showImsakRow && imsakTime && (
@@ -95,17 +122,7 @@ const PrayerSidebar: React.FC<PrayerSidebarProps> = ({
         </div>
       )}
 
-      <div className="shrink-0 px-2.5 py-2 border-b border-white/10">
-        <PrayerStripClockBlock
-          timeMain={timeMain}
-          timePeriod={timePeriod}
-          dayName={dayName}
-          dateStr={dateStr}
-          hijriDate={hijriDate}
-          align="center"
-          ramadanLabel={isRamadan ? 'Ramadan Mubarak' : null}
-        />
-      </div>
+      {!hideClock && <div className="shrink-0 min-h-0">{stripClock}</div>}
 
       {forbiddenPrayer && (
         <div className="shrink-0 px-2 pt-1.5">

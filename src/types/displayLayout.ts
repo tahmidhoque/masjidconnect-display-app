@@ -37,6 +37,12 @@ export interface LayoutStructureOptions {
   stripClockPosition?: 'left' | 'right';
 }
 
+export interface LayoutZoneHeaderOptions {
+  showDate?: boolean;
+  showHijriDate?: boolean;
+  showMasjidName?: boolean;
+}
+
 export interface LayoutZone {
   id: string;
   component: LayoutZoneComponent;
@@ -44,6 +50,7 @@ export interface LayoutZone {
   size: number;
   fontScale: number;
   region?: LayoutRegion;
+  options?: LayoutZoneHeaderOptions;
 }
 
 export interface OrientationLayoutConfig {
@@ -180,6 +187,17 @@ function sanitiseZone(raw: unknown): LayoutZone | null {
       ? (regionRaw as LayoutRegion)
       : undefined;
 
+  const optionsRaw = zone.options;
+  let options: LayoutZoneHeaderOptions | undefined;
+  if (optionsRaw && typeof optionsRaw === 'object') {
+    const opts = optionsRaw as Record<string, unknown>;
+    const parsed: LayoutZoneHeaderOptions = {};
+    if (typeof opts.showDate === 'boolean') parsed.showDate = opts.showDate;
+    if (typeof opts.showHijriDate === 'boolean') parsed.showHijriDate = opts.showHijriDate;
+    if (typeof opts.showMasjidName === 'boolean') parsed.showMasjidName = opts.showMasjidName;
+    if (Object.keys(parsed).length > 0) options = parsed;
+  }
+
   return {
     id: typeof zone.id === 'string' && zone.id !== '' ? zone.id : `zone-${component}`,
     component: component as LayoutZoneComponent,
@@ -193,6 +211,7 @@ function sanitiseZone(raw: unknown): LayoutZone | null {
         ? clamp(zone.fontScale, FONT_SCALE_MIN, FONT_SCALE_MAX)
         : 1,
     region,
+    options,
   };
 }
 

@@ -31,7 +31,12 @@ import { orientationToLayoutMode, isPortraitLayout, parseScreenOrientation } fro
 import { LayoutRenderer, OrientationWrapper, ReferenceViewport } from '../layout';
 import type { RenderedZone } from '../layout';
 import { buildThemeStyle } from '../../utils/displayTheme';
-import type { LayoutZoneComponent } from '../../types/displayLayout';
+import type {
+  LayoutZone,
+  LayoutZoneComponent,
+  LayoutZoneHeaderOptions,
+} from '../../types/displayLayout';
+import { inferZoneRegion } from '../../types/displayLayout';
 import {
   Header,
   Footer,
@@ -521,26 +526,45 @@ const DisplayScreenInner: React.FC = () => {
   const orientationLayout = isPortrait ? layoutConfig.portrait : layoutConfig.landscape;
   const layoutStructure = orientationLayout.structure ?? 'stack';
   const layoutStructureOptions = orientationLayout.structureOptions;
-  const headerInSidebar =
-    layoutStructure === 'sidebar-left' || layoutStructure === 'sidebar-right';
+  const hasVisibleHeader = orientationLayout.zones.some(
+    (zone) => zone.visible && zone.component === 'header',
+  );
 
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
 
-  const headerSlot = (
-    <Header
-      key={`header-hijri-${hijriDateAdjustment}`}
-      masjidName={masjidName}
-      compact={!isPortrait}
-      isRamadan={ramadan.isRamadan}
-      ramadanDay={ramadan.ramadanDay}
-      ramadanTwoLines={isPortrait}
-      showClockSeconds={!isPortrait}
-      timeFormat={timeFormat}
-      hijriDateAdjustment={hijriDateAdjustment}
-      layout={headerInSidebar ? 'vertical' : 'horizontal'}
-    />
-  );
+  const defaultShowDate = displaySettings?.showDate ?? true;
+  const defaultShowHijriDate = displaySettings?.showHijriDate ?? true;
+  const defaultShowMasjidName = displaySettings?.showMasjidName ?? false;
+
+  const resolveHeaderFlags = (options?: LayoutZoneHeaderOptions) => ({
+    showDate: options?.showDate ?? defaultShowDate,
+    showHijriDate: options?.showHijriDate ?? defaultShowHijriDate,
+    showMasjidName: options?.showMasjidName ?? defaultShowMasjidName,
+  });
+
+  const buildHeaderSlot = (zone: LayoutZone) => {
+    const region = inferZoneRegion(layoutStructure, 'header', zone.region);
+    const inSidebar = region === 'sidebar';
+    const flags = resolveHeaderFlags(zone.options);
+    return (
+      <Header
+        key={`header-${zone.id}-${hijriDateAdjustment}`}
+        masjidName={masjidName}
+        showMasjidName={flags.showMasjidName}
+        showDate={flags.showDate}
+        showHijriDate={flags.showHijriDate}
+        compact={!isPortrait && inSidebar}
+        isRamadan={ramadan.isRamadan}
+        ramadanDay={ramadan.ramadanDay}
+        ramadanTwoLines={isPortrait}
+        showClockSeconds={!isPortrait && !inSidebar}
+        timeFormat={timeFormat}
+        hijriDateAdjustment={hijriDateAdjustment}
+        layout={inSidebar ? 'vertical' : 'horizontal'}
+      />
+    );
+  };
 
   const footerSlot = <Footer />;
   const prayerPanel = (
@@ -627,12 +651,17 @@ const DisplayScreenInner: React.FC = () => {
 
   const prayerSidebarSlot = (
     <PrayerSidebar
+      hideClock={hasVisibleHeader}
+      masjidName={masjidName}
       isRamadan={ramadan.isRamadan}
       imsakTime={ramadan.imsakTime}
       showImsak={displaySettings?.showImsak ?? false}
       forbiddenPrayer={forbiddenPrayer}
       timeFormat={timeFormat}
       hijriDateAdjustment={hijriDateAdjustment}
+      showDate={defaultShowDate}
+      showHijriDate={defaultShowHijriDate}
+      showMasjidName={defaultShowMasjidName}
       showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
       tomorrowsJamaats={tomorrowsJamaats}
       countdownSlot={
@@ -655,7 +684,7 @@ const DisplayScreenInner: React.FC = () => {
       showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
       tomorrowsJamaats={tomorrowsJamaats}
       clockPosition={layoutStructureOptions?.stripClockPosition ?? 'left'}
-      hideClock={headerInSidebar}
+      hideClock={hasVisibleHeader}
       countdownSlot={
         <PrayerCountdown
           phase={prayerPhase}
@@ -675,7 +704,7 @@ const DisplayScreenInner: React.FC = () => {
     LayoutZoneComponent,
     { node: React.ReactNode; className?: string; label?: string }
   > = {
-    header: { node: headerSlot, label: 'Clock and dates' },
+    header: { node: null, label: 'Portrait clock and dates' },
     'prayer-panel': { node: prayerPanel, label: 'Prayer times' },
     'prayer-sidebar': {
       node: prayerSidebarSlot,
@@ -706,6 +735,8 @@ const DisplayScreenInner: React.FC = () => {
     .filter((zone) => zone.visible)
     .map((zone) => {
       const entry = zoneRegistry[zone.component];
+      const node =
+        zone.component === 'header' ? buildHeaderSlot(zone) : entry.node;
       return {
         id: zone.id,
         component: zone.component,
@@ -714,7 +745,7 @@ const DisplayScreenInner: React.FC = () => {
         fontScale: zone.fontScale,
         className: entry.className,
         label: entry.label,
-        node: entry.node,
+        node,
       };
     });
 
