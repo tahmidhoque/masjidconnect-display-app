@@ -32,16 +32,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // API responses are cached in apiClient (LocalForage) with explicit
+        // invalidation via content:invalidate — do NOT cache /api/* in the SW.
+        // SW-level API caching caused stale layout/content until hard refresh.
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/portal\.masjidconnect\.co\.uk\/api\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-              networkTimeoutSeconds: 10,
-            },
-          },
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
             handler: 'CacheFirst',

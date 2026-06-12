@@ -10,6 +10,7 @@ import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
 import { parseScreenOrientation, parseRotationDegrees, orientationToRotationDegrees } from "../../utils/orientation";
 import { setScreenOrientation } from "./uiSlice";
+import { unwrapScreenContentPayload } from "../../utils/unwrapScreenContent";
 
 // Constants
 const MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — forceRefresh bypasses this
@@ -509,9 +510,17 @@ export const refreshContent = createAsyncThunk(
 
       // Use sync service for robust data fetching.
       let syncSucceeded = false;
+      let syncedContent: ScreenContent | null = null;
       try {
         const syncResult = await syncService.syncContent({ forceRefresh });
+        if (syncResult.error === 'superseded') {
+          logger.debug('[Content] Refresh superseded by a newer force-refresh — keeping current state');
+          return { skipped: true, reason: 'superseded' };
+        }
         syncSucceeded = syncResult.success === true;
+        if (syncSucceeded && syncResult.data) {
+          syncedContent = unwrapScreenContentPayload(syncResult.data);
+        }
         if (!syncSucceeded) {
           logger.warn('[Content] Content sync unsuccessful, attempting to use cached content', {
             error: syncResult.error,
@@ -521,8 +530,9 @@ export const refreshContent = createAsyncThunk(
         logger.warn('[Content] Sync failed, attempting to use cached content', { error: syncError });
       }
 
-      // Get the content from storage after sync (or from cache if sync failed)
-      const content = await storageService.get<ScreenContent>('screenContent');
+      // Prefer the payload we just fetched; storage can lag behind saveToStorageService.
+      const content =
+        syncedContent ?? (await storageService.get<ScreenContent>('screenContent'));
       if (!content) {
         throw new Error(syncSucceeded ? "No content received from server" : "Sync failed and no cached content available");
       }
@@ -1323,14 +1333,33 @@ export const selectDisplaySettings = (state: { content: ContentState }) =>
  * back to the built-in default layout. Memoised because sanitising builds
  * new objects — recompute only when screenContent changes.
  */
+function pickScreenLayoutPayload(
+  screenContent: ScreenContent | null | undefined,
+): { id?: string; updatedAt?: string; config?: unknown } | null | undefined {
+  const rawLayout =
+    screenContent?.layout ??
+    (screenContent as { data?: { layout?: { config?: unknown } | null } } | null)?.data?.layout;
+  if (!rawLayout || typeof rawLayout !== 'object') return null;
+  return rawLayout as { id?: string; updatedAt?: string; config?: unknown };
+}
+
 export const selectDisplayLayoutConfig = createSelector(
   [(state: { content: ContentState }) => state.content.screenContent],
   (screenContent): DisplayLayoutConfig => {
-    const rawLayout =
-      screenContent?.layout ??
-      (screenContent as { data?: { layout?: { config?: unknown } | null } } | null)
-        ?.data?.layout;
+    const rawLayout = pickScreenLayoutPayload(screenContent);
     return sanitiseLayoutConfig(rawLayout?.config) ?? DEFAULT_LAYOUT_CONFIG;
+  },
+);
+
+/** Changes when the assigned layout template or its config revision changes. */
+export const selectDisplayLayoutRevision = createSelector(
+  [(state: { content: ContentState }) => state.content.screenContent],
+  (screenContent): string => {
+    const layout = pickScreenLayoutPayload(screenContent);
+    if (!layout) return 'builtin';
+    const id = typeof layout.id === 'string' ? layout.id : 'unknown';
+    const updatedAt = typeof layout.updatedAt === 'string' ? layout.updatedAt : '';
+    return `${id}:${updatedAt}`;
   },
 );
 export const selectShowPrayerAnnouncement = (state: {

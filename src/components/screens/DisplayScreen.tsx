@@ -69,7 +69,12 @@ import usePrayerPhase from '../../hooks/usePrayerPhase';
 import useJamaatBuzzer from '../../hooks/useJamaatBuzzer';
 import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
-import { selectTimeFormat, selectDisplaySettings, selectDisplayLayoutConfig } from '../../store/slices/contentSlice';
+import {
+  selectTimeFormat,
+  selectDisplaySettings,
+  selectDisplayLayoutConfig,
+  selectDisplayLayoutRevision,
+} from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag } from '../../utils/mediaSlide';
 import { resolveTerminology } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
@@ -541,6 +546,7 @@ const DisplayScreenInner: React.FC = () => {
 
   /* ---- Layout config (admin layout editor; falls back to built-in default) ---- */
   const layoutConfig = useAppSelector(selectDisplayLayoutConfig);
+  const layoutRevision = useAppSelector(selectDisplayLayoutRevision);
   const orientationLayout = isPortrait ? layoutConfig.portrait : layoutConfig.landscape;
   const layoutStructure = orientationLayout.structure ?? 'stack';
   const layoutStructureOptions = orientationLayout.structureOptions;
@@ -834,6 +840,7 @@ const DisplayScreenInner: React.FC = () => {
     <OrientationWrapper rotationDegrees={rotationDegrees}>
       <ReferenceViewport orientation={layoutMode}>
         <LayoutRenderer
+          key={`${layoutRevision}-${lastContentUpdate ?? ''}`}
           orientation={isPortrait ? 'portrait' : 'landscape'}
           structure={layoutStructure}
           structureOptions={layoutStructureOptions}
