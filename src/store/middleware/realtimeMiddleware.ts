@@ -33,6 +33,12 @@ import {
 } from '../../utils/orientation';
 import type { EmergencyAlert } from '../../api/models';
 import type { ContentInvalidationPayload } from '../../types/realtime';
+import {
+  clearInvalidationCoalesceMap,
+  invalidationCoalesceKey,
+  scheduleInvalidationRefetch,
+  type InvalidationCoalesceState,
+} from '../../utils/contentInvalidationSchedule';
 
 /**
  * Normalise raw Socket.io `emergency:alert` payloads (object, JSON string, or `{ data: { ... } }`).
@@ -70,14 +76,11 @@ interface AuthShape {
 let initialised = false;
 const unsubs: Array<() => void> = [];
 
-/** Coalesce window for content:invalidate (ms). Multiple events per type result in one refetch. */
-const CONTENT_INVALIDATE_COALESCE_MS = 3000;
-
-/** Pending coalesce timeouts per invalidation type. Cleared on cleanup. */
-const invalidationCoalesceMap = new Map<string, ReturnType<typeof setTimeout>>();
+/** Pending leading/trailing invalidation timers per type. Cleared on cleanup. */
+const invalidationCoalesceMap = new Map<string, InvalidationCoalesceState>();
 
 /** Coalesce rapid `content:update` / `prayer-times:update` WS events (ms). */
-const WS_UPDATE_COALESCE_MS = 3000;
+const WS_UPDATE_COALESCE_MS = 600;
 
 /** Pending coalesce timeouts for legacy update event names. Cleared on cleanup. */
 const wsUpdateCoalesceMap = new Map<string, ReturnType<typeof setTimeout>>();
@@ -292,10 +295,8 @@ export const realtimeMiddleware: Middleware = (api: any) => {
         logger.debug('[RealtimeMW] content:invalidate received, scheduling refetch', {
           type: payload.type,
           action: payload.action,
-          coalesceMs: CONTENT_INVALIDATE_COALESCE_MS,
         });
         const runRefetch = () => {
-          invalidationCoalesceMap.delete(payload.type);
           logger.debug('[RealtimeMW] content:invalidate dispatching refetch', { type: payload.type });
           void (async () => {
             try {
@@ -342,10 +343,12 @@ export const realtimeMiddleware: Middleware = (api: any) => {
           })();
         };
 
-        const existing = invalidationCoalesceMap.get(payload.type);
-        if (existing) clearTimeout(existing);
-        const timeoutId = setTimeout(runRefetch, CONTENT_INVALIDATE_COALESCE_MS);
-        invalidationCoalesceMap.set(payload.type, timeoutId);
+        scheduleInvalidationRefetch(
+          invalidationCoalesceMap,
+          invalidationType,
+          runRefetch,
+          invalidationCoalesceKey(invalidationType, payload.entityId),
+        );
       }),
     );
 
@@ -447,8 +450,7 @@ export const realtimeMiddleware: Middleware = (api: any) => {
   const cleanup = () => {
     unsubs.forEach((fn) => fn());
     unsubs.length = 0;
-    invalidationCoalesceMap.forEach((id) => clearTimeout(id));
-    invalidationCoalesceMap.clear();
+    clearInvalidationCoalesceMap(invalidationCoalesceMap);
     wsUpdateCoalesceMap.forEach((id) => clearTimeout(id));
     wsUpdateCoalesceMap.clear();
     api.dispatch(clearPendingRestart());
@@ -478,8 +480,7 @@ export const realtimeMiddleware: Middleware = (api: any) => {
 export const cleanupRealtimeMiddleware = () => {
   unsubs.forEach((fn) => fn());
   unsubs.length = 0;
-  invalidationCoalesceMap.forEach((id) => clearTimeout(id));
-  invalidationCoalesceMap.clear();
+  clearInvalidationCoalesceMap(invalidationCoalesceMap);
   wsUpdateCoalesceMap.forEach((id) => clearTimeout(id));
   wsUpdateCoalesceMap.clear();
   remoteControlService.clearScheduledRestart();

@@ -9,6 +9,7 @@
 import logger from '../utils/logger';
 import realtimeService from './realtimeService';
 import apiClient from '../api/apiClient';
+import { purgeApiServiceWorkerCaches } from '../utils/purgeApiServiceWorkerCaches';
 import storageService from './storageService';
 import credentialService from './credentialService';
 import { isPiPlatform } from '../config/platform';
@@ -336,6 +337,7 @@ class RemoteControlService {
 
     switch (type) {
       case 'RELOAD_CONTENT':
+        await purgeApiServiceWorkerCaches();
         await apiClient.clearCache();
         logger.info('[RemoteControl] RELOAD_CONTENT: cache cleared; refetch is triggered by middleware');
         break;
@@ -347,6 +349,7 @@ class RemoteControlService {
         }
         break;
       case 'CLEAR_CACHE':
+        await purgeApiServiceWorkerCaches();
         await apiClient.clearCache();
         logger.info('[RemoteControl] Display content cache cleared; refetch is triggered by middleware');
         break;

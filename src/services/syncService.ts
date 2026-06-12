@@ -25,6 +25,7 @@ import storageService from './storageService';
 import remoteControlService from './remoteControlService';
 import environment, { defaultMasjidTimezone } from '../config/environment';
 import logger from '../utils/logger';
+import { purgeApiServiceWorkerCaches } from '../utils/purgeApiServiceWorkerCaches';
 
 // ============================================================================
 // Types
@@ -113,6 +114,9 @@ class SyncService {
    * instead of receiving `{ success: false, error: 'Sync already in progress' }`.
    */
   private contentSyncInFlight: Promise<SyncResult<ContentResponse>> | null = null;
+  private contentForceRefreshPending = false;
+  /** Bumped on each force-refresh so slower stale responses cannot overwrite newer data. */
+  private contentFetchGeneration = 0;
   private prayerTimesSyncInFlight: Promise<SyncResult<PrayerTimesResponse>> | null = null;
   private eventsSyncInFlight: Promise<SyncResult<EventsResponse>> | null = null;
 
@@ -375,35 +379,71 @@ class SyncService {
    * @param options.forceRefresh - When true, bypass "content changed" check and clear content cache so we always fetch (e.g. after content:invalidate).
    */
   public async syncContent(options?: { forceRefresh?: boolean }): Promise<SyncResult<ContentResponse>> {
+    const forceRefresh = options?.forceRefresh === true;
+    if (forceRefresh) {
+      this.contentFetchGeneration += 1;
+    }
+    const generation = this.contentFetchGeneration;
+
     if (this.contentSyncInFlight) {
-      logger.debug('[SyncService] Content sync coalesced — awaiting in-flight');
-      return this.contentSyncInFlight;
+      if (forceRefresh) {
+        this.contentForceRefreshPending = true;
+        logger.debug('[SyncService] Content force-refresh waiting for in-flight sync to finish');
+        await this.contentSyncInFlight.catch(() => undefined);
+      } else {
+        logger.debug('[SyncService] Content sync coalesced — awaiting in-flight');
+        return this.contentSyncInFlight;
+      }
     }
 
-    const promise = this.runSyncContent(options);
+    const shouldForce = forceRefresh || this.contentForceRefreshPending;
+    this.contentForceRefreshPending = false;
+
+    const promise = this.runSyncContent({ forceRefresh: shouldForce, generation });
     this.contentSyncInFlight = promise;
-    void promise.finally(() => {
+
+    try {
+      const result = await promise;
+      if (result.error === 'superseded') {
+        return result;
+      }
+      if (this.contentForceRefreshPending) {
+        this.contentForceRefreshPending = false;
+        return this.syncContent({ forceRefresh: true });
+      }
+      return result;
+    } finally {
       if (this.contentSyncInFlight === promise) {
         this.contentSyncInFlight = null;
       }
-    });
-    return promise;
+    }
   }
 
-  private async runSyncContent(options?: { forceRefresh?: boolean }): Promise<SyncResult<ContentResponse>> {
+  private async runSyncContent(options?: {
+    forceRefresh?: boolean;
+    generation?: number;
+  }): Promise<SyncResult<ContentResponse>> {
     const forceRefresh = options?.forceRefresh === true;
+    const generation = options?.generation;
 
     this.updateState('content', { isLoading: true, error: null });
 
     try {
-      // Clear content cache before force-refresh so we never return stale data on network failure
+      // Clear SW + local caches before force-refresh (content:invalidate, startup, admin push).
       if (forceRefresh) {
+        await purgeApiServiceWorkerCaches();
         await apiClient.clearContentCache();
       }
       // No sync-status polling — fetch when called (daily fallback or WebSocket invalidation)
       const response = await apiClient.getContent(
         forceRefresh ? { cacheBust: true, forceNetwork: true } : undefined
       );
+
+      if (generation != null && generation !== this.contentFetchGeneration) {
+        logger.debug('[SyncService] Content sync result discarded (superseded by newer force-refresh)');
+        this.updateState('content', { isLoading: false, error: null });
+        return { success: false, error: 'superseded' };
+      }
 
       if (response.success && response.data) {
         this.updateState('content', {
@@ -427,6 +467,11 @@ class SyncService {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (generation != null && generation !== this.contentFetchGeneration) {
+        logger.debug('[SyncService] Content sync error discarded (superseded)', { error: errorMessage });
+        this.updateState('content', { isLoading: false, error: null });
+        return { success: false, error: 'superseded' };
+      }
       this.updateState('content', { isLoading: false, error: errorMessage });
       this.emitEvent('sync:error', { type: 'content', error: errorMessage });
       logger.error('[SyncService] Content sync failed', { error: errorMessage });
@@ -445,9 +490,15 @@ class SyncService {
     timezoneOverride?: string,
     options?: { forceRefresh?: boolean },
   ): Promise<SyncResult<PrayerTimesResponse>> {
+    const forceRefresh = options?.forceRefresh === true;
     if (this.prayerTimesSyncInFlight) {
-      logger.debug('[SyncService] Prayer times sync coalesced — awaiting in-flight');
-      return this.prayerTimesSyncInFlight;
+      if (forceRefresh) {
+        logger.debug('[SyncService] Prayer times force-refresh waiting for in-flight sync to finish');
+        await this.prayerTimesSyncInFlight.catch(() => undefined);
+      } else {
+        logger.debug('[SyncService] Prayer times sync coalesced — awaiting in-flight');
+        return this.prayerTimesSyncInFlight;
+      }
     }
 
     const promise = this.runSyncPrayerTimes(timezoneOverride, options);
@@ -514,9 +565,15 @@ class SyncService {
    * @param options.forceRefresh - Clear events cache and bypass stale HTTP cache (e.g. content:invalidate type events).
    */
   public async syncEvents(options?: { forceRefresh?: boolean }): Promise<SyncResult<EventsResponse>> {
+    const forceRefresh = options?.forceRefresh === true;
     if (this.eventsSyncInFlight) {
-      logger.debug('[SyncService] Events sync coalesced — awaiting in-flight');
-      return this.eventsSyncInFlight;
+      if (forceRefresh) {
+        logger.debug('[SyncService] Events force-refresh waiting for in-flight sync to finish');
+        await this.eventsSyncInFlight.catch(() => undefined);
+      } else {
+        logger.debug('[SyncService] Events sync coalesced — awaiting in-flight');
+        return this.eventsSyncInFlight;
+      }
     }
 
     const promise = this.runSyncEvents(options);

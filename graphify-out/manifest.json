@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/package.json": {
-    "mtime": 1778161768.2944229,
-    "ast_hash": "403fb451688ea90dd6718e91aedb7be9",
+    "mtime": 1781286397.0863695,
+    "ast_hash": "6c7ae794b425b01d12d7ade4afedffa3",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/vite-env.d.ts": {
@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/vite.config.ts": {
-    "mtime": 1778145250.1366277,
-    "ast_hash": "832427f22ec98f08024f4953af224dfd",
+    "mtime": 1781287439.9023232,
+    "ast_hash": "a1ba2036ff5685349ff88889c4eb8c6b",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/vitest.config.ts": {
@@ -465,8 +465,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/components/screens/DisplayScreen.tsx": {
-    "mtime": 1781258638.7105572,
-    "ast_hash": "14c46e2ca3a6c72c875102f52aae4643",
+    "mtime": 1781288419.255837,
+    "ast_hash": "04f3da710b27b4fe4d9e3330e25d5a56",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/components/screens/DisplayScreen.test.tsx": {
@@ -790,8 +790,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/services/syncService.ts": {
-    "mtime": 1774444009.1971703,
-    "ast_hash": "c3f23fb3ed8aa392d80ad746c91a6e04",
+    "mtime": 1781289602.0474935,
+    "ast_hash": "eec995b1d82d65c4bc949d2a9239bd89",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/services/networkStatusService.ts": {
@@ -800,8 +800,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/services/remoteControlService.ts": {
-    "mtime": 1780748941.2274868,
-    "ast_hash": "5368d8643a582be04494d8aecac65a2a",
+    "mtime": 1781287462.2797444,
+    "ast_hash": "0d4f01c66226dd7846fabd86d1a12efa",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/services/realtimeService.ts": {
@@ -850,8 +850,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/store/middleware/realtimeMiddleware.ts": {
-    "mtime": 1781179769.6050768,
-    "ast_hash": "e0beed2ae17433254edace67d25aa7b5",
+    "mtime": 1781289587.716813,
+    "ast_hash": "e3bfb871ed00a1eb008c3c4067544e78",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/store/middleware/emergencyMiddleware.ts": {
@@ -875,8 +875,8 @@
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/store/slices/contentSlice.ts": {
-    "mtime": 1781257543.0749831,
-    "ast_hash": "496fa9304bfb44b931f056e14c29cb79",
+    "mtime": 1781289615.7929435,
+    "ast_hash": "4e646d0fb1cc95b148d557425a6cf0c1",
     "semantic_hash": ""
   },
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/store/slices/uiSlice.ts": {
@@ -1457,6 +1457,31 @@
   "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/dev/prayerDisplayDevOverride.test.ts": {
     "mtime": 1781258045.4950066,
     "ast_hash": "e97a5da6beb8c5861304b625938329e4",
+    "semantic_hash": ""
+  },
+  "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/utils/purgeApiServiceWorkerCaches.test.ts": {
+    "mtime": 1781287463.7060003,
+    "ast_hash": "da05c591ae2c34486c81eb271e9f8696",
+    "semantic_hash": ""
+  },
+  "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/utils/purgeApiServiceWorkerCaches.ts": {
+    "mtime": 1781287435.9446814,
+    "ast_hash": "cd2abc4f5a52bcdd01dba55536ae3d54",
+    "semantic_hash": ""
+  },
+  "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/utils/contentInvalidationSchedule.ts": {
+    "mtime": 1781289586.222911,
+    "ast_hash": "0ff8db6fb0b66f895aaeba811be9fe69",
+    "semantic_hash": ""
+  },
+  "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/utils/unwrapScreenContent.ts": {
+    "mtime": 1781288338.446481,
+    "ast_hash": "8bd48dbb7c4a64136067739000830c0b",
+    "semantic_hash": ""
+  },
+  "/Users/tahmidhoque/Documents/projects/masjidconnect-display-app/src/utils/contentInvalidationSchedule.test.ts": {
+    "mtime": 1781289621.7665894,
+    "ast_hash": "e0a9320a2051335c265c46becee55d93",
     "semantic_hash": ""
   }
 }
