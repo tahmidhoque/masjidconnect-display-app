@@ -64,6 +64,8 @@ export interface UIState {
     signal: number;
     ip: string;
     hotspotActive: boolean;
+    ethernetConnected: boolean;
+    ethernetIp: string;
   } | null;
   showWifiSettings: boolean;
 

@@ -84,10 +84,36 @@ function nmcli(args, opts = {}) {
 }
 
 /**
+ * Returns Ethernet link state so the UI can distinguish "no WiFi adapter" from
+ * "Ethernet-only kiosk" (valid — do not show a WiFi warning when eth is up).
+ */
+function getEthernetStatus() {
+  const devLine = nmcli('-t -f DEVICE,TYPE,STATE dev', { allowFail: true });
+  for (const line of devLine.split('\n')) {
+    const [dev, type, state] = line.split(':');
+    if (type !== 'ethernet' || state !== 'connected' || !dev) continue;
+
+    let ethernetIp = '';
+    const details = nmcli(`-t -f IP4.ADDRESS dev show ${dev}`, { allowFail: true });
+    for (const detailLine of details.split('\n')) {
+      if (detailLine.startsWith('IP4.ADDRESS:')) {
+        ethernetIp = detailLine.slice('IP4.ADDRESS:'.length).trim().replace(/\/\d+$/, '');
+        break;
+      }
+    }
+
+    return { ethernetConnected: true, ethernetIp };
+  }
+
+  return { ethernetConnected: false, ethernetIp: '' };
+}
+
+/**
  * Returns current WiFi connection status: state, SSID, signal, IP, frequency.
  */
 function getWifiStatus() {
   const hotspotActive = existsSync(WIFI_HOTSPOT_ACTIVE_MARKER);
+  const ethernet = getEthernetStatus();
 
   // Get WiFi device state
   const devLine = nmcli('-t -f DEVICE,TYPE,STATE dev', { allowFail: true });
@@ -103,7 +129,7 @@ function getWifiStatus() {
   }
 
   if (!wifiDevice) {
-    return { state: 'no-adapter', ssid: '', signal: 0, ip: '', frequency: '', security: '', hotspotActive };
+    return { state: 'no-adapter', ssid: '', signal: 0, ip: '', frequency: '', security: '', hotspotActive, ...ethernet };
   }
 
   // Get active WiFi connection details
@@ -118,12 +144,12 @@ function getWifiStatus() {
   }
 
   if (!activeConName || wifiState !== 'connected') {
-    return { state: wifiState, ssid: '', signal: 0, ip: '', frequency: '', security: '', hotspotActive };
+    return { state: wifiState, ssid: '', signal: 0, ip: '', frequency: '', security: '', hotspotActive, ...ethernet };
   }
 
   // Get detailed info about the active connection
   const details = nmcli(`-t -f GENERAL.CONNECTION,WIFI.SSID,WIFI.SIGNAL,WIFI.FREQ,WIFI.SECURITY,IP4.ADDRESS dev show ${wifiDevice}`, { allowFail: true });
-  const info = { state: 'connected', ssid: '', signal: 0, ip: '', frequency: '', security: '', hotspotActive };
+  const info = { state: 'connected', ssid: '', signal: 0, ip: '', frequency: '', security: '', hotspotActive, ...ethernet };
 
   for (const line of details.split('\n')) {
     const idx = line.indexOf(':');

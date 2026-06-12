@@ -789,11 +789,7 @@ const DisplayScreenInner: React.FC = () => {
   const renderedZones: RenderedZone[] = orientationLayout.zones
     .filter((zone) => zone.visible)
     .map((zone) => {
-      const component = (
-        zone.component === 'prayer-strip' || zone.component === 'prayer-sidebar'
-          ? 'prayer-times'
-          : zone.component
-      ) as LayoutZoneComponent;
+      const component = zone.component;
       const entry = zoneRegistry[component];
       const region = inferZoneRegion(layoutStructure, component, zone.region);
       const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
