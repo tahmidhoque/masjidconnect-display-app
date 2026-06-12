@@ -148,8 +148,8 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
       ? 'flex-1 min-w-0'
       : 'prayer-cue-tile--vertical min-h-0 min-w-0';
 
-  const padClass =
-    orientation === 'horizontal' ? 'px-2 py-1' : 'px-1.5 py-1.5';
+  const isVertical = orientation === 'vertical';
+  const padClass = isVertical ? 'px-1 py-1' : 'px-2 py-1';
 
   return (
     <div
@@ -186,7 +186,7 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
 
       {isSunrise ? (
         <Sunrise
-          className={`text-gold/70 mt-0.5 shrink-0 ${orientation === 'vertical' ? 'prayer-cue-tile-sunrise' : 'w-6 h-6'}`}
+          className={`text-gold/70 mt-0.5 shrink-0 ${isVertical ? 'prayer-cue-tile-sunrise' : 'w-6 h-6'}`}
           aria-hidden
         />
       ) : prayer.jamaat ? (

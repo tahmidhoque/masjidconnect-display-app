@@ -43,6 +43,8 @@ interface PrayerTimesPanelProps {
   timeFormat?: TimeFormat;
   /** When true (portrait), use tighter spacing; when false, add more space below header row. */
   compact?: boolean;
+  /** Prayer-only layout — distribute rows to fill available height. */
+  fillHeight?: boolean;
   /** When true, show Tomorrow's Jamaat column after Jamaat. From displaySettings.showTomorrowJamaat. */
   showTomorrowJamaat?: boolean;
   /** Tomorrow's jamaat times by prayer name. Required when showTomorrowJamaat is true. */
@@ -83,6 +85,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   forbiddenPrayer = null,
   timeFormat = '12h',
   compact = false,
+  fillHeight = false,
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
 }) => {
@@ -130,8 +133,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   return (
     <div
       className={`flex flex-col flex-1 min-h-0 overflow-hidden px-4 ${
-        compact ? 'py-3' : 'pt-4 pb-1'
-      }`}
+        fillHeight ? 'py-3' : compact ? 'py-3' : 'pt-4 pb-1'
+      } ${fillHeight ? 'prayer-panel--focus' : ''}`}
     >
       {/* Header row — column labels above data; border below separates from prayer rows */}
       <div
@@ -153,7 +156,11 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-0.5 justify-start">
+      <div
+        className={`flex-1 min-h-0 flex flex-col ${
+          fillHeight ? 'justify-evenly gap-1' : 'gap-0.5 justify-start'
+        }`}
+      >
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
           const ramadanLabel = isRamadan && prayer.name === 'Maghrib' ? iftarLabel : undefined;
@@ -194,7 +201,8 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
               {/* Standard prayer row */}
               <div
                 className={`
-                  ${rowGridClass} px-3 py-1.5 rounded-lg transition-colors duration-normal
+                  ${rowGridClass} px-3 rounded-lg transition-colors duration-normal
+                  ${fillHeight ? 'py-2.5' : 'py-1.5'}
                   ${isNext ? 'bg-emerald/20 ring-1 ring-inset ring-emerald/30' : ''}
                 `}
               >

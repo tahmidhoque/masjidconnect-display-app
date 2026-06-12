@@ -9,13 +9,14 @@ export const DISPLAY_LAYOUT_CONFIG_VERSION = 1 as const;
 export const LAYOUT_ZONE_COMPONENTS = [
   'header',
   'prayer-panel',
-  'prayer-sidebar',
-  'prayer-strip',
+  'prayer-times',
   'jumuah-bar',
   'countdown',
   'content',
   'footer',
 ] as const;
+
+export type PrayerTimesLayout = 'strip' | 'sidebar';
 
 export type LayoutZoneComponent = (typeof LAYOUT_ZONE_COMPONENTS)[number];
 
@@ -41,6 +42,8 @@ export interface LayoutZoneHeaderOptions {
   showDate?: boolean;
   showHijriDate?: boolean;
   showMasjidName?: boolean;
+  /** Prayer times bar — embedded countdown (default true). */
+  showCountdown?: boolean;
 }
 
 export interface LayoutZone {
@@ -88,7 +91,7 @@ export const DEFAULT_LAYOUT_CONFIG: DisplayLayoutConfig = {
     spacingScale: 1,
     zones: [
       { id: 'zone-content', component: 'content', visible: true, size: 5, fontScale: 1 },
-      { id: 'zone-prayer-strip', component: 'prayer-strip', visible: true, size: 0, fontScale: 1 },
+      { id: 'zone-prayer-times', component: 'prayer-times', visible: true, size: 0, fontScale: 1 },
       { id: 'zone-footer', component: 'footer', visible: true, size: 0, fontScale: 1 },
     ],
   },
@@ -119,6 +122,10 @@ const HEX_COLOUR_RE = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+export function inferPrayerTimesLayout(region: LayoutRegion): PrayerTimesLayout {
+  return region === 'sidebar' ? 'sidebar' : 'strip';
+}
+
 export function inferZoneRegion(
   structure: LayoutStructure,
   component: LayoutZoneComponent,
@@ -126,14 +133,9 @@ export function inferZoneRegion(
 ): LayoutRegion {
   if (explicitRegion) return explicitRegion;
 
-  if (structure === 'sidebar-left' || structure === 'sidebar-right') {
-    if (component === 'header' || component === 'prayer-sidebar') return 'sidebar';
-    return 'main';
-  }
-
   if (structure === 'split-top') {
     if (
-      component === 'prayer-strip' ||
+      component === 'prayer-times' ||
       component === 'prayer-panel' ||
       component === 'jumuah-bar' ||
       component === 'header' ||
@@ -145,6 +147,61 @@ export function inferZoneRegion(
   }
 
   return 'main';
+}
+
+export function layoutHasVisibleContent(zones: LayoutZone[]): boolean {
+  return zones.some((zone) => zone.visible && zone.component === 'content');
+}
+
+export function isPrayerOnlyLayout(zones: LayoutZone[]): boolean {
+  const hasVisibleNonFooter = zones.some(
+    (zone) => zone.visible && zone.component !== 'footer',
+  );
+  return hasVisibleNonFooter && !layoutHasVisibleContent(zones);
+}
+
+export function layoutMainZonesEmpty(
+  zones: LayoutZone[],
+  structure: LayoutStructure,
+): boolean {
+  return !zones.some(
+    (zone) =>
+      zone.visible &&
+      zone.component !== 'footer' &&
+      inferZoneRegion(structure, zone.component, zone.region) === 'main',
+  );
+}
+
+export function resolvePrayerFocusZoneSize(
+  zone: LayoutZone,
+  zones: LayoutZone[],
+  structure: LayoutStructure,
+): number {
+  if (!isPrayerOnlyLayout(zones)) return zone.size;
+  if (zone.size > 0) return zone.size;
+
+  const region = inferZoneRegion(structure, zone.component, zone.region);
+
+  switch (zone.component) {
+    case 'prayer-panel':
+      return 10;
+    case 'prayer-times':
+      if (region === 'sidebar') return 1;
+      if (region === 'top-band') return 0;
+      return 6;
+    case 'countdown': {
+      const hasFlexiblePrayer = zones.some(
+        (entry) =>
+          entry.visible &&
+          (entry.component === 'prayer-panel' ||
+            (entry.component === 'prayer-times' &&
+              inferZoneRegion(structure, entry.component, entry.region) === 'main')),
+      );
+      return hasFlexiblePrayer ? 0 : 4;
+    }
+    default:
+      return 0;
+  }
 }
 
 function sanitiseStructure(raw: unknown): LayoutStructure {
@@ -173,11 +230,13 @@ function sanitiseStructureOptions(raw: unknown): LayoutStructureOptions | undefi
 function sanitiseZone(raw: unknown): LayoutZone | null {
   if (!raw || typeof raw !== 'object') return null;
   const zone = raw as Record<string, unknown>;
-  const component = zone.component;
-  if (
-    typeof component !== 'string' ||
-    !(LAYOUT_ZONE_COMPONENTS as readonly string[]).includes(component)
-  ) {
+  const rawComponent = zone.component;
+  if (typeof rawComponent !== 'string') return null;
+  const component =
+    rawComponent === 'prayer-strip' || rawComponent === 'prayer-sidebar'
+      ? 'prayer-times'
+      : rawComponent;
+  if (!(LAYOUT_ZONE_COMPONENTS as readonly string[]).includes(component)) {
     return null;
   }
   const regionRaw = zone.region;
@@ -195,13 +254,17 @@ function sanitiseZone(raw: unknown): LayoutZone | null {
     if (typeof opts.showDate === 'boolean') parsed.showDate = opts.showDate;
     if (typeof opts.showHijriDate === 'boolean') parsed.showHijriDate = opts.showHijriDate;
     if (typeof opts.showMasjidName === 'boolean') parsed.showMasjidName = opts.showMasjidName;
+    if (typeof opts.showCountdown === 'boolean') parsed.showCountdown = opts.showCountdown;
     if (Object.keys(parsed).length > 0) options = parsed;
   }
 
+  const typedComponent = component as LayoutZoneComponent;
+  const forceVisible = typedComponent === 'footer';
+
   return {
     id: typeof zone.id === 'string' && zone.id !== '' ? zone.id : `zone-${component}`,
-    component: component as LayoutZoneComponent,
-    visible: zone.visible !== false,
+    component: typedComponent,
+    visible: forceVisible ? true : zone.visible !== false,
     size:
       typeof zone.size === 'number' && Number.isFinite(zone.size)
         ? clamp(zone.size, 0, ZONE_SIZE_MAX)
@@ -224,13 +287,31 @@ function sanitiseOrientation(raw: unknown): OrientationLayoutConfig | null {
   const seenComponents = new Set<string>();
   for (const rawZone of orientation.zones) {
     const zone = sanitiseZone(rawZone);
-    if (!zone || seenComponents.has(zone.component)) continue;
+    if (!zone) continue;
+    if (seenComponents.has(zone.component)) continue;
     seenComponents.add(zone.component);
     zones.push(zone);
   }
 
-  const hasVisibleContent = zones.some((z) => z.component === 'content' && z.visible);
-  if (zones.length === 0 || !hasVisibleContent) return null;
+  if (!zones.some((z) => z.component === 'footer')) {
+    zones.push({
+      id: 'zone-footer',
+      component: 'footer',
+      visible: true,
+      size: 0,
+      fontScale: 1,
+    });
+  }
+
+  const hasVisibleFooter = zones.some((z) => z.component === 'footer' && z.visible);
+  const hasVisibleNonFooter = zones.some((z) => z.visible && z.component !== 'footer');
+  if (zones.length === 0 || !hasVisibleFooter || !hasVisibleNonFooter) return null;
+
+  const footerIndex = zones.findIndex((z) => z.component === 'footer');
+  if (footerIndex >= 0 && footerIndex !== zones.length - 1) {
+    const [footer] = zones.splice(footerIndex, 1);
+    zones.push(footer);
+  }
 
   return {
     structure: sanitiseStructure(orientation.structure),

@@ -40,6 +40,8 @@ export interface ZoneStackLayoutProps {
   zones: RenderedZone[];
   /** Multiplier on the orientation's base padding/gap. */
   spacingScale: number;
+  /** Prayer-only layout — no content carousel; prayer blocks expand to fill height. */
+  prayerOnly?: boolean;
   /** Optional background layer rendered behind everything. */
   background?: React.ReactNode;
   /** CSS-variable overrides for a custom theme (see utils/displayTheme). */
@@ -56,6 +58,7 @@ const ZoneStackLayout: React.FC<ZoneStackLayoutProps> = ({
   orientation,
   zones,
   spacingScale,
+  prayerOnly = false,
   background,
   themeStyle,
 }) => {
@@ -72,6 +75,7 @@ const ZoneStackLayout: React.FC<ZoneStackLayoutProps> = ({
     <div
       className="relative w-full h-full flex flex-col bg-midnight gpu-accelerated overflow-hidden"
       data-orientation={orientation}
+      data-prayer-only={prayerOnly ? 'true' : undefined}
       style={themeStyle}
     >
       {/* Background layer (e.g. subtle Islamic pattern) */}

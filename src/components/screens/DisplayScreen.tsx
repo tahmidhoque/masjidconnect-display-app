@@ -36,13 +36,17 @@ import type {
   LayoutZoneComponent,
   LayoutZoneHeaderOptions,
 } from '../../types/displayLayout';
-import { inferZoneRegion } from '../../types/displayLayout';
+import {
+  inferPrayerTimesLayout,
+  inferZoneRegion,
+  isPrayerOnlyLayout,
+  resolvePrayerFocusZoneSize,
+} from '../../types/displayLayout';
 import {
   Header,
   Footer,
   PrayerTimesPanel,
-  PrayerStrip,
-  PrayerSidebar,
+  PrayerTimesBar,
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
@@ -529,6 +533,7 @@ const DisplayScreenInner: React.FC = () => {
   const hasVisibleHeader = orientationLayout.zones.some(
     (zone) => zone.visible && zone.component === 'header',
   );
+  const prayerOnly = isPrayerOnlyLayout(orientationLayout.zones);
 
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
@@ -575,12 +580,17 @@ const DisplayScreenInner: React.FC = () => {
       forbiddenPrayer={forbiddenPrayer}
       timeFormat={timeFormat}
       compact={isPortrait}
+      fillHeight={prayerOnly}
       showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
       tomorrowsJamaats={tomorrowsJamaats}
     />
   );
   const countdown = (
-    <PrayerCountdown phase={prayerPhase} inPrayerSubPhase={inPrayerSubPhase} />
+    <PrayerCountdown
+      phase={prayerPhase}
+      inPrayerSubPhase={inPrayerSubPhase}
+      variant={prayerOnly && isPortrait ? 'default' : undefined}
+    />
   );
 
   /**
@@ -649,51 +659,40 @@ const DisplayScreenInner: React.FC = () => {
     [ramadan.isRamadan, layoutConfig.theme],
   );
 
-  const prayerSidebarSlot = (
-    <PrayerSidebar
-      hideClock={hasVisibleHeader}
-      masjidName={masjidName}
-      isRamadan={ramadan.isRamadan}
-      imsakTime={ramadan.imsakTime}
-      showImsak={displaySettings?.showImsak ?? false}
-      forbiddenPrayer={forbiddenPrayer}
-      timeFormat={timeFormat}
-      hijriDateAdjustment={hijriDateAdjustment}
-      showDate={defaultShowDate}
-      showHijriDate={defaultShowHijriDate}
-      showMasjidName={defaultShowMasjidName}
-      showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
-      tomorrowsJamaats={tomorrowsJamaats}
-      countdownSlot={
-        <PrayerCountdown
-          phase={prayerPhase}
-          inPrayerSubPhase={inPrayerSubPhase}
-          variant="strip"
-        />
-      }
-    />
-  );
-
-  const prayerStripSlot = (
-    <PrayerStrip
-      isRamadan={ramadan.isRamadan}
-      imsakTime={ramadan.imsakTime}
-      showImsak={displaySettings?.showImsak ?? false}
-      timeFormat={timeFormat}
-      hijriDateAdjustment={hijriDateAdjustment}
-      showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
-      tomorrowsJamaats={tomorrowsJamaats}
-      clockPosition={layoutStructureOptions?.stripClockPosition ?? 'left'}
-      hideClock={hasVisibleHeader}
-      countdownSlot={
-        <PrayerCountdown
-          phase={prayerPhase}
-          inPrayerSubPhase={inPrayerSubPhase}
-          variant="strip"
-        />
-      }
-    />
-  );
+  const buildPrayerTimesSlot = (zone: LayoutZone) => {
+    const region = inferZoneRegion(layoutStructure, 'prayer-times', zone.region);
+    const variant = inferPrayerTimesLayout(region);
+    const showEmbeddedCountdown = zone.options?.showCountdown !== false;
+    return (
+      <PrayerTimesBar
+        variant={variant}
+        fillHeight={prayerOnly && variant === 'strip'}
+        hideClock={hasVisibleHeader}
+        masjidName={masjidName}
+        isRamadan={ramadan.isRamadan}
+        imsakTime={ramadan.imsakTime}
+        showImsak={displaySettings?.showImsak ?? false}
+        forbiddenPrayer={forbiddenPrayer}
+        timeFormat={timeFormat}
+        hijriDateAdjustment={hijriDateAdjustment}
+        showDate={defaultShowDate}
+        showHijriDate={defaultShowHijriDate}
+        showMasjidName={defaultShowMasjidName}
+        showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+        tomorrowsJamaats={tomorrowsJamaats}
+        clockPosition={layoutStructureOptions?.stripClockPosition ?? 'left'}
+        countdownSlot={
+          showEmbeddedCountdown ? (
+            <PrayerCountdown
+              phase={prayerPhase}
+              inPrayerSubPhase={inPrayerSubPhase}
+              variant={variant === 'sidebar' ? 'sidebar' : 'strip'}
+            />
+          ) : null
+        }
+      />
+    );
+  };
 
   /**
    * Component registry: maps a zone's component type to its rendered node and
@@ -706,18 +705,19 @@ const DisplayScreenInner: React.FC = () => {
   > = {
     header: { node: null, label: 'Portrait clock and dates' },
     'prayer-panel': { node: prayerPanel, label: 'Prayer times' },
-    'prayer-sidebar': {
-      node: prayerSidebarSlot,
-      className: 'h-full min-h-0 flex flex-col',
-      label: 'Prayer times sidebar',
-    },
-    'prayer-strip': {
-      node: prayerStripSlot,
-      className: 'min-h-[8rem] max-h-[18rem]',
+    'prayer-times': {
+      node: null,
       label: 'Prayer times',
     },
-    'jumuah-bar': { node: <JumuahBar timeFormat={timeFormat} />, label: "Jumu'ah times" },
-    countdown: { node: countdown, label: 'Next prayer countdown' },
+    'jumuah-bar': {
+      node: <JumuahBar timeFormat={timeFormat} compact={!isPortrait} />,
+      label: "Jumu'ah times",
+    },
+    countdown: {
+      node: countdown,
+      className: prayerOnly ? 'prayer-countdown-focus shrink-0' : undefined,
+      label: 'Next prayer countdown',
+    },
     content: {
       node: contentSlot,
       className: 'relative overflow-visible',
@@ -734,16 +734,46 @@ const DisplayScreenInner: React.FC = () => {
   const renderedZones: RenderedZone[] = orientationLayout.zones
     .filter((zone) => zone.visible)
     .map((zone) => {
-      const entry = zoneRegistry[zone.component];
+      const component = (
+        zone.component === 'prayer-strip' || zone.component === 'prayer-sidebar'
+          ? 'prayer-times'
+          : zone.component
+      ) as LayoutZoneComponent;
+      const entry = zoneRegistry[component];
+      const region = inferZoneRegion(layoutStructure, component, zone.region);
+      const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
+      const effectiveSize = resolvePrayerFocusZoneSize(
+        zone,
+        orientationLayout.zones,
+        layoutStructure,
+      );
       const node =
-        zone.component === 'header' ? buildHeaderSlot(zone) : entry.node;
+        component === 'header'
+          ? buildHeaderSlot(zone)
+          : component === 'prayer-times'
+            ? buildPrayerTimesSlot(zone)
+            : entry.node;
+      let className = entry.className;
+      if (component === 'prayer-panel') {
+        className = prayerOnly
+          ? 'flex-1 min-h-0 flex flex-col prayer-panel--focus'
+          : className;
+      } else if (prayerVariant === 'sidebar') {
+        className = prayerOnly
+          ? 'h-full min-h-0 flex flex-col prayer-sidebar--focus'
+          : 'h-full min-h-0 flex flex-col';
+      } else if (prayerVariant === 'strip') {
+        className = prayerOnly
+          ? 'flex-1 min-h-0 flex flex-col prayer-strip--focus'
+          : 'min-h-[8rem] max-h-[18rem]';
+      }
       return {
         id: zone.id,
-        component: zone.component,
+        component,
         region: zone.region,
-        size: zone.size,
+        size: effectiveSize,
         fontScale: zone.fontScale,
-        className: entry.className,
+        className,
         label: entry.label,
         node,
       };
@@ -758,6 +788,7 @@ const DisplayScreenInner: React.FC = () => {
           structureOptions={layoutStructureOptions}
           zones={renderedZones}
           spacingScale={orientationLayout.spacingScale}
+          prayerOnly={prayerOnly}
           background={bg}
           themeStyle={themeStyle}
         />

@@ -21,6 +21,8 @@ export interface LayoutRendererProps {
   structureOptions?: LayoutStructureOptions;
   zones: RenderedZone[];
   spacingScale: number;
+  /** Prayer-only layout — no content carousel. */
+  prayerOnly?: boolean;
   background?: React.ReactNode;
   themeStyle?: React.CSSProperties;
 }
@@ -31,6 +33,11 @@ const BASE_SPACING = {
   landscape: { top: 1, x: 1, bottom: 0, gap: 0.5 },
   portrait: { top: 1.5, x: 1.5, bottom: 1.5, gap: 1 },
 } as const;
+
+/** Footer is fixed chrome — rendered below the structure row, not inside main/sidebar. */
+function isFooterChromeZone(zone: RenderedZone): boolean {
+  return zone.component === 'footer';
+}
 
 function partitionZones(
   zones: RenderedZone[],
@@ -99,12 +106,21 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
   structureOptions,
   zones,
   spacingScale,
+  prayerOnly = false,
   background,
   themeStyle,
 }) => {
+  const layoutZones = useMemo(
+    () => zones.filter((zone) => !isFooterChromeZone(zone)),
+    [zones],
+  );
+  const footerZones = useMemo(
+    () => zones.filter((zone) => isFooterChromeZone(zone)),
+    [zones],
+  );
   const partitioned = useMemo(
-    () => partitionZones(zones, structure),
-    [zones, structure],
+    () => partitionZones(layoutZones, structure),
+    [layoutZones, structure],
   );
 
   if (structure === 'stack') {
@@ -113,6 +129,7 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
         orientation={orientation}
         zones={zones}
         spacingScale={spacingScale}
+        prayerOnly={prayerOnly}
         background={background}
         themeStyle={themeStyle}
       />
@@ -123,11 +140,18 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
   const gapRem = base.gap * spacingScale;
   const sidebarWidth = structureOptions?.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH;
 
+  const mainEmpty = partitioned.main.length === 0;
+  const sidebarFullWidth = prayerOnly && mainEmpty && partitioned.sidebar.length > 0;
+  const expandTopBand = prayerOnly && mainEmpty && partitioned.topBand.length > 0;
+
   const stackStyle: React.CSSProperties = {
     paddingTop: `${base.top * spacingScale}rem`,
     paddingLeft: `${base.x * spacingScale}rem`,
     paddingRight: `${base.x * spacingScale}rem`,
-    paddingBottom: `${base.bottom * spacingScale}rem`,
+    paddingBottom:
+      footerZones.length > 0 && orientation === 'landscape'
+        ? `${0.25 * spacingScale}rem`
+        : `${base.bottom * spacingScale}rem`,
     gap: `${gapRem}rem`,
   };
 
@@ -136,6 +160,7 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
       className="relative w-full h-full flex flex-col bg-midnight gpu-accelerated overflow-hidden"
       data-orientation={orientation}
       data-structure={structure}
+      data-prayer-only={prayerOnly ? 'true' : undefined}
       style={themeStyle}
     >
       {background && (
@@ -151,8 +176,12 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
       >
         {structure === 'split-top' && (
           <>
-            <VerticalZoneList zones={partitioned.topBand} gapRem={gapRem} className="shrink-0" />
-            <VerticalZoneList zones={partitioned.main} gapRem={gapRem} className="flex-1" />
+            <VerticalZoneList
+              zones={partitioned.topBand}
+              gapRem={gapRem}
+              className={expandTopBand ? 'flex-1 min-h-0' : 'shrink-0'}
+            />
+            <VerticalZoneList zones={partitioned.main} gapRem={gapRem} className="flex-1 min-h-0" />
           </>
         )}
 
@@ -160,33 +189,39 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
           <div className="flex flex-row flex-1 min-h-0 min-w-0" style={{ gap: `${gapRem}rem` }}>
             {structure === 'sidebar-left' && partitioned.sidebar.length > 0 && (
               <aside
-                className="shrink-0 flex flex-col min-h-0 overflow-hidden"
+                className={`${sidebarFullWidth ? 'flex-1' : 'shrink-0'} flex flex-col min-h-0 overflow-hidden`}
                 style={{
-                  width: `${sidebarWidth * 100}%`,
-                  minWidth: partitioned.sidebar.some((z) => z.component === 'prayer-sidebar')
+                  width: sidebarFullWidth ? '100%' : `${sidebarWidth * 100}%`,
+                  minWidth: partitioned.sidebar.some((z) => z.component === 'prayer-times' || z.component === 'prayer-sidebar')
                     ? '16rem'
                     : '7rem',
                 }}
               >
-                <VerticalZoneList zones={partitioned.sidebar} gapRem={gapRem} className="h-full" />
+                <VerticalZoneList zones={partitioned.sidebar} gapRem={gapRem} className="flex-1 min-h-0" />
               </aside>
             )}
-            <VerticalZoneList zones={partitioned.main} gapRem={gapRem} className="flex-1" />
+            {!sidebarFullWidth && (
+              <VerticalZoneList zones={partitioned.main} gapRem={gapRem} className="flex-1 min-h-0" />
+            )}
             {structure === 'sidebar-right' && partitioned.sidebar.length > 0 && (
               <aside
-                className="shrink-0 flex flex-col min-h-0 overflow-hidden"
+                className={`${sidebarFullWidth ? 'flex-1' : 'shrink-0'} flex flex-col min-h-0 overflow-hidden`}
                 style={{
-                  width: `${sidebarWidth * 100}%`,
-                  minWidth: partitioned.sidebar.some((z) => z.component === 'prayer-sidebar')
+                  width: sidebarFullWidth ? '100%' : `${sidebarWidth * 100}%`,
+                  minWidth: partitioned.sidebar.some((z) => z.component === 'prayer-times' || z.component === 'prayer-sidebar')
                     ? '16rem'
                     : '7rem',
                 }}
               >
-                <VerticalZoneList zones={partitioned.sidebar} gapRem={gapRem} className="h-full" />
+                <VerticalZoneList zones={partitioned.sidebar} gapRem={gapRem} className="flex-1 min-h-0" />
               </aside>
             )}
           </div>
         )}
+
+        {footerZones.map((zone) => (
+          <ZoneCell key={zone.id} zone={zone} />
+        ))}
       </div>
     </div>
   );
