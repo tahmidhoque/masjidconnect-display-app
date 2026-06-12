@@ -53,7 +53,16 @@ import {
   JumuahBar,
   JamaatSoonSlot,
   InPrayerScreen,
+  SupplicationScreen,
+  PostJamaatSupplicationSlot,
+  JamaatBlackoutOverlay,
 } from '../display';
+import { POST_ADHAN_SUPPLICATION } from '@/constants/scheduledSupplications';
+import { isJamaatBlackoutMode } from '@/utils/displaySettingsSupplications';
+import {
+  PRAYER_DISPLAY_DEV_EVENT,
+  isJamaatBlackoutDevForced,
+} from '@/dev/prayerDisplayDevOverride';
 
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
@@ -503,7 +512,12 @@ const DisplayScreenInner: React.FC = () => {
   const isPortrait = isPortraitLayout(orientation);
 
   /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
-  const { phase: prayerPhase, prayerName: phasePrayerName, inPrayerSubPhase } = usePrayerPhase();
+  const {
+    phase: prayerPhase,
+    prayerName: phasePrayerName,
+    inPrayerSubPhase,
+    adhanSupplicationActive,
+  } = usePrayerPhase();
 
   /* ---- Jamaat buzzer: plays a short sound once when jamaat begins ---- */
   useJamaatBuzzer();
@@ -608,11 +622,35 @@ const DisplayScreenInner: React.FC = () => {
   const carouselKey = schedule
     ? `${schedule.id}-${schedule.items?.length ?? 0}-${lastContentUpdate ?? ''}-${lastScheduleUpdate ?? ''}`
     : 'no-schedule';
+  const [blackoutDevRevision, setBlackoutDevRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setBlackoutDevRevision((n) => n + 1);
+    window.addEventListener(PRAYER_DISPLAY_DEV_EVENT, bump);
+    return () => window.removeEventListener(PRAYER_DISPLAY_DEV_EVENT, bump);
+  }, []);
+
+  const jamaatBlackoutActive =
+    prayerPhase === 'in-prayer' &&
+    inPrayerSubPhase === 'jamaat' &&
+    (isJamaatBlackoutMode(displaySettings) ||
+      (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced()));
+
   const contentSlot = useMemo(() => {
+    if (adhanSupplicationActive) {
+      return (
+        <SupplicationScreen supplication={POST_ADHAN_SUPPLICATION} />
+      );
+    }
+
     switch (prayerPhase) {
       case 'jamaat-soon':
         return <JamaatSoonSlot landscapeSplit={!isPortrait} />;
       case 'in-prayer':
+        if (inPrayerSubPhase === 'post-jamaat-supplication') {
+          return (
+            <PostJamaatSupplicationSlot />
+          );
+        }
         // post-jamaat delay: jamaat has finished — return to carousel but keep prayer highlighted
         if (inPrayerSubPhase === 'post-jamaat') {
           return (
@@ -624,7 +662,13 @@ const DisplayScreenInner: React.FC = () => {
             />
           );
         }
-        // jamaat subphase: show calm "Jamaat in progress" screen
+        // jamaat subphase: blackout fills the viewport via overlay; slot stays black underneath
+        if (
+          isJamaatBlackoutMode(displaySettings) ||
+          (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced())
+        ) {
+          return <div className="h-full w-full bg-black" aria-hidden />;
+        }
         return (
           <InPrayerScreen
             prayerName={inPrayerScreenName}
@@ -642,7 +686,18 @@ const DisplayScreenInner: React.FC = () => {
           />
         );
     }
-  }, [prayerPhase, inPrayerScreenName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey, isPortrait]);
+  }, [
+    adhanSupplicationActive,
+    prayerPhase,
+    inPrayerScreenName,
+    inPrayerSubPhase,
+    displaySettings,
+    blackoutDevRevision,
+    carouselItems,
+    carouselInterval,
+    carouselKey,
+    isPortrait,
+  ]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
@@ -793,6 +848,7 @@ const DisplayScreenInner: React.FC = () => {
           themeStyle={themeStyle}
         />
       </ReferenceViewport>
+      {jamaatBlackoutActive ? <JamaatBlackoutOverlay /> : null}
     </OrientationWrapper>
   );
 };

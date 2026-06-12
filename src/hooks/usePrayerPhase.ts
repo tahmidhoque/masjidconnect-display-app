@@ -40,8 +40,14 @@ import { defaultMasjidTimezone } from '@/config/environment';
 import {
   jamaatPhaseMinutesForDisplayPrayer,
   postJamaatDelayMinutes,
+  postJamaatSupplicationWindowMinutes,
 } from '@/utils/displaySettingsJamaat';
+import { isPostAdhanSupplicationActive } from '@/utils/displaySettingsSupplications';
 import { getEffectiveJamaat } from '@/utils/jumuahJamaat';
+import {
+  PRAYER_DISPLAY_DEV_EVENT,
+  resolvePrayerDisplayDevOverride,
+} from '@/dev/prayerDisplayDevOverride';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -58,8 +64,15 @@ export interface PrayerPhaseData {
   phase: PrayerPhase;
   /** Name of the prayer this phase relates to (e.g. "Zuhr") */
   prayerName: string | null;
-  /** When phase is 'in-prayer': 'jamaat' = first A min, 'post-jamaat' = next B min (displaySettings). */
-  inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
+  /**
+   * When phase is 'in-prayer':
+   *   jamaat — jamaat in progress (or blackout)
+   *   post-jamaat-supplication — fixed dua after congregation
+   *   post-jamaat — carousel with prayer highlighted
+   */
+  inPrayerSubPhase?: 'jamaat' | 'post-jamaat-supplication' | 'post-jamaat';
+  /** Post-adhan supplication replaces carousel between adhan and jamaat-soon. */
+  adhanSupplicationActive?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -71,7 +84,7 @@ export interface PrayerPhaseData {
  * Independent of adhan: even when adhan == jamaat (or within this window),
  * the silent-phones graphic still fires for the full lead time.
  */
-const JAMAAT_LEAD_MIN = 5;
+export const JAMAAT_LEAD_MIN = 5;
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
@@ -102,18 +115,17 @@ export const usePrayerPhase = (): PrayerPhaseData => {
   const masjidTz =
     useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
 
-  /* ---- Dev force flag as reactive state ---- */
-  const [forceFlag, setForceFlag] = useState<PrayerPhase | undefined>(
-    () => window.__PRAYER_PHASE_FORCE,
-  );
+  /* ---- Dev overrides (keyboard shortcuts) — bump revision to re-run useMemo ---- */
+  const [devRevision, setDevRevision] = useState(0);
 
   useEffect(() => {
-    const handleForceChange = () => {
-      setForceFlag(window.__PRAYER_PHASE_FORCE);
+    const bumpDevRevision = () => setDevRevision((n) => n + 1);
+    window.addEventListener(PRAYER_PHASE_FORCE_EVENT, bumpDevRevision);
+    window.addEventListener(PRAYER_DISPLAY_DEV_EVENT, bumpDevRevision);
+    return () => {
+      window.removeEventListener(PRAYER_PHASE_FORCE_EVENT, bumpDevRevision);
+      window.removeEventListener(PRAYER_DISPLAY_DEV_EVENT, bumpDevRevision);
     };
-    window.addEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
-    return () =>
-      window.removeEventListener(PRAYER_PHASE_FORCE_EVENT, handleForceChange);
   }, []);
 
   /* ---- Defensive debug: log when current prayer has no jamaat (helps diagnose production) ---- */
@@ -134,11 +146,10 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
   /* ---- Phase calculation (single source of truth, anchored on J) ---- */
   const phaseData = useMemo((): PrayerPhaseData => {
-    // Dev override takes priority
-    if (forceFlag) {
-      const name = nextPrayer?.name ?? currentPrayer?.name ?? null;
-      return { phase: forceFlag, prayerName: name };
-    }
+    const devOverride = resolvePrayerDisplayDevOverride(
+      nextPrayer?.name ?? currentPrayer?.name ?? null,
+    );
+    if (devOverride) return devOverride;
 
     const defaultResult: PrayerPhaseData = {
       phase: 'countdown-adhan',
@@ -166,11 +177,18 @@ export const usePrayerPhase = (): PrayerPhaseData => {
         displaySettings,
         prayerName,
       );
-      const totalWindow = progress + delayMin;
+      const supplicationMin = postJamaatSupplicationWindowMinutes(displaySettings);
+      const totalWindow = progress + supplicationMin + delayMin;
       const elapsed = now - J;
       if (elapsed > totalWindow) return null;
-      const sub: 'jamaat' | 'post-jamaat' =
-        elapsed <= progress ? 'jamaat' : 'post-jamaat';
+      let sub: 'jamaat' | 'post-jamaat-supplication' | 'post-jamaat';
+      if (elapsed <= progress) {
+        sub = 'jamaat';
+      } else if (elapsed <= progress + supplicationMin) {
+        sub = 'post-jamaat-supplication';
+      } else {
+        sub = 'post-jamaat';
+      }
       return { phase: 'in-prayer', prayerName, inPrayerSubPhase: sub };
     };
 
@@ -237,7 +255,18 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     // 5) Adhan passed but more than the lead window remaining → countdown to jamaat.
     if (now >= Aeff && now < J - JAMAAT_LEAD_MIN) {
-      return { phase: 'countdown-jamaat', prayerName: nextPrayer.name };
+      const adhanSupplicationActive = isPostAdhanSupplicationActive(
+        displaySettings,
+        now,
+        Aeff,
+        J,
+        JAMAAT_LEAD_MIN,
+      );
+      return {
+        phase: 'countdown-jamaat',
+        prayerName: nextPrayer.name,
+        adhanSupplicationActive,
+      };
     }
 
     // 6) Default — counting down to adhan.
@@ -246,7 +275,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     nextPrayer,
     currentPrayer,
     currentTime,
-    forceFlag,
+    devRevision,
     displaySettings,
     masjidTz,
     isJumuahToday,
@@ -259,7 +288,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
    */
   const lastTransitionRef = useRef<string>('');
   useEffect(() => {
-    const key = `${phaseData.phase}|${phaseData.inPrayerSubPhase ?? ''}|${phaseData.prayerName ?? ''}`;
+    const key = `${phaseData.phase}|${phaseData.inPrayerSubPhase ?? ''}|${phaseData.adhanSupplicationActive ? 'adhan-dua' : ''}|${phaseData.prayerName ?? ''}`;
     if (lastTransitionRef.current === key) return;
     lastTransitionRef.current = key;
     const now = nowMinutesInTz(currentTime, masjidTz);

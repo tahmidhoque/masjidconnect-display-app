@@ -353,6 +353,25 @@ export interface DisplaySettings {
    */
   minutesAfterJamaatUntilNextPrayerBySalah?: Partial<Record<SalahKey, number>>;
 
+  /** Post-adhan supplication timing (text is fixed in the display app). */
+  postAdhanSupplication?: {
+    enabled: boolean;
+    /** Minutes after adhan before showing. Range 0–15. */
+    delayMinutes: number;
+    /** How long to show. Range 1–15. */
+    durationMinutes: number;
+  };
+
+  /** Post-jamaat supplication timing (text is fixed in the display app). */
+  postJamaatSupplication?: {
+    enabled: boolean;
+    /** How long to show after jamaat-in-progress ends. Range 1–15. */
+    durationMinutes: number;
+  };
+
+  /** During jamaat: `screen` = in-progress graphic, `dark` = full black overlay. */
+  jamaatInProgressMode?: 'screen' | 'dark';
+
   /**
    * Mosque-specific terminology overrides (admin-controlled).
    * When missing, the display app falls back to its existing FE strings.

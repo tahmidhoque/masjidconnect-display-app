@@ -30,7 +30,7 @@ interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
   phase?: PrayerPhase;
   /** When phase is 'in-prayer': 'jamaat' = first A min, 'post-jamaat' = next B min (portal displaySettings). */
-  inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
+  inPrayerSubPhase?: 'jamaat' | 'post-jamaat-supplication' | 'post-jamaat';
   /** Strip = horizontal split row; sidebar = stacked label + digits for narrow columns */
   variant?: 'default' | 'strip' | 'sidebar';
 }
@@ -218,7 +218,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     // post-jamaat: jamaat has finished — show "[prayerName] prayer" static (no countdown, no in-progress)
     // jamaat: show "Jamaat in progress"
     const statusText =
-      inPrayerSubPhase === 'post-jamaat'
+      inPrayerSubPhase === 'post-jamaat' || inPrayerSubPhase === 'post-jamaat-supplication'
         ? 'prayer'
         : `${jamaatLabel} in progress`;
     return (

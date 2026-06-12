@@ -107,6 +107,16 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   minutesAfterJamaatUntilNextPrayer: 10,
   defaultJamaatInProgressMinutes: 10,
   minutesAfterJamaatUntilNextPrayerBySalah: {},
+  postAdhanSupplication: {
+    enabled: false,
+    delayMinutes: 0,
+    durationMinutes: 3,
+  },
+  postJamaatSupplication: {
+    enabled: false,
+    durationMinutes: 3,
+  },
+  jamaatInProgressMode: 'screen',
 };
 
 // Debounce map to prevent rapid successive calls

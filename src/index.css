@@ -645,6 +645,103 @@ html, body {
   word-break: break-word;
 }
 
+/* Scheduled supplications — centred Arabic + grouped Latin (post-jamaat / post-adhan) */
+.supplication-screen__stack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 100%;
+  padding: clamp(0.5rem, 1rem, 1.5rem) clamp(0.75rem, 1.5rem, 2.5rem);
+}
+
+.supplication-screen__arabic-block {
+  display: flex;
+  width: 100%;
+  max-width: 52rem;
+  justify-content: center;
+  padding-bottom: clamp(0.6rem, 0.95rem, 1.15rem);
+}
+
+/* Do not use `.arabic-text` here — it forces text-align:right and breaks centre layout */
+.supplication-screen__arabic {
+  width: 100%;
+  font-family: var(--font-arabic);
+  direction: rtl;
+  text-align: center;
+  font-size: clamp(1.85rem, 3rem, 4rem);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--color-gold);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: balance;
+}
+
+.supplication-screen__divider {
+  width: min(11rem, 38%);
+  height: 1px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-gold) 35%, transparent);
+  margin-bottom: clamp(0.6rem, 0.95rem, 1.15rem);
+}
+
+.supplication-screen__latin-block {
+  display: flex;
+  width: 100%;
+  max-width: 42rem;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.35rem, 0.6rem, 0.8rem);
+  text-align: center;
+}
+
+.supplication-screen__transliteration {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: clamp(0.95rem, 1.3rem, 1.6rem);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.supplication-screen__translation {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: clamp(1.05rem, 1.55rem, 2rem);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: balance;
+}
+
+.supplication-screen__reference {
+  margin-top: clamp(0.7rem, 1.1rem, 1.35rem);
+  font-family: var(--font-sans);
+  font-size: clamp(0.65rem, 0.8rem, 0.95rem);
+  line-height: 1.3;
+  font-style: italic;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.supplication-screen--compact .supplication-screen__arabic {
+  font-size: clamp(1.3rem, 2.1rem, 2.75rem);
+  line-height: 1.42;
+}
+
+.supplication-screen--compact .supplication-screen__translation {
+  font-size: clamp(0.9rem, 1.3rem, 1.7rem);
+  line-height: 1.35;
+}
+
 /* Countdown digits — prominent, legible from distance (portrait panel only; strip uses .text-countdown-strip-digits). */
 .text-countdown {
   font-size: clamp(2.1rem, 3.25rem, 4.25rem);
