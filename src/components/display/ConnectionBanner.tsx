@@ -30,6 +30,7 @@ import {
   selectUpdateMessage,
   selectUpdateRestartAt,
 } from '../../store/slices/uiSlice';
+import { shouldSuppressWifiWarning } from '../../utils/connectionBannerLogic';
 
 /** Delay before showing the banner to prevent startup flash */
 const DISPLAY_DELAY_MS = 5_000;
@@ -118,7 +119,9 @@ const ConnectionBanner: React.FC = () => {
       };
     }
 
-    // WiFi-specific states (Pi only)
+    // WiFi-specific states (Pi only). Skip when Ethernet or app connectivity is healthy.
+    const suppressWifiWarning = shouldSuppressWifiWarning(status, wifiStatus);
+
     if (isPiPlatform && wifiStatus) {
       if (wifiStatus.hotspotActive) {
         return {
@@ -128,15 +131,15 @@ const ConnectionBanner: React.FC = () => {
         };
       }
 
-      if (wifiStatus.state === 'no-adapter') {
+      if (!suppressWifiWarning && wifiStatus.state === 'no-adapter') {
         return {
           variant: 'red',
           icon: <WifiOff className={iconSize} />,
-          message: 'No WiFi adapter detected. Connect via Ethernet',
+          message: 'No network adapter detected — connect via Ethernet',
         };
       }
 
-      if (wifiStatus.state === 'disconnected' || wifiStatus.state === 'unavailable') {
+      if (!suppressWifiWarning && (wifiStatus.state === 'disconnected' || wifiStatus.state === 'unavailable')) {
         return {
           variant: 'red',
           icon: <WifiOff className={iconSize} />,
@@ -144,7 +147,7 @@ const ConnectionBanner: React.FC = () => {
         };
       }
 
-      if (wifiStatus.signal > 0 && wifiStatus.signal < 30) {
+      if (!suppressWifiWarning && wifiStatus.signal > 0 && wifiStatus.signal < 30) {
         return {
           variant: 'orange',
           icon: <AlertTriangle className={iconSize} />,

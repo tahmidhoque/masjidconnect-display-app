@@ -35,6 +35,8 @@ const useWifiStatus = (): void => {
         signal: data.signal || 0,
         ip: data.ip || '',
         hotspotActive: data.hotspotActive === true,
+        ethernetConnected: data.ethernetConnected === true,
+        ethernetIp: data.ethernetIp || '',
       }));
     } catch {
       // Endpoint unavailable (non-Pi or server not running) — clear status silently
