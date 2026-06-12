@@ -95,4 +95,14 @@ describe("totalJamaatPhaseWindowForDisplayPrayer", () => {
     expect(totalJamaatPhaseWindowForDisplayPrayer(s, "Asr")).toBe(32);
     expect(totalJamaatPhaseWindowForDisplayPrayer(s, "Fajr")).toBe(20);
   });
+
+  it("includes post-jamaat supplication duration when enabled", () => {
+    const s = {
+      ...baseSettings(),
+      defaultJamaatInProgressMinutes: 10,
+      minutesAfterJamaatUntilNextPrayer: 10,
+      postJamaatSupplication: { enabled: true, durationMinutes: 5 },
+    };
+    expect(totalJamaatPhaseWindowForDisplayPrayer(s, "Fajr")).toBe(25);
+  });
 });

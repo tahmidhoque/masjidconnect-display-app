@@ -328,6 +328,12 @@ export interface DisplaySettings {
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */
   showTomorrowJamaat: boolean;
+  /** Show Gregorian date in the clock / header area */
+  showDate?: boolean;
+  /** Show Hijri (Islamic) date in the clock / header area */
+  showHijriDate?: boolean;
+  /** Show masjid name in the clock / header area */
+  showMasjidName?: boolean;
   /** Minutes before Fajr for imsak/sehri. Use to compute imsak on the fly when pt.imsak is null. */
   imsakOffset: number;
   /** Days to add to the calculated Hijri date (e.g. +1 if API/local calc is 1 day behind). */
@@ -346,6 +352,25 @@ export interface DisplaySettings {
    * Per-salah overrides for "Jamaat in progress" duration (minutes, 5–30). Omitted keys use defaultJamaatInProgressMinutes.
    */
   minutesAfterJamaatUntilNextPrayerBySalah?: Partial<Record<SalahKey, number>>;
+
+  /** Post-adhan supplication timing (text is fixed in the display app). */
+  postAdhanSupplication?: {
+    enabled: boolean;
+    /** Minutes after adhan before showing. Range 0–15. */
+    delayMinutes: number;
+    /** How long to show. Range 1–15. */
+    durationMinutes: number;
+  };
+
+  /** Post-jamaat supplication timing (text is fixed in the display app). */
+  postJamaatSupplication?: {
+    enabled: boolean;
+    /** How long to show after jamaat-in-progress ends. Range 1–15. */
+    durationMinutes: number;
+  };
+
+  /** During jamaat: `screen` = in-progress graphic, `dark` = full black overlay. */
+  jamaatInProgressMode?: 'screen' | 'dark';
 
   /**
    * Mosque-specific terminology overrides (admin-controlled).
@@ -494,6 +519,8 @@ export interface ScreenContent {
   lastUpdated: string;
   /** Display settings from admin portal (screen customisation). Bundled in content API response. */
   displaySettings?: DisplaySettings;
+  /** Display layout template (zones, ratios, theme) from the admin layout editor. Null = built-in layout. */
+  layout?: import("../types/displayLayout").ScreenLayoutPayload | null;
   // New fields for the updated API format
   data?: {
     masjid?: {
@@ -518,6 +545,7 @@ export interface ScreenContent {
     events?: Event[] | { data: Event[] };
     scheduledPlaylists?: ScheduledPlaylistAssignment[];
     displaySettings?: DisplaySettings;
+    layout?: import("../types/displayLayout").ScreenLayoutPayload | null;
   };
   events?: Event[] | { data: Event[] };
 }

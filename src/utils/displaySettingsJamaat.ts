@@ -4,6 +4,7 @@
  */
 
 import type { DisplaySettings, SalahKey } from "@/api/models";
+import { postJamaatSupplicationDurationMinutes } from "@/utils/displaySettingsSupplications";
 
 const DEFAULT_MINUTES = 10;
 
@@ -61,11 +62,22 @@ export function prayerNameToSalahKey(displayName: string): SalahKey | null {
 /**
  * Resolves A + B total in-prayer window (minutes from scheduled jamaat time).
  */
+export function postJamaatSupplicationWindowMinutes(
+  settings: DisplaySettings | null | undefined,
+): number {
+  if (settings?.postJamaatSupplication?.enabled !== true) return 0;
+  return postJamaatSupplicationDurationMinutes(settings);
+}
+
 export function totalJamaatPhaseWindowMinutes(
   settings: DisplaySettings | null | undefined,
   salahKey: SalahKey,
 ): number {
-  return jamaatPhaseMinutesForSalah(settings, salahKey) + postJamaatDelayMinutes(settings);
+  return (
+    jamaatPhaseMinutesForSalah(settings, salahKey) +
+    postJamaatSupplicationWindowMinutes(settings) +
+    postJamaatDelayMinutes(settings)
+  );
 }
 
 /**
@@ -90,5 +102,9 @@ export function totalJamaatPhaseWindowForDisplayPrayer(
   settings: DisplaySettings | null | undefined,
   displayName: string,
 ): number {
-  return jamaatPhaseMinutesForDisplayPrayer(settings, displayName) + postJamaatDelayMinutes(settings);
+  return (
+    jamaatPhaseMinutesForDisplayPrayer(settings, displayName) +
+    postJamaatSupplicationWindowMinutes(settings) +
+    postJamaatDelayMinutes(settings)
+  );
 }

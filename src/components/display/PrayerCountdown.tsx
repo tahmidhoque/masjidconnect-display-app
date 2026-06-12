@@ -30,9 +30,9 @@ interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
   phase?: PrayerPhase;
   /** When phase is 'in-prayer': 'jamaat' = first A min, 'post-jamaat' = next B min (portal displaySettings). */
-  inPrayerSubPhase?: 'jamaat' | 'post-jamaat';
-  /** When "strip", render centred below prayer cards in the landscape prayer strip */
-  variant?: 'default' | 'strip';
+  inPrayerSubPhase?: 'jamaat' | 'post-jamaat-supplication' | 'post-jamaat';
+  /** Strip = horizontal split row; sidebar = stacked label + digits for narrow columns */
+  variant?: 'default' | 'strip' | 'sidebar';
 }
 
 /**
@@ -175,42 +175,50 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   }
 
   const isStrip = variant === 'strip';
+  const isSidebar = variant === 'sidebar';
   /**
-   * Strip layout: 2-col grid with label flush right and digits flush left, meeting at the centre.
-   * Portrait layout: inline flex centred as one text block — label and digits share a baseline
-   *   so they read as a single phrase ("Maghrib Jamaat in 12m 34s"). Width-stability is provided
-   *   by `.countdown-stable` (min-width: 12ch, text-align: center) so the centred group does not
-   *   jitter as the digits tick.
+   * Strip: 2-col grid — label right, digits left at the centre split.
+   * Sidebar: stacked centred block for narrow columns (scoped type in `.prayer-sidebar-countdown`).
+   * Portrait/default: inline flex centred as one phrase.
    */
-  /** `prayer-countdown-row` scopes CSS overrides for `.countdown-stable` (min-width / alignment) on the strip. */
   const splitGridClass =
     'prayer-countdown-row grid grid-cols-2 w-full max-w-full min-w-0 items-center gap-x-4';
+  const sidebarStackClass =
+    'prayer-countdown-sidebar flex flex-col items-center justify-center w-full max-w-full min-w-0 text-center gap-0.5';
   const portraitRowClass =
     'prayer-countdown-portrait flex w-full max-w-full min-w-0 items-center justify-center flex-nowrap gap-x-3 whitespace-nowrap';
-  const outerClass = isStrip
-    ? splitGridClass
-    : `countdown-container ${portraitRowClass}`;
+  const outerClass = isSidebar
+    ? sidebarStackClass
+    : isStrip
+      ? splitGridClass
+      : `countdown-container ${portraitRowClass}`;
 
-  const labelClass = isStrip
-    ? 'text-countdown-strip-label text-text-primary uppercase font-bold tracking-wider text-right min-w-0'
-    : 'prayer-countdown-label text-text-secondary uppercase font-semibold tracking-wider';
-  const digitsClass = isStrip
+  const labelClass = isSidebar
+    ? 'text-countdown-strip-label text-text-primary uppercase font-bold tracking-wider'
+    : isStrip
+      ? 'text-countdown-strip-label text-text-primary uppercase font-bold tracking-wider text-right min-w-0'
+      : 'prayer-countdown-label text-text-secondary uppercase font-semibold tracking-wider';
+  const digitsClass = isSidebar || isStrip
     ? 'text-countdown-strip-digits text-gold font-extrabold'
     : 'text-countdown text-gold';
 
-  const inPrayerLabelClass = isStrip
-    ? 'text-countdown-strip-label text-text-muted uppercase font-bold text-right min-w-0'
-    : 'prayer-countdown-label text-text-muted uppercase font-medium tracking-wider';
-  const inPrayerValueClass = isStrip
-    ? 'text-countdown-strip-label font-bold text-text-primary text-left min-w-0'
-    : 'prayer-countdown-status font-bold text-text-primary';
+  const inPrayerLabelClass = isSidebar
+    ? 'text-countdown-strip-label text-text-muted uppercase font-bold'
+    : isStrip
+      ? 'text-countdown-strip-label text-text-muted uppercase font-bold text-right min-w-0'
+      : 'prayer-countdown-label text-text-muted uppercase font-medium tracking-wider';
+  const inPrayerValueClass = isSidebar
+    ? 'text-countdown-strip-label font-bold text-text-primary'
+    : isStrip
+      ? 'text-countdown-strip-label font-bold text-text-primary text-left min-w-0'
+      : 'prayer-countdown-status font-bold text-text-primary';
 
   /* ---- In-prayer: name in left half, status in right half (same midline as countdown) ---- */
   if (phase === 'in-prayer') {
     // post-jamaat: jamaat has finished — show "[prayerName] prayer" static (no countdown, no in-progress)
     // jamaat: show "Jamaat in progress"
     const statusText =
-      inPrayerSubPhase === 'post-jamaat'
+      inPrayerSubPhase === 'post-jamaat' || inPrayerSubPhase === 'post-jamaat-supplication'
         ? 'prayer'
         : `${jamaatLabel} in progress`;
     return (
@@ -225,7 +233,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     <div className={outerClass}>
       <span className={labelClass}>{countdownLabel}</span>
       {liveCountdown ? (
-        <span className={`${digitsClass} ${isStrip ? 'text-left min-w-0' : ''}`}>
+        <span className={`${digitsClass} ${isStrip ? 'text-left min-w-0' : ''} ${isSidebar ? 'leading-none' : ''}`}>
           <CountdownDisplay value={liveCountdown} className={digitsClass} />
         </span>
       ) : (

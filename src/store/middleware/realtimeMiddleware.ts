@@ -90,6 +90,7 @@ const VALID_INVALIDATION_TYPES: Array<ContentInvalidationPayload['type']> = [
   'playlist_assignment',
   'events',
   'display_settings',
+  'display_layout',
 ];
 
 export const realtimeMiddleware: Middleware = (api: any) => {
@@ -307,6 +308,10 @@ export const realtimeMiddleware: Middleware = (api: any) => {
                 case 'display_settings':
                   await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
                   await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
+                  break;
+                case 'display_layout':
+                  // Layout config travels inside screen content — one refetch re-renders the layout.
+                  await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
                   break;
                 case 'schedule':
                 case 'schedule_assignment':

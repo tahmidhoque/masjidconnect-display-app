@@ -28,26 +28,48 @@ import { selectMasjidName } from '../../store/slices/contentSlice';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
 import { orientationToLayoutMode, isPortraitLayout, parseScreenOrientation } from '../../utils/orientation';
-import { LandscapeLayout, PortraitLayout, OrientationWrapper, ReferenceViewport } from '../layout';
+import { LayoutRenderer, OrientationWrapper, ReferenceViewport } from '../layout';
+import type { RenderedZone } from '../layout';
+import { buildThemeStyle } from '../../utils/displayTheme';
+import type {
+  LayoutZone,
+  LayoutZoneComponent,
+  LayoutZoneHeaderOptions,
+} from '../../types/displayLayout';
+import {
+  inferPrayerTimesLayout,
+  inferZoneRegion,
+  isPrayerOnlyLayout,
+  resolvePrayerFocusZoneSize,
+} from '../../types/displayLayout';
 import {
   Header,
   Footer,
   PrayerTimesPanel,
-  PrayerStrip,
+  PrayerTimesBar,
   PrayerCountdown,
   ContentCarousel,
   IslamicPattern,
   JumuahBar,
   JamaatSoonSlot,
   InPrayerScreen,
+  SupplicationScreen,
+  PostJamaatSupplicationSlot,
+  JamaatBlackoutOverlay,
 } from '../display';
+import { POST_ADHAN_SUPPLICATION } from '@/constants/scheduledSupplications';
+import { isJamaatBlackoutMode } from '@/utils/displaySettingsSupplications';
+import {
+  PRAYER_DISPLAY_DEV_EVENT,
+  isJamaatBlackoutDevForced,
+} from '@/dev/prayerDisplayDevOverride';
 
 import useRamadanMode from '../../hooks/useRamadanMode';
 import usePrayerPhase from '../../hooks/usePrayerPhase';
 import useJamaatBuzzer from '../../hooks/useJamaatBuzzer';
 import { PrayerTimesProvider, usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import useScheduledPlaylist from '../../hooks/useScheduledPlaylist';
-import { selectTimeFormat, selectDisplaySettings } from '../../store/slices/contentSlice';
+import { selectTimeFormat, selectDisplaySettings, selectDisplayLayoutConfig } from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag } from '../../utils/mediaSlide';
 import { resolveTerminology } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
@@ -490,7 +512,12 @@ const DisplayScreenInner: React.FC = () => {
   const isPortrait = isPortraitLayout(orientation);
 
   /* ---- Prayer phase (jamaat-soon, in-prayer, etc.) ---- */
-  const { phase: prayerPhase, prayerName: phasePrayerName, inPrayerSubPhase } = usePrayerPhase();
+  const {
+    phase: prayerPhase,
+    prayerName: phasePrayerName,
+    inPrayerSubPhase,
+    adhanSupplicationActive,
+  } = usePrayerPhase();
 
   /* ---- Jamaat buzzer: plays a short sound once when jamaat begins ---- */
   useJamaatBuzzer();
@@ -512,21 +539,51 @@ const DisplayScreenInner: React.FC = () => {
       ? resolveTerminology(displaySettings?.terminology, 'jummah', 'Jumuah')
       : phasePrayerName;
 
+  /* ---- Layout config (admin layout editor; falls back to built-in default) ---- */
+  const layoutConfig = useAppSelector(selectDisplayLayoutConfig);
+  const orientationLayout = isPortrait ? layoutConfig.portrait : layoutConfig.landscape;
+  const layoutStructure = orientationLayout.structure ?? 'stack';
+  const layoutStructureOptions = orientationLayout.structureOptions;
+  const hasVisibleHeader = orientationLayout.zones.some(
+    (zone) => zone.visible && zone.component === 'header',
+  );
+  const prayerOnly = isPrayerOnlyLayout(orientationLayout.zones);
+
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
-  const headerSlot = (
-    <Header
-      key={`header-hijri-${hijriDateAdjustment}`}
-      masjidName={masjidName}
-      compact={!isPortrait}
-      isRamadan={ramadan.isRamadan}
-      ramadanDay={ramadan.ramadanDay}
-      ramadanTwoLines={isPortrait}
-      showClockSeconds={!isPortrait}
-      timeFormat={timeFormat}
-      hijriDateAdjustment={hijriDateAdjustment}
-    />
-  );
+
+  const defaultShowDate = displaySettings?.showDate ?? true;
+  const defaultShowHijriDate = displaySettings?.showHijriDate ?? true;
+  const defaultShowMasjidName = displaySettings?.showMasjidName ?? false;
+
+  const resolveHeaderFlags = (options?: LayoutZoneHeaderOptions) => ({
+    showDate: options?.showDate ?? defaultShowDate,
+    showHijriDate: options?.showHijriDate ?? defaultShowHijriDate,
+    showMasjidName: options?.showMasjidName ?? defaultShowMasjidName,
+  });
+
+  const buildHeaderSlot = (zone: LayoutZone) => {
+    const region = inferZoneRegion(layoutStructure, 'header', zone.region);
+    const inSidebar = region === 'sidebar';
+    const flags = resolveHeaderFlags(zone.options);
+    return (
+      <Header
+        key={`header-${zone.id}-${hijriDateAdjustment}`}
+        masjidName={masjidName}
+        showMasjidName={flags.showMasjidName}
+        showDate={flags.showDate}
+        showHijriDate={flags.showHijriDate}
+        compact={!isPortrait && inSidebar}
+        isRamadan={ramadan.isRamadan}
+        ramadanDay={ramadan.ramadanDay}
+        ramadanTwoLines={isPortrait}
+        showClockSeconds={!isPortrait && !inSidebar}
+        timeFormat={timeFormat}
+        hijriDateAdjustment={hijriDateAdjustment}
+        layout={inSidebar ? 'vertical' : 'horizontal'}
+      />
+    );
+  };
 
   const footerSlot = <Footer />;
   const prayerPanel = (
@@ -537,12 +594,17 @@ const DisplayScreenInner: React.FC = () => {
       forbiddenPrayer={forbiddenPrayer}
       timeFormat={timeFormat}
       compact={isPortrait}
+      fillHeight={prayerOnly}
       showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
       tomorrowsJamaats={tomorrowsJamaats}
     />
   );
   const countdown = (
-    <PrayerCountdown phase={prayerPhase} inPrayerSubPhase={inPrayerSubPhase} />
+    <PrayerCountdown
+      phase={prayerPhase}
+      inPrayerSubPhase={inPrayerSubPhase}
+      variant={prayerOnly && isPortrait ? 'default' : undefined}
+    />
   );
 
   /**
@@ -560,11 +622,35 @@ const DisplayScreenInner: React.FC = () => {
   const carouselKey = schedule
     ? `${schedule.id}-${schedule.items?.length ?? 0}-${lastContentUpdate ?? ''}-${lastScheduleUpdate ?? ''}`
     : 'no-schedule';
+  const [blackoutDevRevision, setBlackoutDevRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setBlackoutDevRevision((n) => n + 1);
+    window.addEventListener(PRAYER_DISPLAY_DEV_EVENT, bump);
+    return () => window.removeEventListener(PRAYER_DISPLAY_DEV_EVENT, bump);
+  }, []);
+
+  const jamaatBlackoutActive =
+    prayerPhase === 'in-prayer' &&
+    inPrayerSubPhase === 'jamaat' &&
+    (isJamaatBlackoutMode(displaySettings) ||
+      (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced()));
+
   const contentSlot = useMemo(() => {
+    if (adhanSupplicationActive) {
+      return (
+        <SupplicationScreen supplication={POST_ADHAN_SUPPLICATION} />
+      );
+    }
+
     switch (prayerPhase) {
       case 'jamaat-soon':
         return <JamaatSoonSlot landscapeSplit={!isPortrait} />;
       case 'in-prayer':
+        if (inPrayerSubPhase === 'post-jamaat-supplication') {
+          return (
+            <PostJamaatSupplicationSlot />
+          );
+        }
         // post-jamaat delay: jamaat has finished — return to carousel but keep prayer highlighted
         if (inPrayerSubPhase === 'post-jamaat') {
           return (
@@ -576,7 +662,13 @@ const DisplayScreenInner: React.FC = () => {
             />
           );
         }
-        // jamaat subphase: show calm "Jamaat in progress" screen
+        // jamaat subphase: blackout fills the viewport via overlay; slot stays black underneath
+        if (
+          isJamaatBlackoutMode(displaySettings) ||
+          (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced())
+        ) {
+          return <div className="h-full w-full bg-black" aria-hidden />;
+        }
         return (
           <InPrayerScreen
             prayerName={inPrayerScreenName}
@@ -594,58 +686,169 @@ const DisplayScreenInner: React.FC = () => {
           />
         );
     }
-  }, [prayerPhase, inPrayerScreenName, inPrayerSubPhase, carouselItems, carouselInterval, carouselKey, isPortrait]);
+  }, [
+    adhanSupplicationActive,
+    prayerPhase,
+    inPrayerScreenName,
+    inPrayerSubPhase,
+    displaySettings,
+    blackoutDevRevision,
+    carouselItems,
+    carouselInterval,
+    carouselKey,
+    isPortrait,
+  ]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
   const bg = <IslamicPattern />;
 
-  const countdownSlot = countdown;
-
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
+
+  /**
+   * Custom theme colours (CSS-variable overrides on the layout root).
+   * Skipped while Ramadan mode is active — the seasonal green/gold palette
+   * (html[data-theme="ramadan"]) takes precedence over mosque customisation.
+   */
+  const themeStyle = useMemo(
+    () => (ramadan.isRamadan ? undefined : buildThemeStyle(layoutConfig.theme)),
+    [ramadan.isRamadan, layoutConfig.theme],
+  );
+
+  const buildPrayerTimesSlot = (zone: LayoutZone) => {
+    const region = inferZoneRegion(layoutStructure, 'prayer-times', zone.region);
+    const variant = inferPrayerTimesLayout(region);
+    const showEmbeddedCountdown = zone.options?.showCountdown !== false;
+    return (
+      <PrayerTimesBar
+        variant={variant}
+        fillHeight={prayerOnly && variant === 'strip'}
+        hideClock={hasVisibleHeader}
+        masjidName={masjidName}
+        isRamadan={ramadan.isRamadan}
+        imsakTime={ramadan.imsakTime}
+        showImsak={displaySettings?.showImsak ?? false}
+        forbiddenPrayer={forbiddenPrayer}
+        timeFormat={timeFormat}
+        hijriDateAdjustment={hijriDateAdjustment}
+        showDate={defaultShowDate}
+        showHijriDate={defaultShowHijriDate}
+        showMasjidName={defaultShowMasjidName}
+        showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+        tomorrowsJamaats={tomorrowsJamaats}
+        clockPosition={layoutStructureOptions?.stripClockPosition ?? 'left'}
+        countdownSlot={
+          showEmbeddedCountdown ? (
+            <PrayerCountdown
+              phase={prayerPhase}
+              inPrayerSubPhase={inPrayerSubPhase}
+              variant={variant === 'sidebar' ? 'sidebar' : 'strip'}
+            />
+          ) : null
+        }
+      />
+    );
+  };
+
+  /**
+   * Component registry: maps a zone's component type to its rendered node and
+   * any wrapper constraints carried over from the previous hardcoded layouts
+   * (strip min/max height, landscape footer chrome, carousel overflow).
+   */
+  const zoneRegistry: Record<
+    LayoutZoneComponent,
+    { node: React.ReactNode; className?: string; label?: string }
+  > = {
+    header: { node: null, label: 'Portrait clock and dates' },
+    'prayer-panel': { node: prayerPanel, label: 'Prayer times' },
+    'prayer-times': {
+      node: null,
+      label: 'Prayer times',
+    },
+    'jumuah-bar': {
+      node: <JumuahBar timeFormat={timeFormat} compact={!isPortrait} />,
+      label: "Jumu'ah times",
+    },
+    countdown: {
+      node: countdown,
+      className: prayerOnly ? 'prayer-countdown-focus shrink-0' : undefined,
+      label: 'Next prayer countdown',
+    },
+    content: {
+      node: contentSlot,
+      className: 'relative overflow-visible',
+      label: 'Announcements and content',
+    },
+    footer: {
+      node: footerSlot,
+      className: isPortrait
+        ? ''
+        : 'landscape-footer min-h-[1.5rem] py-0.5 flex items-center',
+    },
+  };
+
+  const renderedZones: RenderedZone[] = orientationLayout.zones
+    .filter((zone) => zone.visible)
+    .map((zone) => {
+      const component = (
+        zone.component === 'prayer-strip' || zone.component === 'prayer-sidebar'
+          ? 'prayer-times'
+          : zone.component
+      ) as LayoutZoneComponent;
+      const entry = zoneRegistry[component];
+      const region = inferZoneRegion(layoutStructure, component, zone.region);
+      const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
+      const effectiveSize = resolvePrayerFocusZoneSize(
+        zone,
+        orientationLayout.zones,
+        layoutStructure,
+      );
+      const node =
+        component === 'header'
+          ? buildHeaderSlot(zone)
+          : component === 'prayer-times'
+            ? buildPrayerTimesSlot(zone)
+            : entry.node;
+      let className = entry.className;
+      if (component === 'prayer-panel') {
+        className = prayerOnly
+          ? 'flex-1 min-h-0 flex flex-col prayer-panel--focus'
+          : className;
+      } else if (prayerVariant === 'sidebar') {
+        className = prayerOnly
+          ? 'h-full min-h-0 flex flex-col prayer-sidebar--focus'
+          : 'h-full min-h-0 flex flex-col';
+      } else if (prayerVariant === 'strip') {
+        className = prayerOnly
+          ? 'flex-1 min-h-0 flex flex-col prayer-strip--focus'
+          : 'min-h-[8rem] max-h-[18rem]';
+      }
+      return {
+        id: zone.id,
+        component,
+        region: zone.region,
+        size: effectiveSize,
+        fontScale: zone.fontScale,
+        className,
+        label: entry.label,
+        node,
+      };
+    });
 
   return (
     <OrientationWrapper rotationDegrees={rotationDegrees}>
       <ReferenceViewport orientation={layoutMode}>
-        {isPortrait ? (
-          <PortraitLayout
-            header={headerSlot}
-            prayerSection={
-              <div className="flex flex-col gap-2 h-full">
-                {prayerPanel}
-                <JumuahBar timeFormat={timeFormat} />
-                {countdownSlot}
-              </div>
-            }
-            content={contentSlot}
-            footer={footerSlot}
-            background={bg}
-          />
-        ) : (
-          <LandscapeLayout
-            content={contentSlot}
-            prayerStrip={
-              <PrayerStrip
-                isRamadan={ramadan.isRamadan}
-                imsakTime={ramadan.imsakTime}
-                showImsak={displaySettings?.showImsak ?? false}
-                timeFormat={timeFormat}
-                hijriDateAdjustment={hijriDateAdjustment}
-                showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
-                tomorrowsJamaats={tomorrowsJamaats}
-                countdownSlot={
-                  <PrayerCountdown
-                    phase={prayerPhase}
-                    inPrayerSubPhase={inPrayerSubPhase}
-                    variant="strip"
-                  />
-                }
-              />
-            }
-            footer={footerSlot}
-            background={bg}
-          />
-        )}
+        <LayoutRenderer
+          orientation={isPortrait ? 'portrait' : 'landscape'}
+          structure={layoutStructure}
+          structureOptions={layoutStructureOptions}
+          zones={renderedZones}
+          spacingScale={orientationLayout.spacingScale}
+          prayerOnly={prayerOnly}
+          background={bg}
+          themeStyle={themeStyle}
+        />
       </ReferenceViewport>
+      {jamaatBlackoutActive ? <JamaatBlackoutOverlay /> : null}
     </OrientationWrapper>
   );
 };

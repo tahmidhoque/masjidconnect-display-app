@@ -1,5 +1,10 @@
-import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, createSelector, PayloadAction } from "@reduxjs/toolkit";
 import { ScreenContent, PrayerTimes, Event, Schedule, ScheduleItem, TimeFormat, ScheduledPlaylistAssignment, DisplaySettings, SalahKey, TerminologyKey } from "../../api/models";
+import {
+  DEFAULT_LAYOUT_CONFIG,
+  sanitiseLayoutConfig,
+  type DisplayLayoutConfig,
+} from "../../types/displayLayout";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
 import logger from "../../utils/logger";
@@ -94,11 +99,24 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   timeFormat: "12h",
   showImsak: false,
   showTomorrowJamaat: false,
+  showDate: true,
+  showHijriDate: true,
+  showMasjidName: false,
   imsakOffset: 10,
   hijriDateAdjustment: 0,
   minutesAfterJamaatUntilNextPrayer: 10,
   defaultJamaatInProgressMinutes: 10,
   minutesAfterJamaatUntilNextPrayerBySalah: {},
+  postAdhanSupplication: {
+    enabled: false,
+    delayMinutes: 0,
+    durationMinutes: 3,
+  },
+  postJamaatSupplication: {
+    enabled: false,
+    durationMinutes: 3,
+  },
+  jamaatInProgressMode: 'screen',
 };
 
 // Debounce map to prevent rapid successive calls
@@ -367,6 +385,9 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
     timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
     showImsak: raw.showImsak ?? false,
     showTomorrowJamaat: raw.showTomorrowJamaat ?? false,
+    showDate: raw.showDate ?? true,
+    showHijriDate: raw.showHijriDate ?? true,
+    showMasjidName: raw.showMasjidName ?? false,
     imsakOffset: raw.imsakOffset ?? 10,
     hijriDateAdjustment: raw.hijriDateAdjustment ?? 0,
     minutesAfterJamaatUntilNextPrayer: minutesAfterJamaat,
@@ -1296,6 +1317,22 @@ export const selectTimeFormat = (state: { content: ContentState }) =>
   state.content.timeFormat;
 export const selectDisplaySettings = (state: { content: ContentState }) =>
   state.content.displaySettings;
+/**
+ * Memoised layout config extraction: reads the layout block delivered in
+ * screen content (top-level or nested under data), sanitises it, and falls
+ * back to the built-in default layout. Memoised because sanitising builds
+ * new objects — recompute only when screenContent changes.
+ */
+export const selectDisplayLayoutConfig = createSelector(
+  [(state: { content: ContentState }) => state.content.screenContent],
+  (screenContent): DisplayLayoutConfig => {
+    const rawLayout =
+      screenContent?.layout ??
+      (screenContent as { data?: { layout?: { config?: unknown } | null } } | null)
+        ?.data?.layout;
+    return sanitiseLayoutConfig(rawLayout?.config) ?? DEFAULT_LAYOUT_CONFIG;
+  },
+);
 export const selectShowPrayerAnnouncement = (state: {
   content: ContentState;
 }) => state.content.showPrayerAnnouncement;

@@ -15,7 +15,9 @@
  *   Ctrl + Shift + 7  — Safety (medium) alert      (15 s)
  *   Ctrl + Shift + 0  — Clear current alert
  *   Ctrl + Shift + R  — Toggle Ramadan mode
- *   Ctrl + Shift + J  — Cycle prayer phase (jamaat-soon → in-prayer → auto)
+ *   Ctrl + Shift + J  — Cycle prayer display (phones → adhan dua → jamaat → … → auto)
+ *   Ctrl + Shift + A  — Toggle post-adhan supplication force
+ *   Ctrl + Shift + B  — Toggle jamaat blackout (full black screen)
  *   Ctrl + Shift + O  — Cycle orientation (landscape → portrait → auto)
  *   Ctrl + Shift + N  — Advance carousel to next slide immediately
  *   Ctrl + Shift + F  — Toggle forbidden-prayer notice (show fake / auto)
@@ -29,7 +31,9 @@
  *   Escape            — Clear current alert
  *
  * Console fallbacks (when a browser shortcut is intercepted):
- *   window.__devCyclePhase()              — same as Ctrl+Shift+J
+ *   window.__devCyclePrayerDisplay()      — same as Ctrl+Shift+J
+ *   window.__devToggleAdhanSupplication() — same as Ctrl+Shift+A
+ *   window.__devToggleJamaatBlackout()    — same as Ctrl+Shift+B
  *   window.__devCycleTomorrowChange()     — same as Ctrl+Alt+Shift+M
  */
 
@@ -41,7 +45,11 @@ import {
 } from '../store/slices/emergencySlice';
 import { RAMADAN_FORCE_EVENT } from './useRamadanMode';
 import { PRAYER_PHASE_FORCE_EVENT } from './usePrayerPhase';
-import type { PrayerPhase } from './usePrayerPhase';
+import {
+  cyclePrayerDisplayDevState,
+  toggleAdhanSupplicationDevForce,
+  toggleJamaatBlackoutDevForce,
+} from '@/dev/prayerDisplayDevOverride';
 import {
   FORBIDDEN_PRAYER_FORCE_EVENT,
   NEXT_PRAYER_CYCLE_EVENT,
@@ -67,8 +75,11 @@ export const ORIENTATION_FORCE_EVENT = 'orientation-force-change';
 declare global {
   interface Window {
     __ORIENTATION_FORCE?: Orientation | undefined;
-    /** Console fallback — same effect as Ctrl+Shift+J */
+    /** @deprecated Use __devCyclePrayerDisplay */
     __devCyclePhase?: () => void;
+    __devCyclePrayerDisplay?: () => void;
+    __devToggleAdhanSupplication?: () => void;
+    __devToggleJamaatBlackout?: () => void;
     /** Console fallback — same effect as Ctrl+Alt+Shift+M */
     __devCycleTomorrowChange?: () => void;
   }
@@ -118,32 +129,6 @@ function toggleRamadanForce(): void {
   }
   // Notify useRamadanMode so it picks up the new value via setState
   window.dispatchEvent(new Event(RAMADAN_FORCE_EVENT));
-}
-
-/**
- * Cycle the prayer phase dev override flag on `window`.
- * Three states: jamaat-soon → in-prayer → auto-detect → jamaat-soon …
- *
- * Dispatches a custom event so `usePrayerPhase` can react via
- * useState (the window property alone is not reactive to React).
- */
-const PRAYER_PHASE_CYCLE: (PrayerPhase | undefined)[] = [
-  'jamaat-soon',
-  'in-prayer',
-  undefined,
-];
-
-function togglePrayerPhaseForce(): void {
-  const current = window.__PRAYER_PHASE_FORCE;
-  const currentIdx = PRAYER_PHASE_CYCLE.indexOf(current);
-  const nextIdx = (currentIdx + 1) % PRAYER_PHASE_CYCLE.length;
-  const nextPhase = PRAYER_PHASE_CYCLE[nextIdx];
-
-  window.__PRAYER_PHASE_FORCE = nextPhase;
-  const label = nextPhase ?? 'auto-detect';
-  logger.info(`[DevKeyboard] Prayer phase force: ${label}`);
-
-  window.dispatchEvent(new Event(PRAYER_PHASE_FORCE_EVENT));
 }
 
 /**
@@ -269,7 +254,9 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+7': 'Safety MEDIUM alert (15 s)',
       'Ctrl+Shift+0': 'Clear current alert',
       'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
-      'Ctrl+Shift+J': 'Cycle prayer phase (jamaat-soon → in-prayer → auto)',
+      'Ctrl+Shift+J': 'Cycle prayer display (phones → adhan dua → jamaat → … → auto)',
+      'Ctrl+Shift+A': 'Toggle post-adhan supplication (force on/off)',
+      'Ctrl+Shift+B': 'Toggle jamaat blackout (full black screen)',
       'Ctrl+Shift+O': 'Cycle orientation (landscape → portrait → auto)',
       'Ctrl+Shift+N': 'Advance carousel to next slide',
       'Ctrl+Shift+F': 'Toggle forbidden-prayer notice (show fake / auto)',
@@ -285,11 +272,14 @@ const useDevKeyboard = (): void => {
      *   __devCycleTomorrowChange()
      *   __devCyclePhase()
      */
-    window.__devCyclePhase = togglePrayerPhaseForce;
+    window.__devCyclePrayerDisplay = cyclePrayerDisplayDevState;
+    window.__devCyclePhase = cyclePrayerDisplayDevState;
+    window.__devToggleAdhanSupplication = toggleAdhanSupplicationDevForce;
+    window.__devToggleJamaatBlackout = toggleJamaatBlackoutDevForce;
     window.__devCycleTomorrowChange = toggleTomorrowJamaatChangeForce;
     // eslint-disable-next-line no-console
     console.log(
-      '%cConsole fallbacks: __devCyclePhase(), __devCycleTomorrowChange()',
+      '%cConsole: __devCyclePrayerDisplay(), __devToggleAdhanSupplication(), __devToggleJamaatBlackout(), __devCycleTomorrowChange()',
       'color: #93c5fd; font-style: italic',
     );
 
@@ -318,10 +308,24 @@ const useDevKeyboard = (): void => {
           return;
         }
 
-        // Prayer phase toggle (J or j)
+        // Prayer display cycle (J or j)
         if (e.key === 'J' || e.key === 'j') {
           e.preventDefault();
-          togglePrayerPhaseForce();
+          cyclePrayerDisplayDevState();
+          return;
+        }
+
+        // Post-adhan supplication toggle (A or a)
+        if (e.key === 'A' || e.key === 'a') {
+          e.preventDefault();
+          toggleAdhanSupplicationDevForce();
+          return;
+        }
+
+        // Jamaat blackout toggle (B or b)
+        if (e.key === 'B' || e.key === 'b') {
+          e.preventDefault();
+          toggleJamaatBlackoutDevForce();
           return;
         }
 
@@ -398,6 +402,9 @@ const useDevKeyboard = (): void => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       delete window.__devCyclePhase;
+      delete window.__devCyclePrayerDisplay;
+      delete window.__devToggleAdhanSupplication;
+      delete window.__devToggleJamaatBlackout;
       delete window.__devCycleTomorrowChange;
     };
   }, [dispatch]);
