@@ -76,6 +76,11 @@ export interface DisplayLayoutConfig {
   landscape: OrientationLayoutConfig;
   portrait: OrientationLayoutConfig;
   theme: DisplayThemeOverrides | null;
+  /**
+   * Editor-only hint for which orientation the admin designs first. Both
+   * orientations are always rendered; the display app ignores this field.
+   */
+  primaryOrientation?: "landscape" | "portrait";
 }
 
 export interface ScreenLayoutPayload {

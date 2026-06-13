@@ -13,6 +13,10 @@ const CONTENT_TRAILING_MS = 600;
 const TRAILING_ONLY_TYPES = new Set<ContentInvalidationPayload['type']>([
   'display_layout',
   'display_settings',
+  'content_item',
+  'schedule',
+  'playlist_assignment',
+  'schedule_assignment',
 ]);
 
 export type InvalidationCoalesceState = {

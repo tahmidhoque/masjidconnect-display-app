@@ -75,7 +75,7 @@ import {
   selectDisplayLayoutConfig,
   selectDisplayLayoutRevision,
 } from '../../store/slices/contentSlice';
-import { parseMediaFullscreenFlag } from '../../utils/mediaSlide';
+import { parseMediaFullscreenFlag, resolveMediaFit } from '../../utils/mediaSlide';
 import { resolveTerminology } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
 
@@ -140,6 +140,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     const titleRaw = item.title ?? item.contentItem?.title;
     const title = typeof titleRaw === 'string' ? titleRaw : undefined;
     const fullscreen = parseMediaFullscreenFlag(content.fullscreen);
+    const mediaFit = resolveMediaFit(content);
     return [{
       id: item.id ?? `sched-${index}`,
       type: 'MEDIA_SLIDE',
@@ -148,6 +149,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
       mediaUrl,
       mediaKind,
       fullscreen,
+      mediaFit,
     }];
   }
 
@@ -625,8 +627,17 @@ const DisplayScreenInner: React.FC = () => {
    *  content:invalidate or RELOAD_CONTENT refreshes data — ensures new content is shown. */
   const lastContentUpdate = useAppSelector((s: RootState) => s.content.lastContentUpdate);
   const lastScheduleUpdate = useAppSelector((s: RootState) => s.content.lastScheduleUpdate);
+  const carouselItemsRevision = useMemo(() => {
+    if (!schedule?.items?.length) return 'empty';
+    return schedule.items
+      .map((item) => {
+        const row = item as { id?: string; contentItemId?: string; updatedAt?: string };
+        return `${row.id ?? ''}:${row.contentItemId ?? ''}:${row.updatedAt ?? ''}`;
+      })
+      .join('|');
+  }, [schedule?.items]);
   const carouselKey = schedule
-    ? `${schedule.id}-${schedule.items?.length ?? 0}-${lastContentUpdate ?? ''}-${lastScheduleUpdate ?? ''}`
+    ? `${schedule.id}-${schedule.items?.length ?? 0}-${carouselItemsRevision}-${lastContentUpdate ?? ''}-${lastScheduleUpdate ?? ''}`
     : 'no-schedule';
   const [blackoutDevRevision, setBlackoutDevRevision] = useState(0);
   useEffect(() => {

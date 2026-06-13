@@ -3,7 +3,7 @@
  * Avoids the browser's embedded PDF viewer (toolbar, thumbnails) so slides look like posters.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -19,6 +19,12 @@ export interface MediaPdfPageProps {
   title?: string;
   /** contain = letterbox (default for signage); cover = fill crop */
   fit: 'contain' | 'cover';
+  /**
+   * Fit mode. `smart` renders the page letterboxed (fit must be 'contain') over
+   * a blurred, zoomed copy of the same page so a poster with a mismatched aspect
+   * ratio fills the screen without dead bars. Defaults to a plain `fit` render.
+   */
+  mode?: 'contain' | 'cover' | 'smart';
   className?: string;
   /** Fires once when the first frame has been painted (or load/render failed). */
   onReady?: () => void;
@@ -28,6 +34,7 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
   url,
   title,
   fit,
+  mode,
   className = '',
   onReady,
 }) => {
@@ -37,6 +44,9 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
   const readyFiredRef = useRef(false);
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+  const isSmart = mode === 'smart';
+  // Data URL of the rendered page, reused as a blurred backdrop in smart mode.
+  const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
 
   const fireReadyOnce = () => {
     if (readyFiredRef.current) return;
@@ -80,6 +90,14 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
         canvasContext: ctx,
         viewport,
       }).promise;
+      // Smart mode: reuse the rendered page as a blurred backdrop (no second render).
+      if (isSmart) {
+        try {
+          setBackdropUrl(canvas.toDataURL('image/png'));
+        } catch {
+          setBackdropUrl(null);
+        }
+      }
       fireReadyOnce();
     } catch (err: unknown) {
       logger.error('[MediaPdfPage] Failed to render page', {
@@ -87,7 +105,7 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
       });
       fireReadyOnce();
     }
-  }, [fit]);
+  }, [fit, isSmart]);
 
   const renderCanvasRef = useRef(renderCanvas);
   renderCanvasRef.current = renderCanvas;
@@ -158,10 +176,25 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
     <div
       ref={wrapRef}
       data-media-pdf-page=""
-      className={`flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden ${className}`}
+      className={`relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden ${className}`}
       aria-label={title ?? 'PDF poster'}
     >
-      <canvas ref={canvasRef} className="gpu-accelerated max-h-full max-w-full" role="img" />
+      {isSmart && backdropUrl && (
+        <>
+          <img
+            src={backdropUrl}
+            alt=""
+            aria-hidden
+            className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-2xl"
+          />
+          <div className="absolute inset-0 bg-midnight/40" aria-hidden />
+        </>
+      )}
+      <canvas
+        ref={canvasRef}
+        className="gpu-accelerated relative max-h-full max-w-full"
+        role="img"
+      />
     </div>
   );
 };

@@ -24,7 +24,8 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import logger from '@/utils/logger';
-import { parseMediaFullscreenFlag } from '@/utils/mediaSlide';
+import { resolveMediaFit } from '@/utils/mediaSlide';
+import type { MediaFit } from '@/utils/mediaSlide';
 import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import {
   getScalingForItem,
@@ -83,8 +84,10 @@ export interface CarouselItem {
   mediaUrl?: string;
   /** MEDIA_SLIDE: derived from content.mimeType */
   mediaKind?: 'image' | 'pdf';
-  /** MEDIA_SLIDE: true = object-cover; false = object-contain (images only) */
+  /** MEDIA_SLIDE: legacy flag — true = cover, false = contain. Superseded by `mediaFit`. */
   fullscreen?: boolean;
+  /** MEDIA_SLIDE: how the asset fills the display area (smart = blurred backdrop). */
+  mediaFit?: MediaFit;
 
   /** DONATION: resolved public donation URL for QR — null when mosque is not donation-ready */
   donationUrl?: string | null;
@@ -317,12 +320,22 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     return it.mediaKind === 'image' || it.mediaKind === 'pdf';
   }, [currentItem]);
 
-  /** Edge-to-edge stage for fullscreen posters — cancels layout padding (see LandscapeLayout / PortraitLayout). */
+  /** Effective fit mode for the current media slide (smart | cover | contain). */
+  const effectiveMediaFit = useMemo<MediaFit>(
+    () => (currentItem ? resolveMediaFit(currentItem) : 'contain'),
+    [currentItem],
+  );
+
+  /**
+   * Edge-to-edge stage for posters that fill the screen — cancels layout padding
+   * (see LandscapeLayout / PortraitLayout). Both `smart` (blurred backdrop) and
+   * `cover` (crop) go edge-to-edge; `contain` stays inline within the content box.
+   */
   const isFullscreenMedia = useMemo(() => {
     if (!isMediaSlide || !currentItem) return false;
-    if (!parseMediaFullscreenFlag(currentItem.fullscreen)) return false;
+    if (effectiveMediaFit !== 'smart' && effectiveMediaFit !== 'cover') return false;
     return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
-  }, [isMediaSlide, currentItem]);
+  }, [isMediaSlide, currentItem, effectiveMediaFit]);
 
   /** DONATION: fixed QR / thermometer layout — no typography fit loop. */
   const isDonationSlide = useMemo(
@@ -722,18 +735,40 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       >
         <div
           data-fullscreen-portal-media=""
-          className={portalMediaLayerClass}
+          className={`${portalMediaLayerClass}${safeItems.length > 1 ? ' pb-14' : ''}`}
         >
           {item.mediaKind === 'pdf' ? (
             <MediaPdfPage
               url={item.mediaUrl}
               title={item.title ?? 'Poster'}
-              fit="contain"
-              className="absolute inset-0 min-h-0"
+              fit={effectiveMediaFit === 'cover' ? 'cover' : 'contain'}
+              mode={effectiveMediaFit}
+              className="min-h-0 flex-1"
               onReady={onMediaAssetLoaded}
             />
+          ) : effectiveMediaFit === 'smart' ? (
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <img
+                src={item.mediaUrl}
+                alt=""
+                aria-hidden
+                className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-2xl"
+                loading="eager"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-midnight/40" aria-hidden />
+              <img
+                src={item.mediaUrl}
+                alt=""
+                className="gpu-accelerated relative h-full w-full object-contain object-center"
+                loading="eager"
+                decoding="async"
+                onLoad={onMediaAssetLoaded}
+                onError={onMediaAssetLoaded}
+              />
+            </div>
           ) : (
-            <div className="absolute inset-0 overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <img
                 src={item.mediaUrl}
                 alt=""
@@ -748,12 +783,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         </div>
         {safeItems.length > 1 && (
           <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 z-[9010] flex justify-center bg-gradient-to-t from-midnight-dark from-35% via-midnight/80 to-transparent pb-4 pt-12"
+            className="pointer-events-none absolute bottom-0 left-0 right-0 z-[9010] flex justify-center pb-4"
             data-carousel-pagination="fullscreen"
           >
-            <div
-              className="pointer-events-none mb-2 rounded-full border border-border/50 bg-midnight/90 px-4 py-2 shadow-[0_-8px_32px_rgba(0,0,0,0.55)]"
-            >
+            <div className="pointer-events-none rounded-full border border-border/50 bg-midnight/95 px-4 py-2 shadow-[0_4px_20px_rgba(0,0,0,0.45)]">
               {paginationDots}
             </div>
           </div>
@@ -806,6 +839,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
               isFullscreenMedia ? (
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
               ) : (
+                /* Inline 'contain' fit — whole poster within the content box,
+                   prayer chrome stays visible. Smart/cover render edge-to-edge
+                   via the fullscreen portal above. */
                 <div className="flex flex-1 min-h-0 w-full flex-col">
                   {item.mediaKind === 'pdf' ? (
                     <MediaPdfPage
@@ -816,21 +852,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
                       onReady={onMediaAssetLoaded}
                     />
                   ) : (
-                    <div
-                      className={
-                        item.fullscreen === true
-                          ? 'flex-1 min-h-0 w-full relative overflow-hidden'
-                          : 'flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden'
-                      }
-                    >
+                    <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
                       <img
                         src={item.mediaUrl}
                         alt=""
-                        className={
-                          item.fullscreen === true
-                            ? 'gpu-accelerated h-full w-full object-cover object-center'
-                            : 'gpu-accelerated max-h-full max-w-full object-contain'
-                        }
+                        className="gpu-accelerated max-h-full max-w-full object-contain"
                         onLoad={onMediaAssetLoaded}
                       />
                     </div>

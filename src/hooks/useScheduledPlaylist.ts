@@ -5,10 +5,14 @@
  * timer-based re-evaluation at schedule boundaries. Falls back to Redux
  * schedule when scheduledPlaylists is absent or empty.
  *
+ * Schedule *content* is derived synchronously from Redux whenever playlists
+ * change (item add/edit/remove). A lightweight boundary tick only handles
+ * time-of-day / date-range switches without caching stale item payloads.
+ *
  * Cleans up all timeouts on unmount (RPi memory rules).
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import {
   selectSchedule,
@@ -32,6 +36,42 @@ export interface UseScheduledPlaylistResult {
   activeAssignmentId: string | null;
 }
 
+/** Fingerprint playlist item payloads so item edits re-resolve without resetting boundary timers. */
+export function buildPlaylistsContentRevision(
+  playlists: ScheduledPlaylistAssignment[] | null | undefined,
+): string {
+  if (!playlists?.length) return '';
+  return playlists
+    .map((p) => {
+      const items = p.schedule?.items ?? [];
+      const itemSig = items
+        .map((item) => {
+          const row = item as {
+            id?: string;
+            contentItemId?: string;
+            updatedAt?: string;
+            order?: number;
+          };
+          return `${row.id ?? ''}:${row.contentItemId ?? ''}:${row.updatedAt ?? ''}:${row.order ?? ''}`;
+        })
+        .join(',');
+      return `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}:${items.length}:${itemSig}`;
+    })
+    .sort()
+    .join('|');
+}
+
+/** Assignment / boundary identity — item edits should not reset the boundary timer. */
+export function buildPlaylistsBoundaryKey(
+  playlists: ScheduledPlaylistAssignment[] | null | undefined,
+): string {
+  if (!playlists?.length) return '';
+  return playlists
+    .map((p) => `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}`)
+    .sort()
+    .join('|');
+}
+
 /**
  * Hook that resolves the active schedule from scheduledPlaylists or falls back
  * to the server-resolved schedule. Schedules a timer to re-evaluate at the next
@@ -43,8 +83,8 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
   const screenContent = useAppSelector(selectScreenContent);
   const masjidTimezone = useAppSelector(selectMasjidTimezone);
 
-  const [resolvedSchedule, setResolvedSchedule] = useState<Schedule | null>(null);
-  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
+  /** Bumped at schedule boundaries so time-based assignment switches re-resolve. */
+  const [boundaryTick, setBoundaryTick] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playlists =
@@ -55,49 +95,58 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
   const useScheduledPlaylists = Array.isArray(playlists) && playlists.length > 0;
   const tz = masjidTimezone || 'UTC';
 
-  // Stable key: only re-run effect when assignments or schedules actually change (avoids clearing timer on every content refresh)
-  const playlistsKey = useMemo(
-    () =>
-      playlists
-        ?.map((p) => `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}`)
-        .sort()
-        .join('|') ?? '',
-    [playlists]
+  const playlistsContentRevision = useMemo(
+    () => buildPlaylistsContentRevision(playlists),
+    [playlists],
   );
-  const playlistsRef = useRef(playlists);
-  playlistsRef.current = playlists;
+  const playlistsBoundaryKey = useMemo(
+    () => buildPlaylistsBoundaryKey(playlists),
+    [playlists],
+  );
 
-  const reEvaluate = useCallback(() => {
-    const pl = playlistsRef.current;
-    if (!useScheduledPlaylists || !pl) return;
-
-    const now = new Date();
-    const assignment = resolveActiveSchedule(pl, now, tz);
-    if (assignment) {
-      const normalised = normalizeScheduleData(assignment.schedule);
-      setResolvedSchedule(normalised);
-      setActiveAssignmentId(assignment.assignmentId);
-    } else {
-      setResolvedSchedule(null);
-      setActiveAssignmentId(null);
+  const resolution = useMemo((): UseScheduledPlaylistResult => {
+    if (!useScheduledPlaylists || !playlists) {
+      return { schedule: reduxSchedule, activeAssignmentId: null };
     }
-  }, [useScheduledPlaylists, tz]);
+
+    // boundaryTick — re-run at RECURRING/DATE_RANGE boundaries only
+    void boundaryTick;
+    void playlistsContentRevision;
+
+    const assignment = resolveActiveSchedule(playlists, new Date(), tz);
+    if (assignment) {
+      return {
+        schedule: normalizeScheduleData(assignment.schedule),
+        activeAssignmentId: assignment.assignmentId,
+      };
+    }
+
+    const def = playlists.find((a) => a.isActive && a.type === 'DEFAULT');
+    if (def) {
+      return {
+        schedule: normalizeScheduleData(def.schedule),
+        activeAssignmentId: def.assignmentId,
+      };
+    }
+
+    return { schedule: reduxSchedule, activeAssignmentId: null };
+  }, [
+    playlists,
+    playlistsContentRevision,
+    useScheduledPlaylists,
+    tz,
+    boundaryTick,
+    reduxSchedule,
+  ]);
 
   useEffect(() => {
     if (!useScheduledPlaylists || !playlists) {
-      setResolvedSchedule(null);
-      setActiveAssignmentId(null);
       return;
     }
 
-    reEvaluate();
-
     const scheduleNextTimer = () => {
-      const pl = playlistsRef.current;
-      if (!pl) return;
       const now = new Date();
-      let next = getNextBoundary(pl, now, tz);
-      // Fallback when no boundary found (e.g. only DEFAULT, or past all DATE_RANGE): re-evaluate at next midnight
+      let next = getNextBoundary(playlists, now, tz);
       if (!next) {
         const nextMidnight = dayjs(now).tz(tz).add(1, 'day').startOf('day').toDate();
         next = nextMidnight;
@@ -108,7 +157,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
       const delay = Math.max(0, next.getTime() - Date.now());
       timeoutRef.current = setTimeout(() => {
         timeoutRef.current = null;
-        reEvaluate();
+        setBoundaryTick((n) => n + 1);
         scheduleNextTimer();
       }, delay);
       logger.debug('[useScheduledPlaylist] Next boundary scheduled', {
@@ -116,6 +165,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
         delayMs: delay,
       });
     };
+
     scheduleNextTimer();
 
     return () => {
@@ -124,34 +174,9 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
         timeoutRef.current = null;
       }
     };
-  }, [playlistsKey, useScheduledPlaylists, tz, reEvaluate]);
+  }, [playlistsBoundaryKey, useScheduledPlaylists, tz, playlists]);
 
-  if (!useScheduledPlaylists || !playlists) {
-    return {
-      schedule: reduxSchedule,
-      activeAssignmentId: null,
-    };
-  }
-
-  if (resolvedSchedule) {
-    return {
-      schedule: resolvedSchedule,
-      activeAssignmentId,
-    };
-  }
-
-  const def = playlists.find((a) => a.isActive && a.type === 'DEFAULT');
-  if (def) {
-    return {
-      schedule: normalizeScheduleData(def.schedule),
-      activeAssignmentId: def.assignmentId,
-    };
-  }
-
-  return {
-    schedule: reduxSchedule,
-    activeAssignmentId: null,
-  };
+  return resolution;
 }
 
 export default useScheduledPlaylist;
