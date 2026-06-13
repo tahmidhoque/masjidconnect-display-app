@@ -43,6 +43,8 @@
   /* Content type: Dua (calm blue per PRD) */
   --color-dua: #1565C0;
   --color-dua-light: #42A5F5;
+  /** Roll-forward tomorrow jamaat — soft slate-cyan, distinct from today's gold */
+  --color-tomorrow-roll: #8BB8D9;
 
   /* Fonts — Amiri as fallback so ﷺ (U+FDFA) and other Arabic glyphs render on RPi when text uses Poppins */
   --font-sans: 'Poppins', 'Amiri', system-ui, -apple-system, sans-serif;
@@ -994,6 +996,21 @@ html, body {
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
+}
+
+/* Roll-forward mode — tomorrow's jamaat in the main slot after today's has passed */
+.text-prayer-time-roll-forward {
+  color: var(--color-tomorrow-roll);
+  font-weight: 600;
+}
+
+.prayer-row--roll-forward {
+  background: color-mix(in srgb, var(--color-tomorrow-roll) 8%, transparent);
+}
+
+.prayer-cue-tile--roll-forward {
+  background: color-mix(in srgb, var(--color-tomorrow-roll) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-tomorrow-roll) 28%, transparent);
 }
 
 /* Column header labels in portrait — recede so times dominate */

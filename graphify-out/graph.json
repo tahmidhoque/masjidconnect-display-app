@@ -3411,7 +3411,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L1",
       "id": "src_app_tsx",
-      "community": 113,
+      "community": 19,
       "norm_label": "app.tsx"
     },
     {
@@ -3420,7 +3420,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L30",
       "id": "src_app_loadingscreen",
-      "community": 113,
+      "community": 19,
       "norm_label": "loadingscreen"
     },
     {
@@ -3429,7 +3429,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L31",
       "id": "src_app_pairingscreen",
-      "community": 113,
+      "community": 19,
       "norm_label": "pairingscreen"
     },
     {
@@ -3438,7 +3438,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L32",
       "id": "src_app_displayscreen",
-      "community": 113,
+      "community": 19,
       "norm_label": "displayscreen"
     },
     {
@@ -3447,7 +3447,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L44",
       "id": "src_app_screentype",
-      "community": 113,
+      "community": 19,
       "norm_label": "screentype"
     },
     {
@@ -3456,7 +3456,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L49",
       "id": "src_app_errorfallback",
-      "community": 113,
+      "community": 19,
       "norm_label": "errorfallback()"
     },
     {
@@ -3465,7 +3465,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L70",
       "id": "src_app_useloadingrotationdegrees",
-      "community": 113,
+      "community": 19,
       "norm_label": "useloadingrotationdegrees()"
     },
     {
@@ -3474,7 +3474,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L81",
       "id": "src_app_approutes",
-      "community": 113,
+      "community": 19,
       "norm_label": "approutes()"
     },
     {
@@ -3483,7 +3483,7 @@
       "source_file": "src/App.tsx",
       "source_location": "L224",
       "id": "src_app_app",
-      "community": 113,
+      "community": 19,
       "norm_label": "app()"
     },
     {
@@ -3492,7 +3492,7 @@
       "source_file": "src/main.tsx",
       "source_location": "L1",
       "id": "src_main_tsx",
-      "community": 67,
+      "community": 51,
       "norm_label": "main.tsx"
     },
     {
@@ -3501,7 +3501,7 @@
       "source_file": "src/main.tsx",
       "source_location": "L15",
       "id": "src_main_handlepersisterror",
-      "community": 67,
+      "community": 51,
       "norm_label": "handlepersisterror()"
     },
     {
@@ -3510,7 +3510,7 @@
       "source_file": "src/main.tsx",
       "source_location": "L41",
       "id": "src_main_root",
-      "community": 67,
+      "community": 51,
       "norm_label": "root"
     },
     {
@@ -3546,7 +3546,7 @@
       "source_file": "src/pwa.ts",
       "source_location": "L1",
       "id": "src_pwa_ts",
-      "community": 67,
+      "community": 51,
       "norm_label": "pwa.ts"
     },
     {
@@ -3555,7 +3555,7 @@
       "source_file": "src/pwa.ts",
       "source_location": "L16",
       "id": "src_pwa_onneedrefresh",
-      "community": 67,
+      "community": 51,
       "norm_label": "onneedrefresh()"
     },
     {
@@ -3564,7 +3564,7 @@
       "source_file": "src/pwa.ts",
       "source_location": "L19",
       "id": "src_pwa_onofflineready",
-      "community": 67,
+      "community": 51,
       "norm_label": "onofflineready()"
     },
     {
@@ -3573,7 +3573,7 @@
       "source_file": "src/pwa.ts",
       "source_location": "L34",
       "id": "src_pwa_checkandapplyupdate",
-      "community": 67,
+      "community": 51,
       "norm_label": "checkandapplyupdate()"
     },
     {
@@ -3726,7 +3726,7 @@
       "source_file": "src/test-utils/mock-store.ts",
       "source_location": "L23",
       "id": "test_utils_mock_store_testrootstate",
-      "community": 51,
+      "community": 13,
       "norm_label": "testrootstate"
     },
     {
@@ -3910,10 +3910,28 @@
       "norm_label": "displaythemeoverrides"
     },
     {
-      "label": "DisplayLayoutConfig",
+      "label": "TomorrowJamaatDisplayMode",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
       "source_location": "L74",
+      "id": "types_displaylayout_tomorrowjamaatdisplaymode",
+      "community": 102,
+      "norm_label": "tomorrowjamaatdisplaymode"
+    },
+    {
+      "label": "LayoutBehaviourOverrides",
+      "file_type": "code",
+      "source_file": "src/types/displayLayout.ts",
+      "source_location": "L76",
+      "id": "types_displaylayout_layoutbehaviouroverrides",
+      "community": 102,
+      "norm_label": "layoutbehaviouroverrides"
+    },
+    {
+      "label": "DisplayLayoutConfig",
+      "file_type": "code",
+      "source_file": "src/types/displayLayout.ts",
+      "source_location": "L101",
       "id": "types_displaylayout_displaylayoutconfig",
       "community": 102,
       "norm_label": "displaylayoutconfig"
@@ -3922,7 +3940,7 @@
       "label": "ScreenLayoutPayload",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L81",
+      "source_location": "L115",
       "id": "types_displaylayout_screenlayoutpayload",
       "community": 102,
       "norm_label": "screenlayoutpayload"
@@ -3931,7 +3949,7 @@
       "label": "DEFAULT_LAYOUT_CONFIG",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L88",
+      "source_location": "L122",
       "id": "types_displaylayout_default_layout_config",
       "community": 102,
       "norm_label": "default_layout_config"
@@ -3940,7 +3958,7 @@
       "label": "clamp()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L122",
+      "source_location": "L156",
       "id": "types_displaylayout_clamp",
       "community": 102,
       "norm_label": "clamp()"
@@ -3949,7 +3967,7 @@
       "label": "inferPrayerTimesLayout()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L125",
+      "source_location": "L159",
       "id": "types_displaylayout_inferprayertimeslayout",
       "community": 102,
       "norm_label": "inferprayertimeslayout()"
@@ -3958,7 +3976,7 @@
       "label": "inferZoneRegion()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L129",
+      "source_location": "L163",
       "id": "types_displaylayout_inferzoneregion",
       "community": 64,
       "norm_label": "inferzoneregion()"
@@ -3967,7 +3985,7 @@
       "label": "layoutHasVisibleContent()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L152",
+      "source_location": "L186",
       "id": "types_displaylayout_layouthasvisiblecontent",
       "community": 102,
       "norm_label": "layouthasvisiblecontent()"
@@ -3976,7 +3994,7 @@
       "label": "isPrayerOnlyLayout()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L156",
+      "source_location": "L190",
       "id": "types_displaylayout_isprayeronlylayout",
       "community": 64,
       "norm_label": "isprayeronlylayout()"
@@ -3985,7 +4003,7 @@
       "label": "layoutMainZonesEmpty()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L163",
+      "source_location": "L197",
       "id": "types_displaylayout_layoutmainzonesempty",
       "community": 102,
       "norm_label": "layoutmainzonesempty()"
@@ -3994,7 +4012,7 @@
       "label": "resolvePrayerFocusZoneSize()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L175",
+      "source_location": "L209",
       "id": "types_displaylayout_resolveprayerfocuszonesize",
       "community": 64,
       "norm_label": "resolveprayerfocuszonesize()"
@@ -4003,7 +4021,7 @@
       "label": "sanitiseStructure()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L207",
+      "source_location": "L241",
       "id": "types_displaylayout_sanitisestructure",
       "community": 102,
       "norm_label": "sanitisestructure()"
@@ -4012,7 +4030,7 @@
       "label": "sanitiseStructureOptions()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L214",
+      "source_location": "L248",
       "id": "types_displaylayout_sanitisestructureoptions",
       "community": 102,
       "norm_label": "sanitisestructureoptions()"
@@ -4021,7 +4039,7 @@
       "label": "sanitiseZone()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L230",
+      "source_location": "L264",
       "id": "types_displaylayout_sanitisezone",
       "community": 102,
       "norm_label": "sanitisezone()"
@@ -4030,7 +4048,7 @@
       "label": "sanitiseOrientation()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L281",
+      "source_location": "L315",
       "id": "types_displaylayout_sanitiseorientation",
       "community": 102,
       "norm_label": "sanitiseorientation()"
@@ -4039,7 +4057,7 @@
       "label": "sanitiseTheme()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L328",
+      "source_location": "L362",
       "id": "types_displaylayout_sanitisetheme",
       "community": 102,
       "norm_label": "sanitisetheme()"
@@ -4048,7 +4066,7 @@
       "label": "sanitiseLayoutConfig()",
       "file_type": "code",
       "source_file": "src/types/displayLayout.ts",
-      "source_location": "L347",
+      "source_location": "L381",
       "id": "types_displaylayout_sanitiselayoutconfig",
       "community": 102,
       "norm_label": "sanitiselayoutconfig()"
@@ -4113,7 +4131,7 @@
       "source_file": "src/types/realtime.ts",
       "source_location": "L29",
       "id": "types_realtime_rotationdegrees",
-      "community": 320,
+      "community": 65,
       "norm_label": "rotationdegrees"
     },
     {
@@ -4149,7 +4167,7 @@
       "source_file": "src/types/realtime.ts",
       "source_location": "L78",
       "id": "types_realtime_heartbeatpayload",
-      "community": 65,
+      "community": 154,
       "norm_label": "heartbeatpayload"
     },
     {
@@ -4158,7 +4176,7 @@
       "source_file": "src/types/realtime.ts",
       "source_location": "L110",
       "id": "types_realtime_heartbeatack",
-      "community": 65,
+      "community": 154,
       "norm_label": "heartbeatack"
     },
     {
@@ -4293,7 +4311,7 @@
       "source_file": "src/contexts/PrayerTimesContext.tsx",
       "source_location": "L26",
       "id": "contexts_prayertimescontext_useprayertimescontext",
-      "community": 64,
+      "community": 32,
       "norm_label": "useprayertimescontext()"
     },
     {
@@ -4302,7 +4320,7 @@
       "source_file": "src/config/environment.ts",
       "source_location": "L1",
       "id": "src_config_environment_ts",
-      "community": 32,
+      "community": 324,
       "norm_label": "environment.ts"
     },
     {
@@ -4311,7 +4329,7 @@
       "source_file": "src/config/environment.ts",
       "source_location": "L8",
       "id": "config_environment_environmentconfig",
-      "community": 32,
+      "community": 324,
       "norm_label": "environmentconfig"
     },
     {
@@ -4320,7 +4338,7 @@
       "source_file": "src/config/environment.ts",
       "source_location": "L35",
       "id": "config_environment_defaults",
-      "community": 32,
+      "community": 324,
       "norm_label": "defaults"
     },
     {
@@ -4329,7 +4347,7 @@
       "source_file": "src/config/environment.ts",
       "source_location": "L60",
       "id": "config_environment_buildconfig",
-      "community": 32,
+      "community": 324,
       "norm_label": "buildconfig()"
     },
     {
@@ -4338,7 +4356,7 @@
       "source_file": "src/config/environment.ts",
       "source_location": "L105",
       "id": "config_environment_config",
-      "community": 32,
+      "community": 324,
       "norm_label": "config"
     },
     {
@@ -4347,7 +4365,7 @@
       "source_file": "src/config/platform.ts",
       "source_location": "L1",
       "id": "src_config_platform_ts",
-      "community": 78,
+      "community": 20,
       "norm_label": "platform.ts"
     },
     {
@@ -4356,7 +4374,7 @@
       "source_file": "src/config/environment.test.ts",
       "source_location": "L1",
       "id": "src_config_environment_test_ts",
-      "community": 32,
+      "community": 324,
       "norm_label": "environment.test.ts"
     },
     {
@@ -4365,7 +4383,7 @@
       "source_file": "src/constants/scheduledSupplications.ts",
       "source_location": "L1",
       "id": "src_constants_scheduledsupplications_ts",
-      "community": 292,
+      "community": 64,
       "norm_label": "scheduledsupplications.ts"
     },
     {
@@ -4374,7 +4392,7 @@
       "source_file": "src/constants/scheduledSupplications.ts",
       "source_location": "L6",
       "id": "constants_scheduledsupplications_hardcodedsupplication",
-      "community": 292,
+      "community": 64,
       "norm_label": "hardcodedsupplication"
     },
     {
@@ -4383,7 +4401,7 @@
       "source_file": "src/constants/scheduledSupplications.ts",
       "source_location": "L21",
       "id": "constants_scheduledsupplications_post_adhan_supplication",
-      "community": 292,
+      "community": 64,
       "norm_label": "post_adhan_supplication"
     },
     {
@@ -4392,7 +4410,7 @@
       "source_file": "src/constants/scheduledSupplications.ts",
       "source_location": "L37",
       "id": "constants_scheduledsupplications_post_jamaat_supplications",
-      "community": 292,
+      "community": 64,
       "norm_label": "post_jamaat_supplications"
     },
     {
@@ -4401,7 +4419,7 @@
       "source_file": "src/utils/adminUrlUtils.test.ts",
       "source_location": "L1",
       "id": "src_utils_adminurlutils_test_ts",
-      "community": 319,
+      "community": 128,
       "norm_label": "adminurlutils.test.ts"
     },
     {
@@ -4410,7 +4428,7 @@
       "source_file": "src/utils/adminUrlUtils.test.ts",
       "source_location": "L10",
       "id": "utils_adminurlutils_test_mocklocation",
-      "community": 319,
+      "community": 128,
       "norm_label": "mocklocation()"
     },
     {
@@ -4419,7 +4437,7 @@
       "source_file": "src/utils/adminUrlUtils.test.ts",
       "source_location": "L21",
       "id": "utils_adminurlutils_test_url",
-      "community": 319,
+      "community": 128,
       "norm_label": "url"
     },
     {
@@ -4428,7 +4446,7 @@
       "source_file": "src/utils/adminUrlUtils.test.ts",
       "source_location": "L87",
       "id": "utils_adminurlutils_test_base",
-      "community": 319,
+      "community": 128,
       "norm_label": "base"
     },
     {
@@ -4437,7 +4455,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L1",
       "id": "src_utils_scheduleresolver_ts",
-      "community": 23,
+      "community": 67,
       "norm_label": "scheduleresolver.ts"
     },
     {
@@ -4446,7 +4464,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L24",
       "id": "utils_scheduleresolver_formattimeintz",
-      "community": 23,
+      "community": 67,
       "norm_label": "formattimeintz()"
     },
     {
@@ -4455,7 +4473,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L32",
       "id": "utils_scheduleresolver_normalisetimestring",
-      "community": 23,
+      "community": 67,
       "norm_label": "normalisetimestring()"
     },
     {
@@ -4464,7 +4482,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L44",
       "id": "utils_scheduleresolver_getdayofweekintz",
-      "community": 23,
+      "community": 67,
       "norm_label": "getdayofweekintz()"
     },
     {
@@ -4473,7 +4491,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L54",
       "id": "utils_scheduleresolver_iswithintimewindow",
-      "community": 23,
+      "community": 67,
       "norm_label": "iswithintimewindow()"
     },
     {
@@ -4482,7 +4500,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L75",
       "id": "utils_scheduleresolver_geteffectivedayforrecurring",
-      "community": 23,
+      "community": 67,
       "norm_label": "geteffectivedayforrecurring()"
     },
     {
@@ -4491,7 +4509,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L103",
       "id": "utils_scheduleresolver_hastimecomponent",
-      "community": 23,
+      "community": 67,
       "norm_label": "hastimecomponent()"
     },
     {
@@ -4500,7 +4518,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L112",
       "id": "utils_scheduleresolver_iswithindaterange",
-      "community": 23,
+      "community": 67,
       "norm_label": "iswithindaterange()"
     },
     {
@@ -4509,7 +4527,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L139",
       "id": "utils_scheduleresolver_matchesrecurring",
-      "community": 23,
+      "community": 67,
       "norm_label": "matchesrecurring()"
     },
     {
@@ -4518,7 +4536,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L179",
       "id": "utils_scheduleresolver_resolveactiveschedule",
-      "community": 23,
+      "community": 67,
       "norm_label": "resolveactiveschedule()"
     },
     {
@@ -4527,7 +4545,7 @@
       "source_file": "src/utils/scheduleResolver.ts",
       "source_location": "L219",
       "id": "utils_scheduleresolver_getnextboundary",
-      "community": 23,
+      "community": 67,
       "norm_label": "getnextboundary()"
     },
     {
@@ -4536,7 +4554,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.ts",
       "source_location": "L1",
       "id": "src_utils_forbiddenprayertimes_ts",
-      "community": 9,
+      "community": 113,
       "norm_label": "forbiddenprayertimes.ts"
     },
     {
@@ -4545,7 +4563,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.ts",
       "source_location": "L24",
       "id": "utils_forbiddenprayertimes_forbiddenwindow",
-      "community": 9,
+      "community": 113,
       "norm_label": "forbiddenwindow"
     },
     {
@@ -4563,7 +4581,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.ts",
       "source_location": "L40",
       "id": "utils_forbiddenprayertimes_getforbiddenprayerwindows",
-      "community": 9,
+      "community": 113,
       "norm_label": "getforbiddenprayerwindows()"
     },
     {
@@ -4572,7 +4590,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.ts",
       "source_location": "L104",
       "id": "utils_forbiddenprayertimes_getcurrentforbiddenwindow",
-      "community": 9,
+      "community": 113,
       "norm_label": "getcurrentforbiddenwindow()"
     },
     {
@@ -4662,7 +4680,7 @@
       "source_file": "src/utils/connectionBannerLogic.ts",
       "source_location": "L1",
       "id": "src_utils_connectionbannerlogic_ts",
-      "community": 20,
+      "community": 319,
       "norm_label": "connectionbannerlogic.ts"
     },
     {
@@ -4671,7 +4689,7 @@
       "source_file": "src/utils/connectionBannerLogic.ts",
       "source_location": "L4",
       "id": "utils_connectionbannerlogic_wifistatussnapshot",
-      "community": 20,
+      "community": 319,
       "norm_label": "wifistatussnapshot"
     },
     {
@@ -4680,7 +4698,7 @@
       "source_file": "src/utils/connectionBannerLogic.ts",
       "source_location": "L9",
       "id": "utils_connectionbannerlogic_shouldsuppresswifiwarning",
-      "community": 20,
+      "community": 319,
       "norm_label": "shouldsuppresswifiwarning()"
     },
     {
@@ -4691,6 +4709,42 @@
       "id": "src_utils_orientation_test_ts",
       "community": 66,
       "norm_label": "orientation.test.ts"
+    },
+    {
+      "label": "tomorrowJamaatDisplay.test.ts",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L1",
+      "id": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "community": 23,
+      "norm_label": "tomorrowjamaatdisplay.test.ts"
+    },
+    {
+      "label": "baseSettings",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L9",
+      "id": "utils_tomorrowjamaatdisplay_test_basesettings",
+      "community": 23,
+      "norm_label": "basesettings"
+    },
+    {
+      "label": "tomorrows",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L54",
+      "id": "utils_tomorrowjamaatdisplay_test_tomorrows",
+      "community": 23,
+      "norm_label": "tomorrows"
+    },
+    {
+      "label": "result",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L59",
+      "id": "utils_tomorrowjamaatdisplay_test_result",
+      "community": 23,
+      "norm_label": "result"
     },
     {
       "label": "displaySettingsJamaat.test.ts",
@@ -4761,7 +4815,7 @@
       "source_file": "src/utils/dateUtils.ts",
       "source_location": "L92",
       "id": "utils_dateutils_parsetimestring",
-      "community": 9,
+      "community": 113,
       "norm_label": "parsetimestring()"
     },
     {
@@ -4770,7 +4824,7 @@
       "source_file": "src/utils/dateUtils.ts",
       "source_location": "L134",
       "id": "utils_dateutils_gettimedifferenceinminutes",
-      "community": 9,
+      "community": 113,
       "norm_label": "gettimedifferenceinminutes()"
     },
     {
@@ -4860,7 +4914,7 @@
       "source_file": "src/utils/dateUtils.ts",
       "source_location": "L325",
       "id": "utils_dateutils_gettimeuntilnextprayer",
-      "community": 64,
+      "community": 9,
       "norm_label": "gettimeuntilnextprayer()"
     },
     {
@@ -4903,7 +4957,7 @@
       "label": "InvalidationCoalesceState",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.ts",
-      "source_location": "L18",
+      "source_location": "L22",
       "id": "utils_contentinvalidationschedule_invalidationcoalescestate",
       "community": 96,
       "norm_label": "invalidationcoalescestate"
@@ -4912,7 +4966,7 @@
       "label": "getInvalidationTrailingMs()",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.ts",
-      "source_location": "L23",
+      "source_location": "L27",
       "id": "utils_contentinvalidationschedule_getinvalidationtrailingms",
       "community": 96,
       "norm_label": "getinvalidationtrailingms()"
@@ -4921,7 +4975,7 @@
       "label": "usesTrailingOnlyInvalidation()",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.ts",
-      "source_location": "L32",
+      "source_location": "L36",
       "id": "utils_contentinvalidationschedule_usestrailingonlyinvalidation",
       "community": 96,
       "norm_label": "usestrailingonlyinvalidation()"
@@ -4930,7 +4984,7 @@
       "label": "invalidationCoalesceKey()",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.ts",
-      "source_location": "L41",
+      "source_location": "L45",
       "id": "utils_contentinvalidationschedule_invalidationcoalescekey",
       "community": 96,
       "norm_label": "invalidationcoalescekey()"
@@ -4939,7 +4993,7 @@
       "label": "scheduleInvalidationRefetch()",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.ts",
-      "source_location": "L54",
+      "source_location": "L58",
       "id": "utils_contentinvalidationschedule_scheduleinvalidationrefetch",
       "community": 96,
       "norm_label": "scheduleinvalidationrefetch()"
@@ -4948,7 +5002,7 @@
       "label": "clearInvalidationCoalesceMap()",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.ts",
-      "source_location": "L94",
+      "source_location": "L98",
       "id": "utils_contentinvalidationschedule_clearinvalidationcoalescemap",
       "community": 96,
       "norm_label": "clearinvalidationcoalescemap()"
@@ -5157,7 +5211,7 @@
       "source_file": "src/utils/logger.ts",
       "source_location": "L76",
       "id": "utils_logger_getlasterror",
-      "community": 113,
+      "community": 19,
       "norm_label": "getlasterror()"
     },
     {
@@ -5166,7 +5220,7 @@
       "source_file": "src/utils/logger.ts",
       "source_location": "L80",
       "id": "utils_logger_getloghistory",
-      "community": 113,
+      "community": 19,
       "norm_label": "getloghistory()"
     },
     {
@@ -5400,7 +5454,7 @@
       "source_file": "src/utils/mediaSlide.ts",
       "source_location": "L1",
       "id": "src_utils_mediaslide_ts",
-      "community": 99,
+      "community": 321,
       "norm_label": "mediaslide.ts"
     },
     {
@@ -5409,8 +5463,35 @@
       "source_file": "src/utils/mediaSlide.ts",
       "source_location": "L4",
       "id": "utils_mediaslide_parsemediafullscreenflag",
-      "community": 99,
+      "community": 321,
       "norm_label": "parsemediafullscreenflag()"
+    },
+    {
+      "label": "MediaFit",
+      "file_type": "code",
+      "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L22",
+      "id": "utils_mediaslide_mediafit",
+      "community": 321,
+      "norm_label": "mediafit"
+    },
+    {
+      "label": "MEDIA_FIT_VALUES",
+      "file_type": "code",
+      "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L24",
+      "id": "utils_mediaslide_media_fit_values",
+      "community": 321,
+      "norm_label": "media_fit_values"
+    },
+    {
+      "label": "resolveMediaFit()",
+      "file_type": "code",
+      "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L34",
+      "id": "utils_mediaslide_resolvemediafit",
+      "community": 321,
+      "norm_label": "resolvemediafit()"
     },
     {
       "label": "metricsCollector.test.ts",
@@ -5454,7 +5535,7 @@
       "source_file": "src/utils/adminUrlUtils.ts",
       "source_location": "L1",
       "id": "src_utils_adminurlutils_ts",
-      "community": 319,
+      "community": 128,
       "norm_label": "adminurlutils.ts"
     },
     {
@@ -5463,7 +5544,7 @@
       "source_file": "src/utils/adminUrlUtils.ts",
       "source_location": "L16",
       "id": "utils_adminurlutils_getapibaseurl",
-      "community": 319,
+      "community": 128,
       "norm_label": "getapibaseurl()"
     },
     {
@@ -5472,7 +5553,7 @@
       "source_file": "src/utils/adminUrlUtils.ts",
       "source_location": "L31",
       "id": "utils_adminurlutils_getadminbaseurl",
-      "community": 319,
+      "community": 128,
       "norm_label": "getadminbaseurl()"
     },
     {
@@ -5481,7 +5562,7 @@
       "source_file": "src/utils/adminUrlUtils.ts",
       "source_location": "L64",
       "id": "utils_adminurlutils_getpairingurl",
-      "community": 319,
+      "community": 128,
       "norm_label": "getpairingurl()"
     },
     {
@@ -5931,7 +6012,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L1",
       "id": "src_utils_forbiddenprayertimes_test_ts",
-      "community": 9,
+      "community": 113,
       "norm_label": "forbiddenprayertimes.test.ts"
     },
     {
@@ -5940,7 +6021,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L31",
       "id": "utils_forbiddenprayertimes_test_mockprayertimes",
-      "community": 9,
+      "community": 113,
       "norm_label": "mockprayertimes"
     },
     {
@@ -5949,7 +6030,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L59",
       "id": "utils_forbiddenprayertimes_test_windows",
-      "community": 9,
+      "community": 113,
       "norm_label": "windows"
     },
     {
@@ -5958,7 +6039,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L91",
       "id": "utils_forbiddenprayertimes_test_partial",
-      "community": 9,
+      "community": 113,
       "norm_label": "partial"
     },
     {
@@ -5967,7 +6048,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L121",
       "id": "utils_forbiddenprayertimes_test_empty",
-      "community": 9,
+      "community": 113,
       "norm_label": "empty"
     },
     {
@@ -5976,7 +6057,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L145",
       "id": "utils_forbiddenprayertimes_test_now",
-      "community": 9,
+      "community": 113,
       "norm_label": "now"
     },
     {
@@ -5985,7 +6066,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L151",
       "id": "utils_forbiddenprayertimes_test_result",
-      "community": 9,
+      "community": 113,
       "norm_label": "result"
     },
     {
@@ -5994,7 +6075,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L230",
       "id": "utils_forbiddenprayertimes_test_withtz",
-      "community": 9,
+      "community": 113,
       "norm_label": "withtz"
     },
     {
@@ -6003,7 +6084,7 @@
       "source_file": "src/utils/forbiddenPrayerTimes.test.ts",
       "source_location": "L234",
       "id": "utils_forbiddenprayertimes_test_withutc",
-      "community": 9,
+      "community": 113,
       "norm_label": "withutc"
     },
     {
@@ -6093,7 +6174,7 @@
       "source_file": "src/utils/connectionBannerLogic.test.ts",
       "source_location": "L1",
       "id": "src_utils_connectionbannerlogic_test_ts",
-      "community": 20,
+      "community": 319,
       "norm_label": "connectionbannerlogic.test.ts"
     },
     {
@@ -6102,7 +6183,7 @@
       "source_file": "src/utils/connectionBannerLogic.test.ts",
       "source_location": "L4",
       "id": "utils_connectionbannerlogic_test_basewifi",
-      "community": 20,
+      "community": 319,
       "norm_label": "basewifi"
     },
     {
@@ -6163,7 +6244,7 @@
       "label": "map",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.test.ts",
-      "source_location": "L31",
+      "source_location": "L33",
       "id": "utils_contentinvalidationschedule_test_map",
       "community": 96,
       "norm_label": "map"
@@ -6172,7 +6253,7 @@
       "label": "run",
       "file_type": "code",
       "source_file": "src/utils/contentInvalidationSchedule.test.ts",
-      "source_location": "L32",
+      "source_location": "L34",
       "id": "utils_contentinvalidationschedule_test_run",
       "community": 96,
       "norm_label": "run"
@@ -6201,7 +6282,7 @@
       "source_file": "src/utils/prayerTerminology.ts",
       "source_location": "L18",
       "id": "utils_prayerterminology_resolveterminology",
-      "community": 78,
+      "community": 32,
       "norm_label": "resolveterminology()"
     },
     {
@@ -6212,6 +6293,87 @@
       "id": "utils_prayerterminology_prayerrownametoterminologykey",
       "community": 17,
       "norm_label": "prayerrownametoterminologykey()"
+    },
+    {
+      "label": "tomorrowJamaatDisplay.ts",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L1",
+      "id": "src_utils_tomorrowjamaatdisplay_ts",
+      "community": 23,
+      "norm_label": "tomorrowjamaatdisplay.ts"
+    },
+    {
+      "label": "TOMORROW_JAMAAT_DISPLAY_MODES",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L11",
+      "id": "utils_tomorrowjamaatdisplay_tomorrow_jamaat_display_modes",
+      "community": 23,
+      "norm_label": "tomorrow_jamaat_display_modes"
+    },
+    {
+      "label": "TomorrowJamaatDisplayMode",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L12",
+      "id": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "community": 17,
+      "norm_label": "tomorrowjamaatdisplaymode"
+    },
+    {
+      "label": "resolveTomorrowJamaatMode()",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L14",
+      "id": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "community": 23,
+      "norm_label": "resolvetomorrowjamaatmode()"
+    },
+    {
+      "label": "tomorrowJamaatModeUsesColumn()",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L28",
+      "id": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn",
+      "community": 23,
+      "norm_label": "tomorrowjamaatmodeusescolumn()"
+    },
+    {
+      "label": "isPrayerJamaatPhaseComplete()",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L33",
+      "id": "utils_tomorrowjamaatdisplay_isprayerjamaatphasecomplete",
+      "community": 23,
+      "norm_label": "isprayerjamaatphasecomplete()"
+    },
+    {
+      "label": "ResolvedJamaatDisplay",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L46",
+      "id": "utils_tomorrowjamaatdisplay_resolvedjamaatdisplay",
+      "community": 23,
+      "norm_label": "resolvedjamaatdisplay"
+    },
+    {
+      "label": "ResolveJamaatDisplayParams",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L54",
+      "id": "utils_tomorrowjamaatdisplay_resolvejamaatdisplayparams",
+      "community": 23,
+      "norm_label": "resolvejamaatdisplayparams"
+    },
+    {
+      "label": "resolvePrayerJamaatDisplay()",
+      "file_type": "code",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L70",
+      "id": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay",
+      "community": 23,
+      "norm_label": "resolveprayerjamaatdisplay()"
     },
     {
       "label": "PortraitLayout.test.tsx",
@@ -6327,7 +6489,7 @@
       "source_file": "src/components/layout/OrientationWrapper.test.tsx",
       "source_location": "L1",
       "id": "src_components_layout_orientationwrapper_test_tsx",
-      "community": 320,
+      "community": 65,
       "norm_label": "orientationwrapper.test.tsx"
     },
     {
@@ -6336,7 +6498,7 @@
       "source_file": "src/components/layout/OrientationWrapper.test.tsx",
       "source_location": "L23",
       "id": "layout_orientationwrapper_test_container",
-      "community": 320,
+      "community": 65,
       "norm_label": "{ container }"
     },
     {
@@ -6345,7 +6507,7 @@
       "source_file": "src/components/layout/OrientationWrapper.test.tsx",
       "source_location": "L30",
       "id": "layout_orientationwrapper_test_inner",
-      "community": 320,
+      "community": 65,
       "norm_label": "inner"
     },
     {
@@ -6417,7 +6579,7 @@
       "source_file": "src/components/layout/ZoneStackLayout.tsx",
       "source_location": "L1",
       "id": "src_components_layout_zonestacklayout_tsx",
-      "community": 317,
+      "community": 326,
       "norm_label": "zonestacklayout.tsx"
     },
     {
@@ -6426,7 +6588,7 @@
       "source_file": "src/components/layout/ZoneStackLayout.tsx",
       "source_location": "L21",
       "id": "layout_zonestacklayout_renderedzone",
-      "community": 317,
+      "community": 326,
       "norm_label": "renderedzone"
     },
     {
@@ -6435,7 +6597,7 @@
       "source_file": "src/components/layout/ZoneStackLayout.tsx",
       "source_location": "L38",
       "id": "layout_zonestacklayout_zonestacklayoutprops",
-      "community": 317,
+      "community": 326,
       "norm_label": "zonestacklayoutprops"
     },
     {
@@ -6444,7 +6606,7 @@
       "source_file": "src/components/layout/ZoneStackLayout.tsx",
       "source_location": "L52",
       "id": "layout_zonestacklayout_base_spacing",
-      "community": 317,
+      "community": 326,
       "norm_label": "base_spacing"
     },
     {
@@ -6453,7 +6615,7 @@
       "source_file": "src/components/layout/ZoneStackLayout.tsx",
       "source_location": "L57",
       "id": "layout_zonestacklayout_zonestacklayout",
-      "community": 317,
+      "community": 326,
       "norm_label": "zonestacklayout()"
     },
     {
@@ -6516,7 +6678,7 @@
       "source_file": "src/components/layout/index.ts",
       "source_location": "L1",
       "id": "src_components_layout_index_ts",
-      "community": 317,
+      "community": 326,
       "norm_label": "index.ts"
     },
     {
@@ -6525,7 +6687,7 @@
       "source_file": "src/components/layout/OrientationWrapper.tsx",
       "source_location": "L1",
       "id": "src_components_layout_orientationwrapper_tsx",
-      "community": 320,
+      "community": 65,
       "norm_label": "orientationwrapper.tsx"
     },
     {
@@ -6534,7 +6696,7 @@
       "source_file": "src/components/layout/OrientationWrapper.tsx",
       "source_location": "L14",
       "id": "layout_orientationwrapper_orientationwrapperprops",
-      "community": 320,
+      "community": 65,
       "norm_label": "orientationwrapperprops"
     },
     {
@@ -6543,7 +6705,7 @@
       "source_file": "src/components/layout/OrientationWrapper.tsx",
       "source_location": "L20",
       "id": "layout_orientationwrapper_orientationwrapper",
-      "community": 320,
+      "community": 65,
       "norm_label": "orientationwrapper()"
     },
     {
@@ -6552,7 +6714,7 @@
       "source_file": "src/components/screens/PairingScreen.tsx",
       "source_location": "L1",
       "id": "src_components_screens_pairingscreen_tsx",
-      "community": 319,
+      "community": 128,
       "norm_label": "pairingscreen.tsx"
     },
     {
@@ -6561,7 +6723,7 @@
       "source_file": "src/components/screens/PairingScreen.tsx",
       "source_location": "L42",
       "id": "screens_pairingscreen_usecountdown",
-      "community": 319,
+      "community": 128,
       "norm_label": "usecountdown()"
     },
     {
@@ -6570,7 +6732,7 @@
       "source_file": "src/components/screens/PairingScreen.tsx",
       "source_location": "L76",
       "id": "screens_pairingscreen_pairingscreen",
-      "community": 319,
+      "community": 128,
       "norm_label": "pairingscreen()"
     },
     {
@@ -6579,7 +6741,7 @@
       "source_file": "src/components/screens/LoadingScreen.tsx",
       "source_location": "L1",
       "id": "src_components_screens_loadingscreen_tsx",
-      "community": 128,
+      "community": 320,
       "norm_label": "loadingscreen.tsx"
     },
     {
@@ -6588,7 +6750,7 @@
       "source_file": "src/components/screens/LoadingScreen.tsx",
       "source_location": "L18",
       "id": "screens_loadingscreen_loadingscreenprops",
-      "community": 128,
+      "community": 320,
       "norm_label": "loadingscreenprops"
     },
     {
@@ -6597,7 +6759,7 @@
       "source_file": "src/components/screens/LoadingScreen.tsx",
       "source_location": "L24",
       "id": "screens_loadingscreen_loadingscreen",
-      "community": 128,
+      "community": 320,
       "norm_label": "loadingscreen()"
     },
     {
@@ -6606,7 +6768,7 @@
       "source_file": "src/components/screens/LoadingScreen.test.tsx",
       "source_location": "L1",
       "id": "src_components_screens_loadingscreen_test_tsx",
-      "community": 128,
+      "community": 320,
       "norm_label": "loadingscreen.test.tsx"
     },
     {
@@ -6615,7 +6777,7 @@
       "source_file": "src/components/screens/LoadingScreen.test.tsx",
       "source_location": "L14",
       "id": "screens_loadingscreen_test_renderloadingscreen",
-      "community": 128,
+      "community": 320,
       "norm_label": "renderloadingscreen()"
     },
     {
@@ -6624,7 +6786,7 @@
       "source_file": "src/components/screens/LoadingScreen.test.tsx",
       "source_location": "L25",
       "id": "screens_loadingscreen_test_defaulttasks",
-      "community": 128,
+      "community": 320,
       "norm_label": "defaulttasks"
     },
     {
@@ -6642,7 +6804,7 @@
       "source_file": "src/components/screens/DisplayScreen.tsx",
       "source_location": "L86",
       "id": "screens_displayscreen_resolveitemduration",
-      "community": 64,
+      "community": 321,
       "norm_label": "resolveitemduration()"
     },
     {
@@ -6651,14 +6813,14 @@
       "source_file": "src/components/screens/DisplayScreen.tsx",
       "source_location": "L104",
       "id": "screens_displayscreen_scheduleitemtocarouselitems",
-      "community": 64,
+      "community": 321,
       "norm_label": "scheduleitemtocarouselitems()"
     },
     {
       "label": "eventToCarouselItem()",
       "file_type": "code",
       "source_file": "src/components/screens/DisplayScreen.tsx",
-      "source_location": "L386",
+      "source_location": "L388",
       "id": "screens_displayscreen_eventtocarouselitem",
       "community": 0,
       "norm_label": "eventtocarouselitem()"
@@ -6667,7 +6829,7 @@
       "label": "buildCarouselItems()",
       "file_type": "code",
       "source_file": "src/components/screens/DisplayScreen.tsx",
-      "source_location": "L431",
+      "source_location": "L433",
       "id": "screens_displayscreen_buildcarouselitems",
       "community": 64,
       "norm_label": "buildcarouselitems()"
@@ -6676,16 +6838,16 @@
       "label": "DisplayScreenInner()",
       "file_type": "code",
       "source_file": "src/components/screens/DisplayScreen.tsx",
-      "source_location": "L464",
+      "source_location": "L466",
       "id": "screens_displayscreen_displayscreeninner",
-      "community": 64,
+      "community": 32,
       "norm_label": "displayscreeninner()"
     },
     {
       "label": "DisplayScreen()",
       "file_type": "code",
       "source_file": "src/components/screens/DisplayScreen.tsx",
-      "source_location": "L859",
+      "source_location": "L871",
       "id": "screens_displayscreen_displayscreen",
       "community": 64,
       "norm_label": "displayscreen()"
@@ -6696,7 +6858,7 @@
       "source_file": "src/components/screens/DisplayScreen.test.tsx",
       "source_location": "L1",
       "id": "src_components_screens_displayscreen_test_tsx",
-      "community": 64,
+      "community": 321,
       "norm_label": "displayscreen.test.tsx"
     },
     {
@@ -6705,7 +6867,7 @@
       "source_file": "src/components/screens/DisplayScreen.test.tsx",
       "source_location": "L10",
       "id": "screens_displayscreen_test_scheduleitem",
-      "community": 64,
+      "community": 321,
       "norm_label": "scheduleitem"
     },
     {
@@ -6714,7 +6876,7 @@
       "source_file": "src/components/screens/DisplayScreen.test.tsx",
       "source_location": "L23",
       "id": "screens_displayscreen_test_result",
-      "community": 64,
+      "community": 321,
       "norm_label": "result"
     },
     {
@@ -6723,7 +6885,7 @@
       "source_file": "src/components/screens/DisplayScreen.test.tsx",
       "source_location": "L59",
       "id": "screens_displayscreen_test_normalizeditem",
-      "community": 64,
+      "community": 321,
       "norm_label": "normalizeditem"
     },
     {
@@ -6955,7 +7117,7 @@
       "label": "EventSlide",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L40",
+      "source_location": "L41",
       "id": "display_contentcarousel_eventslide",
       "community": 99,
       "norm_label": "eventslide"
@@ -6964,7 +7126,7 @@
       "label": "DonationSlide",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L41",
+      "source_location": "L42",
       "id": "display_contentcarousel_donationslide",
       "community": 99,
       "norm_label": "donationslide"
@@ -6973,7 +7135,7 @@
       "label": "AsmaName",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L46",
+      "source_location": "L47",
       "id": "display_contentcarousel_asmaname",
       "community": 99,
       "norm_label": "asmaname"
@@ -6982,7 +7144,7 @@
       "label": "CarouselItem",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L53",
+      "source_location": "L54",
       "id": "display_contentcarousel_carouselitem",
       "community": 115,
       "norm_label": "carouselitem"
@@ -6991,7 +7153,7 @@
       "label": "ContentCarouselProps",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L113",
+      "source_location": "L116",
       "id": "display_contentcarousel_contentcarouselprops",
       "community": 99,
       "norm_label": "contentcarouselprops"
@@ -7000,7 +7162,7 @@
       "label": "applyFontSizeProps()",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L154",
+      "source_location": "L157",
       "id": "display_contentcarousel_applyfontsizeprops",
       "community": 99,
       "norm_label": "applyfontsizeprops()"
@@ -7009,7 +7171,7 @@
       "label": "ContentCarousel()",
       "file_type": "code",
       "source_file": "src/components/display/ContentCarousel.tsx",
-      "source_location": "L160",
+      "source_location": "L163",
       "id": "display_contentcarousel_contentcarousel",
       "community": 99,
       "norm_label": "contentcarousel()"
@@ -7488,7 +7650,7 @@
       "source_file": "src/components/display/SupplicationScreen.tsx",
       "source_location": "L1",
       "id": "src_components_display_supplicationscreen_tsx",
-      "community": 292,
+      "community": 64,
       "norm_label": "supplicationscreen.tsx"
     },
     {
@@ -7497,7 +7659,7 @@
       "source_file": "src/components/display/SupplicationScreen.tsx",
       "source_location": "L12",
       "id": "display_supplicationscreen_supplicationscreenprops",
-      "community": 292,
+      "community": 64,
       "norm_label": "supplicationscreenprops"
     },
     {
@@ -7506,7 +7668,7 @@
       "source_file": "src/components/display/SupplicationScreen.tsx",
       "source_location": "L16",
       "id": "display_supplicationscreen_supplicationscreen",
-      "community": 292,
+      "community": 64,
       "norm_label": "supplicationscreen()"
     },
     {
@@ -7515,7 +7677,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L1",
       "id": "src_components_display_emergencyalertoverlay_tsx",
-      "community": 53,
+      "community": 78,
       "norm_label": "emergencyalertoverlay.tsx"
     },
     {
@@ -7524,7 +7686,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L41",
       "id": "display_emergencyalertoverlay_category_colors",
-      "community": 53,
+      "community": 78,
       "norm_label": "category_colors"
     },
     {
@@ -7533,7 +7695,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L51",
       "id": "display_emergencyalertoverlay_getalertbackgroundcolor",
-      "community": 53,
+      "community": 78,
       "norm_label": "getalertbackgroundcolor()"
     },
     {
@@ -7542,7 +7704,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L62",
       "id": "display_emergencyalertoverlay_gettextcolor",
-      "community": 53,
+      "community": 78,
       "norm_label": "gettextcolor()"
     },
     {
@@ -7551,7 +7713,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L78",
       "id": "display_emergencyalertoverlay_categorymeta",
-      "community": 53,
+      "community": 78,
       "norm_label": "categorymeta"
     },
     {
@@ -7560,7 +7722,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L84",
       "id": "display_emergencyalertoverlay_getcategorymeta",
-      "community": 53,
+      "community": 78,
       "norm_label": "getcategorymeta()"
     },
     {
@@ -7569,7 +7731,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L130",
       "id": "display_emergencyalertoverlay_getremainingms",
-      "community": 53,
+      "community": 78,
       "norm_label": "getremainingms()"
     },
     {
@@ -7578,7 +7740,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L134",
       "id": "display_emergencyalertoverlay_formatcountdown",
-      "community": 53,
+      "community": 78,
       "norm_label": "formatcountdown()"
     },
     {
@@ -7587,7 +7749,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L146",
       "id": "display_emergencyalertoverlay_geturgencyclass",
-      "community": 53,
+      "community": 78,
       "norm_label": "geturgencyclass()"
     },
     {
@@ -7596,7 +7758,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L154",
       "id": "display_emergencyalertoverlay_gettitleweight",
-      "community": 53,
+      "community": 78,
       "norm_label": "gettitleweight()"
     },
     {
@@ -7605,7 +7767,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L166",
       "id": "display_emergencyalertoverlay_masjidconnectwordmark",
-      "community": 53,
+      "community": 78,
       "norm_label": "masjidconnectwordmark()"
     },
     {
@@ -7614,7 +7776,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L179",
       "id": "display_emergencyalertoverlay_alertcontentprops",
-      "community": 320,
+      "community": 65,
       "norm_label": "alertcontentprops"
     },
     {
@@ -7623,7 +7785,7 @@
       "source_file": "src/components/display/EmergencyAlertOverlay.tsx",
       "source_location": "L188",
       "id": "display_emergencyalertoverlay_alertcontent",
-      "community": 53,
+      "community": 78,
       "norm_label": "alertcontent()"
     },
     {
@@ -7668,7 +7830,7 @@
       "source_file": "src/components/display/PrayerCountdown.tsx",
       "source_location": "L53",
       "id": "display_prayercountdown_prayercountdown",
-      "community": 78,
+      "community": 32,
       "norm_label": "prayercountdown()"
     },
     {
@@ -7677,7 +7839,7 @@
       "source_file": "src/components/display/MediaPdfPage.tsx",
       "source_location": "L1",
       "id": "src_components_display_mediapdfpage_tsx",
-      "community": 19,
+      "community": 99,
       "norm_label": "mediapdfpage.tsx"
     },
     {
@@ -7686,16 +7848,16 @@
       "source_file": "src/components/display/MediaPdfPage.tsx",
       "source_location": "L16",
       "id": "display_mediapdfpage_mediapdfpageprops",
-      "community": 19,
+      "community": 99,
       "norm_label": "mediapdfpageprops"
     },
     {
       "label": "MediaPdfPage()",
       "file_type": "code",
       "source_file": "src/components/display/MediaPdfPage.tsx",
-      "source_location": "L27",
+      "source_location": "L33",
       "id": "display_mediapdfpage_mediapdfpage",
-      "community": 19,
+      "community": 99,
       "norm_label": "mediapdfpage()"
     },
     {
@@ -7713,7 +7875,7 @@
       "source_file": "src/components/display/PrayerStrip.tsx",
       "source_location": "L5",
       "id": "display_prayerstrip_prayerstrip",
-      "community": 78,
+      "community": 32,
       "norm_label": "prayerstrip()"
     },
     {
@@ -7722,7 +7884,7 @@
       "source_file": "src/components/display/JamaatBlackoutOverlay.tsx",
       "source_location": "L1",
       "id": "src_components_display_jamaatblackoutoverlay_tsx",
-      "community": 292,
+      "community": 17,
       "norm_label": "jamaatblackoutoverlay.tsx"
     },
     {
@@ -7731,7 +7893,7 @@
       "source_file": "src/components/display/JamaatBlackoutOverlay.tsx",
       "source_location": "L12",
       "id": "display_jamaatblackoutoverlay_resolveportalroot",
-      "community": 292,
+      "community": 17,
       "norm_label": "resolveportalroot()"
     },
     {
@@ -7740,7 +7902,7 @@
       "source_file": "src/components/display/JamaatBlackoutOverlay.tsx",
       "source_location": "L16",
       "id": "display_jamaatblackoutoverlay_jamaatblackoutoverlay",
-      "community": 292,
+      "community": 17,
       "norm_label": "jamaatblackoutoverlay()"
     },
     {
@@ -7756,7 +7918,7 @@
       "label": "PrayerTimesPanelProps",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesPanel.tsx",
-      "source_location": "L30",
+      "source_location": "L37",
       "id": "display_prayertimespanel_prayertimespanelprops",
       "community": 17,
       "norm_label": "prayertimespanelprops"
@@ -7765,7 +7927,7 @@
       "label": "TimeWithPeriod()",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesPanel.tsx",
-      "source_location": "L64",
+      "source_location": "L73",
       "id": "display_prayertimespanel_timewithperiod",
       "community": 17,
       "norm_label": "timewithperiod()"
@@ -7774,9 +7936,9 @@
       "label": "PrayerTimesPanel()",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesPanel.tsx",
-      "source_location": "L81",
+      "source_location": "L90",
       "id": "display_prayertimespanel_prayertimespanel",
-      "community": 78,
+      "community": 32,
       "norm_label": "prayertimespanel()"
     },
     {
@@ -7857,7 +8019,7 @@
       "source_file": "src/components/display/ConnectionBanner.tsx",
       "source_location": "L46",
       "id": "display_connectionbanner_connectionbanner",
-      "community": 20,
+      "community": 319,
       "norm_label": "connectionbanner()"
     },
     {
@@ -7992,7 +8154,7 @@
       "source_file": "src/components/display/JumuahBar.tsx",
       "source_location": "L27",
       "id": "display_jumuahbar_jumuahbar",
-      "community": 9,
+      "community": 32,
       "norm_label": "jumuahbar()"
     },
     {
@@ -8145,7 +8307,7 @@
       "source_file": "src/components/display/JamaatSoonSlot.tsx",
       "source_location": "L143",
       "id": "display_jamaatsoonslot_jamaatsoonslot",
-      "community": 64,
+      "community": 318,
       "norm_label": "jamaatsoonslot()"
     },
     {
@@ -8161,7 +8323,7 @@
       "label": "STRIP_DISPLAY_NAMES",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L17",
+      "source_location": "L22",
       "id": "display_prayerstriptiles_strip_display_names",
       "community": 17,
       "norm_label": "strip_display_names"
@@ -8170,7 +8332,7 @@
       "label": "StripTileOrientation",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L22",
+      "source_location": "L27",
       "id": "display_prayerstriptiles_striptileorientation",
       "community": 17,
       "norm_label": "striptileorientation"
@@ -8179,7 +8341,7 @@
       "label": "StripPrayerRow",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L24",
+      "source_location": "L29",
       "id": "display_prayerstriptiles_stripprayerrow",
       "community": 17,
       "norm_label": "stripprayerrow"
@@ -8188,7 +8350,7 @@
       "label": "TimeWithPeriod()",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L32",
+      "source_location": "L37",
       "id": "display_prayerstriptiles_timewithperiod",
       "community": 17,
       "norm_label": "timewithperiod()"
@@ -8197,7 +8359,7 @@
       "label": "resolveStripPrayerDisplayName()",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L51",
+      "source_location": "L56",
       "id": "display_prayerstriptiles_resolvestripprayerdisplayname",
       "community": 17,
       "norm_label": "resolvestripprayerdisplayname()"
@@ -8206,7 +8368,7 @@
       "label": "PrayerStripClockBlockProps",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L63",
+      "source_location": "L68",
       "id": "display_prayerstriptiles_prayerstripclockblockprops",
       "community": 17,
       "norm_label": "prayerstripclockblockprops"
@@ -8215,7 +8377,7 @@
       "label": "PrayerStripClockBlock()",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L74",
+      "source_location": "L79",
       "id": "display_prayerstriptiles_prayerstripclockblock",
       "community": 17,
       "norm_label": "prayerstripclockblock()"
@@ -8224,7 +8386,7 @@
       "label": "PrayerCueTileProps",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L112",
+      "source_location": "L117",
       "id": "display_prayerstriptiles_prayercuetileprops",
       "community": 17,
       "norm_label": "prayercuetileprops"
@@ -8233,16 +8395,16 @@
       "label": "PrayerCueTile()",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L127",
+      "source_location": "L135",
       "id": "display_prayerstriptiles_prayercuetile",
-      "community": 17,
+      "community": 23,
       "norm_label": "prayercuetile()"
     },
     {
       "label": "PrayerStripTileGridProps",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L244",
+      "source_location": "L278",
       "id": "display_prayerstriptiles_prayerstriptilegridprops",
       "community": 17,
       "norm_label": "prayerstriptilegridprops"
@@ -8251,7 +8413,7 @@
       "label": "PrayerStripTileGrid()",
       "file_type": "code",
       "source_file": "src/components/display/prayerStripTiles.tsx",
-      "source_location": "L253",
+      "source_location": "L287",
       "id": "display_prayerstriptiles_prayerstriptilegrid",
       "community": 17,
       "norm_label": "prayerstriptilegrid()"
@@ -8262,7 +8424,7 @@
       "source_file": "src/components/display/PostJamaatSupplicationSlot.tsx",
       "source_location": "L1",
       "id": "src_components_display_postjamaatsupplicationslot_tsx",
-      "community": 292,
+      "community": 64,
       "norm_label": "postjamaatsupplicationslot.tsx"
     },
     {
@@ -8271,7 +8433,7 @@
       "source_file": "src/components/display/PostJamaatSupplicationSlot.tsx",
       "source_location": "L18",
       "id": "display_postjamaatsupplicationslot_postjamaatsupplicationslot",
-      "community": 292,
+      "community": 64,
       "norm_label": "postjamaatsupplicationslot()"
     },
     {
@@ -8287,7 +8449,7 @@
       "label": "DAYS_SHORT",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L27",
+      "source_location": "L32",
       "id": "display_prayertimesbar_days_short",
       "community": 17,
       "norm_label": "days_short"
@@ -8296,7 +8458,7 @@
       "label": "DAYS_LONG",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L28",
+      "source_location": "L33",
       "id": "display_prayertimesbar_days_long",
       "community": 17,
       "norm_label": "days_long"
@@ -8305,7 +8467,7 @@
       "label": "MONTHS_SHORT",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L29",
+      "source_location": "L34",
       "id": "display_prayertimesbar_months_short",
       "community": 17,
       "norm_label": "months_short"
@@ -8314,7 +8476,7 @@
       "label": "MONTHS_LONG",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L33",
+      "source_location": "L38",
       "id": "display_prayertimesbar_months_long",
       "community": 17,
       "norm_label": "months_long"
@@ -8323,7 +8485,7 @@
       "label": "PrayerTimesBarVariant",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L38",
+      "source_location": "L43",
       "id": "display_prayertimesbar_prayertimesbarvariant",
       "community": 17,
       "norm_label": "prayertimesbarvariant"
@@ -8332,7 +8494,7 @@
       "label": "PrayerTimesBarProps",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L40",
+      "source_location": "L45",
       "id": "display_prayertimesbar_prayertimesbarprops",
       "community": 17,
       "norm_label": "prayertimesbarprops"
@@ -8341,9 +8503,9 @@
       "label": "PrayerTimesBar()",
       "file_type": "code",
       "source_file": "src/components/display/PrayerTimesBar.tsx",
-      "source_location": "L61",
+      "source_location": "L67",
       "id": "display_prayertimesbar_prayertimesbar",
-      "community": 78,
+      "community": 32,
       "norm_label": "prayertimesbar()"
     },
     {
@@ -8397,7 +8559,7 @@
       "source_file": "src/components/display/Header.tsx",
       "source_location": "L1",
       "id": "src_components_display_header_tsx",
-      "community": 17,
+      "community": 9,
       "norm_label": "header.tsx"
     },
     {
@@ -8406,7 +8568,7 @@
       "source_file": "src/components/display/Header.tsx",
       "source_location": "L16",
       "id": "display_header_headerprops",
-      "community": 17,
+      "community": 9,
       "norm_label": "headerprops"
     },
     {
@@ -8415,7 +8577,7 @@
       "source_file": "src/components/display/Header.tsx",
       "source_location": "L42",
       "id": "display_header_goldaccentbar",
-      "community": 17,
+      "community": 9,
       "norm_label": "goldaccentbar()"
     },
     {
@@ -8424,7 +8586,7 @@
       "source_file": "src/components/display/Header.tsx",
       "source_location": "L52",
       "id": "display_header_days",
-      "community": 17,
+      "community": 9,
       "norm_label": "days"
     },
     {
@@ -8433,7 +8595,7 @@
       "source_file": "src/components/display/Header.tsx",
       "source_location": "L53",
       "id": "display_header_months",
-      "community": 17,
+      "community": 9,
       "norm_label": "months"
     },
     {
@@ -8451,7 +8613,7 @@
       "source_file": "src/components/display/index.ts",
       "source_location": "L1",
       "id": "src_components_display_index_ts",
-      "community": 292,
+      "community": 17,
       "norm_label": "index.ts"
     },
     {
@@ -8487,7 +8649,7 @@
       "source_file": "src/components/display/CountdownDisplay.tsx",
       "source_location": "L1",
       "id": "src_components_display_countdowndisplay_tsx",
-      "community": 292,
+      "community": 163,
       "norm_label": "countdowndisplay.tsx"
     },
     {
@@ -8496,7 +8658,7 @@
       "source_file": "src/components/display/CountdownDisplay.tsx",
       "source_location": "L16",
       "id": "display_countdowndisplay_countdowndisplayprops",
-      "community": 292,
+      "community": 163,
       "norm_label": "countdowndisplayprops"
     },
     {
@@ -8505,7 +8667,7 @@
       "source_file": "src/components/display/CountdownDisplay.tsx",
       "source_location": "L23",
       "id": "display_countdowndisplay_countdowndisplay",
-      "community": 292,
+      "community": 163,
       "norm_label": "countdowndisplay()"
     },
     {
@@ -8604,7 +8766,7 @@
       "source_file": "src/components/display/SilentPhonesGraphic.tsx",
       "source_location": "L1",
       "id": "src_components_display_silentphonesgraphic_tsx",
-      "community": 78,
+      "community": 32,
       "norm_label": "silentphonesgraphic.tsx"
     },
     {
@@ -8613,7 +8775,7 @@
       "source_file": "src/components/display/SilentPhonesGraphic.tsx",
       "source_location": "L21",
       "id": "display_silentphonesgraphic_silentphonesgraphicprops",
-      "community": 78,
+      "community": 32,
       "norm_label": "silentphonesgraphicprops"
     },
     {
@@ -8622,7 +8784,7 @@
       "source_file": "src/components/display/SilentPhonesGraphic.tsx",
       "source_location": "L26",
       "id": "display_silentphonesgraphic_prohibitionsvg",
-      "community": 78,
+      "community": 32,
       "norm_label": "prohibitionsvg()"
     },
     {
@@ -8631,7 +8793,7 @@
       "source_file": "src/components/display/SilentPhonesGraphic.tsx",
       "source_location": "L95",
       "id": "display_silentphonesgraphic_silentphonesgraphic",
-      "community": 78,
+      "community": 32,
       "norm_label": "silentphonesgraphic()"
     },
     {
@@ -8640,7 +8802,7 @@
       "source_file": "src/components/display/TomorrowsJamaatChangeSlide.tsx",
       "source_location": "L1",
       "id": "src_components_display_tomorrowsjamaatchangeslide_tsx",
-      "community": 78,
+      "community": 318,
       "norm_label": "tomorrowsjamaatchangeslide.tsx"
     },
     {
@@ -8649,7 +8811,7 @@
       "source_file": "src/components/display/TomorrowsJamaatChangeSlide.tsx",
       "source_location": "L28",
       "id": "display_tomorrowsjamaatchangeslide_tomorrowsjamaatchangeslideprops",
-      "community": 78,
+      "community": 318,
       "norm_label": "tomorrowsjamaatchangeslideprops"
     },
     {
@@ -8658,7 +8820,7 @@
       "source_file": "src/components/display/TomorrowsJamaatChangeSlide.tsx",
       "source_location": "L42",
       "id": "display_tomorrowsjamaatchangeslide_tomorrowcalendarmotif",
-      "community": 78,
+      "community": 318,
       "norm_label": "tomorrowcalendarmotif()"
     },
     {
@@ -8667,7 +8829,7 @@
       "source_file": "src/components/display/TomorrowsJamaatChangeSlide.tsx",
       "source_location": "L150",
       "id": "display_tomorrowsjamaatchangeslide_tomorrowsjamaatchangeslide",
-      "community": 78,
+      "community": 32,
       "norm_label": "tomorrowsjamaatchangeslide()"
     },
     {
@@ -8676,7 +8838,7 @@
       "source_file": "src/components/display/InPrayerScreen.tsx",
       "source_location": "L1",
       "id": "src_components_display_inprayerscreen_tsx",
-      "community": 78,
+      "community": 32,
       "norm_label": "inprayerscreen.tsx"
     },
     {
@@ -8685,7 +8847,7 @@
       "source_file": "src/components/display/InPrayerScreen.tsx",
       "source_location": "L22",
       "id": "display_inprayerscreen_inprayerscreenprops",
-      "community": 78,
+      "community": 32,
       "norm_label": "inprayerscreenprops"
     },
     {
@@ -8694,7 +8856,7 @@
       "source_file": "src/components/display/InPrayerScreen.tsx",
       "source_location": "L32",
       "id": "display_inprayerscreen_prayerrugmotif",
-      "community": 78,
+      "community": 32,
       "norm_label": "prayerrugmotif()"
     },
     {
@@ -8703,7 +8865,7 @@
       "source_file": "src/components/display/InPrayerScreen.tsx",
       "source_location": "L41",
       "id": "display_inprayerscreen_inprayerscreen",
-      "community": 78,
+      "community": 32,
       "norm_label": "inprayerscreen()"
     },
     {
@@ -8910,7 +9072,7 @@
       "source_file": "src/hooks/useCurrentTime.ts",
       "source_location": "L1",
       "id": "src_hooks_usecurrenttime_ts",
-      "community": 53,
+      "community": 32,
       "norm_label": "usecurrenttime.ts"
     },
     {
@@ -8982,7 +9144,7 @@
       "source_file": "src/hooks/useCurrentTime.ts",
       "source_location": "L117",
       "id": "hooks_usecurrenttime_usecurrenttime",
-      "community": 53,
+      "community": 32,
       "norm_label": "usecurrenttime()"
     },
     {
@@ -8991,7 +9153,7 @@
       "source_file": "src/hooks/useCurrentTime.ts",
       "source_location": "L150",
       "id": "hooks_usecurrenttime_usetimemanagerstats",
-      "community": 53,
+      "community": 32,
       "norm_label": "usetimemanagerstats()"
     },
     {
@@ -9000,7 +9162,7 @@
       "source_file": "src/hooks/useConnectionStatus.ts",
       "source_location": "L1",
       "id": "src_hooks_useconnectionstatus_ts",
-      "community": 20,
+      "community": 319,
       "norm_label": "useconnectionstatus.ts"
     },
     {
@@ -9009,7 +9171,7 @@
       "source_file": "src/hooks/useConnectionStatus.ts",
       "source_location": "L14",
       "id": "hooks_useconnectionstatus_connectionstatustype",
-      "community": 20,
+      "community": 319,
       "norm_label": "connectionstatustype"
     },
     {
@@ -9018,7 +9180,7 @@
       "source_file": "src/hooks/useConnectionStatus.ts",
       "source_location": "L21",
       "id": "hooks_useconnectionstatus_connectionstatus",
-      "community": 20,
+      "community": 319,
       "norm_label": "connectionstatus"
     },
     {
@@ -9027,7 +9189,7 @@
       "source_file": "src/hooks/useConnectionStatus.ts",
       "source_location": "L31",
       "id": "hooks_useconnectionstatus_useconnectionstatus",
-      "community": 20,
+      "community": 319,
       "norm_label": "useconnectionstatus()"
     },
     {
@@ -9036,7 +9198,7 @@
       "source_file": "src/hooks/useWifiStatus.ts",
       "source_location": "L1",
       "id": "src_hooks_usewifistatus_ts",
-      "community": 78,
+      "community": 20,
       "norm_label": "usewifistatus.ts"
     },
     {
@@ -9045,7 +9207,7 @@
       "source_file": "src/hooks/useWifiStatus.ts",
       "source_location": "L19",
       "id": "hooks_usewifistatus_usewifistatus",
-      "community": 78,
+      "community": 20,
       "norm_label": "usewifistatus()"
     },
     {
@@ -9171,7 +9333,7 @@
       "source_file": "src/hooks/usePrayerTimes.test.ts",
       "source_location": "L191",
       "id": "hooks_useprayertimes_test_mounthook",
-      "community": 43,
+      "community": 13,
       "norm_label": "mounthook()"
     },
     {
@@ -9310,12 +9472,93 @@
       "norm_label": "storewithweek"
     },
     {
+      "label": "useScheduledPlaylist.test.ts",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L1",
+      "id": "src_hooks_usescheduledplaylist_test_ts",
+      "community": 67,
+      "norm_label": "usescheduledplaylist.test.ts"
+    },
+    {
+      "label": "makeAssignment()",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L8",
+      "id": "hooks_usescheduledplaylist_test_makeassignment",
+      "community": 67,
+      "norm_label": "makeassignment()"
+    },
+    {
+      "label": "base",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L24",
+      "id": "hooks_usescheduledplaylist_test_base",
+      "community": 67,
+      "norm_label": "base"
+    },
+    {
+      "label": "withNewItem",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L34",
+      "id": "hooks_usescheduledplaylist_test_withnewitem",
+      "community": 67,
+      "norm_label": "withnewitem"
+    },
+    {
+      "label": "editedItem",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L47",
+      "id": "hooks_usescheduledplaylist_test_editeditem",
+      "community": 67,
+      "norm_label": "editeditem"
+    },
+    {
+      "label": "baseKey",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L58",
+      "id": "hooks_usescheduledplaylist_test_basekey",
+      "community": 67,
+      "norm_label": "basekey"
+    },
+    {
+      "label": "playlists",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L64",
+      "id": "hooks_usescheduledplaylist_test_playlists",
+      "community": 67,
+      "norm_label": "playlists"
+    },
+    {
+      "label": "before",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L82",
+      "id": "hooks_usescheduledplaylist_test_before",
+      "community": 67,
+      "norm_label": "before"
+    },
+    {
+      "label": "after",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L92",
+      "id": "hooks_usescheduledplaylist_test_after",
+      "community": 67,
+      "norm_label": "after"
+    },
+    {
       "label": "useJamaatBuzzer.ts",
       "file_type": "code",
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L1",
       "id": "src_hooks_usejamaatbuzzer_ts",
-      "community": 32,
+      "community": 78,
       "norm_label": "usejamaatbuzzer.ts"
     },
     {
@@ -9324,7 +9567,7 @@
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L49",
       "id": "hooks_usejamaatbuzzer_dedupestate",
-      "community": 32,
+      "community": 78,
       "norm_label": "dedupestate"
     },
     {
@@ -9333,7 +9576,7 @@
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L56",
       "id": "hooks_usejamaatbuzzer_todaykey",
-      "community": 32,
+      "community": 78,
       "norm_label": "todaykey()"
     },
     {
@@ -9342,7 +9585,7 @@
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L64",
       "id": "hooks_usejamaatbuzzer_loaddedupe",
-      "community": 32,
+      "community": 78,
       "norm_label": "loaddedupe()"
     },
     {
@@ -9351,7 +9594,7 @@
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L80",
       "id": "hooks_usejamaatbuzzer_alreadybuzzedtoday",
-      "community": 32,
+      "community": 78,
       "norm_label": "alreadybuzzedtoday()"
     },
     {
@@ -9360,7 +9603,7 @@
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L84",
       "id": "hooks_usejamaatbuzzer_markbuzzedtoday",
-      "community": 32,
+      "community": 78,
       "norm_label": "markbuzzedtoday()"
     },
     {
@@ -9378,7 +9621,7 @@
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L115",
       "id": "hooks_usejamaatbuzzer_usejamaatbuzzer",
-      "community": 64,
+      "community": 32,
       "norm_label": "usejamaatbuzzer()"
     },
     {
@@ -9513,7 +9756,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L1",
       "id": "src_hooks_useprayertimes_ts",
-      "community": 9,
+      "community": 113,
       "norm_label": "useprayertimes.ts"
     },
     {
@@ -9522,7 +9765,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L39",
       "id": "hooks_useprayertimes_window",
-      "community": 17,
+      "community": 113,
       "norm_label": "window"
     },
     {
@@ -9531,7 +9774,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L49",
       "id": "hooks_useprayertimes_formattedprayertime",
-      "community": 9,
+      "community": 113,
       "norm_label": "formattedprayertime"
     },
     {
@@ -9540,7 +9783,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L86",
       "id": "hooks_useprayertimes_tomorrowsjamaatentry",
-      "community": 9,
+      "community": 113,
       "norm_label": "tomorrowsjamaatentry"
     },
     {
@@ -9558,7 +9801,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L98",
       "id": "hooks_useprayertimes_prayertimeshook",
-      "community": 17,
+      "community": 113,
       "norm_label": "prayertimeshook"
     },
     {
@@ -9567,7 +9810,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L120",
       "id": "hooks_useprayertimes_prayer_names",
-      "community": 9,
+      "community": 113,
       "norm_label": "prayer_names"
     },
     {
@@ -9576,7 +9819,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L121",
       "id": "hooks_useprayertimes_skip_prayers",
-      "community": 9,
+      "community": 113,
       "norm_label": "skip_prayers"
     },
     {
@@ -9585,7 +9828,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L123",
       "id": "hooks_useprayertimes_prayers_with_jamaat",
-      "community": 9,
+      "community": 113,
       "norm_label": "prayers_with_jamaat"
     },
     {
@@ -9594,7 +9837,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L129",
       "id": "hooks_useprayertimes_getjamaattime",
-      "community": 9,
+      "community": 113,
       "norm_label": "getjamaattime()"
     },
     {
@@ -9603,7 +9846,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L152",
       "id": "hooks_useprayertimes_buildtomorrowsjamaats",
-      "community": 9,
+      "community": 113,
       "norm_label": "buildtomorrowsjamaats()"
     },
     {
@@ -9621,7 +9864,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L237",
       "id": "hooks_useprayertimes_parseymdintz",
-      "community": 9,
+      "community": 113,
       "norm_label": "parseymdintz()"
     },
     {
@@ -9630,7 +9873,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L246",
       "id": "hooks_useprayertimes_findupcomingfridayjummahinweek",
-      "community": 9,
+      "community": 113,
       "norm_label": "findupcomingfridayjummahinweek()"
     },
     {
@@ -9639,7 +9882,7 @@
       "source_file": "src/hooks/usePrayerTimes.ts",
       "source_location": "L271",
       "id": "hooks_useprayertimes_resolveupcomingfridayjummahraw",
-      "community": 9,
+      "community": 113,
       "norm_label": "resolveupcomingfridayjummahraw()"
     },
     {
@@ -9657,7 +9900,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L1",
       "id": "src_hooks_useramadanmode_ts",
-      "community": 64,
+      "community": 9,
       "norm_label": "useramadanmode.ts"
     },
     {
@@ -9666,7 +9909,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L39",
       "id": "hooks_useramadanmode_ramadanmodedata",
-      "community": 64,
+      "community": 9,
       "norm_label": "ramadanmodedata"
     },
     {
@@ -9675,7 +9918,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L72",
       "id": "hooks_useramadanmode_window",
-      "community": 64,
+      "community": 9,
       "norm_label": "window"
     },
     {
@@ -9684,7 +9927,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L81",
       "id": "hooks_useramadanmode_parsedhijri",
-      "community": 64,
+      "community": 9,
       "norm_label": "parsedhijri"
     },
     {
@@ -9693,7 +9936,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L91",
       "id": "hooks_useramadanmode_gettodaysprayertimesraw",
-      "community": 64,
+      "community": 9,
       "norm_label": "gettodaysprayertimesraw()"
     },
     {
@@ -9702,7 +9945,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L101",
       "id": "hooks_useramadanmode_parsehijristring",
-      "community": 64,
+      "community": 9,
       "norm_label": "parsehijristring()"
     },
     {
@@ -9711,7 +9954,7 @@
       "source_file": "src/hooks/useRamadanMode.ts",
       "source_location": "L119",
       "id": "hooks_useramadanmode_useramadanmode",
-      "community": 64,
+      "community": 32,
       "norm_label": "useramadanmode()"
     },
     {
@@ -9738,7 +9981,7 @@
       "source_file": "src/hooks/useConnectionStatus.test.ts",
       "source_location": "L1",
       "id": "src_hooks_useconnectionstatus_test_ts",
-      "community": 13,
+      "community": 319,
       "norm_label": "useconnectionstatus.test.ts"
     },
     {
@@ -9747,7 +9990,7 @@
       "source_file": "src/hooks/useConnectionStatus.test.ts",
       "source_location": "L15",
       "id": "hooks_useconnectionstatus_test_connected",
-      "community": 13,
+      "community": 319,
       "norm_label": "connected()"
     },
     {
@@ -9756,7 +9999,7 @@
       "source_file": "src/hooks/useConnectionStatus.test.ts",
       "source_location": "L27",
       "id": "hooks_useconnectionstatus_test_wrapper",
-      "community": 13,
+      "community": 319,
       "norm_label": "wrapper()"
     },
     {
@@ -9765,7 +10008,7 @@
       "source_file": "src/hooks/useConnectionStatus.test.ts",
       "source_location": "L29",
       "id": "hooks_useconnectionstatus_test_result",
-      "community": 13,
+      "community": 319,
       "norm_label": "{ result }"
     },
     {
@@ -9774,7 +10017,7 @@
       "source_file": "src/hooks/useConnectionStatus.test.ts",
       "source_location": "L51",
       "id": "hooks_useconnectionstatus_test_store",
-      "community": 13,
+      "community": 319,
       "norm_label": "store"
     },
     {
@@ -9783,7 +10026,7 @@
       "source_file": "src/hooks/useConnectionStatus.test.ts",
       "source_location": "L53",
       "id": "hooks_useconnectionstatus_test_preloaded",
-      "community": 13,
+      "community": 319,
       "norm_label": "preloaded"
     },
     {
@@ -9792,25 +10035,43 @@
       "source_file": "src/hooks/useScheduledPlaylist.ts",
       "source_location": "L1",
       "id": "src_hooks_usescheduledplaylist_ts",
-      "community": 23,
+      "community": 67,
       "norm_label": "usescheduledplaylist.ts"
     },
     {
       "label": "UseScheduledPlaylistResult",
       "file_type": "code",
       "source_file": "src/hooks/useScheduledPlaylist.ts",
-      "source_location": "L30",
+      "source_location": "L34",
       "id": "hooks_usescheduledplaylist_usescheduledplaylistresult",
-      "community": 23,
+      "community": 67,
       "norm_label": "usescheduledplaylistresult"
+    },
+    {
+      "label": "buildPlaylistsContentRevision()",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.ts",
+      "source_location": "L40",
+      "id": "hooks_usescheduledplaylist_buildplaylistscontentrevision",
+      "community": 67,
+      "norm_label": "buildplaylistscontentrevision()"
+    },
+    {
+      "label": "buildPlaylistsBoundaryKey()",
+      "file_type": "code",
+      "source_file": "src/hooks/useScheduledPlaylist.ts",
+      "source_location": "L65",
+      "id": "hooks_usescheduledplaylist_buildplaylistsboundarykey",
+      "community": 67,
+      "norm_label": "buildplaylistsboundarykey()"
     },
     {
       "label": "useScheduledPlaylist()",
       "file_type": "code",
       "source_file": "src/hooks/useScheduledPlaylist.ts",
-      "source_location": "L40",
+      "source_location": "L80",
       "id": "hooks_usescheduledplaylist_usescheduledplaylist",
-      "community": 23,
+      "community": 67,
       "norm_label": "usescheduledplaylist()"
     },
     {
@@ -9819,7 +10080,7 @@
       "source_file": "src/hooks/useAppLoader.ts",
       "source_location": "L1",
       "id": "src_hooks_useapploader_ts",
-      "community": 128,
+      "community": 320,
       "norm_label": "useapploader.ts"
     },
     {
@@ -9828,7 +10089,7 @@
       "source_file": "src/hooks/useAppLoader.ts",
       "source_location": "L17",
       "id": "hooks_useapploader_loadingtask",
-      "community": 128,
+      "community": 320,
       "norm_label": "loadingtask"
     },
     {
@@ -9837,7 +10098,7 @@
       "source_file": "src/hooks/useAppLoader.ts",
       "source_location": "L25",
       "id": "hooks_useapploader_apploadingphase",
-      "community": 128,
+      "community": 320,
       "norm_label": "apploadingphase"
     },
     {
@@ -9846,7 +10107,7 @@
       "source_file": "src/hooks/useAppLoader.ts",
       "source_location": "L27",
       "id": "hooks_useapploader_apploaderstate",
-      "community": 128,
+      "community": 320,
       "norm_label": "apploaderstate"
     },
     {
@@ -9855,7 +10116,7 @@
       "source_file": "src/hooks/useAppLoader.ts",
       "source_location": "L38",
       "id": "hooks_useapploader_default_tasks",
-      "community": 128,
+      "community": 320,
       "norm_label": "default_tasks"
     },
     {
@@ -9864,7 +10125,7 @@
       "source_file": "src/hooks/useAppLoader.ts",
       "source_location": "L48",
       "id": "hooks_useapploader_useapploader",
-      "community": 113,
+      "community": 57,
       "norm_label": "useapploader()"
     },
     {
@@ -9873,7 +10134,7 @@
       "source_file": "src/hooks/useMasjidTime.ts",
       "source_location": "L1",
       "id": "src_hooks_usemasjidtime_ts",
-      "community": 53,
+      "community": 32,
       "norm_label": "usemasjidtime.ts"
     },
     {
@@ -9882,7 +10143,7 @@
       "source_file": "src/hooks/useMasjidTime.ts",
       "source_location": "L33",
       "id": "hooks_usemasjidtime_usemasjidtime",
-      "community": 78,
+      "community": 32,
       "norm_label": "usemasjidtime()"
     },
     {
@@ -9927,7 +10188,7 @@
       "source_file": "src/hooks/usePrayerPhase.ts",
       "source_location": "L110",
       "id": "hooks_useprayerphase_useprayerphase",
-      "community": 64,
+      "community": 32,
       "norm_label": "useprayerphase()"
     },
     {
@@ -10026,7 +10287,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L1",
       "id": "src_hooks_useprayerphase_test_ts",
-      "community": 321,
+      "community": 13,
       "norm_label": "useprayerphase.test.ts"
     },
     {
@@ -10035,7 +10296,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L33",
       "id": "hooks_useprayerphase_test_mockprayer",
-      "community": 321,
+      "community": 13,
       "norm_label": "mockprayer"
     },
     {
@@ -10044,7 +10305,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L38",
       "id": "hooks_useprayerphase_test_mocknextref",
-      "community": 321,
+      "community": 13,
       "norm_label": "mocknextref"
     },
     {
@@ -10053,7 +10314,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L39",
       "id": "hooks_useprayerphase_test_mockcurrentref",
-      "community": 321,
+      "community": 13,
       "norm_label": "mockcurrentref"
     },
     {
@@ -10062,7 +10323,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L40",
       "id": "hooks_useprayerphase_test_mockisjumuahtodayref",
-      "community": 321,
+      "community": 13,
       "norm_label": "mockisjumuahtodayref"
     },
     {
@@ -10071,7 +10332,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L41",
       "id": "hooks_useprayerphase_test_mockjumuahtimeref",
-      "community": 321,
+      "community": 13,
       "norm_label": "mockjumuahtimeref"
     },
     {
@@ -10080,7 +10341,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L64",
       "id": "hooks_useprayerphase_test_renderphase",
-      "community": 321,
+      "community": 13,
       "norm_label": "renderphase()"
     },
     {
@@ -10089,7 +10350,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L81",
       "id": "hooks_useprayerphase_test_setmasjidtime",
-      "community": 321,
+      "community": 13,
       "norm_label": "setmasjidtime()"
     },
     {
@@ -10098,7 +10359,7 @@
       "source_file": "src/hooks/usePrayerPhase.test.ts",
       "source_location": "L108",
       "id": "hooks_useprayerphase_test_result",
-      "community": 321,
+      "community": 13,
       "norm_label": "{ result }"
     },
     {
@@ -10206,7 +10467,7 @@
       "source_file": "src/api/apiClient.ts",
       "source_location": "L107",
       "id": "api_apiclient_remotecommand",
-      "community": 81,
+      "community": 29,
       "norm_label": "remotecommand"
     },
     {
@@ -10359,7 +10620,7 @@
       "source_file": "src/api/apiClient.ts",
       "source_location": "L425",
       "id": "api_apiclient_apiclient_savetostorageservice",
-      "community": 47,
+      "community": 82,
       "norm_label": ".savetostorageservice()"
     },
     {
@@ -10395,7 +10656,7 @@
       "source_file": "src/api/apiClient.ts",
       "source_location": "L542",
       "id": "api_apiclient_apiclient_requestpairingcode",
-      "community": 0,
+      "community": 47,
       "norm_label": ".requestpairingcode()"
     },
     {
@@ -10557,7 +10818,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L1",
       "id": "src_api_masjiddisplayclient_ts",
-      "community": 0,
+      "community": 265,
       "norm_label": "masjiddisplayclient.ts"
     },
     {
@@ -10593,7 +10854,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L47",
       "id": "api_masjiddisplayclient_offlinestorage",
-      "community": 0,
+      "community": 265,
       "norm_label": "offlinestorage"
     },
     {
@@ -10602,7 +10863,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L72",
       "id": "api_masjiddisplayclient_cache_expiration",
-      "community": 0,
+      "community": 265,
       "norm_label": "cache_expiration"
     },
     {
@@ -10611,7 +10872,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L79",
       "id": "api_masjiddisplayclient_polling_intervals",
-      "community": 0,
+      "community": 265,
       "norm_label": "polling_intervals"
     },
     {
@@ -10620,7 +10881,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L95",
       "id": "api_masjiddisplayclient_endpointbackoff",
-      "community": 0,
+      "community": 265,
       "norm_label": "endpointbackoff"
     },
     {
@@ -10629,7 +10890,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L102",
       "id": "api_masjiddisplayclient_storage_keys",
-      "community": 0,
+      "community": 265,
       "norm_label": "storage_keys"
     },
     {
@@ -10638,7 +10899,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L108",
       "id": "api_masjiddisplayclient_cacheitem",
-      "community": 0,
+      "community": 265,
       "norm_label": "cacheitem"
     },
     {
@@ -10647,7 +10908,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L115",
       "id": "api_masjiddisplayclient_debouncemap",
-      "community": 0,
+      "community": 265,
       "norm_label": "debouncemap"
     },
     {
@@ -10656,7 +10917,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L116",
       "id": "api_masjiddisplayclient_shoulddebouncelog",
-      "community": 0,
+      "community": 265,
       "norm_label": "shoulddebouncelog()"
     },
     {
@@ -10773,7 +11034,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L583",
       "id": "api_masjiddisplayclient_masjiddisplayclient_isauthenticated",
-      "community": 46,
+      "community": 18,
       "norm_label": ".isauthenticated()"
     },
     {
@@ -10827,7 +11088,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L1052",
       "id": "api_masjiddisplayclient_masjiddisplayclient_sendheartbeat",
-      "community": 46,
+      "community": 265,
       "norm_label": ".sendheartbeat()"
     },
     {
@@ -10881,7 +11142,7 @@
       "source_file": "src/api/masjidDisplayClient.ts",
       "source_location": "L1562",
       "id": "api_masjiddisplayclient_masjiddisplayclient_generatedeviceid",
-      "community": 18,
+      "community": 46,
       "norm_label": ".generatedeviceid()"
     },
     {
@@ -10989,7 +11250,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L8",
       "id": "api_models_githubrelease",
-      "community": 0,
+      "community": 265,
       "norm_label": "githubrelease"
     },
     {
@@ -11025,7 +11286,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L45",
       "id": "api_models_requestpairingcoderequest",
-      "community": 0,
+      "community": 265,
       "norm_label": "requestpairingcoderequest"
     },
     {
@@ -11034,7 +11295,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L53",
       "id": "api_models_requestpairingcoderesponse",
-      "community": 0,
+      "community": 47,
       "norm_label": "requestpairingcoderesponse"
     },
     {
@@ -11043,7 +11304,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L59",
       "id": "api_models_checkpairingstatusrequest",
-      "community": 0,
+      "community": 265,
       "norm_label": "checkpairingstatusrequest"
     },
     {
@@ -11052,7 +11313,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L63",
       "id": "api_models_checkpairingstatusresponse",
-      "community": 0,
+      "community": 265,
       "norm_label": "checkpairingstatusresponse"
     },
     {
@@ -11070,7 +11331,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L82",
       "id": "api_models_pairedcredentialsrequest",
-      "community": 0,
+      "community": 265,
       "norm_label": "pairedcredentialsrequest"
     },
     {
@@ -11097,7 +11358,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L105",
       "id": "api_models_heartbeatrequest",
-      "community": 0,
+      "community": 265,
       "norm_label": "heartbeatrequest"
     },
     {
@@ -11115,7 +11376,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L140",
       "id": "api_models_heartbeatresponse",
-      "community": 0,
+      "community": 265,
       "norm_label": "heartbeatresponse"
     },
     {
@@ -11241,7 +11502,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L284",
       "id": "api_models_analyticsrequest",
-      "community": 0,
+      "community": 46,
       "norm_label": "analyticsrequest"
     },
     {
@@ -11250,7 +11511,7 @@
       "source_file": "src/api/models.ts",
       "source_location": "L290",
       "id": "api_models_analyticsresponse",
-      "community": 0,
+      "community": 46,
       "norm_label": "analyticsresponse"
     },
     {
@@ -11286,14 +11547,14 @@
       "source_file": "src/api/models.ts",
       "source_location": "L320",
       "id": "api_models_displaysettings",
-      "community": 105,
+      "community": 23,
       "norm_label": "displaysettings"
     },
     {
       "label": "TerminologyKey",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L388",
+      "source_location": "L395",
       "id": "api_models_terminologykey",
       "community": 17,
       "norm_label": "terminologykey"
@@ -11302,7 +11563,7 @@
       "label": "ContentItemType",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L404",
+      "source_location": "L411",
       "id": "api_models_contentitemtype",
       "community": 0,
       "norm_label": "contentitemtype"
@@ -11311,7 +11572,7 @@
       "label": "DuaContent",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L413",
+      "source_location": "L420",
       "id": "api_models_duacontent",
       "community": 0,
       "norm_label": "duacontent"
@@ -11320,7 +11581,7 @@
       "label": "ContentItem",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L421",
+      "source_location": "L428",
       "id": "api_models_contentitem",
       "community": 0,
       "norm_label": "contentitem"
@@ -11329,7 +11590,7 @@
       "label": "ScheduleItem",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L429",
+      "source_location": "L436",
       "id": "api_models_scheduleitem",
       "community": 0,
       "norm_label": "scheduleitem"
@@ -11338,16 +11599,16 @@
       "label": "Schedule",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L435",
+      "source_location": "L442",
       "id": "api_models_schedule",
-      "community": 23,
+      "community": 67,
       "norm_label": "schedule"
     },
     {
       "label": "PlaylistAssignmentType",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L446",
+      "source_location": "L453",
       "id": "api_models_playlistassignmenttype",
       "community": 0,
       "norm_label": "playlistassignmenttype"
@@ -11356,25 +11617,25 @@
       "label": "ScheduledPlaylistAssignment",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L448",
+      "source_location": "L455",
       "id": "api_models_scheduledplaylistassignment",
-      "community": 23,
+      "community": 67,
       "norm_label": "scheduledplaylistassignment"
     },
     {
       "label": "PrayerTimes",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L468",
+      "source_location": "L475",
       "id": "api_models_prayertimes",
-      "community": 23,
+      "community": 113,
       "norm_label": "prayertimes"
     },
     {
       "label": "ContentOverride",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L492",
+      "source_location": "L499",
       "id": "api_models_contentoverride",
       "community": 0,
       "norm_label": "contentoverride"
@@ -11383,7 +11644,7 @@
       "label": "ScreenContent",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L498",
+      "source_location": "L505",
       "id": "api_models_screencontent",
       "community": 0,
       "norm_label": "screencontent"
@@ -11392,7 +11653,7 @@
       "label": "PrayerName",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L554",
+      "source_location": "L561",
       "id": "api_models_prayername",
       "community": 0,
       "norm_label": "prayername"
@@ -11401,7 +11662,7 @@
       "label": "Prayer",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L563",
+      "source_location": "L570",
       "id": "api_models_prayer",
       "community": 0,
       "norm_label": "prayer"
@@ -11410,7 +11671,7 @@
       "label": "PrayerStatus",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L568",
+      "source_location": "L575",
       "id": "api_models_prayerstatus",
       "community": 0,
       "norm_label": "prayerstatus"
@@ -11419,7 +11680,7 @@
       "label": "EventType",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L600",
+      "source_location": "L607",
       "id": "api_models_eventtype",
       "community": 0,
       "norm_label": "eventtype"
@@ -11428,7 +11689,7 @@
       "label": "EventCategory",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L616",
+      "source_location": "L623",
       "id": "api_models_eventcategory",
       "community": 40,
       "norm_label": "eventcategory"
@@ -11437,7 +11698,7 @@
       "label": "EventV2",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L631",
+      "source_location": "L638",
       "id": "api_models_eventv2",
       "community": 40,
       "norm_label": "eventv2"
@@ -11446,25 +11707,25 @@
       "label": "Event",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L665",
+      "source_location": "L672",
       "id": "api_models_event",
-      "community": 23,
+      "community": 0,
       "norm_label": "event"
     },
     {
       "label": "EventsResponse",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L667",
+      "source_location": "L674",
       "id": "api_models_eventsresponse",
-      "community": 0,
+      "community": 46,
       "norm_label": "eventsresponse"
     },
     {
       "label": "ApiResponse",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L672",
+      "source_location": "L679",
       "id": "api_models_apiresponse",
       "community": 46,
       "norm_label": "apiresponse"
@@ -11473,7 +11734,7 @@
       "label": "AlertCategory",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L684",
+      "source_location": "L691",
       "id": "api_models_alertcategory",
       "community": 38,
       "norm_label": "alertcategory"
@@ -11482,16 +11743,16 @@
       "label": "AlertUrgency",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L693",
+      "source_location": "L700",
       "id": "api_models_alerturgency",
-      "community": 53,
+      "community": 78,
       "norm_label": "alerturgency"
     },
     {
       "label": "EmergencyAlert",
       "file_type": "code",
       "source_file": "src/api/models.ts",
-      "source_location": "L695",
+      "source_location": "L702",
       "id": "api_models_emergencyalert",
       "community": 95,
       "norm_label": "emergencyalert"
@@ -12276,7 +12537,7 @@
       "source_file": "src/services/syncService.ts",
       "source_location": "L698",
       "id": "services_syncservice_syncservice_processcommands",
-      "community": 81,
+      "community": 29,
       "norm_label": ".processcommands()"
     },
     {
@@ -12654,7 +12915,7 @@
       "source_file": "src/services/realtimeService.ts",
       "source_location": "L1",
       "id": "src_services_realtimeservice_ts",
-      "community": 65,
+      "community": 154,
       "norm_label": "realtimeservice.ts"
     },
     {
@@ -12663,7 +12924,7 @@
       "source_file": "src/services/realtimeService.ts",
       "source_location": "L25",
       "id": "services_realtimeservice_eventcallback",
-      "community": 65,
+      "community": 154,
       "norm_label": "eventcallback"
     },
     {
@@ -12672,7 +12933,7 @@
       "source_file": "src/services/realtimeService.ts",
       "source_location": "L28",
       "id": "services_realtimeservice_command_types",
-      "community": 65,
+      "community": 154,
       "norm_label": "command_types"
     },
     {
@@ -12681,7 +12942,7 @@
       "source_file": "src/services/realtimeService.ts",
       "source_location": "L46",
       "id": "services_realtimeservice_errormessagefromconnecterror",
-      "community": 65,
+      "community": 154,
       "norm_label": "errormessagefromconnecterror()"
     },
     {
@@ -12690,7 +12951,7 @@
       "source_file": "src/services/realtimeService.ts",
       "source_location": "L57",
       "id": "services_realtimeservice_isinvalidscreentokenerror",
-      "community": 65,
+      "community": 154,
       "norm_label": "isinvalidscreentokenerror()"
     },
     {
@@ -13104,7 +13365,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L1",
       "id": "src_store_index_ts",
-      "community": 67,
+      "community": 51,
       "norm_label": "index.ts"
     },
     {
@@ -13113,7 +13374,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L31",
       "id": "store_index_rootreducer",
-      "community": 67,
+      "community": 51,
       "norm_label": "rootreducer"
     },
     {
@@ -13122,7 +13383,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L39",
       "id": "store_index_statevalidationtransform",
-      "community": 67,
+      "community": 51,
       "norm_label": "statevalidationtransform"
     },
     {
@@ -13131,7 +13392,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L50",
       "id": "store_index_persistconfig",
-      "community": 67,
+      "community": 51,
       "norm_label": "persistconfig"
     },
     {
@@ -13140,7 +13401,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L59",
       "id": "store_index_persistedreducer",
-      "community": 67,
+      "community": 51,
       "norm_label": "persistedreducer"
     },
     {
@@ -13149,7 +13410,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L64",
       "id": "store_index_store",
-      "community": 67,
+      "community": 51,
       "norm_label": "store"
     },
     {
@@ -13158,7 +13419,7 @@
       "source_file": "src/store/index.ts",
       "source_location": "L84",
       "id": "store_index_persistor",
-      "community": 67,
+      "community": 51,
       "norm_label": "persistor"
     },
     {
@@ -13878,7 +14139,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L1",
       "id": "src_store_slices_contentslice_test_ts",
-      "community": 265,
+      "community": 57,
       "norm_label": "contentslice.test.ts"
     },
     {
@@ -13887,7 +14148,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L29",
       "id": "slices_contentslice_test_minimalprayertimes",
-      "community": 265,
+      "community": 57,
       "norm_label": "minimalprayertimes"
     },
     {
@@ -13896,7 +14157,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L51",
       "id": "slices_contentslice_test_state",
-      "community": 265,
+      "community": 57,
       "norm_label": "state"
     },
     {
@@ -13905,7 +14166,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L68",
       "id": "slices_contentslice_test_payload",
-      "community": 265,
+      "community": 57,
       "norm_label": "payload"
     },
     {
@@ -13914,7 +14175,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L80",
       "id": "slices_contentslice_test_prev",
-      "community": 265,
+      "community": 57,
       "norm_label": "prev"
     },
     {
@@ -13923,7 +14184,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L109",
       "id": "slices_contentslice_test_schedulewithdua",
-      "community": 265,
+      "community": 57,
       "norm_label": "schedulewithdua"
     },
     {
@@ -13932,7 +14193,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L186",
       "id": "slices_contentslice_test_schedule",
-      "community": 265,
+      "community": 57,
       "norm_label": "schedule"
     },
     {
@@ -13941,7 +14202,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L234",
       "id": "slices_contentslice_test_events",
-      "community": 265,
+      "community": 57,
       "norm_label": "events"
     },
     {
@@ -13950,7 +14211,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L298",
       "id": "slices_contentslice_test_raw",
-      "community": 265,
+      "community": 57,
       "norm_label": "raw"
     },
     {
@@ -13959,7 +14220,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L317",
       "id": "slices_contentslice_test_result",
-      "community": 265,
+      "community": 57,
       "norm_label": "result"
     },
     {
@@ -13968,7 +14229,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L328",
       "id": "slices_contentslice_test_baditem",
-      "community": 265,
+      "community": 57,
       "norm_label": "baditem"
     },
     {
@@ -13977,7 +14238,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L330",
       "id": "slices_contentslice_test_get",
-      "community": 265,
+      "community": 57,
       "norm_label": "get()"
     },
     {
@@ -13986,7 +14247,7 @@
       "source_file": "src/store/slices/contentSlice.test.ts",
       "source_location": "L346",
       "id": "slices_contentslice_test_ids",
-      "community": 265,
+      "community": 57,
       "norm_label": "ids"
     },
     {
@@ -14049,7 +14310,7 @@
       "source_file": "src/store/slices/authSlice.ts",
       "source_location": "L139",
       "id": "slices_authslice_checkpairingstatus",
-      "community": 57,
+      "community": 128,
       "norm_label": "checkpairingstatus"
     },
     {
@@ -14058,7 +14319,7 @@
       "source_file": "src/store/slices/authSlice.ts",
       "source_location": "L220",
       "id": "slices_authslice_initializefromstorage",
-      "community": 128,
+      "community": 320,
       "norm_label": "initializefromstorage"
     },
     {
@@ -14200,7 +14461,7 @@
       "label": "SKIP_PRAYERS",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L17",
+      "source_location": "L21",
       "id": "slices_contentslice_skip_prayers",
       "community": 23,
       "norm_label": "skip_prayers"
@@ -14209,7 +14470,7 @@
       "label": "normalisePrayerTimesForStore()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L26",
+      "source_location": "L30",
       "id": "slices_contentslice_normaliseprayertimesforstore",
       "community": 23,
       "norm_label": "normaliseprayertimesforstore()"
@@ -14218,7 +14479,7 @@
       "label": "SALAH_KEYS",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L40",
+      "source_location": "L44",
       "id": "slices_contentslice_salah_keys",
       "community": 23,
       "norm_label": "salah_keys"
@@ -14227,7 +14488,7 @@
       "label": "TERMINOLOGY_KEYS",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L42",
+      "source_location": "L46",
       "id": "slices_contentslice_terminology_keys",
       "community": 23,
       "norm_label": "terminology_keys"
@@ -14236,7 +14497,7 @@
       "label": "normaliseTerminology()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L58",
+      "source_location": "L62",
       "id": "slices_contentslice_normaliseterminology",
       "community": 23,
       "norm_label": "normaliseterminology()"
@@ -14245,7 +14506,7 @@
       "label": "clampJamaatSettingMinutes()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L75",
+      "source_location": "L79",
       "id": "slices_contentslice_clampjamaatsettingminutes",
       "community": 23,
       "norm_label": "clampjamaatsettingminutes()"
@@ -14254,7 +14515,7 @@
       "label": "normaliseJamaatBySalah()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L82",
+      "source_location": "L86",
       "id": "slices_contentslice_normalisejamaatbysalah",
       "community": 23,
       "norm_label": "normalisejamaatbysalah()"
@@ -14263,7 +14524,7 @@
       "label": "DEFAULT_DISPLAY_SETTINGS",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L97",
+      "source_location": "L101",
       "id": "slices_contentslice_default_display_settings",
       "community": 57,
       "norm_label": "default_display_settings"
@@ -14272,7 +14533,7 @@
       "label": "debounceMap",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L124",
+      "source_location": "L129",
       "id": "slices_contentslice_debouncemap",
       "community": 23,
       "norm_label": "debouncemap"
@@ -14281,16 +14542,16 @@
       "label": "ContentState",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L127",
+      "source_location": "L132",
       "id": "slices_contentslice_contentstate",
-      "community": 23,
+      "community": 113,
       "norm_label": "contentstate"
     },
     {
       "label": "initialState",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L171",
+      "source_location": "L176",
       "id": "slices_contentslice_initialstate",
       "community": 23,
       "norm_label": "initialstate"
@@ -14299,25 +14560,25 @@
       "label": "createFallbackSchedule()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L202",
+      "source_location": "L207",
       "id": "slices_contentslice_createfallbackschedule",
-      "community": 23,
+      "community": 67,
       "norm_label": "createfallbackschedule()"
     },
     {
       "label": "normalizeScheduleData()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L209",
+      "source_location": "L214",
       "id": "slices_contentslice_normalizescheduledata",
-      "community": 23,
+      "community": 67,
       "norm_label": "normalizescheduledata()"
     },
     {
       "label": "extractDisplaySettings()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L359",
+      "source_location": "L364",
       "id": "slices_contentslice_extractdisplaysettings",
       "community": 23,
       "norm_label": "extractdisplaysettings()"
@@ -14326,7 +14587,7 @@
       "label": "extractMasjidName()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L404",
+      "source_location": "L411",
       "id": "slices_contentslice_extractmasjidname",
       "community": 23,
       "norm_label": "extractmasjidname()"
@@ -14335,7 +14596,7 @@
       "label": "pickScheduledPlaylists()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L431",
+      "source_location": "L438",
       "id": "slices_contentslice_pickscheduledplaylists",
       "community": 23,
       "norm_label": "pickscheduledplaylists()"
@@ -14344,7 +14605,7 @@
       "label": "pickSchedulePayloadFromScreenContent()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L458",
+      "source_location": "L465",
       "id": "slices_contentslice_pickschedulepayloadfromscreencontent",
       "community": 23,
       "norm_label": "pickschedulepayloadfromscreencontent()"
@@ -14353,7 +14614,7 @@
       "label": "refreshContent",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L477",
+      "source_location": "L484",
       "id": "slices_contentslice_refreshcontent",
       "community": 57,
       "norm_label": "refreshcontent"
@@ -14362,61 +14623,61 @@
       "label": "refreshPrayerTimes",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L625",
+      "source_location": "L632",
       "id": "slices_contentslice_refreshprayertimes",
-      "community": 265,
+      "community": 57,
       "norm_label": "refreshprayertimes"
     },
     {
       "label": "loadPrayerTimesFromStorage",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L733",
+      "source_location": "L740",
       "id": "slices_contentslice_loadprayertimesfromstorage",
-      "community": 9,
+      "community": 113,
       "norm_label": "loadprayertimesfromstorage"
     },
     {
       "label": "refreshSchedule",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L756",
+      "source_location": "L763",
       "id": "slices_contentslice_refreshschedule",
-      "community": 265,
+      "community": 57,
       "norm_label": "refreshschedule"
     },
     {
       "label": "refreshEvents",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L832",
+      "source_location": "L839",
       "id": "slices_contentslice_refreshevents",
-      "community": 265,
+      "community": 57,
       "norm_label": "refreshevents"
     },
     {
       "label": "loadCachedContent",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L877",
+      "source_location": "L884",
       "id": "slices_contentslice_loadcachedcontent",
-      "community": 265,
+      "community": 57,
       "norm_label": "loadcachedcontent"
     },
     {
       "label": "refreshAllContent",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L943",
+      "source_location": "L950",
       "id": "slices_contentslice_refreshallcontent",
-      "community": 128,
+      "community": 320,
       "norm_label": "refreshallcontent"
     },
     {
       "label": "contentSlice",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L989",
+      "source_location": "L996",
       "id": "slices_contentslice_contentslice",
       "community": 23,
       "norm_label": "contentslice"
@@ -14425,7 +14686,7 @@
       "label": "selectIsLoading()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1308",
+      "source_location": "L1315",
       "id": "slices_contentslice_selectisloading",
       "community": 23,
       "norm_label": "selectisloading()"
@@ -14434,43 +14695,43 @@
       "label": "selectScreenContent()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1310",
+      "source_location": "L1317",
       "id": "slices_contentslice_selectscreencontent",
-      "community": 23,
+      "community": 67,
       "norm_label": "selectscreencontent()"
     },
     {
       "label": "selectPrayerTimes()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1312",
+      "source_location": "L1319",
       "id": "slices_contentslice_selectprayertimes",
-      "community": 64,
+      "community": 9,
       "norm_label": "selectprayertimes()"
     },
     {
       "label": "selectSchedule()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1314",
+      "source_location": "L1321",
       "id": "slices_contentslice_selectschedule",
-      "community": 23,
+      "community": 67,
       "norm_label": "selectschedule()"
     },
     {
       "label": "selectScheduledPlaylists()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1316",
+      "source_location": "L1323",
       "id": "slices_contentslice_selectscheduledplaylists",
-      "community": 23,
+      "community": 67,
       "norm_label": "selectscheduledplaylists()"
     },
     {
       "label": "selectEvents()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1318",
+      "source_location": "L1325",
       "id": "slices_contentslice_selectevents",
       "community": 23,
       "norm_label": "selectevents()"
@@ -14479,7 +14740,7 @@
       "label": "selectMasjidName()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1320",
+      "source_location": "L1327",
       "id": "slices_contentslice_selectmasjidname",
       "community": 64,
       "norm_label": "selectmasjidname()"
@@ -14488,7 +14749,7 @@
       "label": "selectMasjidTimezone()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1322",
+      "source_location": "L1329",
       "id": "slices_contentslice_selectmasjidtimezone",
       "community": 32,
       "norm_label": "selectmasjidtimezone()"
@@ -14497,7 +14758,7 @@
       "label": "selectCarouselTime()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1324",
+      "source_location": "L1331",
       "id": "slices_contentslice_selectcarouseltime",
       "community": 23,
       "norm_label": "selectcarouseltime()"
@@ -14506,16 +14767,16 @@
       "label": "selectTimeFormat()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1326",
+      "source_location": "L1333",
       "id": "slices_contentslice_selecttimeformat",
-      "community": 78,
+      "community": 318,
       "norm_label": "selecttimeformat()"
     },
     {
       "label": "selectDisplaySettings()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1328",
+      "source_location": "L1335",
       "id": "slices_contentslice_selectdisplaysettings",
       "community": 32,
       "norm_label": "selectdisplaysettings()"
@@ -14524,7 +14785,7 @@
       "label": "pickScreenLayoutPayload()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1336",
+      "source_location": "L1343",
       "id": "slices_contentslice_pickscreenlayoutpayload",
       "community": 23,
       "norm_label": "pickscreenlayoutpayload()"
@@ -14533,7 +14794,7 @@
       "label": "selectDisplayLayoutConfig",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1346",
+      "source_location": "L1353",
       "id": "slices_contentslice_selectdisplaylayoutconfig",
       "community": 64,
       "norm_label": "selectdisplaylayoutconfig"
@@ -14542,7 +14803,7 @@
       "label": "selectDisplayLayoutRevision",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1355",
+      "source_location": "L1362",
       "id": "slices_contentslice_selectdisplaylayoutrevision",
       "community": 64,
       "norm_label": "selectdisplaylayoutrevision"
@@ -14551,7 +14812,7 @@
       "label": "selectShowPrayerAnnouncement()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1365",
+      "source_location": "L1372",
       "id": "slices_contentslice_selectshowprayerannouncement",
       "community": 23,
       "norm_label": "selectshowprayerannouncement()"
@@ -14560,7 +14821,7 @@
       "label": "selectPrayerAnnouncementName()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1368",
+      "source_location": "L1375",
       "id": "slices_contentslice_selectprayerannouncementname",
       "community": 23,
       "norm_label": "selectprayerannouncementname()"
@@ -14569,7 +14830,7 @@
       "label": "selectIsPrayerJamaat()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1371",
+      "source_location": "L1378",
       "id": "slices_contentslice_selectisprayerjamaat",
       "community": 23,
       "norm_label": "selectisprayerjamaat()"
@@ -14578,7 +14839,7 @@
       "label": "selectLastUpdated()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1373",
+      "source_location": "L1380",
       "id": "slices_contentslice_selectlastupdated",
       "community": 23,
       "norm_label": "selectlastupdated()"
@@ -14587,7 +14848,7 @@
       "label": "selectContentError()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1375",
+      "source_location": "L1382",
       "id": "slices_contentslice_selectcontenterror",
       "community": 23,
       "norm_label": "selectcontenterror()"
@@ -14596,7 +14857,7 @@
       "label": "selectPrayerTimesError()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1377",
+      "source_location": "L1384",
       "id": "slices_contentslice_selectprayertimeserror",
       "community": 23,
       "norm_label": "selectprayertimeserror()"
@@ -14605,7 +14866,7 @@
       "label": "selectScheduleError()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1379",
+      "source_location": "L1386",
       "id": "slices_contentslice_selectscheduleerror",
       "community": 23,
       "norm_label": "selectscheduleerror()"
@@ -14614,7 +14875,7 @@
       "label": "selectEventsError()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1381",
+      "source_location": "L1388",
       "id": "slices_contentslice_selecteventserror",
       "community": 23,
       "norm_label": "selecteventserror()"
@@ -14623,7 +14884,7 @@
       "label": "selectIsLoadingContent()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1385",
+      "source_location": "L1392",
       "id": "slices_contentslice_selectisloadingcontent",
       "community": 23,
       "norm_label": "selectisloadingcontent()"
@@ -14632,7 +14893,7 @@
       "label": "selectIsLoadingPrayerTimes()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1387",
+      "source_location": "L1394",
       "id": "slices_contentslice_selectisloadingprayertimes",
       "community": 23,
       "norm_label": "selectisloadingprayertimes()"
@@ -14641,7 +14902,7 @@
       "label": "selectIsLoadingSchedule()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1389",
+      "source_location": "L1396",
       "id": "slices_contentslice_selectisloadingschedule",
       "community": 23,
       "norm_label": "selectisloadingschedule()"
@@ -14650,7 +14911,7 @@
       "label": "selectIsLoadingEvents()",
       "file_type": "code",
       "source_file": "src/store/slices/contentSlice.ts",
-      "source_location": "L1391",
+      "source_location": "L1398",
       "id": "slices_contentslice_selectisloadingevents",
       "community": 23,
       "norm_label": "selectisloadingevents()"
@@ -14679,7 +14940,7 @@
       "source_file": "src/store/slices/uiSlice.ts",
       "source_location": "L9",
       "id": "slices_uislice_uistate",
-      "community": 320,
+      "community": 65,
       "norm_label": "uistate"
     },
     {
@@ -14949,7 +15210,7 @@
       "source_file": "src/store/slices/uiSlice.ts",
       "source_location": "L431",
       "id": "slices_uislice_selectwifistatus",
-      "community": 20,
+      "community": 78,
       "norm_label": "selectwifistatus()"
     },
     {
@@ -14967,7 +15228,7 @@
       "source_file": "src/store/slices/uiSlice.ts",
       "source_location": "L437",
       "id": "slices_uislice_selectofflineduration",
-      "community": 324,
+      "community": 20,
       "norm_label": "selectofflineduration()"
     },
     {
@@ -14976,7 +15237,7 @@
       "source_file": "src/store/slices/uiSlice.ts",
       "source_location": "L442",
       "id": "slices_uislice_selectactivenotifications",
-      "community": 324,
+      "community": 20,
       "norm_label": "selectactivenotifications()"
     },
     {
@@ -15111,7 +15372,7 @@
       "source_file": "src/store/slices/uiSlice.test.ts",
       "source_location": "L1",
       "id": "src_store_slices_uislice_test_ts",
-      "community": 324,
+      "community": 20,
       "norm_label": "uislice.test.ts"
     },
     {
@@ -15120,7 +15381,7 @@
       "source_file": "src/store/slices/uiSlice.test.ts",
       "source_location": "L32",
       "id": "slices_uislice_test_state",
-      "community": 324,
+      "community": 20,
       "norm_label": "state"
     },
     {
@@ -15129,7 +15390,7 @@
       "source_file": "src/store/slices/uiSlice.test.ts",
       "source_location": "L215",
       "id": "slices_uislice_test_duration",
-      "community": 324,
+      "community": 20,
       "norm_label": "duration"
     },
     {
@@ -15138,7 +15399,7 @@
       "source_file": "src/store/slices/uiSlice.test.ts",
       "source_location": "L224",
       "id": "slices_uislice_test_active",
-      "community": 324,
+      "community": 20,
       "norm_label": "active"
     },
     {
@@ -15147,7 +15408,7 @@
       "source_file": "src/store/slices/uiSlice.test.ts",
       "source_location": "L230",
       "id": "slices_uislice_test_oldtime",
-      "community": 324,
+      "community": 20,
       "norm_label": "oldtime"
     },
     {
@@ -26955,7 +27216,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L92",
       "id": "docs_test_implementation_summary_3_service_tests_100_complete",
-      "community": 325,
+      "community": 149,
       "norm_label": "3. service tests (100% complete)"
     },
     {
@@ -26964,7 +27225,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L94",
       "id": "docs_test_implementation_summary_src_services_tests_analyticsservice_test_ts",
-      "community": 325,
+      "community": 149,
       "norm_label": "`src/services/__tests__/analyticsservice.test.ts`"
     },
     {
@@ -26973,7 +27234,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L107",
       "id": "docs_test_implementation_summary_src_services_tests_datasyncservice_test_ts",
-      "community": 325,
+      "community": 149,
       "norm_label": "`src/services/__tests__/datasyncservice.test.ts`"
     },
     {
@@ -26982,7 +27243,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L122",
       "id": "docs_test_implementation_summary_src_services_tests_storageservice_test_ts",
-      "community": 325,
+      "community": 149,
       "norm_label": "`src/services/__tests__/storageservice.test.ts`"
     },
     {
@@ -27018,7 +27279,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L160",
       "id": "docs_test_implementation_summary_test_coverage_summary",
-      "community": 328,
+      "community": 123,
       "norm_label": "\ud83d\udcca test coverage summary"
     },
     {
@@ -27027,7 +27288,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L162",
       "id": "docs_test_implementation_summary_files_with_complete_test_coverage",
-      "community": 328,
+      "community": 123,
       "norm_label": "files with complete test coverage"
     },
     {
@@ -27036,7 +27297,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L175",
       "id": "docs_test_implementation_summary_test_categories",
-      "community": 328,
+      "community": 123,
       "norm_label": "test categories"
     },
     {
@@ -27270,7 +27531,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L332",
       "id": "docs_test_implementation_summary_benefits",
-      "community": 123,
+      "community": 325,
       "norm_label": "\ud83d\udca1 benefits"
     },
     {
@@ -27279,7 +27540,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L334",
       "id": "docs_test_implementation_summary_for_development",
-      "community": 123,
+      "community": 325,
       "norm_label": "for development"
     },
     {
@@ -27288,7 +27549,7 @@
       "source_file": "docs/TEST_IMPLEMENTATION_SUMMARY.md",
       "source_location": "L341",
       "id": "docs_test_implementation_summary_for_maintenance",
-      "community": 123,
+      "community": 325,
       "norm_label": "for maintenance"
     },
     {
@@ -38754,7 +39015,7 @@
       "source_file": "src/store/hooks.ts",
       "source_location": "L9",
       "id": "store_hooks_useappselector",
-      "community": 78,
+      "community": 32,
       "norm_label": "useappselector"
     },
     {
@@ -38762,7 +39023,7 @@
       "file_type": "code",
       "source_file": "src/constants/scheduledSupplications.ts",
       "source_location": "L34",
-      "community": 292,
+      "community": 64,
       "norm_label": "post_jamaat_supplication",
       "id": "constants_scheduledsupplications_post_jamaat_supplication"
     },
@@ -44627,6 +44888,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/types/displayLayout.ts",
+      "source_location": "L76",
+      "weight": 1.0,
+      "source": "src_types_displaylayout_ts",
+      "target": "types_displaylayout_layoutbehaviouroverrides",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/types/displayLayout.ts",
       "source_location": "L152",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -44802,6 +45073,16 @@
       "confidence_score": 1.0,
       "source": "src_types_displaylayout_ts",
       "target": "types_displaylayout_screenlayoutpayload"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/types/displayLayout.ts",
+      "source_location": "L74",
+      "weight": 1.0,
+      "source": "src_types_displaylayout_ts",
+      "target": "types_displaylayout_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -47597,6 +47878,102 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "api_models_displaysettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "src_api_models_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "src_utils_tomorrowjamaatdisplay_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "utils_tomorrowjamaatdisplay_isprayerjamaatphasecomplete",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "utils_tomorrowjamaatdisplay_test_basesettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "utils_tomorrowjamaatdisplay_test_result",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.test.ts",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_test_ts",
+      "target": "utils_tomorrowjamaatdisplay_test_tomorrows",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "src/utils/displaySettingsJamaat.test.ts",
       "source_location": "L6",
       "weight": 1.0,
@@ -48081,6 +48458,17 @@
       "target": "utils_dateutils_tominutesfrommidnight"
     },
     {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "src_utils_dateutils_ts",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -48513,6 +48901,28 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_dateutils_tominutesfrommidnight",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "utils_tomorrowjamaatdisplay_isprayerjamaatphasecomplete",
+      "target": "utils_dateutils_tominutesfrommidnight"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "src/hooks/useJamaatBuzzer.ts",
       "source_location": "L33",
       "weight": 1.0,
@@ -48788,9 +49198,9 @@
       "source_file": "src/utils/contentInvalidationSchedule.ts",
       "source_location": "L41",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_utils_contentinvalidationschedule_ts",
-      "target": "utils_contentinvalidationschedule_invalidationcoalescekey",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_invalidationcoalescekey"
     },
     {
       "relation": "contains",
@@ -48818,9 +49228,9 @@
       "source_file": "src/utils/contentInvalidationSchedule.ts",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_utils_contentinvalidationschedule_ts",
-      "target": "utils_contentinvalidationschedule_trailing_only_types",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_trailing_only_types"
     },
     {
       "relation": "contains",
@@ -48828,9 +49238,9 @@
       "source_file": "src/utils/contentInvalidationSchedule.ts",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_utils_contentinvalidationschedule_ts",
-      "target": "utils_contentinvalidationschedule_usestrailingonlyinvalidation",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_usestrailingonlyinvalidation"
     },
     {
       "relation": "imports",
@@ -48883,9 +49293,9 @@
       "source_file": "src/utils/contentInvalidationSchedule.test.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_utils_contentinvalidationschedule_test_ts",
-      "target": "utils_contentinvalidationschedule_usestrailingonlyinvalidation",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_usestrailingonlyinvalidation"
     },
     {
       "relation": "calls",
@@ -48894,9 +49304,9 @@
       "source_file": "src/utils/contentInvalidationSchedule.ts",
       "source_location": "L61",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "utils_contentinvalidationschedule_scheduleinvalidationrefetch",
-      "target": "utils_contentinvalidationschedule_usestrailingonlyinvalidation",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_usestrailingonlyinvalidation"
     },
     {
       "relation": "imports",
@@ -48905,9 +49315,9 @@
       "source_file": "src/store/middleware/realtimeMiddleware.ts",
       "source_location": "L36",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_store_middleware_realtimemiddleware_ts",
-      "target": "utils_contentinvalidationschedule_invalidationcoalescekey",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_invalidationcoalescekey"
     },
     {
       "relation": "imports",
@@ -48916,9 +49326,9 @@
       "source_file": "src/utils/contentInvalidationSchedule.test.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_utils_contentinvalidationschedule_test_ts",
-      "target": "utils_contentinvalidationschedule_invalidationcoalescekey",
-      "confidence_score": 1.0
+      "target": "utils_contentinvalidationschedule_invalidationcoalescekey"
     },
     {
       "relation": "imports",
@@ -50525,11 +50935,41 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "src_utils_mediaslide_ts",
+      "target": "utils_mediaslide_media_fit_values",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "src_utils_mediaslide_ts",
+      "target": "utils_mediaslide_mediafit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/mediaSlide.ts",
       "source_location": "L4",
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_utils_mediaslide_ts",
       "target": "utils_mediaslide_parsemediafullscreenflag"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "src_utils_mediaslide_ts",
+      "target": "utils_mediaslide_resolvemediafit",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -50563,6 +51003,72 @@
       "confidence_score": 1.0,
       "source": "src_components_screens_displayscreen_tsx",
       "target": "utils_mediaslide_parsemediafullscreenflag"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/mediaSlide.ts",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "utils_mediaslide_resolvemediafit",
+      "target": "utils_mediaslide_parsemediafullscreenflag",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/ContentCarousel.tsx",
+      "source_location": "L90",
+      "weight": 1.0,
+      "source": "display_contentcarousel_carouselitem",
+      "target": "utils_mediaslide_mediafit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/ContentCarousel.tsx",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "src_components_display_contentcarousel_tsx",
+      "target": "utils_mediaslide_mediafit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/screens/DisplayScreen.tsx",
+      "source_location": "L143",
+      "weight": 1.0,
+      "source": "screens_displayscreen_scheduleitemtocarouselitems",
+      "target": "utils_mediaslide_resolvemediafit"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/ContentCarousel.tsx",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "src_components_display_contentcarousel_tsx",
+      "target": "utils_mediaslide_resolvemediafit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/screens/DisplayScreen.tsx",
+      "source_location": "L78",
+      "weight": 1.0,
+      "source": "src_components_screens_displayscreen_tsx",
+      "target": "utils_mediaslide_resolvemediafit",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -51773,6 +52279,17 @@
       "target": "utils_displaysettingsjamaat_totaljamaatphasewindowminutes"
     },
     {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "src_utils_displaysettingsjamaat_ts",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
@@ -51935,6 +52452,28 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_hooks_useprayertimes_ts",
+      "target": "utils_displaysettingsjamaat_totaljamaatphasewindowfordisplayprayer"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_displaysettingsjamaat_totaljamaatphasewindowfordisplayprayer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "utils_tomorrowjamaatdisplay_isprayerjamaatphasecomplete",
       "target": "utils_displaysettingsjamaat_totaljamaatphasewindowfordisplayprayer"
     },
     {
@@ -52476,6 +53015,427 @@
       "confidence_score": 1.0,
       "source": "src_components_display_tomorrowsjamaatchangeslide_tsx",
       "target": "utils_prayerterminology_prayerrownametoterminologykey"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/prayerStripTiles.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_components_display_prayerstriptiles_tsx",
+      "target": "src_utils_tomorrowjamaatdisplay_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimesbar_tsx",
+      "target": "src_utils_tomorrowjamaatdisplay_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimespanel_tsx",
+      "target": "src_utils_tomorrowjamaatdisplay_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/store/slices/contentSlice.ts",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_store_slices_contentslice_ts",
+      "target": "src_utils_tomorrowjamaatdisplay_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "api_models_displaysettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "hooks_useprayertimes_tomorrowsjamaatsmap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "src_api_models_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "src_hooks_useprayertimes_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_isprayerjamaatphasecomplete",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolvedjamaatdisplay",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolvejamaatdisplayparams",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_tomorrow_jamaat_display_modes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "src_utils_tomorrowjamaatdisplay_ts",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L59",
+      "weight": 1.0,
+      "source": "display_prayertimesbar_prayertimesbarprops",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "display_prayertimespanel_prayertimespanelprops",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/prayerStripTiles.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_components_display_prayerstriptiles_tsx",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimesbar_tsx",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimespanel_tsx",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatdisplaymode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "display_prayertimesbar_prayertimesbar",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L109",
+      "weight": 1.0,
+      "source": "display_prayertimespanel_prayertimespanel",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/store/slices/contentSlice.ts",
+      "source_location": "L387",
+      "weight": 1.0,
+      "source": "slices_contentslice_extractdisplaysettings",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimesbar_tsx",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimespanel_tsx",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/store/slices/contentSlice.ts",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_store_slices_contentslice_ts",
+      "target": "utils_tomorrowjamaatdisplay_resolvetomorrowjamaatmode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L113",
+      "weight": 1.0,
+      "source": "display_prayertimesbar_prayertimesbar",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L133",
+      "weight": 1.0,
+      "source": "display_prayertimespanel_prayertimespanel",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/store/slices/contentSlice.ts",
+      "source_location": "L395",
+      "weight": 1.0,
+      "source": "slices_contentslice_extractdisplaysettings",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesBar.tsx",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimesbar_tsx",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimespanel_tsx",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/store/slices/contentSlice.ts",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_store_slices_contentslice_ts",
+      "target": "utils_tomorrowjamaatdisplay_tomorrowjamaatmodeusescolumn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay",
+      "target": "utils_tomorrowjamaatdisplay_isprayerjamaatphasecomplete",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "utils_tomorrowjamaatdisplay_resolvejamaatdisplayparams",
+      "target": "api_models_displaysettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utils/tomorrowJamaatDisplay.ts",
+      "source_location": "L58",
+      "weight": 1.0,
+      "source": "utils_tomorrowjamaatdisplay_resolvejamaatdisplayparams",
+      "target": "hooks_useprayertimes_tomorrowsjamaatsmap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/display/prayerStripTiles.tsx",
+      "source_location": "L157",
+      "weight": 1.0,
+      "source": "display_prayerstriptiles_prayercuetile",
+      "target": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/prayerStripTiles.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_components_display_prayerstriptiles_tsx",
+      "target": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimespanel_tsx",
+      "target": "utils_tomorrowjamaatdisplay_resolveprayerjamaatdisplay",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -55831,6 +56791,17 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "src_components_display_prayertimespanel_tsx",
+      "target": "src_hooks_usemasjidtime_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
       "source_location": "L21",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -55891,6 +56862,17 @@
       "confidence_score": 1.0,
       "source": "display_prayertimespanel_prayertimespanelprops",
       "target": "hooks_useprayertimes_tomorrowsjamaatsmap"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/display/PrayerTimesPanel.tsx",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "display_prayertimespanel_prayertimespanel",
+      "target": "hooks_usemasjidtime_usemasjidtime"
     },
     {
       "relation": "calls",
@@ -56739,6 +57721,17 @@
       "confidence_score": 1.0,
       "source": "src_hooks_usedevkeyboard_ts",
       "target": "display_jamaatsoonslot_tomorrowjamaatchangeforce"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/display/prayerStripTiles.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_components_display_prayerstriptiles_tsx",
+      "target": "api_models_displaysettings",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -59009,6 +60002,141 @@
       "target": "src_hooks_useprayertimes_ts"
     },
     {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "api_models_scheduledplaylistassignment",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_buildplaylistsboundarykey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_buildplaylistscontentrevision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L92",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_after",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_base",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L58",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_basekey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L82",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_before",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_editeditem",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_makeassignment",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_playlists",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "hooks_usescheduledplaylist_test_withnewitem",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "src_api_models_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_test_ts",
+      "target": "src_hooks_usescheduledplaylist_ts",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/hooks/useJamaatBuzzer.ts",
@@ -60136,6 +61264,26 @@
       "confidence_score": 1.0,
       "source": "src_hooks_usescheduledplaylist_ts",
       "target": "api_models_scheduledplaylistassignment"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.ts",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_ts",
+      "target": "hooks_usescheduledplaylist_buildplaylistsboundarykey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useScheduledPlaylist.ts",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "src_hooks_usescheduledplaylist_ts",
+      "target": "hooks_usescheduledplaylist_buildplaylistscontentrevision",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -95564,5 +96712,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "ecb1d32f5935db44f74ea37780c7215b67af6279"
+  "built_at_commit": "991f66c9a22a7da6d9f3eac1b59145b0430864de"
 }

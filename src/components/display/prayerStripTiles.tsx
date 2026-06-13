@@ -6,8 +6,13 @@
 import React from 'react';
 import { Sunrise } from 'lucide-react';
 import type { TimeFormat } from '../../api/models';
+import type { DisplaySettings } from '../../api/models';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
 import { getTimeDisplayParts } from '../../utils/dateUtils';
+import {
+  resolvePrayerJamaatDisplay,
+  type TomorrowJamaatDisplayMode,
+} from '../../utils/tomorrowJamaatDisplay';
 import {
   prayerRowNameToTerminologyKey,
   resolveTerminology,
@@ -119,6 +124,9 @@ interface PrayerCueTileProps {
   showImsakInCard?: boolean;
   showTomorrowCol?: boolean;
   tomorrowsJamaats?: TomorrowsJamaatsMap | null;
+  tomorrowJamaatMode?: TomorrowJamaatDisplayMode;
+  displaySettings?: DisplaySettings | null;
+  nowMin?: number;
   jummahLabel: string;
   zuhrLabel: string;
   iftarLabel: string;
@@ -134,6 +142,9 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
   showImsakInCard = false,
   showTomorrowCol = false,
   tomorrowsJamaats = null,
+  tomorrowJamaatMode = 'off',
+  displaySettings = null,
+  nowMin = 0,
   jummahLabel,
   zuhrLabel,
   iftarLabel,
@@ -142,6 +153,25 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
   const isSunrise = prayer.name === 'Sunrise';
   const ramadanLabel =
     isRamadan && prayer.name === 'Maghrib' ? iftarLabel : undefined;
+  const resolvedJamaat = prayer.jamaat
+    ? resolvePrayerJamaatDisplay({
+        prayerName: prayer.name,
+        todayJamaat: prayer.jamaat,
+        todayIsJumuah: prayer.isJumuah,
+        tomorrowsJamaats: tomorrowsJamaats ?? null,
+        mode: tomorrowJamaatMode,
+        displaySettings,
+        nowMin,
+        jummahLabel,
+        zuhrLabel,
+      })
+    : null;
+  const isRollForward = resolvedJamaat?.isRollForward === true;
+  const tomorrowAbbrev = resolveTerminology(
+    displaySettings?.terminology,
+    'tomorrowAbbrev',
+    'Tmw',
+  );
 
   const sizeClass =
     orientation === 'horizontal'
@@ -157,6 +187,7 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
         prayer-cue-tile ${sizeClass} ${padClass} flex flex-col items-center justify-center gap-0.5
         rounded-lg transition-colors duration-normal overflow-hidden
         ${isNext ? 'bg-emerald/15 border-2 border-emerald/40' : 'bg-surface/50 border border-border'}
+        ${isRollForward && !isNext ? 'prayer-cue-tile--roll-forward' : ''}
       `}
     >
       <div className="flex items-center gap-1 flex-wrap justify-center max-w-full">
@@ -189,12 +220,20 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
           className={`text-gold/70 mt-0.5 shrink-0 ${isVertical ? 'prayer-cue-tile-sunrise' : 'w-6 h-6'}`}
           aria-hidden
         />
-      ) : prayer.jamaat ? (
-        <span className="text-prayer-strip-jamaat-primary text-gold/90 mt-0.5 tabular-nums text-center leading-none">
+      ) : prayer.jamaat && resolvedJamaat ? (
+        <span
+          className={`text-prayer-strip-jamaat-primary mt-0.5 tabular-nums text-center leading-none ${
+            isNext
+              ? 'text-emerald-light'
+              : isRollForward
+                ? 'text-prayer-time-roll-forward'
+                : 'text-gold/90'
+          }`}
+        >
           <TimeWithPeriod
-            timeString={prayer.jamaat}
+            timeString={resolvedJamaat.jamaatTime}
             timeFormat={timeFormat}
-            className="text-gold font-semibold"
+            className={isRollForward ? '' : 'text-gold font-semibold'}
           />
         </span>
       ) : null}
@@ -221,7 +260,7 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
           <div className="mt-0.5 w-full min-w-0 flex flex-col items-center justify-center shrink-0">
             {prayer.jamaat && tomorrowJamaat ? (
               <span className="inline-flex flex-nowrap items-baseline gap-x-0.5 whitespace-nowrap text-prayer-strip-jamaat text-text-muted tabular-nums max-w-full leading-tight">
-                <span className="shrink-0">Tmw</span>
+                <span className="shrink-0">{tomorrowAbbrev}</span>
                 <TimeWithPeriod
                   timeString={tomorrowJamaat}
                   timeFormat={timeFormat}

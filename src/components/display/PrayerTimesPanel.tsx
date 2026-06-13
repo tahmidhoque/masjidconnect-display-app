@@ -19,13 +19,20 @@
 import React from 'react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
+import useMasjidTime from '../../hooks/useMasjidTime';
 import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
 import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
 import { getTimeDisplayParts } from '../../utils/dateUtils';
 import type { TimeFormat } from '../../api/models';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
-import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
+import { prayerRowNameToTerminologyKey, resolveTerminology, resolveTomorrowColumnHeader } from '../../utils/prayerTerminology';
+import {
+  resolvePrayerJamaatDisplay,
+  resolveTomorrowJamaatMode,
+  tomorrowJamaatModeUsesColumn,
+  type TomorrowJamaatDisplayMode,
+} from '../../utils/tomorrowJamaatDisplay';
 
 interface PrayerTimesPanelProps {
   /** Whether Ramadan mode is active — shows Iftar annotation on Maghrib */
@@ -47,8 +54,10 @@ interface PrayerTimesPanelProps {
   fillHeight?: boolean;
   /** When true, show Tomorrow's Jamaat column after Jamaat. From displaySettings.showTomorrowJamaat. */
   showTomorrowJamaat?: boolean;
-  /** Tomorrow's jamaat times by prayer name. Required when showTomorrowJamaat is true. */
+  /** Tomorrow's jamaat times by prayer name. Required when tomorrow column or roll-forward is on. */
   tomorrowsJamaats?: TomorrowsJamaatsMap;
+  /** How tomorrow's jamaat times are shown (from displaySettings). */
+  tomorrowJamaatMode?: TomorrowJamaatDisplayMode;
 }
 
 /** Time column cell class. Width is owned by the parent grid template
@@ -88,9 +97,16 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   fillHeight = false,
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
+  tomorrowJamaatMode: tomorrowJamaatModeProp,
 }) => {
   const { todaysPrayerTimes } = usePrayerTimesContext();
-  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  const displaySettings = useAppSelector(selectDisplaySettings);
+  const terminology = displaySettings?.terminology;
+  const now = useMasjidTime();
+  const nowMin = now.hour() * 60 + now.minute() + now.second() / 60;
+  const tomorrowJamaatMode =
+    tomorrowJamaatModeProp ??
+    resolveTomorrowJamaatMode(displaySettings ?? undefined);
 
   const adhanLabel = resolveTerminology(terminology, 'adhan', 'Start');
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
@@ -103,6 +119,7 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   // terminology so customised masjid labels are honoured.
   const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
   const zuhrLabel = resolveTerminology(terminology, 'zuhr', 'Zuhr');
+  const tomorrowColumnHeader = resolveTomorrowColumnHeader(terminology, jamaatLabel);
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
     return (
@@ -113,7 +130,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
   }
 
   const showImsakRow = showImsak && !!imsakTime;
-  const showTomorrowCol = showTomorrowJamaat && !!tomorrowsJamaats;
+  const showTomorrowCol =
+    (showTomorrowJamaat || tomorrowJamaatModeUsesColumn(tomorrowJamaatMode)) &&
+    !!tomorrowsJamaats;
   const rowGridClass = showTomorrowCol
     ? 'grid grid-cols-[1fr_7rem_8rem_7rem] gap-x-4 items-center'
     : 'grid grid-cols-[1fr_7.5rem_8.5rem] gap-x-4 items-center';
@@ -152,7 +171,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         <span className={`text-prayer-col-label text-text-secondary ${timeColClass}`}>{adhanLabel}</span>
         <span className={`text-prayer-col-label text-gold/85 ${timeColClass}`}>{jamaatLabel}</span>
         {showTomorrowCol && (
-          <span className={`text-prayer-col-label text-gold/75 ${timeColClass}`}>{`Tomorrow's ${jamaatLabel}`}</span>
+          <span className={`text-prayer-col-label text-gold/75 ${timeColClass}`}>
+            {tomorrowColumnHeader}
+          </span>
         )}
       </div>
 
@@ -164,6 +185,20 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
           const ramadanLabel = isRamadan && prayer.name === 'Maghrib' ? iftarLabel : undefined;
+          const resolvedJamaat = prayer.jamaat
+            ? resolvePrayerJamaatDisplay({
+                prayerName: prayer.name,
+                todayJamaat: prayer.jamaat,
+                todayIsJumuah: prayer.isJumuah,
+                tomorrowsJamaats,
+                mode: tomorrowJamaatMode,
+                displaySettings: displaySettings ?? null,
+                nowMin,
+                jummahLabel,
+                zuhrLabel,
+              })
+            : null;
+          const isRollForward = resolvedJamaat?.isRollForward === true;
 
           return (
             <React.Fragment key={prayer.name}>
@@ -204,10 +239,19 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   ${rowGridClass} px-3 rounded-lg transition-colors duration-normal
                   ${fillHeight ? 'py-2.5' : 'py-1.5'}
                   ${isNext ? 'bg-emerald/20 ring-1 ring-inset ring-emerald/30' : ''}
+                  ${isRollForward && !isNext ? 'prayer-row--roll-forward' : ''}
                 `}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`text-prayer-name ${isNext ? 'text-emerald-light' : 'text-text-primary'}`}>
+                  <span
+                    className={`text-prayer-name ${
+                      isNext
+                        ? 'text-emerald-light'
+                        : isRollForward
+                          ? 'text-text-secondary'
+                          : 'text-text-primary'
+                    }`}
+                  >
                     {(() => {
                       // Friday Zuhr slot is replaced by Jumuah upstream; relabel
                       // the row so users don't see "Zuhr" with Jumuah times.
@@ -223,21 +267,38 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   )}
                 </div>
 
-                {prayer.jamaat ? (
+                {prayer.jamaat && resolvedJamaat ? (
                   <>
                     <span className={timeColClass}>
                       <TimeWithPeriod
                         timeString={prayer.time}
                         timeFormat={timeFormat}
-                        className={`text-prayer-time-adhan ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
+                        className={`text-prayer-time-adhan ${
+                          isNext
+                            ? 'text-emerald-light'
+                            : isRollForward
+                              ? 'text-text-muted'
+                              : 'text-text-secondary'
+                        }`}
                       />
                     </span>
-                    <span className={timeColClass}>
+                    <span className={`${timeColClass} flex flex-col ${tomorrowItemsAlignClass}`}>
                       <TimeWithPeriod
-                        timeString={prayer.jamaat}
+                        timeString={resolvedJamaat.jamaatTime}
                         timeFormat={timeFormat}
-                        className={`text-prayer-time-jamaat ${isNext ? 'text-emerald-light' : 'text-gold'}`}
+                        className={`text-prayer-time-jamaat ${
+                          isNext
+                            ? 'text-emerald-light'
+                            : isRollForward
+                              ? 'text-prayer-time-roll-forward'
+                              : 'text-gold'
+                        }`}
                       />
+                      {isRollForward && resolvedJamaat.mismatchLabel ? (
+                        <span className="text-caption text-text-muted/80 font-normal leading-tight mt-0.5">
+                          {resolvedJamaat.mismatchLabel}
+                        </span>
+                      ) : null}
                     </span>
                     {showTomorrowCol && (() => {
                       const tomorrowEntry = tomorrowsJamaats?.[prayer.name];

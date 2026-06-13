@@ -11,6 +11,10 @@ import logger from "../../utils/logger";
 import { parseScreenOrientation, parseRotationDegrees, orientationToRotationDegrees } from "../../utils/orientation";
 import { setScreenOrientation } from "./uiSlice";
 import { unwrapScreenContentPayload } from "../../utils/unwrapScreenContent";
+import {
+  resolveTomorrowJamaatMode,
+  tomorrowJamaatModeUsesColumn,
+} from "../../utils/tomorrowJamaatDisplay";
 
 // Constants
 const MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — forceRefresh bypasses this
@@ -53,6 +57,8 @@ const TERMINOLOGY_KEYS: TerminologyKey[] = [
   "jamaat",
   "suhoor",
   "iftar",
+  "tomorrowAbbrev",
+  "tomorrowColumn",
 ];
 
 function normaliseTerminology(raw: unknown): Partial<Record<TerminologyKey, string>> | null {
@@ -100,6 +106,7 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   timeFormat: "12h",
   showImsak: false,
   showTomorrowJamaat: false,
+  tomorrowJamaatMode: 'off',
   showDate: true,
   showHijriDate: true,
   showMasjidName: false,
@@ -379,13 +386,15 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
   const minutesAfterJamaatUntilNextPrayerBySalah = normaliseJamaatBySalah(
     raw.minutesAfterJamaatUntilNextPrayerBySalah,
   );
+  const tomorrowJamaatMode = resolveTomorrowJamaatMode(raw);
 
   return {
     ramadanMode: raw.ramadanMode ?? "auto",
     isRamadanActive: raw.isRamadanActive ?? false,
     timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
     showImsak: raw.showImsak ?? false,
-    showTomorrowJamaat: raw.showTomorrowJamaat ?? false,
+    tomorrowJamaatMode,
+    showTomorrowJamaat: tomorrowJamaatModeUsesColumn(tomorrowJamaatMode),
     showDate: raw.showDate ?? true,
     showHijriDate: raw.showHijriDate ?? true,
     showMasjidName: raw.showMasjidName ?? false,

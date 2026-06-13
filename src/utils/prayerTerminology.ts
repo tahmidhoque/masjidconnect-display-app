@@ -28,6 +28,16 @@ export function resolveTerminology(
   return trimmed;
 }
 
+/** Portrait tomorrow-column header from terminology, or `Tomorrow's {jamaatLabel}`. */
+export function resolveTomorrowColumnHeader(
+  terminology: TerminologyMap,
+  jamaatLabel: string,
+): string {
+  const custom = resolveTerminology(terminology, 'tomorrowColumn', '');
+  if (custom) return custom;
+  return `Tomorrow's ${jamaatLabel}`;
+}
+
 /**
  * Map UI prayer row names / phase labels to stable terminology keys.
  *

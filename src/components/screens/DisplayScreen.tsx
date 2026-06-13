@@ -604,6 +604,7 @@ const DisplayScreenInner: React.FC = () => {
       compact={isPortrait}
       fillHeight={prayerOnly}
       showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
+      tomorrowJamaatMode={displaySettings?.tomorrowJamaatMode ?? 'off'}
       tomorrowsJamaats={tomorrowsJamaats}
     />
   );

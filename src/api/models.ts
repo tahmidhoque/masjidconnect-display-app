@@ -328,6 +328,13 @@ export interface DisplaySettings {
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */
   showTomorrowJamaat: boolean;
+  /**
+   * How tomorrow's jamaat times appear:
+   * - `off` — today's times only
+   * - `column` — extra "Tomorrow's jamaat" column (legacy boolean maps here)
+   * - `roll-forward` — after jamaat finishes, swap row to tomorrow's time with colour cue
+   */
+  tomorrowJamaatMode?: 'off' | 'column' | 'roll-forward';
   /** Show Gregorian date in the clock / header area */
   showDate?: boolean;
   /** Show Hijri (Islamic) date in the clock / header area */
@@ -398,7 +405,9 @@ export type TerminologyKey =
   | "khutbah"
   | "jamaat"
   | "suhoor"
-  | "iftar";
+  | "iftar"
+  | "tomorrowAbbrev"
+  | "tomorrowColumn";
 
 // Content Types
 export type ContentItemType =

@@ -14,6 +14,11 @@ import type { TimeFormat } from '../../api/models';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
 import { resolveTerminology } from '../../utils/prayerTerminology';
+import {
+  resolveTomorrowJamaatMode,
+  tomorrowJamaatModeUsesColumn,
+  type TomorrowJamaatDisplayMode,
+} from '../../utils/tomorrowJamaatDisplay';
 import ForbiddenPrayerNotice from './ForbiddenPrayerNotice';
 import type { CurrentForbiddenState } from '../../utils/forbiddenPrayerTimes';
 import {
@@ -51,6 +56,7 @@ export interface PrayerTimesBarProps {
   hijriDateAdjustment?: number;
   showTomorrowJamaat?: boolean;
   tomorrowsJamaats?: TomorrowsJamaatsMap;
+  tomorrowJamaatMode?: TomorrowJamaatDisplayMode;
   showDate?: boolean;
   showHijriDate?: boolean;
   showMasjidName?: boolean;
@@ -71,6 +77,7 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
   hijriDateAdjustment = 0,
   showTomorrowJamaat = false,
   tomorrowsJamaats = null,
+  tomorrowJamaatMode: tomorrowJamaatModeProp,
   showDate = true,
   showHijriDate = true,
   showMasjidName = false,
@@ -80,7 +87,12 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
   const isSidebar = variant === 'sidebar';
   const now = useMasjidTime();
   const { todaysPrayerTimes } = usePrayerTimesContext();
-  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  const displaySettings = useAppSelector(selectDisplaySettings);
+  const terminology = displaySettings?.terminology;
+  const tomorrowJamaatMode =
+    tomorrowJamaatModeProp ??
+    resolveTomorrowJamaatMode(displaySettings ?? undefined);
+  const nowMin = now.hour() * 60 + now.minute() + now.second() / 60;
 
   const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
   const zuhrLabel = resolveTerminology(terminology, 'zuhr', 'Zuhr');
@@ -97,7 +109,9 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
     [now.date(), hijriDateAdjustment],
   );
 
-  const showTomorrowCol = showTomorrowJamaat && !!tomorrowsJamaats;
+  const showTomorrowCol =
+    (showTomorrowJamaat || tomorrowJamaatModeUsesColumn(tomorrowJamaatMode)) &&
+    !!tomorrowsJamaats;
   const showImsakRow = showImsak && !!imsakTime;
 
   if (!todaysPrayerTimes || todaysPrayerTimes.length === 0) {
@@ -170,6 +184,9 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
               showImsakInCard={showImsak && !!imsakTime && prayer.name === 'Fajr' && !showImsakRow}
               showTomorrowCol={showTomorrowCol}
               tomorrowsJamaats={tomorrowsJamaats}
+              tomorrowJamaatMode={tomorrowJamaatMode}
+              displaySettings={displaySettings ?? null}
+              nowMin={nowMin}
               jummahLabel={jummahLabel}
               zuhrLabel={zuhrLabel}
               iftarLabel={iftarLabel}
@@ -232,6 +249,9 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
               showImsakInCard={showImsak && !!imsakTime && prayer.name === 'Fajr' && !showImsakRow}
               showTomorrowCol={showTomorrowCol}
               tomorrowsJamaats={tomorrowsJamaats}
+              tomorrowJamaatMode={tomorrowJamaatMode}
+              displaySettings={displaySettings ?? null}
+              nowMin={nowMin}
               jummahLabel={jummahLabel}
               zuhrLabel={zuhrLabel}
               iftarLabel={iftarLabel}

@@ -82,6 +82,7 @@ export function buildThemeStyle(
       ? hexToRgba(theme.textSecondary, textSecondary.a)
       : theme.textSecondary,
     '--color-text-muted': hexToRgba(theme.textSecondary, 0.5),
+    '--color-tomorrow-roll': theme.tomorrowRoll ?? '#8BB8D9',
     '--layout-overlay': hexToRgba(theme.background, 0.25),
   } as React.CSSProperties;
 }

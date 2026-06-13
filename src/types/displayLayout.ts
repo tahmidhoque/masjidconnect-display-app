@@ -69,6 +69,35 @@ export interface DisplayThemeOverrides {
   highlight: string;
   textPrimary: string;
   textSecondary: string;
+  /** Tomorrow jamaat roll-forward — maps to --color-tomorrow-roll */
+  tomorrowRoll: string;
+}
+
+export type TomorrowJamaatDisplayMode = 'off' | 'column' | 'roll-forward';
+
+export interface LayoutBehaviourOverrides {
+  showImsak?: boolean;
+  showTomorrowJamaat?: boolean;
+  tomorrowJamaatMode?: TomorrowJamaatDisplayMode;
+  showDate?: boolean;
+  showHijriDate?: boolean;
+  showMasjidName?: boolean;
+  minutesAfterJamaatUntilNextPrayer?: number;
+  defaultJamaatInProgressMinutes?: number;
+  minutesAfterJamaatUntilNextPrayerBySalah?: Partial<
+    Record<'fajr' | 'zuhr' | 'asr' | 'maghrib' | 'isha', number>
+  >;
+  jamaatInProgressMode?: 'screen' | 'dark';
+  timeFormat?: '12h' | '24h';
+  postAdhanSupplication?: {
+    enabled?: boolean;
+    delayMinutes?: number;
+    durationMinutes?: number;
+  };
+  postJamaatSupplication?: {
+    enabled?: boolean;
+    durationMinutes?: number;
+  };
 }
 
 export interface DisplayLayoutConfig {
@@ -77,7 +106,7 @@ export interface DisplayLayoutConfig {
   portrait: OrientationLayoutConfig;
   theme: DisplayThemeOverrides | null;
   /** Per-layout behaviour overrides (merged server-side into displaySettings). */
-  behaviour?: Record<string, unknown> | null;
+  behaviour?: LayoutBehaviourOverrides | null;
   /**
    * Editor-only hint for which orientation the admin designs first. Both
    * orientations are always rendered; the display app ignores this field.
@@ -335,7 +364,7 @@ function sanitiseOrientation(raw: unknown): OrientationLayoutConfig | null {
 function sanitiseTheme(raw: unknown): DisplayThemeOverrides | null {
   if (!raw || typeof raw !== 'object') return null;
   const theme = raw as Record<string, unknown>;
-  const keys: Array<keyof DisplayThemeOverrides> = [
+  const requiredKeys: Array<keyof DisplayThemeOverrides> = [
     'background',
     'accent',
     'highlight',
@@ -343,11 +372,16 @@ function sanitiseTheme(raw: unknown): DisplayThemeOverrides | null {
     'textSecondary',
   ];
   const result = {} as DisplayThemeOverrides;
-  for (const key of keys) {
+  for (const key of requiredKeys) {
     const value = theme[key];
     if (typeof value !== 'string' || !HEX_COLOUR_RE.test(value)) return null;
     result[key] = value;
   }
+  const tomorrowRoll = theme.tomorrowRoll;
+  result.tomorrowRoll =
+    typeof tomorrowRoll === 'string' && HEX_COLOUR_RE.test(tomorrowRoll)
+      ? tomorrowRoll
+      : '#8BB8D9';
   return result;
 }
 
