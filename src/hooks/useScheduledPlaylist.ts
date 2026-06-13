@@ -48,11 +48,10 @@ export function buildPlaylistsContentRevision(
         .map((item) => {
           const row = item as {
             id?: string;
-            contentItemId?: string;
-            updatedAt?: string;
+            contentItem?: { id?: string; updatedAt?: string };
             order?: number;
           };
-          return `${row.id ?? ''}:${row.contentItemId ?? ''}:${row.updatedAt ?? ''}:${row.order ?? ''}`;
+          return `${row.id ?? ''}:${row.contentItem?.id ?? ''}:${row.contentItem?.updatedAt ?? ''}:${row.order ?? ''}`;
         })
         .join(',');
       return `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}:${items.length}:${itemSig}`;

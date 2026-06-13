@@ -3,7 +3,33 @@ import {
   buildPlaylistsBoundaryKey,
   buildPlaylistsContentRevision,
 } from './useScheduledPlaylist';
-import type { ScheduledPlaylistAssignment } from '@/api/models';
+import type { ScheduledPlaylistAssignment, ScheduleItem } from '@/api/models';
+
+function makeScheduleItem(id: string, contentId: string, order: number): ScheduleItem {
+  return {
+    id,
+    order,
+    contentItem: {
+      id: contentId,
+      type: 'CUSTOM',
+      title: 'Test item',
+      content: {},
+      duration: 10,
+    },
+  };
+}
+
+function makeSchedule(
+  overrides: Partial<ScheduledPlaylistAssignment['schedule']> &
+    Pick<ScheduledPlaylistAssignment['schedule'], 'id' | 'name' | 'items'>,
+): ScheduledPlaylistAssignment['schedule'] {
+  return {
+    description: null,
+    isDefault: true,
+    isActive: true,
+    ...overrides,
+  };
+}
 
 function makeAssignment(
   overrides: Partial<ScheduledPlaylistAssignment> & {
@@ -24,34 +50,34 @@ describe('buildPlaylistsContentRevision', () => {
     const base = [
       makeAssignment({
         assignmentId: 'a1',
-        schedule: {
+        schedule: makeSchedule({
           id: 'sched-1',
           name: 'Main',
-          items: [{ id: 'item-1', contentItemId: 'c1', order: 0 }],
-        },
+          items: [makeScheduleItem('item-1', 'c1', 0)],
+        }),
       }),
     ];
     const withNewItem = [
       makeAssignment({
         assignmentId: 'a1',
-        schedule: {
+        schedule: makeSchedule({
           id: 'sched-1',
           name: 'Main',
           items: [
-            { id: 'item-1', contentItemId: 'c1', order: 0 },
-            { id: 'item-2', contentItemId: 'c2', order: 1 },
+            makeScheduleItem('item-1', 'c1', 0),
+            makeScheduleItem('item-2', 'c2', 1),
           ],
-        },
+        }),
       }),
     ];
     const editedItem = [
       makeAssignment({
         assignmentId: 'a1',
-        schedule: {
+        schedule: makeSchedule({
           id: 'sched-1',
           name: 'Main',
-          items: [{ id: 'item-1', contentItemId: 'c99', order: 0 }],
-        },
+          items: [makeScheduleItem('item-1', 'c99', 0)],
+        }),
       }),
     ];
 
@@ -64,11 +90,11 @@ describe('buildPlaylistsContentRevision', () => {
     const playlists = [
       makeAssignment({
         assignmentId: 'a1',
-        schedule: {
+        schedule: makeSchedule({
           id: 'sched-1',
           name: 'Main',
-          items: [{ id: 'item-1', contentItemId: 'c1', order: 0 }],
-        },
+          items: [makeScheduleItem('item-1', 'c1', 0)],
+        }),
       }),
     ];
     expect(buildPlaylistsContentRevision(playlists)).toBe(
@@ -82,21 +108,21 @@ describe('buildPlaylistsBoundaryKey', () => {
     const before = [
       makeAssignment({
         assignmentId: 'a1',
-        schedule: {
+        schedule: makeSchedule({
           id: 'sched-1',
           name: 'Main',
-          items: [{ id: 'item-1' }],
-        },
+          items: [makeScheduleItem('item-1', 'c1', 0)],
+        }),
       }),
     ];
     const after = [
       makeAssignment({
         assignmentId: 'a1',
-        schedule: {
+        schedule: makeSchedule({
           id: 'sched-1',
           name: 'Main',
-          items: [{ id: 'item-1' }, { id: 'item-2' }],
-        },
+          items: [makeScheduleItem('item-1', 'c1', 0), makeScheduleItem('item-2', 'c2', 1)],
+        }),
       }),
     ];
     expect(buildPlaylistsBoundaryKey(before)).toBe(buildPlaylistsBoundaryKey(after));
