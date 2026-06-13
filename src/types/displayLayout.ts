@@ -76,6 +76,8 @@ export interface DisplayLayoutConfig {
   landscape: OrientationLayoutConfig;
   portrait: OrientationLayoutConfig;
   theme: DisplayThemeOverrides | null;
+  /** Per-layout behaviour overrides (merged server-side into displaySettings). */
+  behaviour?: Record<string, unknown> | null;
   /**
    * Editor-only hint for which orientation the admin designs first. Both
    * orientations are always rendered; the display app ignores this field.
