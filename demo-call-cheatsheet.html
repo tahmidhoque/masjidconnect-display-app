@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MasjidConnect — Demo Call Script</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 9px;
+    line-height: 1.45;
+    color: #1a1a1a;
+    background: #fff;
+  }
+
+  .page {
+    padding: 14px 18px 10px;
+    max-width: 210mm;
+    margin: 0 auto;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px solid #1a6b3a;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  header h1 { font-size: 15px; font-weight: 800; color: #1a6b3a; letter-spacing: -0.3px; }
+  header .tagline { font-size: 8px; color: #555; margin-top: 2px; }
+  header .meta { text-align: right; font-size: 8px; color: #555; line-height: 1.6; }
+  header .meta strong { color: #1a1a1a; }
+
+  /* ── PHASE BLOCKS ── */
+  .phase {
+    border-radius: 5px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 9px;
+    background: #1a6b3a;
+    color: white;
+  }
+  .phase-header.amber { background: #b86f00; }
+  .phase-header.blue  { background: #1a4e8a; }
+  .phase-header.teal  { background: #1a7a6a; }
+  .phase-header.red   { background: #9e2a2a; }
+  .phase-header.purple { background: #5a2a8a; }
+
+  .phase-num {
+    font-size: 14px;
+    font-weight: 800;
+    opacity: 0.9;
+    line-height: 1;
+  }
+  .phase-title { font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
+  .phase-time  { margin-left: auto; font-size: 7.5px; opacity: 0.85; font-weight: 600; letter-spacing: 0.3px; background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 3px; }
+
+  .phase-body {
+    padding: 7px 9px;
+    background: #fafafa;
+  }
+
+  /* ── SCRIPT LINE ── */
+  .script {
+    background: #e8f3ec;
+    border-left: 3px solid #1a6b3a;
+    border-radius: 0 3px 3px 0;
+    padding: 4px 7px;
+    font-size: 8.5px;
+    color: #1a3a28;
+    font-style: italic;
+    margin: 3px 0;
+    line-height: 1.5;
+  }
+  .script.amber  { background: #fdf3e0; border-left-color: #b86f00; color: #5a3800; }
+  .script.blue   { background: #e0ecf7; border-left-color: #1a4e8a; color: #0d2e5a; }
+  .script.teal   { background: #e0f3f0; border-left-color: #1a7a6a; color: #0d3a34; }
+  .script.red    { background: #fce8e8; border-left-color: #9e2a2a; color: #5a0a0a; }
+  .script.purple { background: #f0e8f8; border-left-color: #5a2a8a; color: #2a0a5a; }
+
+  .script .label {
+    display: inline-block;
+    font-size: 7px;
+    font-weight: 800;
+    font-style: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(0,0,0,0.1);
+    padding: 0 3px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* ── TIP ── */
+  .tip {
+    font-size: 7.5px;
+    color: #666;
+    margin: 3px 0;
+    padding-left: 8px;
+    border-left: 2px solid #ddd;
+    font-style: normal;
+  }
+  .tip strong { color: #333; }
+
+  /* ── Q ROW ── */
+  .q-row {
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #e5e5e5;
+  }
+  .q-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .q-label {
+    font-size: 8px;
+    font-weight: 700;
+    color: #b86f00;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .q-label.red { color: #9e2a2a; }
+  .q-label.green { color: #1a6b3a; }
+
+  /* ── DEMO ITEM ── */
+  .demo-item {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    align-items: flex-start;
+  }
+  .demo-item:last-child { margin-bottom: 0; }
+
+  .demo-num {
+    width: 16px;
+    height: 16px;
+    background: #1a4e8a;
+    color: white;
+    border-radius: 50%;
+    font-size: 8px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .demo-content { flex: 1; }
+  .demo-title { font-size: 8.5px; font-weight: 700; color: #1a4e8a; margin-bottom: 2px; }
+
+  /* ── OBJECTION ITEM ── */
+  .obj-item {
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed #e8e8e8;
+  }
+  .obj-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .obj-q {
+    font-size: 8px;
+    font-weight: 700;
+    color: #9e2a2a;
+    margin-bottom: 2px;
+  }
+
+  /* ── CLOSE OPTIONS ── */
+  .close-item {
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #e5e5e5;
+  }
+  .close-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .close-scenario { font-size: 7.5px; font-weight: 700; color: #5a2a8a; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+
+  /* ── 2 COL GRID ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* ── DIFF TABLE ── */
+  .diff-row {
+    display: flex;
+    gap: 4px;
+    font-size: 8px;
+    margin-bottom: 3px;
+    align-items: flex-start;
+  }
+  .diff-dot { width: 5px; height: 5px; background: #1a6b3a; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+
+  /* ── COMPETITOR ROW ── */
+  .comp-row {
+    font-size: 8px;
+    margin-bottom: 3px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    gap: 5px;
+  }
+  .comp-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .comp-name { font-weight: 700; color: #333; min-width: 110px; flex-shrink: 0; }
+  .comp-vs { color: #555; }
+
+  /* ── PAGE BREAK ── */
+  .page-break { page-break-after: always; }
+
+  /* ── PAGE LABEL ── */
+  .page-label {
+    font-size: 7.5px;
+    color: #aaa;
+    text-align: right;
+    margin-bottom: 4px;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 7px;
+    color: #bbb;
+    border-top: 1px solid #eee;
+    padding-top: 4px;
+  }
+
+  @media print {
+    body { font-size: 8.8px; }
+    .page { padding: 10px 14px; }
+    @page { margin: 0.35cm; size: A4; }
+    .page-break { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════ PAGE 1 ══════ -->
+<div class="page">
+  <div class="page-label">Page 1 of 2 — Opening · Discovery · Demo</div>
+
+  <header>
+    <div>
+      <h1>MasjidConnect — Demo Call Script</h1>
+      <div class="tagline">Mindset: you are diagnosing a problem, not selling a product. <strong>Ask more than you tell.</strong></div>
+    </div>
+    <div class="meta">
+      <strong>Target length: 45–60 min</strong><br>
+      Situation → Pain → Demo → Close<br>
+      Always end with a concrete next step
+    </div>
+  </header>
+
+  <!-- PHASE 1: OPENING -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num">1</div>
+      <div class="phase-title">OPENING — Warm Up & Set the Agenda</div>
+      <div class="phase-time">2–3 MIN</div>
+    </div>
+    <div class="phase-body">
+      <div class="script">
+        <span class="label">Say</span>"Assalamu Alaikum — great to connect with you. I'm [name] from MasjidConnect. Before I jump into anything, would it be okay if I asked you a few questions about your masjid first? That way I can make sure whatever I show you is actually relevant to your situation rather than just walking through everything."
+      </div>
+      <div class="tip">➜ If they say "sure" — great. If they say "actually can you just show me the product?" — do a 2 min overview first, then say <em>"let me pause and check — does any of that feel relevant to what you're dealing with?"</em></div>
+      <div class="script" style="margin-top:4px;">
+        <span class="label">Then</span>"Perfect. So tell me a bit about [Masjid name] — how many people do you typically get for Jumu'ah, and how long have you been running the masjid?"
+      </div>
+      <div class="tip">➜ This is small talk but it matters — it tells you scale, maturity, and how organised they are. Listen for clues about who actually runs things.</div>
+    </div>
+  </div>
+
+  <!-- PHASE 2: DISCOVERY -->
+  <div class="phase">
+    <div class="phase-header amber">
+      <div class="phase-num">2</div>
+      <div class="phase-title">DISCOVERY — Understand Their World</div>
+      <div class="phase-time">12–15 MIN</div>
+    </div>
+    <div class="phase-body">
+      <div class="three-col">
+
+        <!-- Situation -->
+        <div>
+          <div class="q-row">
+            <div class="q-label">Situation</div>
+            <div class="script amber"><span class="label">Ask</span>"How are you currently displaying prayer times and announcements — TV screens, printed sheets, a whiteboard?"</div>
+            <div class="tip"><strong>Follow up:</strong> "And who updates that — a dedicated admin, a volunteer rota, or is it more ad-hoc?"</div>
+          </div>
+          <div class="q-row">
+            <div class="script amber"><span class="label">Ask</span>"How many screens are you working with right now — or are you starting from scratch?"</div>
+            <div class="tip"><strong>Follow up:</strong> "Are they all in the same building or spread across different areas?"</div>
+          </div>
+          <div class="q-row">
+            <div class="script amber"><span class="label">Ask</span>"How often does your content need to change — daily, weekly, or is it mostly static?"</div>
+          </div>
+          <div class="q-row">
+            <div class="script amber" style="border-bottom:none;margin-bottom:0;padding-bottom:0;"><span class="label">Ask</span>"Do you use any software today to manage any of this, or is it all manual?"</div>
+          </div>
+        </div>
+
+        <!-- Pain -->
+        <div>
+          <div class="q-row">
+            <div class="q-label red">Pain</div>
+            <div class="script red"><span class="label">Ask</span>"What's the biggest headache with how things work today?"</div>
+            <div class="tip"><strong>If they hesitate:</strong> "A lot of masajid tell us it's either the manual effort to keep it updated, or the times being wrong — does either of those ring a bell?"</div>
+          </div>
+          <div class="q-row">
+            <div class="script red"><span class="label">Ask</span>"Has anything gone wrong before — wrong prayer times on screen, an announcement that was out of date, something that caused confusion for the jama'ah?"</div>
+            <div class="tip">➜ If they share a story, <em>don't rush past it.</em> These moments build your demo narrative.</div>
+          </div>
+          <div class="q-row">
+            <div class="script red"><span class="label">Ask</span>"How much time does your team spend each week just keeping the displays updated?"</div>
+          </div>
+          <div class="q-row" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+            <div class="script red" style="margin-bottom:0;"><span class="label">Ask</span>"If you could wave a magic wand, what would the ideal setup look like for you?"</div>
+          </div>
+        </div>
+
+        <!-- Decision -->
+        <div>
+          <div class="q-row">
+            <div class="q-label green">Decision</div>
+            <div class="script"><span class="label">Ask</span>"Who else would be involved in a decision like this — a management committee, trustees, the imam?"</div>
+            <div class="tip"><strong>If committee:</strong> "Would it help if I could join a call with them, or put something together you can share?"</div>
+          </div>
+          <div class="q-row">
+            <div class="script"><span class="label">Ask</span>"Is there a budget set aside for something like this, or is that still being figured out?"</div>
+            <div class="tip"><strong>If no budget:</strong> Don't panic — note it and come back to ROI in the close.</div>
+          </div>
+          <div class="q-row">
+            <div class="script"><span class="label">Ask</span>"What's driving you to look at this now — is there a particular event coming up, or has something specific changed?"</div>
+          </div>
+          <div class="q-row" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+            <div class="script"><span class="label">Ask</span>"What would a good outcome from today look like for you?"</div>
+            <div class="tip">➜ Sets their expectations and tells you how to close.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3: BRIDGE -->
+  <div class="phase">
+    <div class="phase-header teal">
+      <div class="phase-num">3</div>
+      <div class="phase-title">BRIDGE — Transition from Discovery to Demo</div>
+      <div class="phase-time">1 MIN</div>
+    </div>
+    <div class="phase-body">
+      <div class="script teal">
+        <span class="label">Say</span>"Okay, that's really helpful — thank you. So it sounds like the main things for you are [X] and [Y]. Let me show you exactly how MasjidConnect handles those. I'll skip the parts that aren't relevant to you and focus on what you've told me matters most."
+      </div>
+      <div class="tip">➜ <strong>Fill in [X] and [Y] from your notes.</strong> If they said "volunteers spend ages updating times" — say that back verbatim. It shows you listened and the demo feels personal even if it's the same every time.</div>
+    </div>
+  </div>
+
+  <!-- PHASE 4: DEMO -->
+  <div class="phase">
+    <div class="phase-header blue">
+      <div class="phase-num">4</div>
+      <div class="phase-title">DEMO — Show Don't Tell</div>
+      <div class="phase-time">20–25 MIN</div>
+    </div>
+    <div class="phase-body">
+      <div class="two-col">
+        <div>
+          <div class="demo-item">
+            <div class="demo-num">A</div>
+            <div class="demo-content">
+              <div class="demo-title">The Display — Start Here (Emotional Hook)</div>
+              <div class="script blue"><span class="label">Say</span>"So this is what your congregation would actually see when they walk in. Prayer times, next iqamah countdown, announcements — all updating automatically."</div>
+              <div class="tip"><strong>Pause here.</strong> Let them take it in. Then: "Can you see that working in your masjid?"</div>
+            </div>
+          </div>
+
+          <div class="demo-item">
+            <div class="demo-num">B</div>
+            <div class="demo-content">
+              <div class="demo-title">Admin Portal — The 'Wow That's Easy' Moment</div>
+              <div class="script blue"><span class="label">Say</span>"You mentioned [volunteer name / admin] manages the content. Here's what they'd use — it's a web dashboard, no app to install. They can update an announcement from their phone in 30 seconds."</div>
+              <div class="tip">Show a live update if possible. Nothing beats watching the screen change in real time.</div>
+            </div>
+          </div>
+
+          <div class="demo-item">
+            <div class="demo-num">C</div>
+            <div class="demo-content">
+              <div class="demo-title">Prayer Times — Auto-Calculated</div>
+              <div class="script blue"><span class="label">Say</span>"You don't enter prayer times manually. You set your location and calculation method once, and it calculates them automatically — including adjusting for daylight saving. If Ramadan timetables change, you update once and every screen reflects it."</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="demo-item">
+            <div class="demo-num">D</div>
+            <div class="demo-content">
+              <div class="demo-title">Emergency Alerts — High Impact, Always Resonates</div>
+              <div class="script blue"><span class="label">Say</span>"This one's important. If there's ever an urgent situation in the masjid — a medical emergency, a security concern, anything — you can push an alert to every screen instantly, from your phone. It overrides whatever is displaying. Most masajid haven't thought about this until they need it."</div>
+              <div class="tip">➜ Watch their reaction here. If they lean forward or say "oh that's really useful," anchor the whole close around it.</div>
+            </div>
+          </div>
+
+          <div class="demo-item">
+            <div class="demo-num">E</div>
+            <div class="demo-content">
+              <div class="demo-title">Offline Mode — The Reliability Guarantee</div>
+              <div class="script blue"><span class="label">Say</span>"One thing that causes problems for masajid using other solutions is internet outages — Jumu'ah is about to start and the screen goes blank. With MasjidConnect, prayer times are cached locally on the device. Even if the internet goes down completely, the display keeps running perfectly."</div>
+            </div>
+          </div>
+
+          <div class="demo-item">
+            <div class="demo-num">F</div>
+            <div class="demo-content">
+              <div class="demo-title">The Hardware — Raspberry Pi</div>
+              <div class="script blue"><span class="label">Say</span>"The device running this is a Raspberry Pi — it's a small computer about the size of a deck of cards. It plugs into your TV's HDMI port. Setup takes about 20 minutes. You don't need a technician. And if one ever breaks, you can replace it yourself for around £50."</div>
+              <div class="tip"><strong>Check in after each section:</strong> "Does that address the concern you had about [X]?"</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">MasjidConnect · Demo Call Script · Page 1 of 2</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ PAGE 2 ══════ -->
+<div class="page-break"></div>
+<div class="page">
+  <div class="page-label">Page 2 of 2 — Objections · Close · Competitors & Differentiators</div>
+
+  <header>
+    <div>
+      <h1>MasjidConnect — Demo Call Script <span style="font-size:10px;font-weight:400;color:#555;">(continued)</span></h1>
+      <div class="tagline">When you get a hard question: <strong>acknowledge it → reframe → answer.</strong> Never get defensive.</div>
+    </div>
+    <div class="meta">
+      <strong>Remember:</strong> silence after a question is fine<br>
+      Never interrupt an objection mid-sentence<br>
+      "That's a fair point" buys you thinking time
+    </div>
+  </header>
+
+  <div class="two-col" style="margin-bottom:8px;">
+
+    <!-- OBJECTIONS -->
+    <div class="phase" style="margin-bottom:0;">
+      <div class="phase-header red">
+        <div class="phase-num">5</div>
+        <div class="phase-title">HANDLING OBJECTIONS</div>
+      </div>
+      <div class="phase-body">
+
+        <div class="obj-item">
+          <div class="obj-q">"We don't have the budget right now."</div>
+          <div class="script red"><span class="label">Say</span>"That's totally fair — can I ask, what's the current setup costing you in volunteer hours and printed materials each month? Sometimes when we add that up, the numbers are closer than people expect. And I can also look at whether there's a phased option that might work."</div>
+        </div>
+
+        <div class="obj-item">
+          <div class="obj-q">"We need to discuss with the committee / trustees."</div>
+          <div class="script red"><span class="label">Say</span>"Of course — that's exactly how it should work. Would it help if I joined that meeting, even just for 10 minutes to answer questions? Or I can put together a one-pager with the key points that makes it easy for you to present it."</div>
+          <div class="tip">➜ Always offer both options — some prefer you join, some prefer to own the room themselves.</div>
+        </div>
+
+        <div class="obj-item">
+          <div class="obj-q">"Can't we just use a TV slideshow or a free app?"</div>
+          <div class="script red"><span class="label">Say</span>"You absolutely can, and a lot of masajid start there. The difference is: with those, someone still has to manually update prayer times, there's no emergency alert system, and times won't auto-adjust for daylight saving or Ramadan. MasjidConnect handles all of that automatically. But if the timing isn't right, there's no pressure."</div>
+        </div>
+
+        <div class="obj-item">
+          <div class="obj-q">"What happens if the internet goes down?"</div>
+          <div class="script red"><span class="label">Say</span>"Great question — this is actually something we designed specifically for. Prayer times and your schedule are cached locally on the device, so the display keeps running normally even with no internet. It syncs back up automatically when the connection returns."</div>
+        </div>
+
+        <div class="obj-item">
+          <div class="obj-q">"What if the Raspberry Pi breaks?"</div>
+          <div class="script red"><span class="label">Say</span>"It's standard, widely available hardware — a replacement costs around £50 and is available on Amazon next-day. All your content and settings are stored in the cloud, so you just plug in a new one and it restores itself. We can also walk you through it over a call."</div>
+        </div>
+
+        <div class="obj-item">
+          <div class="obj-q">"Is this secure? We don't want strangers controlling our screens."</div>
+          <div class="script red"><span class="label">Say</span>"Completely understandable. Access is role-based — you control who can log into the admin portal and what they can change. Emergency alerts can be locked to specific admins only. The device communicates outbound to our servers; there's no open inbound access to your network."</div>
+        </div>
+
+        <div class="obj-item">
+          <div class="obj-q">"We're already looking at [competitor]."</div>
+          <div class="script red"><span class="label">Say</span>"Good to know — what's standing out to you about them so far?"</div>
+          <div class="tip">➜ <strong>Stop talking and listen.</strong> Their answer tells you exactly what to address. Never attack a competitor by name — compare on specific features only.</div>
+        </div>
+
+        <div class="obj-item" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+          <div class="obj-q">"We're not ready right now — maybe in a few months."</div>
+          <div class="script red"><span class="label">Say</span>"No problem at all. What would need to happen between now and then for this to make sense? I want to make sure that when you are ready, I can pick up exactly where we left off."</div>
+          <div class="tip">➜ Then schedule a specific follow-up date before you hang up. "Shall we put something in the diary for [month]?"</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: CLOSE + COMPETITORS -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+
+      <!-- CLOSE -->
+      <div class="phase" style="margin-bottom:0;">
+        <div class="phase-header purple">
+          <div class="phase-num">6</div>
+          <div class="phase-title">CLOSING — Always End With a Next Step</div>
+          <div class="phase-time">5 MIN</div>
+        </div>
+        <div class="phase-body">
+
+          <div class="tip" style="margin-bottom:5px;"><strong>Before closing, summarise what they told you:</strong> "So based on what you've shared, [pain point] is the main thing you're trying to solve — and it sounds like [feature] is the part that would make the biggest difference for you."</div>
+
+          <div class="close-item">
+            <div class="close-scenario">If they're ready to move forward</div>
+            <div class="script purple"><span class="label">Say</span>"Brilliant. The next step would be [trial / order / setup call]. I'll send you everything you need within the hour — does that work?"</div>
+          </div>
+
+          <div class="close-item">
+            <div class="close-scenario">If they need committee approval</div>
+            <div class="script purple"><span class="label">Say</span>"Completely understand. I'll send you a summary you can share with them — and I'm happy to join the meeting if that helps. When are they next getting together?"</div>
+          </div>
+
+          <div class="close-item">
+            <div class="close-scenario">If they're unsure / need to think</div>
+            <div class="script purple"><span class="label">Say</span>"No rush at all. What would need to be true for this to be a clear yes for you? Is there something specific I can help clarify?"</div>
+          </div>
+
+          <div class="close-item">
+            <div class="close-scenario">If there's no budget yet</div>
+            <div class="script purple"><span class="label">Say</span>"Understood. When does your next budget discussion happen? I'd love to make sure you have the numbers to hand when that conversation comes up."</div>
+          </div>
+
+          <div class="close-item" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+            <div class="close-scenario">Universal close — use every time</div>
+            <div class="script purple"><span class="label">Say</span>"Before we wrap up — what's the single most useful thing I can send you after this call?"</div>
+            <div class="tip">➜ Then: <strong>"And let's put a date in the diary now to follow up — would [specific date] work?"</strong> Never end without a booked next step.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- COMPETITORS -->
+      <div class="phase" style="margin-bottom:0;">
+        <div class="phase-header teal">
+          <div class="phase-num" style="font-size:11px;">VS</div>
+          <div class="phase-title">COMPETITORS & YOUR DIFFERENTIATORS</div>
+        </div>
+        <div class="phase-body">
+
+          <div class="comp-row">
+            <div class="comp-name">IslamicFinder / MuslimPro</div>
+            <div class="comp-vs">Consumer apps — not built for signage. No display mode, no admin portal, no emergency alerts.</div>
+          </div>
+          <div class="comp-row">
+            <div class="comp-name">Yodeck / Screenly / Rise</div>
+            <div class="comp-vs">Generic signage — no prayer times, no iqamah countdowns, no masjid-specific features. Manual setup required for everything.</div>
+          </div>
+          <div class="comp-row">
+            <div class="comp-name">Volunteer-built solution</div>
+            <div class="comp-vs"><em>"What happens when that volunteer moves on or isn't available? Who maintains it then?"</em></div>
+          </div>
+          <div class="comp-row" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+            <div class="comp-name">Other masjid software</div>
+            <div class="comp-vs">Ask: "Does it have an offline mode? Emergency alerts? Do you own the hardware or rent it?"</div>
+          </div>
+
+          <div style="margin-top:6px;border-top:1px solid #ddd;padding-top:5px;">
+            <div style="font-size:7.5px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Why MasjidConnect wins</div>
+            <div class="two-col" style="gap:3px;">
+              <div class="diff-row"><div class="diff-dot"></div><span><strong>Built for masajid</strong> — not adapted from a church tool</span></div>
+              <div class="diff-row"><div class="diff-dot"></div><span><strong>Offline-first</strong> — prayer times never go blank</span></div>
+              <div class="diff-row"><div class="diff-dot"></div><span><strong>Emergency alerts</strong> to all screens in seconds</span></div>
+              <div class="diff-row"><div class="diff-dot"></div><span><strong>You own the hardware</strong> — no subscription lock-in</span></div>
+              <div class="diff-row"><div class="diff-dot"></div><span><strong>Auto DST &amp; Ramadan</strong> adjustment — set it and forget it</span></div>
+              <div class="diff-row"><div class="diff-dot"></div><span><strong>£50 hardware</strong> — replaceable same-day by anyone</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- QUICK REMINDERS BAR -->
+  <div style="background:#1a1a1a;color:white;border-radius:4px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:7.5px;">
+    <div><strong style="color:#7ad9a0;">DO:</strong> Ask before presenting · Reflect their words back · Pause after questions · Name a next step</div>
+    <div style="width:1px;background:#444;height:14px;"></div>
+    <div><strong style="color:#f0857a;">DON'T:</strong> Pitch before listening · Attack competitors · End without a date · Promise what you can't deliver</div>
+    <div style="width:1px;background:#444;height:14px;"></div>
+    <div><strong style="color:#f0d07a;">IF STUCK:</strong> "That's a fair point — can I ask what's driving that concern?" buys you time every time.</div>
+  </div>
+
+  <div class="footer">MasjidConnect · Demo Call Script · Page 2 of 2 · Keep this next to you during calls</div>
+</div>
+
+</body>
+</html>

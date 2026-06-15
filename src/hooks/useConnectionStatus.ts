@@ -8,6 +8,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { selectIsOffline } from '../store/slices/uiSlice';
+import { selectIsAuthenticated } from '../store/slices/authSlice';
 import realtimeService from '../services/realtimeService';
 import logger from '../utils/logger';
 
@@ -30,6 +31,7 @@ const STARTUP_GRACE_MS = 10_000;
 
 export const useConnectionStatus = (): ConnectionStatus => {
   const isOffline = useSelector(selectIsOffline);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const [wsConnected, setWsConnected] = useState(false);
   const [wsReconnecting, setWsReconnecting] = useState(false);
   const [grace, setGrace] = useState(true);
@@ -67,10 +69,17 @@ export const useConnectionStatus = (): ConnectionStatus => {
       return { hasConnection: false, status: 'reconnecting' as const, message: 'Reconnecting...', severity: 'warning' as const, isReconnecting: true };
     }
     if (!wsConnected) {
+      // During pairing the WebSocket intentionally has no credentials and cannot
+      // connect. Don't report server-unreachable — the API is clearly reachable
+      // (we obtained a pairing code). Only flag server-unreachable once we are
+      // authenticated and the WebSocket is expected to be connected.
+      if (!isAuthenticated) {
+        return { hasConnection: true, status: 'connected' as const, message: '', severity: 'error' as const, isReconnecting: false };
+      }
       return { hasConnection: false, status: 'server-unreachable' as const, message: 'Server Unreachable', severity: 'warning' as const, isReconnecting: false };
     }
     return { hasConnection: true, status: 'connected' as const, message: '', severity: 'error' as const, isReconnecting: false };
-  }, [isOffline, wsConnected, wsReconnecting, grace]);
+  }, [isOffline, wsConnected, wsReconnecting, grace, isAuthenticated]);
 };
 
 export default useConnectionStatus;

@@ -6,7 +6,7 @@
  */
 
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import apiClient, { PairedCredentialsResponse } from '../../api/apiClient';
+import apiClient from '../../api/apiClient';
 import credentialService from '../../services/credentialService';
 import logger from '../../utils/logger';
 
@@ -154,7 +154,31 @@ export const checkPairingStatus = createAsyncThunk(
         return { isPaired: false, credentials: null };
       }
 
-      // Step 2: If needsDevicePairing, call PUT /api/screens/pair before fetching credentials
+      // Step 2a: check-simple STEP 2 (PairingHistory path) embeds full credentials directly.
+      // Use them immediately — no extra network call needed.
+      const rawStatus = statusResponse.data as Record<string, unknown>;
+      const embedded = rawStatus.credentials as
+        | { apiKey?: string; screenId?: string; masjidId?: string }
+        | undefined;
+
+      if (!statusResponse.data.needsDevicePairing && embedded?.apiKey && embedded?.screenId) {
+        logger.info('[Auth] Using credentials embedded in check-simple response');
+        const apiKey = String(embedded.apiKey);
+        const screenId = String(embedded.screenId);
+        const masjidId = embedded.masjidId ? String(embedded.masjidId) : undefined;
+
+        credentialService.saveCredentials({ apiKey, screenId, masjidId });
+        localStorage.removeItem('pairingCode');
+        localStorage.removeItem('pairingCodeExpiresAt');
+
+        return {
+          isPaired: true,
+          credentials: { apiKey, screenId, masjidId: masjidId || null },
+        };
+      }
+
+      // Step 2b: Admin has paired but device handshake (PUT) is still needed to
+      // transition the screen to ONLINE and clear the pairing code from the DB.
       if (statusResponse.data.needsDevicePairing) {
         logger.info('[Auth] needsDevicePairing true, completing device pairing via PUT');
         const state = getState() as { auth: AuthState };
@@ -165,12 +189,17 @@ export const checkPairingStatus = createAsyncThunk(
         };
         const putResponse = await apiClient.completeDevicePairing(pairingCode, deviceInfo);
         if (!putResponse.success) {
-          throw new Error(putResponse.error || 'Failed to complete device pairing');
+          // Log the failure but don't abort — the screen may already be ONLINE from
+          // a previous attempt. PairingHistory lookup in paired-credentials still works.
+          logger.warn('[Auth] PUT /screens/pair returned error, attempting credential fetch anyway', {
+            error: putResponse.error,
+          });
+        } else {
+          logger.info('[Auth] Device pairing completed, fetching credentials');
         }
-        logger.info('[Auth] Device pairing completed, fetching credentials');
       }
 
-      // Step 3: Fetch credentials
+      // Step 3: Fetch credentials via paired-credentials endpoint
       logger.info('[Auth] Device is paired, fetching credentials');
       const credentialsResponse = await apiClient.getPairedCredentials(pairingCode);
 
@@ -178,11 +207,9 @@ export const checkPairingStatus = createAsyncThunk(
         throw new Error(credentialsResponse.error || 'Failed to fetch credentials');
       }
 
-      const { apiKey, screenId, masjidId, masjidName, screenName, orientation } = 
+      const { apiKey, screenId, masjidId, masjidName, screenName, orientation } =
         credentialsResponse.data;
 
-      // Credentials are automatically saved by apiClient.getPairedCredentials
-      // But let's verify and store additional info
       logger.info('[Auth] Credentials received and saved', {
         screenId,
         masjidId,
@@ -190,12 +217,10 @@ export const checkPairingStatus = createAsyncThunk(
         screenName,
       });
 
-      // Store additional info
       if (masjidName) localStorage.setItem('masjid_name', masjidName);
       if (screenName) localStorage.setItem('screen_name', screenName);
       if (orientation) localStorage.setItem('screen_orientation', orientation);
 
-      // Clear pairing data
       localStorage.removeItem('pairingCode');
       localStorage.removeItem('pairingCodeExpiresAt');
 

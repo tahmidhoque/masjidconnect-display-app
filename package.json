@@ -6,7 +6,7 @@
   "description": "MasjidConnect Display App - Lightweight digital signage for mosques",
   "author": {
     "name": "MasjidConnect",
-    "email": "support@masjidconnect.com"
+    "email": "support@masjidconnect.co.uk"
   },
   "scripts": {
     "test": "vitest run",
