@@ -12,6 +12,7 @@ import {
   loadCachedContent,
   refreshAllContent,
   normalizeScheduleData,
+  extractDisplaySettings,
   DEFAULT_DISPLAY_SETTINGS,
 } from './contentSlice';
 import {
@@ -359,6 +360,42 @@ describe('contentSlice', () => {
       const result = normalizeScheduleData(raw);
       expect(result.items).toHaveLength(1);
       expect(result.items[0].contentItem.type).toBe('CUSTOM');
+    });
+  });
+
+  describe('extractDisplaySettings', () => {
+    it('preserves postJamaatSupplication, postAdhanSupplication and jamaatInProgressMode from the API', () => {
+      const content = {
+        displaySettings: {
+          postAdhanSupplication: { enabled: true, delayMinutes: 2, durationMinutes: 4 },
+          postJamaatSupplication: { enabled: true, durationMinutes: 5 },
+          jamaatInProgressMode: 'dark',
+        },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.postJamaatSupplication).toEqual({ enabled: true, durationMinutes: 5 });
+      expect(result.postAdhanSupplication).toEqual({
+        enabled: true,
+        delayMinutes: 2,
+        durationMinutes: 4,
+      });
+      expect(result.jamaatInProgressMode).toBe('dark');
+    });
+
+    it('clamps out-of-range supplication durations and defaults missing blocks to disabled', () => {
+      const content = {
+        displaySettings: {
+          postJamaatSupplication: { enabled: true, durationMinutes: 99 },
+        },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.postJamaatSupplication).toEqual({ enabled: true, durationMinutes: 15 });
+      expect(result.postAdhanSupplication?.enabled).toBe(false);
+      expect(result.jamaatInProgressMode).toBe('screen');
     });
   });
 

@@ -307,6 +307,7 @@
   /* ───────────────────────── GENERIC GRID ───────────────────────── */
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-top: 16px; }
+  .grid-sched { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-top: 10px; }
   .quote-strip + .grid-2,
   .quote-strip + .grid-3 { margin-top: 0; }
   table.licmp + .grid-2,
@@ -380,31 +381,85 @@
   .stat .n { font-size: 22px; font-weight: 800; color: var(--emerald-dark); line-height: 1; }
   .stat .l { font-size: 8.8px; color: var(--muted); margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-  /* ───────────────────────── AUTOMATION TIMELINE ───────────────────────── */
-  .auto-wrap { border: 1px solid var(--line); border-radius: 11px; overflow: hidden; margin-bottom: 18px; }
-  .auto-head { background: var(--midnight); color: #fff; padding: 11px 15px; display: flex; align-items: center; gap: 9px; }
+  /* ───────────────────────── AUTOMATION / SCHEDULING ───────────────────────── */
+  .auto-wrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 2px 12px rgba(10,38,71,0.06); }
+  .auto-head { background: linear-gradient(135deg, var(--midnight) 0%, var(--midnight-light) 100%); color: #fff; padding: 12px 16px; display: flex; align-items: center; gap: 9px; }
   .auto-head .logo-mark { height: 15px; }
-  .auto-head b { font-size: 12.5px; }
-  .auto-head .sub { font-size: 9px; color: rgba(255,255,255,0.7); margin-left: auto; }
-  .auto-body { padding: 15px; background: var(--paper-soft); }
+  .auto-head b { font-size: 12.5px; letter-spacing: -0.2px; }
+  .auto-head .sub { font-size: 8.5px; color: rgba(255,255,255,0.72); margin-left: auto; font-weight: 600; letter-spacing: 0.3px; }
+  .auto-body { padding: 14px 15px 15px; background: linear-gradient(180deg, #f8fafc 0%, var(--paper-soft) 100%); }
 
-  .timeline { position: relative; padding-left: 4px; }
-  .tl-track { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 12px; }
-  .tl-day { text-align: center; font-size: 8px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-  .tl-day.fri { color: var(--gold-dark); }
-  .tl-bars { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; }
-  .tl-cell { height: 46px; border-radius: 6px; background: #e7edf3; position: relative; overflow: hidden; }
-  .tl-block { position: absolute; left: 3px; right: 3px; border-radius: 4px; font-size: 6.5px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; padding: 0 2px; text-align: center; line-height: 1.1; }
-  .tl-default { background: var(--midnight-light); top: 3px; bottom: 3px; }
-  .tl-jumuah { background: var(--gold-dark); color: var(--midnight); top: 3px; height: 22px; }
-  .tl-event  { background: var(--emerald); top: 27px; bottom: 3px; }
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
+  .week-col {
+    background: #fff; border: 1px solid var(--line); border-radius: 9px;
+    padding: 7px 5px 6px; display: flex; flex-direction: column; gap: 5px; min-height: 78px;
+  }
+  .week-col--fri {
+    border-color: var(--gold-dark);
+    background: linear-gradient(180deg, #fffef8 0%, #fff 100%);
+    box-shadow: inset 0 0 0 1px rgba(212,168,74,0.18);
+  }
+  .week-day {
+    text-align: center; font-size: 7.5px; font-weight: 800; letter-spacing: 0.7px;
+    text-transform: uppercase; color: var(--muted); padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .week-col--fri .week-day { color: var(--gold-dark); border-bottom-color: rgba(212,168,74,0.35); }
+  .week-stack { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+  .week-chip {
+    display: flex; align-items: center; justify-content: center; min-height: 16px;
+    text-align: center; font-size: 6.5px; font-weight: 700; padding: 3px 2px;
+    border-radius: 5px; line-height: 1.1; color: #fff;
+  }
+  .week-chip--default { background: var(--midnight-light); flex: 1; min-height: 22px; }
+  .week-chip--jumuah { background: var(--gold-dark); color: var(--midnight); min-height: 18px; }
+  .week-chip--event { background: var(--emerald); flex: 1; min-height: 22px; }
+  .week-chip--prayer { background: #5c7cfa; min-height: 15px; }
 
+  .sched-legend {
+    display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 11px;
+    padding: 9px 11px; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+  }
+  .sched-legend .lk { font-size: 8px; }
+  .sched-note { font-size: 8px; color: var(--muted); margin-top: 8px; line-height: 1.4; font-style: italic; }
+
+  .sched-rules-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    margin: 13px 0 8px; padding-top: 12px; border-top: 1px solid var(--line);
+  }
+  .sched-rules-head b { font-size: 10px; color: var(--midnight); }
+  .sched-rules-head span { font-size: 8px; color: var(--muted); }
+
+  .sched-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .sched-rule {
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 9px 7px 10px; border-left-width: 3px; border-left-style: solid;
+  }
+  .sched-rule--default { border-left-color: var(--midnight-light); }
+  .sched-rule--recurring { border-left-color: var(--gold-dark); }
+  .sched-rule--prayer { border-left-color: #5c7cfa; }
+  .sched-rule--range { border-left-color: var(--emerald); }
+  .sched-rule-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 2px; }
+  .sched-rule-type {
+    font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .sched-rule-prio {
+    font-size: 7px; font-weight: 700; color: var(--midnight-light);
+    background: var(--paper-soft); border: 1px solid var(--line); border-radius: 999px;
+    padding: 1px 6px; white-space: nowrap;
+  }
+  .sched-rule-title { font-size: 9.5px; font-weight: 800; color: var(--midnight); line-height: 1.25; margin-bottom: 1px; }
+  .sched-rule-meta { font-size: 8.5px; color: var(--muted); line-height: 1.35; }
+
+  /* legacy rule-list (other pages) */
   .rule-list { margin-top: 4px; }
-  .rule-item { display: flex; gap: 9px; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 7px; }
+  .rule-item { display: flex; gap: 9px; align-items: center; padding: 6px 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 5px; }
   .rule-item:last-child { margin-bottom: 0; }
   .rule-badge { font-size: 7.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; min-width: 74px; text-align: center; }
   .rb-recurring { background: #fcefcf; color: var(--gold-dark); }
   .rb-range { background: #d9f0eb; color: var(--emerald-dark); }
+  .rb-prayer { background: #e3ecf8; color: var(--midnight-light); }
   .rb-default { background: #dde6f1; color: var(--midnight-light); }
   .rule-item .desc { font-size: 10.3px; color: var(--ink); }
   .rule-item .desc b { color: var(--midnight); }
@@ -819,6 +874,7 @@
 
     <div class="strapline">
       <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Playlist scheduling</span>
+      <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Prayer-window playlists</span>
       <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Auto prayer times</span>
       <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Works offline</span>
       <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> One-off cost · no lock-in</span>
@@ -832,7 +888,7 @@
       <div class="who">
         UK-operated · Built by committee members<br>
         <b>www.masjidconnect.co.uk</b><br>
-        Version 1.0 · June 2026
+        Version 1.2 · June 2026
       </div>
     </div>
 
@@ -873,7 +929,8 @@
     <div class="col answer">
       <h3><span class="tag">With MasjidConnect</span> Set it once</h3>
       <div class="pa-row"><span class="mk">✓</span><span><b>Schedule Jumu'ah forever.</b> Build the Friday layout once and it appears automatically every Friday — and reverts on its own afterwards.</span></div>
-      <div class="pa-row"><span class="mk">✓</span><span><b>Plan weeks ahead.</b> Ramadan, fundraisers, Eid, school holidays — queue them up by date and time, then forget about them.</span></div>
+      <div class="pa-row"><span class="mk">✓</span><span><b>Plan weeks ahead.</b> Ramadan, fundraisers, Eid, school holidays — queue them by date and time on Starter, then forget about them.</span></div>
+      <div class="pa-row"><span class="mk">✓</span><span><b>Tied to prayer times.</b> On Growth, run a different playlist between Maghrib and Isha — anchored to your timetable, not a clock you re-set every season.</span></div>
       <div class="pa-row"><span class="mk">✓</span><span><b>Prayer times calculate themselves.</b> Set location and method once; DST and seasonal shifts are handled automatically.</span></div>
       <div class="pa-row"><span class="mk">✓</span><span><b>One-off cost.</b> A lifetime software licence you own — no per-screen monthly subscription.</span></div>
       <div class="pa-row"><span class="mk">✓</span><span><b>Runs offline.</b> Prayer times and content are cached on the device — fullest experience on our Display Unit; the screen keeps going when the internet drops.</span></div>
@@ -944,7 +1001,8 @@
   <div class="rule"></div>
   <p class="lead" style="max-width:100%;">
     You build <strong>playlists</strong> — sets of slides — and assign each one a schedule.
-    The display switches between them automatically. Set your Jumu'ah screen once; it runs every Friday.
+    Most masjid display apps still need someone on site to swap content; MasjidConnect switches playlists
+    by day and time, by date range, or — on Growth — between two prayers. Set Jumu'ah once; it runs every Friday.
   </p>
 
   <div class="auto-wrap">
@@ -954,78 +1012,126 @@
       <span class="sub">Built once · repeats on its own</span>
     </div>
     <div class="auto-body">
-      <div class="timeline">
-        <div class="tl-track">
-          <div class="tl-day">Mon</div><div class="tl-day">Tue</div><div class="tl-day">Wed</div>
-          <div class="tl-day">Thu</div><div class="tl-day fri">Fri</div><div class="tl-day">Sat</div><div class="tl-day">Sun</div>
+      <div class="week-grid">
+        <div class="week-col">
+          <div class="week-day">Mon</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--default">Everyday</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
         </div>
-        <div class="tl-bars">
-          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
-          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
-          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
-          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
-          <div class="tl-cell"><div class="tl-block tl-jumuah">Jumu'ah</div><div class="tl-block tl-event">Everyday</div></div>
-          <div class="tl-cell"><div class="tl-block tl-event" style="top:3px;">Weekend class</div></div>
-          <div class="tl-cell"><div class="tl-block tl-event" style="top:3px;">Weekend class</div></div>
+        <div class="week-col">
+          <div class="week-day">Tue</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--default">Everyday</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
+        </div>
+        <div class="week-col">
+          <div class="week-day">Wed</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--default">Everyday</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
+        </div>
+        <div class="week-col">
+          <div class="week-day">Thu</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--default">Everyday</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
+        </div>
+        <div class="week-col week-col--fri">
+          <div class="week-day">Fri</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--jumuah">Jumu'ah</span>
+            <span class="week-chip week-chip--default">Everyday</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
+        </div>
+        <div class="week-col">
+          <div class="week-day">Sat</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--event">Weekend class</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
+        </div>
+        <div class="week-col">
+          <div class="week-day">Sun</div>
+          <div class="week-stack">
+            <span class="week-chip week-chip--event">Weekend class</span>
+            <span class="week-chip week-chip--prayer">Mag–Isha</span>
+          </div>
         </div>
       </div>
 
-      <div class="legend" style="margin:12px 0 14px;">
-        <span class="lk"><span class="sw" style="background:var(--midnight-light)"></span> Default playlist</span>
-        <span class="lk"><span class="sw" style="background:var(--gold-dark)"></span> Friday Jumu'ah (recurring)</span>
-        <span class="lk"><span class="sw" style="background:var(--emerald)"></span> Time / day-scoped playlist</span>
+      <div class="sched-legend">
+        <span class="lk"><span class="sw" style="background:var(--midnight-light)"></span> Default</span>
+        <span class="lk"><span class="sw" style="background:var(--gold-dark)"></span> Jumu'ah (Fri)</span>
+        <span class="lk"><span class="sw" style="background:var(--emerald)"></span> Day / time scoped</span>
+        <span class="lk"><span class="sw" style="background:#5c7cfa"></span> Prayer window · Growth</span>
       </div>
+      <p class="sched-note">When schedules overlap, the higher-priority playlist wins — shown in the example rules below.</p>
 
-      <div class="rule-list">
-        <div class="rule-item">
-          <span class="rule-badge rb-default">Default</span>
-          <span class="desc"><b>Everyday content</b> — verses, announcements, prayer countdown. Shows whenever nothing more specific is scheduled.</span>
-          <span class="prio">Priority 0</span>
+      <div class="sched-rules-head">
+        <b>Example rules for this week</b>
+        <span>Higher number = takes over when active</span>
+      </div>
+      <div class="sched-rules">
+        <div class="sched-rule sched-rule--default">
+          <div class="sched-rule-top"><span class="sched-rule-type">Default</span><span class="sched-rule-prio">P0</span></div>
+          <div class="sched-rule-title">Everyday content</div>
+          <div class="sched-rule-meta">Verses, announcements, prayer countdown — whenever nothing more specific is scheduled.</div>
         </div>
-        <div class="rule-item">
-          <span class="rule-badge rb-recurring">Recurring</span>
-          <span class="desc"><b>Jumu'ah screen</b> — every <b>Friday, 11:30–14:00</b>. Khutbah reminder, silent-phones notice, Jumu'ah timings.</span>
-          <span class="prio">Priority 10</span>
+        <div class="sched-rule sched-rule--recurring">
+          <div class="sched-rule-top"><span class="sched-rule-type">Recurring</span><span class="sched-rule-prio">P5</span></div>
+          <div class="sched-rule-title">Weekend madrasah</div>
+          <div class="sched-rule-meta">Sat &amp; Sun — class times and parent reminders.</div>
         </div>
-        <div class="rule-item">
-          <span class="rule-badge rb-recurring">Recurring</span>
-          <span class="desc"><b>Weekend madrasah</b> — <b>Sat &amp; Sun</b>, class times and parent reminders.</span>
-          <span class="prio">Priority 5</span>
+        <div class="sched-rule sched-rule--recurring">
+          <div class="sched-rule-top"><span class="sched-rule-type">Recurring</span><span class="sched-rule-prio">P10</span></div>
+          <div class="sched-rule-title">Jumu'ah screen</div>
+          <div class="sched-rule-meta">Every Friday 11:30–14:00 — khutbah reminder, silent phones, Jumu'ah timings.</div>
         </div>
-        <div class="rule-item">
-          <span class="rule-badge rb-range">Date range</span>
-          <span class="desc"><b>Ramadan timetable</b> — runs <b>1–30 Ramadan only</b>, then disappears by itself. Suhoor/iftar, taraweeh, i'tikaf sign-up.</span>
-          <span class="prio">Priority 20</span>
+        <div class="sched-rule sched-rule--prayer">
+          <div class="sched-rule-top"><span class="sched-rule-type">Prayer window</span><span class="sched-rule-prio">P8 · Growth</span></div>
+          <div class="sched-rule-title">Maghrib → Isha</div>
+          <div class="sched-rule-meta">Quieter playlist between prayers — follows your timetable when jamaat shifts.</div>
         </div>
-        <div class="rule-item">
-          <span class="rule-badge rb-range">Date range</span>
-          <span class="desc"><b>Eid &amp; fundraiser</b> — appears for the dates you set, highest priority, overrides everything beneath it.</span>
-          <span class="prio">Priority 30</span>
+        <div class="sched-rule sched-rule--range">
+          <div class="sched-rule-top"><span class="sched-rule-type">Date range</span><span class="sched-rule-prio">P20</span></div>
+          <div class="sched-rule-title">Ramadan timetable</div>
+          <div class="sched-rule-meta">1–30 Ramadan only — suhoor/iftar, taraweeh, i'tikaf sign-up, then off by itself.</div>
+        </div>
+        <div class="sched-rule sched-rule--range">
+          <div class="sched-rule-top"><span class="sched-rule-type">Date range</span><span class="sched-rule-prio">P30</span></div>
+          <div class="sched-rule-title">Eid &amp; fundraiser</div>
+          <div class="sched-rule-meta">Fixed start/end dates — highest priority, overrides everything beneath it.</div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="quote-strip">
-    <div class="qq">&ldquo;We run three screens at Lye Ghausia now. Jumu'ah playlists switch themselves, prayer times stay right, and when we need a janazah or parking message out quickly, it hits every screen in seconds. It's the first display system I've used that actually feels built for a masjid.&rdquo;</div>
-    <div class="qa"><b>Osman</b> · Committee lead · Lye Ghausia Jamia Masjid, West Midlands</div>
-  </div>
-
-  <div class="grid-3">
+  <div class="grid-sched">
     <div class="fcard">
       <div class="ico gd"><svg aria-hidden="true"><use href="#i-repeat"/></svg></div>
       <h4>Recurring rules</h4>
-      <p>Pick the days of the week and a time window. "Every Friday afternoon" or "weekday mornings" — set once, repeats forever.</p>
+      <p>Pick days of the week and a time window. Jumu'ah every Friday, weekday mornings — set once, repeats forever. <b>Starter+</b></p>
     </div>
     <div class="fcard">
       <div class="ico em"><svg aria-hidden="true"><use href="#i-calendar-range"/></svg></div>
       <h4>Date-range campaigns</h4>
-      <p>Give a playlist a start and end date. It switches on and off on its own — for Ramadan, Eid and appeals.</p>
+      <p>Start and end dates for Ramadan timetables, Eid appeals, and fundraisers — switches on and off by itself. <b>Starter+</b></p>
+    </div>
+    <div class="fcard">
+      <div class="ico"><svg aria-hidden="true"><use href="#i-timer"/></svg></div>
+      <h4>Prayer windows</h4>
+      <p>Run a playlist between two prayers — e.g. after Maghrib until Isha. Anchored to adhan or jamaat, with optional offsets. <b>Growth+</b></p>
     </div>
     <div class="fcard">
       <div class="ico"><svg aria-hidden="true"><use href="#i-layers"/></svg></div>
       <h4>Priority stacking</h4>
-      <p>When rules overlap, the higher priority wins. Layer special content on top of everyday content without deleting anything.</p>
+      <p>When rules overlap, the higher priority wins. Layer Ramadan or Eid content on everyday playlists without deleting anything.</p>
     </div>
   </div>
 
@@ -1191,7 +1297,7 @@
 
   <p class="capture-note">Production screenshots — same fonts and layouts as on your screens.</p>
 
-  <div class="gal tri" style="gap:13px;">
+  <div class="gal" style="gap:13px;">
 
     <div class="mock">
       <img class="shot ls" src="brochure-assets/slide-verse.png" alt="Verse and Hadith slide">
@@ -1235,7 +1341,7 @@
     <div>Layout gallery · 3 of 4</div>
   </div>
 
-  <div class="gal tri" style="gap:13px; margin-top:0;">
+  <div class="gal" style="gap:13px; margin-top:0;">
 
     <div class="mock">
       <img class="shot ls" src="brochure-assets/slide-eid.png" alt="Custom image slide — Lye Ghausia Eid ul-Adha poster">
@@ -1254,7 +1360,7 @@
 
   </div>
 
-  <div class="alert-showcase" style="margin-top:14px;">
+  <div class="alert-showcase" style="margin-top:14px; max-width:80%; margin-left:auto; margin-right:auto;">
     <div class="mock">
       <img class="shot ls" src="brochure-assets/realtime-alert.png" alt="Real-time alert full-screen takeover — janazah notice">
       <div class="cap">
@@ -1300,8 +1406,8 @@
       <div class="themes" style="margin-bottom:16px;">
         <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-stack-verse.png" alt="Midnight theme"><div class="nm">Midnight (default)</div></div>
         <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-theme-emerald.png" alt="Emerald theme"><div class="nm">Emerald</div></div>
-        <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-ramadan.png" alt="Ramadan theme"><div class="nm">Ramadan</div></div>
-        <div class="theme"><div class="prev" style="background:linear-gradient(160deg,#2b1840,#160a24); color:#d9b3ff">Aa</div><div class="nm">Custom colours</div></div>
+        <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-theme-purple.png" alt="Royal Purple theme"><div class="nm">Royal Purple</div></div>
+        <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-theme-burgundy.png" alt="Burgundy theme"><div class="nm">Burgundy</div></div>
       </div>
       <div style="font-size:8.5px; color:var(--muted); margin-bottom:14px;">Set background, accent, highlight and text colours — or match your masjid's existing brand exactly.</div>
 
@@ -1344,8 +1450,9 @@
   <div class="rule"></div>
   <p class="lead" style="max-width:100%; margin-bottom:10px;">
     MasjidConnect runs in a web browser. You do <strong>not</strong> have to use our hardware — but our
-    <strong>MasjidConnect Display Unit</strong> is the option we design, warrant, and fully support. Any HDMI TV
-    from 24″ to 85″ works in landscape or portrait.
+    <strong>MasjidConnect Display Unit</strong> (£189 standalone) is the signage computer we design, warrant, and fully support.
+    It is <strong>not a TV</strong> — you plug it into any HDMI screen from 24″ to 85″, landscape or portrait.
+    Installed packages include the TV; the quote depends on the size you choose.
   </p>
 
   <div class="in-situ-grid">
@@ -1405,7 +1512,7 @@
     <div class="fcard" style="border-color:var(--gold); background:#fffef8;">
       <div class="ico gd" style="margin-bottom:6px;"><svg aria-hidden="true"><use href="#i-box"/></svg></div>
       <h4 style="font-size:11px;">MasjidConnect Display Unit <span style="font-size:7px; font-weight:800; color:var(--gold-dark); text-transform:uppercase; letter-spacing:0.5px;">Recommended</span></h4>
-      <p style="font-size:8.6px;">Our signage computer with MasjidConnect OS pre-installed. Offline mode, automatic updates, Wi‑Fi recovery, and <b>12-month manufacturer warranty</b>. Included in installed packages or from <b>£189</b> standalone. <b>Care plans and Display Guard cover hardware we supply.</b></p>
+      <p style="font-size:8.6px;">Our pre-configured signage computer (the brains behind the display). Offline mode, automatic updates, Wi‑Fi recovery, and <b>12-month manufacturer warranty</b>. <b>£189 standalone — TV not included.</b> You need any HDMI TV or monitor. Included in installed packages (TV supplied; size quoted). <b>Care plans and Display Guard cover hardware we supply.</b></p>
     </div>
     <div class="fcard">
       <div class="ico em" style="margin-bottom:6px;"><svg aria-hidden="true"><use href="#i-monitor"/></svg></div>
@@ -1437,13 +1544,14 @@
     <div>
       <div style="font-size:10px; font-weight:800; color:var(--midnight); margin-bottom:6px;">Display Unit — what's in the box</div>
       <table class="spec">
-        <tr><th>Device</th><td>MasjidConnect Display Unit — pre-configured signage computer</td></tr>
+        <tr><th>Device</th><td>MasjidConnect Display Unit — pre-configured signage computer (not a TV)</td></tr>
+        <tr><th>TV / monitor</th><td><b>Not included</b> at £189 — you need any HDMI screen, or book an installed package</td></tr>
         <tr><th>Software</th><td>MasjidConnect OS — auto-updating, offline-first</td></tr>
         <tr><th>Connectivity</th><td>Wi‑Fi 5, Bluetooth, Gigabit Ethernet</td></tr>
         <tr><th>Display output</th><td>HDMI — up to 4K@60Hz</td></tr>
         <tr><th>Included</th><td>Ventilated case, power supply, HDMI cable, quick-start card</td></tr>
         <tr><th>Warranty</th><td>12-month manufacturer warranty (return-to-base)</td></tr>
-        <tr><th>Standalone price</th><td>£189 if bought separately (final price)</td></tr>
+        <tr><th>Standalone price</th><td>£189 for the unit only (final price) — bring your own TV</td></tr>
       </table>
     </div>
     <div>
@@ -1495,17 +1603,17 @@
     <div class="path-card">
       <div class="sit">Try it first</div>
       <h4>One screen, your own TV</h4>
-      <p>Pair a Fire Stick, smart TV browser, or PC in kiosk mode. Start on the <b>Free</b> tier to test, then move to <b>Starter (£349)</b> when you want scheduling and real-time announcements on up to 3 screens.</p>
+      <p>Pair a Fire Stick, smart TV browser, or PC in kiosk mode. Start on the <b>Free</b> tier to test, then move to <b>Starter (£349)</b> when you want recurring Jumu'ah, date-range campaigns, and real-time announcements on up to 3 screens.</p>
     </div>
     <div class="path-card rec">
       <div class="sit">Most masajid</div>
       <h4>2–10 screens or multiple halls</h4>
-      <p><b>Growth licence (£499)</b> — recurring Jumu'ah and Ramadan scheduling, unlimited playlists, ticketing and CRM. Or <b>Growth Installed (from £1,199)</b> if you want us to supply, mount and hand over a Display Unit.</p>
+      <p><b>Growth Installed (from £1,199)</b> — TV, Display Unit, install, prayer-window playlists, ticketing and CRM. Or buy a <b>Growth licence (£499)</b> and add a Display Unit (£189, TV not included) yourself.</p>
     </div>
     <div class="path-card">
       <div class="sit">Hands-off install</div>
       <h4>One screen, fitted for you</h4>
-      <p><b>Starter Installed (from £899)</b> — we visit, mount the TV, pair the Display Unit, set your layout and Jumu'ah playlist, then hand over. Final price confirmed in writing after your postcode and scope.</p>
+      <p><b>Starter Installed (from £899)</b> — we visit with a TV (size quoted), mount it, install the Display Unit, set your layout and Jumu'ah playlist, then hand over.</p>
     </div>
     <div class="path-card">
       <div class="sit">Networks &amp; multi-site</div>
@@ -1515,14 +1623,14 @@
   </div>
 
   <div class="path-bridge">
-    <b>Software only or installed?</b> Licences are a one-off payment you own — add our Display Unit (£189 standalone) or choose an installed package if you want us on site. Optional care plans (£279/yr+) are for hands-on help, not for keeping the software running.
+    <b>Software only or installed?</b> Licences are a one-off payment you own. Add a Display Unit for <b>£189</b> (signage computer only — you supply the TV) or choose an installed package if you want us on site with a TV included. Optional care plans (£279/yr+) are for hands-on help, not for keeping the software running.
   </div>
 
   <div class="proc-box" style="margin-top:14px;">
     <h4>Still deciding? Three quick questions</h4>
     <p><b>How many screens?</b> One hall entrance is often Starter; a main hall plus side rooms usually means Growth.<br>
     <b>Who will maintain it?</b> Tech-confident volunteers can self-serve; care plans suit committees without a regular IT volunteer.<br>
-    <b>Your own hardware or ours?</b> Our Display Unit is recommended for offline mode and warranty — but MasjidConnect runs on devices you already own.</p>
+    <b>Your own hardware or ours?</b> The £189 Display Unit is the brains — you still need a TV. Installed packages include the TV (price varies by size). MasjidConnect also runs on sticks and smart TVs you already own.</p>
   </div>
 
   <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 12</div></div>
@@ -1561,7 +1669,7 @@
       <div class="tb"><ul>
         <li>Up to 3 screens</li>
         <li>Full content library</li>
-        <li>Basic scheduling</li>
+        <li>Recurring &amp; date-range scheduling</li>
         <li>Real-time announcements</li>
         <li>Up to 3 admin users</li>
       </ul></div>
@@ -1570,7 +1678,7 @@
       <div class="th"><span class="pop">Most popular</span><div class="tn">Growth</div><div class="price">£499</div><div class="once">One-off · lifetime</div></div>
       <div class="tb"><ul>
         <li>Up to 10 screens</li>
-        <li>Advanced scheduling</li>
+        <li>Prayer-window scheduling</li>
         <li>Unlimited playlists</li>
         <li>Event ticketing</li>
         <li>Members CRM &amp; donations</li>
@@ -1590,9 +1698,9 @@
 
   <div class="proc-box" style="margin-top:12px;">
     <h4>Why most masajid choose Growth over Starter</h4>
-    <p>For <strong>£150 more</strong> than Starter you get 10 screens instead of 3, plus recurring and date-range
-      scheduling — Jumu'ah every Friday, Ramadan timetables that start and stop on their own — ticketing, CRM, and
-      lower donation fees. If you have more than one hall or entrance screen, Growth is usually the right tier.</p>
+    <p>For <strong>£150 more</strong> than Starter you get 10 screens instead of 3,
+      <strong>prayer-window scheduling</strong> (playlists between Maghrib, Isha, and the rest of your timetable),
+      unlimited playlists, ticketing, CRM, and lower donation fees. Recurring Jumu'ah and Ramadan date ranges are already on Starter — Growth is the tier when you need more screens or content tied to prayer times.</p>
   </div>
 
   <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 13</div></div>
@@ -1656,11 +1764,18 @@
         <td class="growth-col"><span class="val">Unlimited</span></td><td><span class="val">Unlimited</span></td>
       </tr>
       <tr>
-        <td class="feat">Playlist scheduling</td>
+        <td class="feat">Playlist scheduling (recurring &amp; date range)</td>
         <td class="no">✕</td>
-        <td><span class="val">Basic</span></td>
-        <td class="growth-col"><span class="val">Recurring + date range</span></td>
-        <td><span class="val">Recurring + date range</span></td>
+        <td class="yes">✓</td>
+        <td class="growth-col yes">✓</td>
+        <td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Prayer-window scheduling (between prayers)</td>
+        <td class="no">✕</td>
+        <td class="no">✕</td>
+        <td class="growth-col yes">✓</td>
+        <td class="yes">✓</td>
       </tr>
       <tr>
         <td class="feat">Real-time screen announcements</td>
@@ -1827,18 +1942,19 @@
   <div class="rule"></div>
   <p class="lead" style="max-width:100%;">
     Installed prices are <strong>starting points</strong>, not fixed quotes. Every package below includes
-    <strong>one screen</strong> in our free travel radius. Additional screens, distance, mounting complexity,
-    and time on site all affect the final figure — we quote before you commit.
+    <strong>one complete screen</strong> (TV + Display Unit + install) in our free travel radius.
+    The &ldquo;from&rdquo; price assumes a typical TV size (usually 43″–55″) — larger hall displays cost more.
+    Additional screens, distance, and mounting complexity also affect the final figure — we quote before you commit.
   </p>
 
   <div class="grid-3" style="margin-bottom:12px;">
     <div class="fcard" style="background:#fff;">
       <h4 style="font-size:12px;">Starter Installed <span style="float:right; color:var(--emerald-dark)">from £899</span></h4>
-      <p style="margin-top:4px;">Starter licence + Display Unit + qualified electrician install, mount, pair, and volunteer training for <b>one screen</b>.</p>
+      <p style="margin-top:4px;">Starter licence + TV + Display Unit + qualified electrician install, mount, pair, and volunteer training for <b>one screen</b> (TV size quoted).</p>
     </div>
     <div class="fcard" style="background:#fff; border-color:var(--gold);">
       <h4 style="font-size:12px;">Growth Installed <span style="float:right; color:var(--emerald-dark)">from £1,199</span></h4>
-      <p style="margin-top:4px;"><b style="color:var(--gold-dark)">Most popular.</b> Growth licence + install + Members CRM, ticketing &amp; donor setup for <b>one screen</b>.</p>
+      <p style="margin-top:4px;"><b style="color:var(--gold-dark)">Most popular.</b> Growth licence + TV + install + Members CRM, ticketing &amp; donor setup for <b>one screen</b> (TV size quoted).</p>
     </div>
     <div class="fcard" style="background:#fff;">
       <h4 style="font-size:12px;">Pro Installed <span style="float:right; color:var(--emerald-dark)">from £1,799</span></h4>
@@ -1849,7 +1965,8 @@
   <div class="proc-box warn">
     <h4>Why "from" — and when the price goes up</h4>
     <ul>
-      <li><b>More screens:</b> Each package includes one installed screen. Most masajid want 2–4 (main hall, sisters' area, entrance). Additional installed screens are <b>from £349 each</b> — each adds mounting, wiring, pairing, and on-site time.</li>
+      <li><b>Screen size:</b> Installed &ldquo;from&rdquo; prices assume a standard wall-mounted TV (typically 43″–55″). A 65″ or 75″ main-hall display costs more — we confirm size and price in your written quote.</li>
+      <li><b>More screens:</b> Each package includes one installed screen. Most masajid want 2–4 (main hall, sisters' area, entrance). Additional installed screens are <b>from £349 each</b> — each adds a TV (size quoted), mounting, wiring, pairing, and on-site time.</li>
       <li><b>Larger rollouts:</b> A Growth licence with 6–7 supplied screens is a much longer install — often a full day or more. We quote this separately; we cannot absorb multi-screen labour at a single-screen price.</li>
       <li><b>Travel distance:</b> Install travel is free within 50 miles of Oxfordshire. 50–100 miles carries a <b>£75 surcharge</b>. Beyond that we batch visits or arrange remote-assisted setup — see travel bands on the next page.</li>
       <li><b>Your building:</b> Standard wall mount and fused spur are included. Major electrical work, heritage buildings, or unusual cable runs are quoted after a site check.</li>
@@ -1875,12 +1992,12 @@
       <h4>What's included in a standard install (one screen)</h4>
       <ul>
         <li>Half-day on-site visit (typical for one screen)</li>
-        <li>MasjidConnect Display Unit — pre-configured, supplied &amp; installed by us</li>
-        <li>Screen mounted &amp; wired by a qualified electrician</li>
+        <li>TV supplied, mounted &amp; wired by a qualified electrician</li>
+        <li>MasjidConnect Display Unit — pre-configured, installed behind the screen</li>
         <li>Landscape or portrait — your choice of location</li>
         <li>Paired to your account; prayer times &amp; first content set up with you</li>
         <li>Hands-on training for the volunteers who will run it</li>
-        <li>Supply your own TV? We still mount, wire, and configure it</li>
+        <li>Prefer your own TV? We can mount it instead — labour only, no TV charge</li>
       </ul>
     </div>
     <div class="proc-box">
@@ -1888,7 +2005,8 @@
       <ul>
         <li>New mains circuits beyond a standard fused spur</li>
         <li>Structural work on listed or heritage buildings without a prior survey</li>
-        <li>Supply of the TV/monitor itself (unless agreed in your quote)</li>
+        <li>Very large commercial displays above the size in your quote</li>
+        <li>The £189 standalone Display Unit without installation (TV not included)</li>
         <li>Ongoing care beyond any plan included with your package</li>
       </ul>
       <p style="margin-top:8px;"><b>Example quote:</b> Growth Installed (from £1,199) + 2 extra screens (from £349 each) + travel if outside free radius = <b>from ~£1,897</b> before any site-specific adjustments. We confirm in writing before booking.</p>
@@ -2109,11 +2227,18 @@
     </thead>
     <tbody>
       <tr>
-        <td class="feat">Automated scheduling</td>
-        <td class="mc-col yes">✓ Recurring + date-range</td>
+        <td class="feat">Automated playlist scheduling</td>
+        <td class="mc-col yes">✓ Recurring, date-range &amp; prayer windows</td>
         <td class="no">Limited / manual</td>
-        <td>Basic playlists</td>
+        <td>Timed playlists only</td>
         <td class="no">✕ Manual every time</td>
+      </tr>
+      <tr>
+        <td class="feat">Schedules tied to prayer times</td>
+        <td class="mc-col yes">✓ Growth+</td>
+        <td class="no">✕</td>
+        <td class="no">✕</td>
+        <td class="no">✕</td>
       </tr>
       <tr>
         <td class="feat">Auto prayer times (DST &amp; Ramadan)</td>
@@ -2191,8 +2316,8 @@
   <div class="grid-3" style="margin-top:18px;">
     <div class="fcard" style="background:var(--paper-soft)">
       <div class="ico gd"><svg aria-hidden="true"><use href="#i-calendar-check"/></svg></div>
-      <h4>No more Friday rush</h4>
-      <p>The main reason masajid switch — Jumu'ah content that schedules itself every week.</p>
+      <h4>Scheduling others don't offer</h4>
+      <p>Recurring Fridays and Ramadan date ranges on Starter; prayer-window playlists on Growth — most masjid apps still expect a volunteer to swap content by hand.</p>
     </div>
     <div class="fcard" style="background:var(--paper-soft)">
       <div class="ico em"><svg aria-hidden="true"><use href="#i-wallet"/></svg></div>
@@ -2247,24 +2372,16 @@
   <div class="grid-2" style="gap:14px;">
     <div>
       <div class="faq-item">
+        <div class="fq">Does the £189 Display Unit include a TV?</div>
+        <div class="fa">No. The Display Unit is the signage computer — the brains behind the display. You need a separate HDMI TV or monitor. On an <b>installed package</b>, we supply and mount the TV; the &ldquo;from&rdquo; price assumes a typical size (usually 43″–55″), and larger hall screens cost more. We confirm screen size and final price in writing before you book.</div>
+      </div>
+      <div class="faq-item">
         <div class="fq">Can we use our own Fire Stick or smart TV instead of your Display Unit?</div>
         <div class="fa">Yes. MasjidConnect runs in a browser on Android TV, Fire TV Stick, a PC in kiosk mode, or many smart TV browsers — fine for trying it out or a single screen. Our Display Unit is what we recommend for offline mode, automatic updates, and hardware we supply and warrant. <b>Care plans, on-site visits, Display Guard, and the 12-month manufacturer warranty apply only to MasjidConnect Display Units supplied by us.</b> Software bugs are still fixed under Platform Support on any device.</div>
       </div>
       <div class="faq-item">
         <div class="fq">Do we have to pay every year just to keep the screens running?</div>
         <div class="fa">No. The software licence is a one-off payment — yours for the life of the product for your masjid. Annual fees apply only to optional services: care plans (hands-on volunteer help) and the Community App listing (£129/yr). Platform Support for software bugs is included with every licence at no annual cost.</div>
-      </div>
-      <div class="faq-item">
-        <div class="fq">What if we need help but don't want a care plan?</div>
-        <div class="fa">You still have Platform Support for software faults on any paired device (email, 5 working days). Care plans add remote help with settings and content, and you can book paid sessions for one-off setup help. Many masajid self-serve using our guides; others choose Care after their first Ramadan.</div>
-      </div>
-      <div class="faq-item">
-        <div class="fq">Why are installed packages "from" prices?</div>
-        <div class="fa">Because every masjid is different. One screen in Oxfordshire is not the same job as six screens in Birmingham with long cable runs. We quote in writing after understanding your screen count, locations, travel, and building — before you book. Multi-screen rollouts are priced for the labour involved; we do not subsidise large installs at single-screen rates.</div>
-      </div>
-      <div class="faq-item">
-        <div class="fq">Can we upgrade later?</div>
-        <div class="fa">Yes. Upgrade your licence tier from the admin dashboard when you need more screens or features. Contact us for multi-site or network pricing if you manage several masajid.</div>
       </div>
     </div>
     <div>
@@ -2280,6 +2397,43 @@
         <div class="fq">We're migrating from another system — can you help?</div>
         <div class="fa">Yes. We can import prayer times and help rebuild playlists during install or a care-plan session. Tell us what you use today on your discovery call and we will scope migration as part of your quote.</div>
       </div>
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 20</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 21 — FOR YOUR COMMITTEE / FAQ (cont.) ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>For your committee</div>
+  </div>
+
+  <div class="eyebrow">Questions &amp; answers</div>
+  <h2 class="section">What treasurers and trustees ask <span style="font-weight:700; color:var(--muted); font-size:13px;">— continued</span></h2>
+  <div class="rule"></div>
+
+  <div class="grid-2" style="gap:14px; margin-top:16px;">
+    <div>
+      <div class="faq-item">
+        <div class="fq">What if we need help but don't want a care plan?</div>
+        <div class="fa">You still have Platform Support for software faults on any paired device (email, 5 working days). Care plans add remote help with settings and content, and you can book paid sessions for one-off setup help. Many masajid self-serve using our guides; others choose Care after their first Ramadan.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Why are installed packages "from" prices?</div>
+        <div class="fa">Because every masjid is different. One screen in Oxfordshire is not the same job as six screens in Birmingham with long cable runs. We quote in writing after understanding your screen count, locations, travel, and building — before you book. Multi-screen rollouts are priced for the labour involved; we do not subsidise large installs at single-screen rates.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Can we upgrade later?</div>
+        <div class="fa">Yes. Upgrade your licence tier from the admin dashboard when you need more screens or features. Contact us for multi-site or network pricing if you manage several masajid.</div>
+      </div>
+    </div>
+    <div>
+      <div class="faq-item">
+        <div class="fq">What playlist scheduling is included on each tier?</div>
+        <div class="fa"><b>Free</b> — one default playlist only. <b>Starter</b> — recurring rules (e.g. Jumu'ah every Friday) and date-range campaigns (e.g. Ramadan 1–30). <b>Growth and Pro</b> add <b>prayer-window</b> schedules: a playlist that runs between two prayers on your timetable (Maghrib to Isha, and so on), including adhan/jamaat anchors. Most masjid display apps do not offer this level of automation.</div>
+      </div>
       <div class="faq-item">
         <div class="fq">Who owns our content and data?</div>
         <div class="fa">Your masjid owns the content you publish. MasjidConnect stores admin data and media on secure UK-hosted cloud infrastructure. You can export your data; we do not hold your masjid hostage. See our privacy policy at <b>masjidconnect.co.uk/privacy</b> for retention and GDPR details.</div>
@@ -2291,16 +2445,16 @@
     </div>
   </div>
 
-  <div class="proc-box" style="margin-top:12px;">
+  <div class="proc-box" style="margin-top:14px;">
     <h4>Document control</h4>
     <p>Version <b>1.0</b> · Published <b>June 2026</b> · MasjidConnect Display product brochure.
       Pricing and support terms match our published rates at that date. A written quotation overrides this document for installed work.</p>
   </div>
 
-  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 20</div></div>
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 21</div></div>
 </div>
 
-<!-- ══════════════════════════ PAGE 21 — NEXT STEPS / BACK ══════════════════════════ -->
+<!-- ══════════════════════════ PAGE 22 — NEXT STEPS / BACK ══════════════════════════ -->
 <div class="page dark" style="display:flex; flex-direction:column;">
   <div class="run-head" style="border-bottom-color:rgba(255,255,255,0.12);">
     <div class="brandlet" style="color:#fff;"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
@@ -2331,7 +2485,7 @@
   </div>
 
   <div style="margin-top:26px; text-align:center;">
-    <div style="font-size:13px; color:rgba(255,255,255,0.8); font-weight:600;">Schedule Jumu'ah once. It runs every Friday after that.</div>
+    <div style="font-size:13px; color:rgba(255,255,255,0.8); font-weight:600;">Schedule Jumu'ah once. Prayer windows follow your timetable.</div>
   </div>
 
   <div class="contact-box" style="border-color:rgba(255,255,255,0.15); margin-top:auto;">
@@ -2358,7 +2512,7 @@
 
   <div class="run-foot" style="color:rgba(255,255,255,0.4); border-top-color:rgba(255,255,255,0.12);">
     <div class="gov">MasjidConnect</div>
-    <div>Page 21</div>
+    <div>Page 22</div>
   </div>
 </div>
 

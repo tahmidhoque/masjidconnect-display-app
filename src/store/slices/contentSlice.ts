@@ -99,6 +99,38 @@ function normaliseJamaatBySalah(
   return out;
 }
 
+/** Clamp a supplication minute value (rounded) into [min, max], with fallback. */
+function clampSupplicationMinutes(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (typeof value !== "number" || Number.isNaN(value)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+/** Normalise the post-adhan supplication block from API (clamp ranges, default off). */
+function normalisePostAdhanSupplication(
+  raw: DisplaySettings["postAdhanSupplication"] | undefined,
+): DisplaySettings["postAdhanSupplication"] {
+  return {
+    enabled: raw?.enabled === true,
+    delayMinutes: clampSupplicationMinutes(raw?.delayMinutes, 0, 15, 0),
+    durationMinutes: clampSupplicationMinutes(raw?.durationMinutes, 1, 15, 3),
+  };
+}
+
+/** Normalise the post-jamaat supplication block from API (clamp ranges, default off). */
+function normalisePostJamaatSupplication(
+  raw: DisplaySettings["postJamaatSupplication"] | undefined,
+): DisplaySettings["postJamaatSupplication"] {
+  return {
+    enabled: raw?.enabled === true,
+    durationMinutes: clampSupplicationMinutes(raw?.durationMinutes, 1, 15, 3),
+  };
+}
+
 /** Safe defaults when displaySettings is missing from API (backward compatibility). */
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   ramadanMode: "auto",
@@ -363,7 +395,7 @@ export const normalizeScheduleData = (schedule: any): Schedule => {
 };
 
 /** Extract displaySettings from content with safe defaults. */
-const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings => {
+export const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings => {
   const raw =
     content?.displaySettings ??
     (content as { data?: { displaySettings?: DisplaySettings } })?.data?.displaySettings;
@@ -403,6 +435,9 @@ const extractDisplaySettings = (content: ScreenContent | null): DisplaySettings 
     minutesAfterJamaatUntilNextPrayer: minutesAfterJamaat,
     defaultJamaatInProgressMinutes,
     minutesAfterJamaatUntilNextPrayerBySalah,
+    postAdhanSupplication: normalisePostAdhanSupplication(raw.postAdhanSupplication),
+    postJamaatSupplication: normalisePostJamaatSupplication(raw.postJamaatSupplication),
+    jamaatInProgressMode: raw.jamaatInProgressMode === "dark" ? "dark" : "screen",
     terminology: normaliseTerminology(
       (raw as unknown as { terminology?: unknown; terminologyPreferences?: unknown }).terminology,
     ),

@@ -41,6 +41,8 @@ const SCENARIOS = [
   'pt-full',
   'pt-prayer-focus',
   'ls-theme-emerald',
+  'ls-theme-purple',
+  'ls-theme-burgundy',
   'ls-ramadan',
   'realtime-alert',
 ];

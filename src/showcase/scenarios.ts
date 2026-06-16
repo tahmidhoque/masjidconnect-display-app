@@ -86,6 +86,26 @@ const EMERALD_THEME: DisplayThemeOverrides = {
   tomorrowRoll: '#8BB8D9',
 };
 
+/* Royal purple — a distinct brand palette for the "make it yours" gallery. */
+const PURPLE_THEME: DisplayThemeOverrides = {
+  background: '#241546',
+  accent: '#A98AE0',
+  highlight: '#F0C674',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#CFBCEC',
+  tomorrowRoll: '#9DB6E0',
+};
+
+/* Deep burgundy — warm-toned alternative for the "make it yours" gallery. */
+const BURGUNDY_THEME: DisplayThemeOverrides = {
+  background: '#3A1320',
+  accent: '#E08AA0',
+  highlight: '#E9C46A',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#E8C6CF',
+  tomorrowRoll: '#C9A0AE',
+};
+
 /* ------------------------------------------------------------------ */
 /*  Layout builders                                                    */
 /* ------------------------------------------------------------------ */
@@ -493,6 +513,18 @@ export const SCENARIOS: Record<string, Scenario> = {
     id: 'ls-theme-emerald',
     orientation: 'LANDSCAPE',
     layout: config('landscape', LS_STACK, EMERALD_THEME),
+    scheduleItems: [verse()],
+  },
+  'ls-theme-purple': {
+    id: 'ls-theme-purple',
+    orientation: 'LANDSCAPE',
+    layout: config('landscape', LS_STACK, PURPLE_THEME),
+    scheduleItems: [verse()],
+  },
+  'ls-theme-burgundy': {
+    id: 'ls-theme-burgundy',
+    orientation: 'LANDSCAPE',
+    layout: config('landscape', LS_STACK, BURGUNDY_THEME),
     scheduleItems: [verse()],
   },
   'ls-ramadan': {
