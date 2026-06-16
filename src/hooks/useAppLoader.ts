@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { initializeFromStorage, requestPairingCode } from '../store/slices/authSlice';
-import { refreshAllContent } from '../store/slices/contentSlice';
+import { refreshAllContent, loadCachedContent } from '../store/slices/contentSlice';
 import { setInitializing, setInitializationStage, setLoadingMessage } from '../store/slices/uiSlice';
 import credentialService from '../services/credentialService';
 import logger from '../utils/logger';
@@ -60,6 +60,15 @@ export const useAppLoader = (): AppLoaderState => {
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
   const pairingCodeFlowStartedRef = useRef(false);
+
+  /**
+   * Latest "do we already have renderable content?" signal. Content is in the
+   * redux-persist whitelist, so on a returning device it's rehydrated before
+   * the loading phase begins. Tracked via a ref so the loading effect can read
+   * the current value without re-running when content changes.
+   */
+  const hasContentRef = useRef(false);
+  hasContentRef.current = !!(screenContent || prayerTimes);
 
   /** Update a task's status */
   const updateTask = useCallback((id: string, update: Partial<LoadingTask>) => {
@@ -157,8 +166,13 @@ export const useAppLoader = (): AppLoaderState => {
   }, [phase, tasks, isAuthenticated, isPairing, pairingCode, dispatch, updateTask]);
 
   /* ------------------------------------------------------------------ */
-  /*  Phase: LOADING — fetch content and prayer times; ready only when  */
-  /*  refreshAllContent settles (fresh data on load, or cache if offline) */
+  /*  Phase: LOADING — cache-first, network-in-background.              */
+  /*                                                                    */
+  /*  Returning devices have content rehydrated from redux-persist /    */
+  /*  storageService, so we render immediately and refresh in the       */
+  /*  background. Only a first run with no cache blocks on the network  */
+  /*  (and its retry backoff). This stops cold start / page refresh     */
+  /*  from stalling ~7s+ on the forced content fetch + retries.         */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (phase !== 'loading') return;
@@ -169,23 +183,51 @@ export const useAppLoader = (): AppLoaderState => {
     updateTask('prayer-times', { status: 'loading', progress: 20 });
 
     let cancelled = false;
-    dispatch(refreshAllContent({ forceRefresh: true }))
-      .then(() => {
-        if (cancelled) return;
-        updateTask('content', { status: 'complete', progress: 100 });
-        updateTask('prayer-times', { status: 'complete', progress: 100 });
-        dispatch(setInitializing(false));
-        setPhase('ready');
-        logger.info('[AppLoader] All data loaded');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        updateTask('content', { status: 'complete', progress: 100 });
-        updateTask('prayer-times', { status: 'complete', progress: 100 });
-        dispatch(setInitializing(false));
-        setPhase('ready');
-        logger.warn('[AppLoader] Refresh failed, proceeding with cached data');
-      });
+
+    const markReady = (message: string) => {
+      if (cancelled) return;
+      updateTask('content', { status: 'complete', progress: 100 });
+      updateTask('prayer-times', { status: 'complete', progress: 100 });
+      dispatch(setInitializing(false));
+      setPhase('ready');
+      logger.info(message);
+    };
+
+    const run = async () => {
+      // 1) Surface any cached content (storageService) into the store. Won't
+      //    clobber rehydrated state — loadCachedContent only sets fields it finds.
+      let cachedScreenContent: unknown = null;
+      let cachedPrayerTimes: unknown = null;
+      try {
+        const payload = await dispatch(loadCachedContent()).unwrap();
+        cachedScreenContent = payload?.screenContent ?? null;
+        cachedPrayerTimes = payload?.prayerTimes ?? null;
+      } catch {
+        // No cache available — fall through to the blocking network path.
+      }
+      if (cancelled) return;
+
+      const haveContent =
+        hasContentRef.current || !!(cachedScreenContent || cachedPrayerTimes);
+
+      // 2a) We can render now — go ready and refresh fresh data in the
+      //     background so the network round-trip + retries never block the screen.
+      if (haveContent) {
+        markReady('[AppLoader] Rendered from cache; refreshing in background');
+        dispatch(refreshAllContent({ forceRefresh: true }));
+        return;
+      }
+
+      // 2b) No cache (e.g. first run after pairing) — we must wait for the network.
+      try {
+        await dispatch(refreshAllContent({ forceRefresh: true }));
+        markReady('[AppLoader] All data loaded');
+      } catch {
+        markReady('[AppLoader] Refresh failed, proceeding with cached data');
+      }
+    };
+
+    run();
 
     return () => {
       cancelled = true;

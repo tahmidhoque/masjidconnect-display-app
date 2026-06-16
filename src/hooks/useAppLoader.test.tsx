@@ -85,4 +85,39 @@ describe('useAppLoader', () => {
       { timeout: 3000 },
     );
   });
+
+  it('reaches ready from cached content without a working content endpoint (cache-first, background refresh)', async () => {
+    // apiClient.getContent is intentionally not mocked — the forced refresh
+    // would fail. Cache-first means the screen must still become ready because
+    // the network refresh runs in the background and never blocks the loader.
+    mockGetCredentials.mockReturnValue({ apiKey: 'k', screenId: 's', masjidId: 'm' });
+    const store = createTestStore({
+      auth: {
+        isAuthenticated: true,
+        isPaired: true,
+        screenId: 's',
+        apiKey: 'k',
+        masjidId: 'm',
+      } as never,
+      content: {
+        screenContent: mockScreenContent as never,
+        prayerTimes: mockPrayerTimesArray[0] as never,
+        isLoading: false,
+      } as never,
+    });
+    const preloaded = store.getState();
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
+    const { result } = renderHook(() => useAppLoader(), { wrapper });
+    await waitFor(
+      () => {
+        expect(result.current.phase).toBe('ready');
+      },
+      { timeout: 5000 },
+    );
+  });
 });
