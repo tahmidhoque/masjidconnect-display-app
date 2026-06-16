@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPlaylistsBoundaryKey,
   buildPlaylistsContentRevision,
+  buildPrayerTimesBoundaryKey,
 } from './useScheduledPlaylist';
-import type { ScheduledPlaylistAssignment, ScheduleItem } from '@/api/models';
+import type { ScheduledPlaylistAssignment, ScheduleItem, PrayerTimes } from '@/api/models';
 
 function makeScheduleItem(id: string, contentId: string, order: number): ScheduleItem {
   return {
@@ -38,10 +39,15 @@ function makeAssignment(
   },
 ): ScheduledPlaylistAssignment {
   return {
-    assignmentId: overrides.assignmentId,
-    type: overrides.type ?? 'DEFAULT',
-    isActive: overrides.isActive ?? true,
-    schedule: overrides.schedule,
+    type: 'DEFAULT',
+    priority: 0,
+    isActive: true,
+    daysOfWeek: [],
+    startTime: null,
+    endTime: null,
+    startDate: null,
+    endDate: null,
+    ...overrides,
   } as ScheduledPlaylistAssignment;
 }
 
@@ -126,5 +132,70 @@ describe('buildPlaylistsBoundaryKey', () => {
       }),
     ];
     expect(buildPlaylistsBoundaryKey(before)).toBe(buildPlaylistsBoundaryKey(after));
+  });
+
+  it('changes when prayer-window fields change', () => {
+    const base = [
+      makeAssignment({
+        assignmentId: 'a1',
+        type: 'PRAYER_WINDOW',
+        startPrayer: 'MAGHRIB',
+        endPrayer: 'ISHA',
+        startPrayerAnchor: 'ADHAN',
+        endPrayerAnchor: 'ADHAN',
+        schedule: makeSchedule({
+          id: 'sched-1',
+          name: 'Evening',
+          items: [],
+        }),
+      }),
+    ];
+    const changedEnd = [
+      makeAssignment({
+        assignmentId: 'a1',
+        type: 'PRAYER_WINDOW',
+        startPrayer: 'MAGHRIB',
+        endPrayer: 'FAJR',
+        startPrayerAnchor: 'ADHAN',
+        endPrayerAnchor: 'ADHAN',
+        schedule: makeSchedule({
+          id: 'sched-1',
+          name: 'Evening',
+          items: [],
+        }),
+      }),
+    ];
+    expect(buildPlaylistsBoundaryKey(base)).not.toBe(
+      buildPlaylistsBoundaryKey(changedEnd),
+    );
+  });
+});
+
+describe('buildPrayerTimesBoundaryKey', () => {
+  const prayerTimes: PrayerTimes = {
+    fajr: '05:30',
+    sunrise: '06:45',
+    zuhr: '12:15',
+    asr: '15:30',
+    maghrib: '18:20',
+    isha: '19:45',
+    fajrJamaat: '05:45',
+    zuhrJamaat: '12:30',
+    asrJamaat: '16:00',
+    maghribJamaat: '18:25',
+    ishaJamaat: '20:00',
+  };
+
+  it('changes when jamaat times change', () => {
+    const baseKey = buildPrayerTimesBoundaryKey(prayerTimes);
+    const updated = buildPrayerTimesBoundaryKey({
+      ...prayerTimes,
+      maghribJamaat: '18:30',
+    });
+    expect(updated).not.toBe(baseKey);
+  });
+
+  it('is empty when prayer times are absent', () => {
+    expect(buildPrayerTimesBoundaryKey(null)).toBe('');
   });
 });

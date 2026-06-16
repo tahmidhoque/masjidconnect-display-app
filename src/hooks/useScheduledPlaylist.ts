@@ -19,6 +19,7 @@ import {
   selectScheduledPlaylists,
   selectScreenContent,
   selectMasjidTimezone,
+  selectPrayerTimes,
 } from '@/store/slices/contentSlice';
 import { normalizeScheduleData } from '@/store/slices/contentSlice';
 import { resolveActiveSchedule, getNextBoundary } from '@/utils/scheduleResolver';
@@ -28,7 +29,7 @@ import timezone from 'dayjs/plugin/timezone';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-import type { Schedule, ScheduledPlaylistAssignment } from '@/api/models';
+import type { Schedule, ScheduledPlaylistAssignment, PrayerTimes } from '@/api/models';
 import logger from '@/utils/logger';
 
 export interface UseScheduledPlaylistResult {
@@ -66,21 +67,48 @@ export function buildPlaylistsBoundaryKey(
 ): string {
   if (!playlists?.length) return '';
   return playlists
-    .map((p) => `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}`)
+    .map((p) => {
+      const prayerSig =
+        p.type === 'PRAYER_WINDOW'
+          ? `:${p.startPrayer ?? ''}:${p.endPrayer ?? ''}:${p.startPrayerAnchor ?? ''}:${p.endPrayerAnchor ?? ''}:${p.startPrayerOffsetMinutes ?? 0}:${p.endPrayerOffsetMinutes ?? 0}`
+          : '';
+      return `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}${prayerSig}`;
+    })
     .sort()
     .join('|');
+}
+
+/** Fingerprint prayer times so boundary timers reset when the timetable changes. */
+export function buildPrayerTimesBoundaryKey(
+  prayerTimes: PrayerTimes | null | undefined,
+): string {
+  if (!prayerTimes) return '';
+  return [
+    prayerTimes.fajr,
+    prayerTimes.sunrise,
+    prayerTimes.zuhr,
+    prayerTimes.asr,
+    prayerTimes.maghrib,
+    prayerTimes.isha,
+    prayerTimes.fajrJamaat,
+    prayerTimes.zuhrJamaat,
+    prayerTimes.asrJamaat,
+    prayerTimes.maghribJamaat,
+    prayerTimes.ishaJamaat,
+  ].join('|');
 }
 
 /**
  * Hook that resolves the active schedule from scheduledPlaylists or falls back
  * to the server-resolved schedule. Schedules a timer to re-evaluate at the next
- * boundary (startTime/endTime/startDate/endDate).
+ * boundary (clock times, date ranges, or prayer-window edges).
  */
 function useScheduledPlaylist(): UseScheduledPlaylistResult {
   const reduxSchedule = useAppSelector(selectSchedule);
   const scheduledPlaylists = useAppSelector(selectScheduledPlaylists);
   const screenContent = useAppSelector(selectScreenContent);
   const masjidTimezone = useAppSelector(selectMasjidTimezone);
+  const prayerTimes = useAppSelector(selectPrayerTimes);
 
   /** Bumped at schedule boundaries so time-based assignment switches re-resolve. */
   const [boundaryTick, setBoundaryTick] = useState(0);
@@ -102,17 +130,21 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
     () => buildPlaylistsBoundaryKey(playlists),
     [playlists],
   );
+  const prayerTimesBoundaryKey = useMemo(
+    () => buildPrayerTimesBoundaryKey(prayerTimes),
+    [prayerTimes],
+  );
 
   const resolution = useMemo((): UseScheduledPlaylistResult => {
     if (!useScheduledPlaylists || !playlists) {
       return { schedule: reduxSchedule, activeAssignmentId: null };
     }
 
-    // boundaryTick — re-run at RECURRING/DATE_RANGE boundaries only
+    // boundaryTick — re-run at schedule boundaries (clock, date range, prayer window)
     void boundaryTick;
     void playlistsContentRevision;
 
-    const assignment = resolveActiveSchedule(playlists, new Date(), tz);
+    const assignment = resolveActiveSchedule(playlists, new Date(), tz, prayerTimes);
     if (assignment) {
       return {
         schedule: normalizeScheduleData(assignment.schedule),
@@ -136,6 +168,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
     tz,
     boundaryTick,
     reduxSchedule,
+    prayerTimes,
   ]);
 
   useEffect(() => {
@@ -145,7 +178,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
 
     const scheduleNextTimer = () => {
       const now = new Date();
-      let next = getNextBoundary(playlists, now, tz);
+      let next = getNextBoundary(playlists, now, tz, prayerTimes);
       if (!next) {
         const nextMidnight = dayjs(now).tz(tz).add(1, 'day').startOf('day').toDate();
         next = nextMidnight;
@@ -173,7 +206,7 @@ function useScheduledPlaylist(): UseScheduledPlaylistResult {
         timeoutRef.current = null;
       }
     };
-  }, [playlistsBoundaryKey, useScheduledPlaylists, tz, playlists]);
+  }, [playlistsBoundaryKey, prayerTimesBoundaryKey, useScheduledPlaylists, tz, playlists, prayerTimes]);
 
   return resolution;
 }

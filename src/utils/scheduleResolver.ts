@@ -2,15 +2,20 @@
  * Client-side scheduled playlist resolution.
  *
  * Resolves the active schedule from scheduledPlaylists assignments based on
- * current time and timezone. Supports DATE_RANGE, RECURRING (including
- * cross-midnight windows), and DEFAULT assignment types.
+ * current time and timezone. Supports DATE_RANGE, PRAYER_WINDOW, RECURRING
+ * (including cross-midnight windows), and DEFAULT assignment types.
  */
 
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import type { ScheduledPlaylistAssignment } from '@/api/models';
+import type { ScheduledPlaylistAssignment, PrayerTimes } from '@/api/models';
+import {
+  isWithinPrayerWindow,
+  getUpcomingPrayerWindowBoundaries,
+  type PrayerWindowFields,
+} from '@/utils/prayerWindowSchedule';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -169,17 +174,13 @@ function matchesRecurring(
 /**
  * Resolve the active schedule assignment from scheduled playlist assignments.
  *
- * Priority: DATE_RANGE (by priority desc) > RECURRING (by priority desc) > DEFAULT.
- *
- * @param scheduledPlaylists - Array of playlist assignments from the API
- * @param now - Current time
- * @param timezoneStr - Masjid timezone (e.g. "Europe/London")
- * @returns The active assignment (with schedule and assignmentId), or null if none matches
+ * Priority: DATE_RANGE > PRAYER_WINDOW > RECURRING > DEFAULT (by priority desc within each type).
  */
 export function resolveActiveSchedule(
   scheduledPlaylists: ScheduledPlaylistAssignment[],
   now: Date,
-  timezoneStr: string
+  timezoneStr: string,
+  prayerTimes?: PrayerTimes | null,
 ): ScheduledPlaylistAssignment | null {
   const active = scheduledPlaylists.filter((a) => a.isActive);
   if (active.length === 0) return null;
@@ -192,6 +193,38 @@ export function resolveActiveSchedule(
     .sort((a, b) => b.priority - a.priority);
   for (const a of dateRange) {
     if (isWithinDateRange(now, a.startDate, a.endDate, tz)) return a;
+  }
+
+  if (prayerTimes) {
+    const prayerWindows = active
+      .filter(
+        (a) =>
+          a.type === 'PRAYER_WINDOW' &&
+          a.startPrayer &&
+          a.endPrayer &&
+          a.startPrayerAnchor &&
+          a.endPrayerAnchor,
+      )
+      .sort((a, b) => b.priority - a.priority);
+    for (const a of prayerWindows) {
+      if (
+        isWithinPrayerWindow(
+          now,
+          {
+            startPrayer: a.startPrayer!,
+            endPrayer: a.endPrayer!,
+            startPrayerAnchor: a.startPrayerAnchor!,
+            endPrayerAnchor: a.endPrayerAnchor!,
+            startPrayerOffsetMinutes: a.startPrayerOffsetMinutes ?? 0,
+            endPrayerOffsetMinutes: a.endPrayerOffsetMinutes ?? 0,
+          },
+          prayerTimes,
+          tz,
+        )
+      ) {
+        return a;
+      }
+    }
   }
 
   // RECURRING: sort by priority desc, pick first match
@@ -208,18 +241,14 @@ export function resolveActiveSchedule(
 }
 
 /**
- * Compute the next schedule boundary (nearest startTime/endTime/startDate/endDate).
+ * Compute the next schedule boundary (nearest start/end across assignment types).
  * Used to schedule a timer for re-evaluation.
- *
- * @param scheduledPlaylists - Array of playlist assignments
- * @param now - Current time
- * @param timezoneStr - Masjid timezone
- * @returns The Date of the next boundary, or null if none can be determined
  */
 export function getNextBoundary(
   scheduledPlaylists: ScheduledPlaylistAssignment[],
   now: Date,
-  timezoneStr: string
+  timezoneStr: string,
+  prayerTimes?: PrayerTimes | null,
 ): Date | null {
   const active = scheduledPlaylists.filter((a) => a.isActive);
   if (active.length === 0) return null;
@@ -228,6 +257,13 @@ export function getNextBoundary(
   const nowD = dayjs(now).tz(tz);
   const nowMs = now.getTime();
   let nearest: number | null = null;
+
+  const consider = (candidate: Date) => {
+    const ms = candidate.getTime();
+    if (ms > nowMs && (nearest === null || ms < nearest)) {
+      nearest = ms;
+    }
+  };
 
   for (const a of active) {
     if (a.type === 'DATE_RANGE') {
@@ -242,6 +278,30 @@ export function getNextBoundary(
           ? dayjs(a.endDate).tz(tz).toDate().getTime()
           : dayjs.tz(a.endDate, tz).add(1, 'day').startOf('day').toDate().getTime();
         if (d > nowMs && (nearest === null || d < nearest)) nearest = d;
+      }
+    } else if (
+      a.type === 'PRAYER_WINDOW' &&
+      prayerTimes &&
+      a.startPrayer &&
+      a.endPrayer &&
+      a.startPrayerAnchor &&
+      a.endPrayerAnchor
+    ) {
+      const fields: PrayerWindowFields = {
+        startPrayer: a.startPrayer,
+        endPrayer: a.endPrayer,
+        startPrayerAnchor: a.startPrayerAnchor,
+        endPrayerAnchor: a.endPrayerAnchor,
+        startPrayerOffsetMinutes: a.startPrayerOffsetMinutes ?? 0,
+        endPrayerOffsetMinutes: a.endPrayerOffsetMinutes ?? 0,
+      };
+      for (const boundary of getUpcomingPrayerWindowBoundaries(
+        fields,
+        prayerTimes,
+        now,
+        tz,
+      )) {
+        consider(boundary);
       }
     } else if (a.type === 'RECURRING' && a.startTime && a.endTime) {
       const startNorm = normaliseTimeString(a.startTime);

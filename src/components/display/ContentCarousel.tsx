@@ -40,6 +40,14 @@ import MediaPdfPage from './MediaPdfPage';
 
 const EventSlide = lazy(() => import('./EventSlide'));
 const DonationSlide = lazy(() => import('./DonationSlide'));
+const VideoSlide = lazy(() => import('./VideoSlide'));
+
+/**
+ * Upper bound (seconds) for how long a single VIDEO slide can stay on screen.
+ * Normal advance is driven by the clip's `ended` event; this only guards
+ * against a video that never loads or never fires `ended`.
+ */
+const VIDEO_SAFETY_CAP_SECONDS = 300;
 /** Custom event fired by the dev keyboard shortcut (Ctrl+Shift+N) to skip to the next slide instantly. */
 export const CAROUSEL_ADVANCE_EVENT = 'carousel-advance';
 
@@ -88,6 +96,11 @@ export interface CarouselItem {
   fullscreen?: boolean;
   /** MEDIA_SLIDE: how the asset fills the display area (smart = blurred backdrop). */
   mediaFit?: MediaFit;
+
+  /** VIDEO: public video URL (mp4/webm). */
+  videoUrl?: string;
+  /** VIDEO: play muted (default true). Sound depends on screen hardware + browser autoplay policy. */
+  muted?: boolean;
 
   /** DONATION: resolved public donation URL for QR — null when mosque is not donation-ready */
   donationUrl?: string | null;
@@ -223,14 +236,26 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     setMediaSlideAssetReady(true);
   }, []);
 
-  /** Per-item auto-advance: use current slide's duration (from API) or default interval */
+  /**
+   * Per-item auto-advance: use the current slide's duration (from API) or the
+   * default interval. VIDEO slides instead advance when the clip ends (see the
+   * VideoSlide `onEnded` → `advance`); here we only arm a long safety-cap timer
+   * so a stalled or broken video can never freeze the carousel.
+   */
   useEffect(() => {
     if (safeItems.length <= 1) return;
 
     const item = safeItems[activeIdx];
-    const seconds = item?.duration != null && item.duration > 0
-      ? Math.max(5, Math.min(300, Number(item.duration)))
-      : interval;
+    const isVideo =
+      item?.type?.toLowerCase() === 'video' &&
+      typeof item.videoUrl === 'string' &&
+      item.videoUrl.trim() !== '';
+
+    const seconds = isVideo
+      ? VIDEO_SAFETY_CAP_SECONDS
+      : item?.duration != null && item.duration > 0
+        ? Math.max(5, Math.min(300, Number(item.duration)))
+        : interval;
     const ms = seconds * 1000;
 
     const id = setTimeout(advance, ms);
@@ -320,7 +345,18 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     return it.mediaKind === 'image' || it.mediaKind === 'pdf';
   }, [currentItem]);
 
-  /** Effective fit mode for the current media slide (smart | cover | contain). */
+  /** VIDEO: looping clip — no typography fit loop; advances when the clip ends. */
+  const isVideoSlide = useMemo(() => {
+    const it = currentItem;
+    if (!it) return false;
+    if (it.type?.toLowerCase() !== 'video') return false;
+    return typeof it.videoUrl === 'string' && it.videoUrl.trim() !== '';
+  }, [currentItem]);
+
+  /** Media-like slides (poster or video) share layout: no text fit loop, no gap, fill the box. */
+  const isMediaLike = isMediaSlide || isVideoSlide;
+
+  /** Effective fit mode for the current media/video slide (smart | cover | contain). */
   const effectiveMediaFit = useMemo<MediaFit>(
     () => (currentItem ? resolveMediaFit(currentItem) : 'contain'),
     [currentItem],
@@ -332,10 +368,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
    * `cover` (crop) go edge-to-edge; `contain` stays inline within the content box.
    */
   const isFullscreenMedia = useMemo(() => {
-    if (!isMediaSlide || !currentItem) return false;
+    if (!currentItem) return false;
     if (effectiveMediaFit !== 'smart' && effectiveMediaFit !== 'cover') return false;
+    if (isVideoSlide) return true;
+    if (!isMediaSlide) return false;
     return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
-  }, [isMediaSlide, currentItem, effectiveMediaFit]);
+  }, [isMediaSlide, isVideoSlide, currentItem, effectiveMediaFit]);
 
   /** DONATION: fixed QR / thermometer layout — no typography fit loop. */
   const isDonationSlide = useMemo(
@@ -346,11 +384,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
   /** Compute the scaling result for the current item (memoised). Event slides use getScalingForEvent. */
   const scalingResult = useMemo(() => {
     if (!currentItem) return null;
-    if (isMediaSlide) return null;
+    if (isMediaLike) return null;
     if (isDonationSlide) return null;
     if (isEventSlide && currentItem.event) return getScalingForEvent(currentItem.event);
     return getScalingForItem(currentItem);
-  }, [currentItem, isDonationSlide, isEventSlide, isMediaSlide]);
+  }, [currentItem, isDonationSlide, isEventSlide, isMediaLike]);
 
   /**
    * Apply the tier's initial font sizes synchronously before the browser paints.
@@ -366,14 +404,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     // Hide the new slide until the fit loop has settled — prevents the
     // "text grows in" flash that was visible while the binary search ran.
     setIsFitted(false);
-    if (isMediaSlide || isDonationSlide) {
+    if (isMediaLike || isDonationSlide) {
       setSafetyScale(1);
       setIsFitted(true);
       return;
     }
     if (!content || !scalingResult) return;
     applyFontSizeProps(content, scalingResult.initialSizes);
-  }, [activeIdx, isDonationSlide, isMediaSlide, scalingResult]);
+  }, [activeIdx, isDonationSlide, isMediaLike, scalingResult]);
 
   /**
    * Adaptive typography fit loop.
@@ -664,7 +702,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
   /** In-flow shell hidden while portal paints fullscreen media over prayer strip + footer. */
   const slideEnterAnimation = isFullscreenMedia
     ? 'opacity-0 pointer-events-none'
-    : isMediaSlide
+    : isMediaLike
       ? phase === 'out'
         ? 'animate-fade-out'
         : phase === 'in' && mediaSlideAssetReady
@@ -726,7 +764,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
   const fullscreenPortal =
     fullscreenPortalRoot &&
     isFullscreenMedia &&
-    item.mediaUrl &&
+    (item.mediaUrl || item.videoUrl) &&
     createPortal(
       /* Do not add `relative` here: it overrides `fixed` in Tailwind and collapses the overlay (absolute children do not give the box height). z-[9000] is below emergency (9999) and WiFi (9998). */
       <div
@@ -737,9 +775,22 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
           data-fullscreen-portal-media=""
           className={`${portalMediaLayerClass}${safeItems.length > 1 ? ' pb-14' : ''}`}
         >
-          {item.mediaKind === 'pdf' ? (
+          {isVideoSlide && item.videoUrl ? (
+            <Suspense fallback={null}>
+              <VideoSlide
+                url={item.videoUrl}
+                title={item.title}
+                fit={effectiveMediaFit}
+                muted={item.muted ?? true}
+                loop={safeItems.length <= 1}
+                onReady={onMediaAssetLoaded}
+                onEnded={advance}
+                className="min-h-0 flex-1"
+              />
+            </Suspense>
+          ) : item.mediaKind === 'pdf' ? (
             <MediaPdfPage
-              url={item.mediaUrl}
+              url={item.mediaUrl!}
               title={item.title ?? 'Poster'}
               fit={effectiveMediaFit === 'cover' ? 'cover' : 'contain'}
               mode={effectiveMediaFit}
@@ -814,14 +865,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
           key={item.id}
           className={`
             w-full h-full min-h-0 gpu-accelerated flex flex-col items-stretch
-            ${needsScroll || isMediaSlide ? 'justify-start' : 'justify-center'}
+            ${needsScroll || isMediaLike ? 'justify-start' : 'justify-center'}
             ${slideEnterAnimation}
           `}
         >
           {/* Content wrapper — when needsScroll, fills container so scroll region has constrained height. */}
           <div
             ref={contentRef}
-            className={`flex flex-col min-w-0 w-full max-w-full ${needsScroll || isMediaSlide || isDonationSlide ? 'flex-1 min-h-0' : 'flex-shrink-0'} ${isMediaSlide ? '' : 'gap-4'}`}
+            className={`flex flex-col min-w-0 w-full max-w-full ${needsScroll || isMediaLike || isDonationSlide ? 'flex-1 min-h-0' : 'flex-shrink-0'} ${isMediaLike ? '' : 'gap-4'}`}
             style={safetyScale < 1 ? {
               transform: `scale(${safetyScale})`,
               transformOrigin: 'top center',
@@ -835,6 +886,27 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
               <Suspense fallback={null}>
                 <DonationSlide item={item} compact={compact} />
               </Suspense>
+            ) : isVideoSlide && item.videoUrl ? (
+              isFullscreenMedia ? (
+                /* Smart/cover render edge-to-edge via the fullscreen portal above. */
+                <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
+              ) : (
+                /* Inline 'contain' fit — video within the content box, prayer chrome stays visible. */
+                <div className="flex flex-1 min-h-0 w-full flex-col">
+                  <Suspense fallback={null}>
+                    <VideoSlide
+                      url={item.videoUrl}
+                      title={item.title}
+                      fit="contain"
+                      muted={item.muted ?? true}
+                      loop={safeItems.length <= 1}
+                      onReady={onMediaAssetLoaded}
+                      onEnded={advance}
+                      className="min-h-0 w-full flex-1"
+                    />
+                  </Suspense>
+                </div>
+              )
             ) : isMediaSlide && item.mediaUrl ? (
               isFullscreenMedia ? (
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />

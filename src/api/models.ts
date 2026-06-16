@@ -452,7 +452,21 @@ export interface Schedule {
   cacheControl?: { maxAge?: number; staleWhileRevalidate?: number };
 }
 
-export type PlaylistAssignmentType = 'DEFAULT' | 'RECURRING' | 'DATE_RANGE';
+export type PrayerBoundaryPrayer =
+  | 'FAJR'
+  | 'SUNRISE'
+  | 'ZUHR'
+  | 'ASR'
+  | 'MAGHRIB'
+  | 'ISHA';
+
+export type PrayerTimeAnchor = 'ADHAN' | 'JAMAAT';
+
+export type PlaylistAssignmentType =
+  | 'DEFAULT'
+  | 'RECURRING'
+  | 'DATE_RANGE'
+  | 'PRAYER_WINDOW';
 
 export interface ScheduledPlaylistAssignment {
   assignmentId: string;
@@ -463,6 +477,12 @@ export interface ScheduledPlaylistAssignment {
   endTime: string | null;
   startDate: string | null;
   endDate: string | null;
+  startPrayer?: PrayerBoundaryPrayer | null;
+  endPrayer?: PrayerBoundaryPrayer | null;
+  startPrayerAnchor?: PrayerTimeAnchor | null;
+  endPrayerAnchor?: PrayerTimeAnchor | null;
+  startPrayerOffsetMinutes?: number;
+  endPrayerOffsetMinutes?: number;
   isActive: boolean;
   schedule: {
     id: string;

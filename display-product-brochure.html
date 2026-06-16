@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MasjidConnect Display — Product Brochure</title>
+<style>
+  /* ───────────────────────── RESET / BASE ───────────────────────── */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --midnight:        #0A2647;
+    --midnight-light:  #144272;
+    --midnight-dark:   #061A33;
+    --emerald:         #2A9D8F;
+    --emerald-light:   #3DBFAE;
+    --emerald-dark:    #1F7A6F;
+    --gold:            #E9C46A;
+    --gold-light:      #F0D48A;
+    --gold-dark:       #D4A84A;
+    --alert-red:       #E63946;
+    --dua:             #1565C0;
+    --dua-light:       #42A5F5;
+    --ink:             #14202e;
+    --muted:           #5b6b7c;
+    --line:            #e3e8ee;
+    --paper:           #ffffff;
+    --paper-soft:      #f6f8fb;
+  }
+
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  @font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('brochure-assets/fonts/poppins-regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('brochure-assets/fonts/poppins-semibold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('brochure-assets/fonts/poppins-bold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url('brochure-assets/fonts/poppins-bold.woff2') format('woff2');
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('brochure-assets/fonts/inter-latin-400-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 900;
+    font-display: swap;
+    src: url('brochure-assets/fonts/inter-latin-900-normal.woff2') format('woff2');
+  }
+
+  body {
+    font-family: 'Poppins', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: var(--ink);
+    background: #5a6577;
+    line-height: 1.5;
+    font-size: 12px;
+    padding-top: 52px;
+  }
+
+  /* ───────────────────────── PAGE FRAME ───────────────────────── */
+  .page {
+    position: relative;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 12px auto;
+    background: var(--paper);
+    padding: 16mm 15mm 26mm;
+    overflow: hidden;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.25);
+    box-sizing: border-box;
+  }
+  .page.dark { background: var(--midnight); color: #fff; }
+
+  /* running header / footer */
+  .run-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 8px; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--line);
+    padding-bottom: 6px; margin-bottom: 16px;
+  }
+  .run-head .brandlet { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--midnight); }
+  .run-foot {
+    position: absolute; left: 15mm; right: 15mm; bottom: 11mm;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 7.5px; color: #9aa6b3; border-top: 1px solid var(--line); padding-top: 9px;
+  }
+  .run-foot .gov { max-width: 72%; line-height: 1.35; }
+  .dark .run-foot { color: rgba(255,255,255,0.4); border-top-color: rgba(255,255,255,0.12); }
+
+  /* ───────────────────────── BRAND LOGOS ───────────────────────── */
+  .logo-full { height: 40px; width: auto; display: block; }
+  .logo-mark { width: auto; display: block; flex-shrink: 0; object-fit: contain; }
+  .logo-mark.xs { height: 9px; }
+  .logo-mark.sm { height: 13px; }
+  .logo-mark.md { height: 18px; }
+  .logo-mark.lg { height: 26px; }
+  .logo-mark.xl { height: 34px; }
+  .brandlet { display: flex; align-items: center; gap: 6px; }
+  .brandlet .logo-mark { height: 13px; }
+  .cover .topbar .logo-mark { height: 36px; }
+  .cover .chip .logo-mark { height: 11px; width: 11px; }
+
+  /* ───────────────────────── TYPOGRAPHY ───────────────────────── */
+  h2.section {
+    font-size: 21px; font-weight: 800; color: var(--midnight);
+    letter-spacing: -0.4px; line-height: 1.1; margin-bottom: 4px;
+  }
+  .dark h2.section { color: #fff; }
+  .eyebrow {
+    font-size: 9px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--emerald-dark); margin-bottom: 7px;
+  }
+  .dark .eyebrow { color: var(--gold); }
+  .lead { font-size: 12px; color: var(--muted); max-width: 86%; margin-bottom: 18px; }
+  .dark .lead { color: rgba(255,255,255,0.75); }
+  .rule { height: 3px; width: 46px; background: var(--gold); border-radius: 3px; margin: 9px 0 16px; }
+
+  p { margin-bottom: 8px; }
+  strong { color: var(--midnight); }
+  .dark strong { color: var(--gold-light); }
+
+  /* ───────────────────────── COVER ───────────────────────── */
+  .cover {
+    background:
+      radial-gradient(900px 520px at 78% -8%, rgba(42,157,143,0.30), transparent 60%),
+      radial-gradient(720px 520px at -10% 108%, rgba(233,196,106,0.18), transparent 55%),
+      linear-gradient(160deg, var(--midnight) 0%, var(--midnight-dark) 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    padding: 22mm 18mm;
+    height: 297mm;
+    min-height: 297mm;
+    max-height: 297mm;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .cover .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .cover .wordmark {
+    font-family: 'Inter', 'Poppins', system-ui, sans-serif;
+    font-size: 18px;
+    letter-spacing: -0.025em;
+    color: #fff;
+    line-height: 1;
+  }
+  .cover .wordmark .wm-heavy { font-weight: 900; }
+  .cover .wordmark .wm-light { font-weight: 400; }
+  .cover .product-pill {
+    margin-left: auto; font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--midnight);
+    background: var(--gold); padding: 5px 12px; border-radius: 20px;
+  }
+  .cover .hero {
+    margin-top: auto;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .cover h1 {
+    font-size: 42px; font-weight: 800; line-height: 1.05; letter-spacing: -1.5px;
+    margin-top: auto;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .cover h1 em { font-style: normal; color: var(--gold); }
+  .cover .sub {
+    font-size: 13px; color: rgba(255,255,255,0.82); max-width: 82%; line-height: 1.5; margin-bottom: 0;
+    flex-shrink: 0;
+  }
+  .cover .prepared {
+    margin-top: 22px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.18);
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+    flex-shrink: 0;
+  }
+  .cover .prepared .for { font-size: 10px; color: rgba(255,255,255,0.6); letter-spacing: 0.5px; }
+  .cover .prepared .for b { display: block; font-size: 14px; color: #fff; font-weight: 700; margin-top: 3px; letter-spacing: 0; }
+  .cover .prepared .who { text-align: right; font-size: 9.5px; color: rgba(255,255,255,0.6); line-height: 1.7; }
+  .cover .prepared .who b { color: var(--gold-light); }
+
+  /* Trust strip + early social proof */
+  .trust-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-top: 14px; padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+    flex-shrink: 0;
+  }
+  .trust-strip .ts { text-align: center; }
+  .trust-strip .ts .tv { font-size: 11px; font-weight: 800; color: var(--gold-light); line-height: 1.2; }
+  .trust-strip .ts .tl { font-size: 8px; color: rgba(255,255,255,0.65); margin-top: 3px; line-height: 1.3; }
+
+  .trust-wall {
+    margin-top: 12px; padding: 12px 14px 14px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--paper-soft);
+  }
+  .trust-wall .tw-label {
+    font-size: 8px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--emerald-dark); text-align: center; margin-bottom: 10px;
+  }
+  .trust-wall .tw-grid {
+    display: flex; flex-direction: column; gap: 10px; align-items: center;
+  }
+  .trust-wall .tw-row {
+    display: flex; justify-content: center; gap: 14px; width: 100%;
+  }
+  .trust-wall .tw-row-top .tw-cell { flex: 0 1 calc(33.333% - 10px); max-width: calc(33.333% - 10px); }
+  .trust-wall .tw-row-bottom .tw-cell { flex: 0 1 calc(33.333% - 10px); max-width: calc(33.333% - 10px); }
+  .trust-wall .tw-cell {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    text-align: center; gap: 5px; min-width: 0; padding: 4px 2px;
+  }
+  .trust-wall .tw-logo {
+    height: 30px; width: 100%; display: flex; align-items: center; justify-content: center;
+  }
+  .trust-wall .tw-logo img {
+    max-height: 30px; max-width: 92%; width: auto; object-fit: contain;
+  }
+  .trust-wall .tw-logo .tw-mark {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: var(--midnight); color: var(--gold);
+    font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  }
+  .trust-wall .tw-name {
+    font-size: 7.6px; font-weight: 700; color: var(--midnight);
+    line-height: 1.28; max-width: 100%;
+  }
+
+  .quote-strip {
+    border: 1px solid var(--line); border-left: 4px solid var(--gold);
+    border-radius: 10px; padding: 12px 14px; background: #fffef8; margin-top: 16px; margin-bottom: 18px;
+  }
+  .quote-strip .qq { font-size: 10.5px; color: var(--ink); line-height: 1.45; font-style: italic; margin-bottom: 6px; }
+  .quote-strip .qa { font-size: 9px; color: var(--muted); }
+  .quote-strip .qa b { color: var(--midnight); }
+
+  .contents {
+    font-size: 9px; color: var(--muted); line-height: 1.55;
+    padding: 10px 12px; border-radius: 9px; border: 1px dashed var(--line);
+    background: var(--paper-soft); margin-top: 12px;
+  }
+  .contents b { color: var(--midnight); }
+
+  .in-situ-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .in-situ { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #fff; }
+  .in-situ img { display: block; width: 100%; height: auto; }
+  .in-situ .cap { padding: 8px 10px; font-size: 9px; color: var(--muted); line-height: 1.4; }
+  .in-situ .cap b { display: block; font-size: 9.5px; color: var(--midnight); margin-bottom: 2px; }
+
+  .cover .strapline {
+    display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .cover .chip {
+    font-size: 9px; font-weight: 600; color: #fff;
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18);
+    padding: 5px 10px; border-radius: 18px; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .cover-hero-shot {
+    margin-top: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.14);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    background: #061A33;
+    flex-shrink: 0;
+    width: 84%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .cover-hero-shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 112mm;
+    object-fit: contain;
+    vertical-align: top;
+  }
+
+  /* ───────────────────────── GENERIC GRID ───────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-top: 16px; }
+  .quote-strip + .grid-2,
+  .quote-strip + .grid-3 { margin-top: 0; }
+  table.licmp + .grid-2,
+  table.supp + .grid-2 { margin-top: 14px; }
+
+  /* Extra breathing room before the footer on dense pages */
+  .page > :not(.run-head):not(.run-foot):nth-last-child(2) {
+    margin-bottom: 4mm;
+  }
+
+  /* Icon badge — feature cards + inline callouts */
+  .ico {
+    width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    background: var(--midnight); color: var(--gold); flex-shrink: 0;
+  }
+  .ico.em { background: var(--emerald); color: #fff; }
+  .ico.gd { background: var(--gold); color: var(--midnight); }
+  .ico.rd { background: var(--alert-red); color: #fff; }
+  .ico svg {
+    width: 15px; height: 15px; display: block;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ───────────────────────── FEATURE CARDS ───────────────────────── */
+  .fcard {
+    border: 1px solid var(--line); border-radius: 9px; padding: 12px 13px;
+    background: var(--paper-soft);
+  }
+  .fcard .ico { margin-bottom: 8px; }
+  .fcard h4 { font-size: 12px; color: var(--midnight); margin-bottom: 3px; font-weight: 800; }
+  .fcard p { font-size: 10.3px; color: var(--muted); margin: 0; line-height: 1.45; }
+
+  /* Inline callout strip (page 4 platform note, page 7 templates) */
+  .callout {
+    display: flex; gap: 12px; align-items: center;
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .callout.soft { background: var(--paper-soft); border: 1px solid var(--line); margin-top: 16px; margin-bottom: 4px; }
+  .callout.dark { background: var(--midnight); color: #fff; margin-top: 18px; margin-bottom: 16px; }
+  .callout .ico { margin-bottom: 0; }
+  .callout p, .callout .copy { font-size: 10.2px; color: var(--muted); margin: 0; line-height: 1.45; }
+  .callout.dark .copy { font-size: 9.9px; color: rgba(255,255,255,0.75); }
+  .callout .copy b { color: var(--midnight); }
+  .callout.dark .copy b { color: #fff; }
+  .callout .copy .title { font-size: 12px; font-weight: 800; color: var(--midnight); margin-bottom: 2px; }
+  .callout.dark .copy .title { color: #fff; }
+
+  /* ───────────────────────── PROBLEM/ANSWER ───────────────────────── */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-radius: 11px; overflow: hidden; border: 1px solid var(--line); }
+  .split .col { padding: 18px 18px; }
+  .split .col.problem { background: #fbf2f1; }
+  .split .col.answer { background: #eef7f5; border-left: 1px solid var(--line); }
+  .split .col h3 { font-size: 13px; margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
+  .split .col.problem h3 { color: #a32f28; }
+  .split .col.answer h3 { color: var(--emerald-dark); }
+  .split .col .tag { font-size: 8px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 10px; }
+  .split .col.problem .tag { background: #f3c9c5; color: #a32f28; }
+  .split .col.answer .tag { background: #bfe5dd; color: var(--emerald-dark); }
+  .pa-row { display: flex; gap: 8px; font-size: 10.5px; margin-bottom: 9px; align-items: flex-start; line-height: 1.4; }
+  .pa-row:last-child { margin-bottom: 0; }
+  .pa-row .mk { font-weight: 800; flex-shrink: 0; }
+  .problem .pa-row .mk { color: #c0392b; }
+  .answer .pa-row .mk { color: var(--emerald); }
+  .problem .pa-row span:last-child { color: #6b4340; }
+  .answer .pa-row span:last-child { color: #2c4f49; }
+
+  /* ───────────────────────── STAT STRIP ───────────────────────── */
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 16px; }
+  .stat { text-align: center; padding: 12px 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-soft); }
+  .stat .n { font-size: 22px; font-weight: 800; color: var(--emerald-dark); line-height: 1; }
+  .stat .l { font-size: 8.8px; color: var(--muted); margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ───────────────────────── AUTOMATION TIMELINE ───────────────────────── */
+  .auto-wrap { border: 1px solid var(--line); border-radius: 11px; overflow: hidden; margin-bottom: 18px; }
+  .auto-head { background: var(--midnight); color: #fff; padding: 11px 15px; display: flex; align-items: center; gap: 9px; }
+  .auto-head .logo-mark { height: 15px; }
+  .auto-head b { font-size: 12.5px; }
+  .auto-head .sub { font-size: 9px; color: rgba(255,255,255,0.7); margin-left: auto; }
+  .auto-body { padding: 15px; background: var(--paper-soft); }
+
+  .timeline { position: relative; padding-left: 4px; }
+  .tl-track { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 12px; }
+  .tl-day { text-align: center; font-size: 8px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .tl-day.fri { color: var(--gold-dark); }
+  .tl-bars { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; }
+  .tl-cell { height: 46px; border-radius: 6px; background: #e7edf3; position: relative; overflow: hidden; }
+  .tl-block { position: absolute; left: 3px; right: 3px; border-radius: 4px; font-size: 6.5px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; padding: 0 2px; text-align: center; line-height: 1.1; }
+  .tl-default { background: var(--midnight-light); top: 3px; bottom: 3px; }
+  .tl-jumuah { background: var(--gold-dark); color: var(--midnight); top: 3px; height: 22px; }
+  .tl-event  { background: var(--emerald); top: 27px; bottom: 3px; }
+
+  .rule-list { margin-top: 4px; }
+  .rule-item { display: flex; gap: 9px; align-items: center; padding: 8px 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 7px; }
+  .rule-item:last-child { margin-bottom: 0; }
+  .rule-badge { font-size: 7.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; min-width: 74px; text-align: center; }
+  .rb-recurring { background: #fcefcf; color: var(--gold-dark); }
+  .rb-range { background: #d9f0eb; color: var(--emerald-dark); }
+  .rb-default { background: #dde6f1; color: var(--midnight-light); }
+  .rule-item .desc { font-size: 10.3px; color: var(--ink); }
+  .rule-item .desc b { color: var(--midnight); }
+  .rule-item .prio { margin-left: auto; font-size: 8px; color: var(--muted); white-space: nowrap; }
+
+  /* ───────────────────────── SCREEN MOCKUPS ───────────────────────── */
+  .gal { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+  .gal.tri { grid-template-columns: 1fr 1fr 1fr; }
+  .mock { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .mock .cap { padding: 8px 11px 9px; }
+  .mock .cap .name { font-size: 10.5px; font-weight: 800; color: var(--midnight); display: flex; align-items: center; gap: 6px; }
+  .mock .cap .name .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--emerald); }
+  .mock .cap .meta { font-size: 9px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .mock .cap .tags { margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .mtag { font-size: 7px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: #eef2f7; color: var(--midnight-light); }
+
+  /* live display captures (from scripts/capture-brochure.mjs) */
+  .shot {
+    display: block; width: 100%; height: auto;
+    background: var(--midnight-dark);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .capture-note {
+    font-size: 8.7px; color: var(--muted); font-style: italic; margin: -6px 0 14px;
+  }
+
+  /* legend / token chips */
+  .legend { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px; }
+  .lk { display: inline-flex; align-items: center; gap: 5px; font-size: 8.5px; color: var(--muted); }
+  .lk .sw { width: 11px; height: 11px; border-radius: 3px; }
+
+  /* theme swatches */
+  .themes { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .theme { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .theme .prev { height: 52px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; letter-spacing: 0.5px; }
+  .theme .prev.shot-thumb { padding: 0; object-fit: cover; object-position: center top; width: 100%; display: block; }
+  .theme .nm { font-size: 8.5px; text-align: center; padding: 5px; color: var(--muted); }
+
+  /* ───────────────────────── PRICING ───────────────────────── */
+  .tier-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .tier { border: 1px solid var(--line); border-radius: 11px; overflow: hidden; display: flex; flex-direction: column; }
+  .tier.feat { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(233,196,106,0.4); }
+  .tier .th { padding: 11px 12px 10px; background: var(--paper-soft); position: relative; }
+  .tier.feat .th { background: var(--midnight); color: #fff; }
+  .tier .th .pop { position: absolute; top: 8px; right: 10px; font-size: 6.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; background: var(--gold); color: var(--midnight); padding: 2px 6px; border-radius: 8px; }
+  .tier .th .tn { font-size: 12px; font-weight: 800; color: var(--midnight); }
+  .tier.feat .th .tn { color: #fff; }
+  .tier .th .price { font-size: 22px; font-weight: 800; color: var(--emerald-dark); margin-top: 4px; letter-spacing: -0.5px; }
+  .tier.feat .th .price { color: var(--gold); }
+  .tier .th .price small { font-size: 9px; font-weight: 600; color: var(--muted); }
+  .tier.feat .th .price small { color: rgba(255,255,255,0.6); }
+  .tier .th .once { font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-top: 2px; }
+  .tier.feat .th .once { color: rgba(255,255,255,0.6); }
+  .tier .tb { padding: 10px 12px; flex: 1; }
+  .tier .tb ul { list-style: none; }
+  .tier .tb li { font-size: 9.6px; color: var(--ink); padding: 3px 0 3px 14px; position: relative; line-height: 1.35; }
+  .tier .tb li::before { content: '✓'; position: absolute; left: 0; color: var(--emerald); font-weight: 800; }
+
+  .price-note { font-size: 9.2px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+  .price-note b { color: var(--midnight); }
+
+  .support-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 4px; }
+  .scard { border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; background: var(--paper-soft); }
+  .scard .sn { font-size: 11px; font-weight: 800; color: var(--midnight); display: flex; justify-content: space-between; align-items: baseline; }
+  .scard .sp { font-size: 11px; font-weight: 800; color: var(--emerald-dark); }
+  .scard ul { list-style: none; margin-top: 7px; }
+  .scard li { font-size: 9.2px; color: var(--muted); padding: 2px 0 2px 12px; position: relative; }
+  .scard li::before { content: '•'; position: absolute; left: 0; color: var(--gold-dark); }
+
+  /* ───────────────────────── COMPARISON ───────────────────────── */
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 10px; }
+  table.cmp th, table.cmp td { padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--line); }
+  table.cmp thead th { background: var(--midnight); color: #fff; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  table.cmp thead th.mc { background: var(--emerald-dark); }
+  table.cmp tbody td { color: var(--muted); }
+  table.cmp tbody td.feat { color: var(--midnight); font-weight: 700; }
+  table.cmp .yes { color: var(--emerald-dark); font-weight: 800; }
+  table.cmp .no { color: #c0392b; font-weight: 700; }
+  table.cmp .mc-col { background: rgba(42,157,143,0.07); }
+  table.cmp tbody tr:nth-child(even) td:not(.mc-col) { background: var(--paper-soft); }
+
+  /* ───────────────────────── SUPPORT COMPARISON ───────────────────────── */
+  table.supp { width: 100%; border-collapse: collapse; font-size: 9.2px; margin-bottom: 8px; }
+  table.supp th, table.supp td { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.35; }
+  table.supp thead th { background: var(--midnight); color: #fff; font-size: 8.7px; text-transform: uppercase; letter-spacing: 0.4px; }
+  table.supp thead th.plat { background: var(--midnight-light); }
+  table.supp tbody td { color: var(--muted); }
+  table.supp tbody td.lbl { color: var(--midnight); font-weight: 700; width: 18%; }
+  table.supp tbody tr:nth-child(even) td { background: var(--paper-soft); }
+  table.supp .plat-col { background: rgba(10,38,71,0.05); }
+
+  /* ───────────────────────── SPEC TABLE ───────────────────────── */
+  table.spec { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+  table.spec th, table.spec td { padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+  table.spec th { color: var(--muted); font-weight: 600; width: 34%; font-size: 9px; }
+  table.spec td { color: var(--ink); }
+
+  /* ───────────────────────── PROCUREMENT BLOCKS ───────────────────────── */
+  .proc-box {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    background: var(--paper-soft); margin-top: 14px;
+  }
+  .grid-2 + .proc-box,
+  .grid-3 + .proc-box { margin-top: 16px; }
+  .grid-2 .proc-box,
+  .grid-3 .proc-box,
+  .grid-2 .price-disclaimer { margin-top: 0; }
+  .proc-box h4 { font-size: 10.5px; font-weight: 800; color: var(--midnight); margin-bottom: 6px; }
+  .proc-box p, .proc-box li { font-size: 9.5px; color: var(--muted); line-height: 1.45; margin: 0; }
+  .proc-box ul { list-style: none; margin-top: 6px; }
+  .proc-box li { padding: 2px 0 2px 12px; position: relative; }
+  .proc-box li::before { content: '•'; position: absolute; left: 0; color: var(--emerald-dark); font-weight: 800; }
+  .proc-box.warn { background: #fff8e8; border-color: var(--gold); }
+  .proc-box.warn h4 { color: var(--gold-dark); }
+
+  .faq-item { border-bottom: 1px solid var(--line); padding: 6px 0; }
+  .faq-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .faq-item .fq { font-size: 10.5px; font-weight: 800; color: var(--midnight); margin-bottom: 3px; }
+  .faq-item .fa { font-size: 9.5px; color: var(--muted); line-height: 1.45; }
+
+  .outcome-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+  .outcome {
+    border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; background: #fff;
+  }
+  .outcome .oq { font-size: 9.6px; font-style: italic; color: var(--ink); line-height: 1.4; margin-bottom: 6px; }
+  .outcome .oa { font-size: 8.7px; color: var(--muted); }
+  .outcome .oa b { color: var(--midnight); }
+
+  .travel-row { display: grid; grid-template-columns: 1.1fr 0.7fr 0.6fr 1.6fr; gap: 8px; font-size: 9.2px; padding: 6px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .travel-row:last-child { border-bottom: none; }
+  .travel-row .tl { font-weight: 800; color: var(--midnight); }
+  .travel-row .ts { font-weight: 800; color: var(--emerald-dark); }
+
+  .tier-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .tier-compare .tc { border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; background: #fff; }
+  .tier-compare .tc h5 { font-size: 10px; font-weight: 800; color: var(--midnight); margin-bottom: 4px; }
+  .tier-compare .tc ul { list-style: none; }
+  .tier-compare .tc li { font-size: 8.9px; color: var(--muted); padding: 2px 0 2px 12px; position: relative; line-height: 1.35; }
+  .tier-compare .tc li::before { content: '✓'; position: absolute; left: 0; color: var(--emerald); font-weight: 800; font-size: 7px; }
+  .tier-compare .tc li.no::before { content: '✕'; color: #c0392b; }
+
+  .price-disclaimer { font-size: 8.5px; color: var(--muted); line-height: 1.5; margin-top: 0; padding: 10px 12px; background: var(--paper-soft); border-radius: 8px; border: 1px solid var(--line); }
+
+  /* ───────────────────────── LICENCE COMPARISON ───────────────────────── */
+  table.licmp { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 6px; }
+  table.licmp th, table.licmp td { padding: 4px 6px; text-align: center; border-bottom: 1px solid var(--line); vertical-align: middle; line-height: 1.32; }
+  table.licmp thead th { background: var(--midnight); color: #fff; font-size: 8px; text-transform: uppercase; letter-spacing: 0.35px; }
+  table.licmp thead th.feat-h { text-align: left; width: 24%; }
+  table.licmp thead th.growth-h { background: var(--emerald-dark); }
+  table.licmp tbody td.feat { text-align: left; color: var(--midnight); font-weight: 700; font-size: 8.6px; }
+  table.licmp tbody td { color: var(--muted); }
+  table.licmp tbody td.growth-col { background: rgba(42,157,143,0.07); }
+  table.licmp tr.cat td { background: var(--paper-soft); font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--emerald-dark); padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--line); }
+  table.licmp .yes { color: var(--emerald-dark); font-weight: 800; }
+  table.licmp .no { color: #c0392b; font-weight: 700; }
+  table.licmp .val { font-size: 8.3px; display: block; line-height: 1.25; }
+
+  /* ───────────────────────── CTA / BACK ───────────────────────── */
+  .cta-band {
+    background: radial-gradient(700px 300px at 80% -20%, rgba(42,157,143,0.35), transparent 60%),
+                linear-gradient(150deg, var(--midnight), var(--midnight-dark));
+    color: #fff; border-radius: 14px; padding: 26px 28px; margin-top: 4px;
+  }
+  .cta-band h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .cta-band h3 em { color: var(--gold); font-style: normal; }
+  .cta-band p { font-size: 11px; color: rgba(255,255,255,0.8); max-width: 80%; }
+  .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 18px; }
+  .step { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 9px; padding: 12px; }
+  .step .sn { width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: var(--midnight); font-weight: 800; font-size: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 7px; }
+  .step h5 { font-size: 10.5px; margin-bottom: 3px; }
+  .step p { font-size: 9.3px; color: rgba(255,255,255,0.72); margin: 0; }
+
+  .contact-box { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-top: 20px; }
+  .contact-box .cc { padding: 18px 20px; }
+  .contact-box .cc.brand { background: var(--midnight); color: #fff; display: flex; flex-direction: column; justify-content: center; }
+  .contact-box .cc.brand .logo-full { height: 44px; margin-bottom: 6px; }
+  .contact-box .cc.brand .wm { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .contact-box .cc.brand .wm span { color: var(--gold); }
+  .contact-box .cc.brand .tl { font-size: 9px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+  .contact-box .cc.det .crow { font-size: 10px; margin-bottom: 9px; }
+  .contact-box .cc.det .crow .cl { font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); }
+  .contact-box .cc.det .crow .cv { font-size: 11.5px; color: var(--midnight); font-weight: 700; }
+  .contact-box .cc.det .crow .cv a { color: var(--emerald-dark); text-decoration: none; }
+
+  .qr-cta { margin-top: 10px; font-size: 9px; color: rgba(255,255,255,0.75); }
+  .qr-cta a { color: var(--gold-light); font-weight: 700; text-decoration: none; }
+
+  .qr-block {
+    display: flex; align-items: center; gap: 14px; margin-top: 14px;
+    padding: 12px 14px; border-radius: 10px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  }
+  .qr-block img {
+    width: 72px; height: 72px; border-radius: 6px; background: #fff;
+    padding: 4px; flex-shrink: 0; display: block;
+  }
+  .qr-block .ql { font-size: 10px; color: rgba(255,255,255,0.85); line-height: 1.45; }
+  .qr-block .ql b { color: var(--gold-light); display: block; font-size: 10.5px; margin-bottom: 2px; }
+
+  /* Package path picker (pre-pricing) */
+  .path-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  .path-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px 15px;
+    background: var(--paper-soft);
+  }
+  .path-card.rec { border-color: var(--gold); background: #fffef8; box-shadow: 0 0 0 1px rgba(233,196,106,0.35); }
+  .path-card .sit {
+    font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--emerald-dark); margin-bottom: 5px;
+  }
+  .path-card h4 { font-size: 12px; color: var(--midnight); margin-bottom: 6px; font-weight: 800; line-height: 1.2; }
+  .path-card p { font-size: 9.6px; color: var(--muted); margin: 0; line-height: 1.45; }
+  .path-card p b { color: var(--midnight); }
+  .path-bridge {
+    margin-top: 14px; padding: 11px 14px; border-radius: 9px;
+    background: var(--midnight); color: rgba(255,255,255,0.82); font-size: 9.8px; line-height: 1.45;
+  }
+  .path-bridge b { color: var(--gold-light); }
+
+  /* Compact “+6 more” feature list */
+  .more-features {
+    margin-top: 12px; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; background: var(--paper-soft);
+  }
+  .more-features h4 { font-size: 10px; font-weight: 800; color: var(--midnight); margin-bottom: 8px; }
+  .more-features ul {
+    list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 14px;
+  }
+  .more-features li {
+    font-size: 9.6px; color: var(--muted); padding-left: 12px; position: relative; line-height: 1.35;
+  }
+  .more-features li::before { content: '✓'; position: absolute; left: 0; color: var(--emerald); font-weight: 800; }
+  .more-features li b { color: var(--midnight); font-weight: 700; }
+
+  /* Security callout */
+  .security-callout {
+    display: flex; gap: 12px; align-items: flex-start;
+    border: 1px solid rgba(42,157,143,0.45); border-radius: 10px;
+    padding: 12px 14px; background: #eef7f5; margin-bottom: 14px;
+  }
+  .security-callout .ico { margin-bottom: 0; }
+  .security-callout .sec-body h4 { font-size: 10.5px; font-weight: 800; color: var(--midnight); margin-bottom: 4px; }
+  .security-callout .sec-body p { font-size: 9.5px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; }
+  .security-callout .sec-body ul { margin: 0; padding-left: 14px; font-size: 9.4px; color: var(--muted); line-height: 1.4; }
+
+  /* Admin portal screenshot */
+  .portal-shot {
+    margin-bottom: 14px; border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; background: var(--paper-soft);
+  }
+  .portal-shot img { display: block; width: 100%; height: auto; }
+  .portal-shot .cap {
+    padding: 8px 12px; font-size: 9.4px; color: var(--muted);
+    border-top: 1px solid var(--line); line-height: 1.4;
+  }
+  .portal-shot .cap b { color: var(--midnight); }
+
+  /* ───────────────────────── PRINT HINT (screen only) ───────────────────────── */
+  .print-hint {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    padding: 10px 16px;
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: center;
+    color: #fff;
+    background: #0A2647;
+    border-bottom: 2px solid var(--gold);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  }
+  .print-hint b { color: var(--gold-light); }
+
+  /* ───────────────────────── PRINT ───────────────────────── */
+  @media print {
+    .print-hint { display: none !important; }
+
+    html, body {
+      background: #fff;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    /* Default: one logical section per sheet; tall sections may continue (no clipping) */
+    .page {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      min-height: 297mm;
+      height: auto;
+      max-height: none;
+      overflow: visible;
+      page-break-after: always;
+      break-after: page;
+      page-break-inside: auto;
+      break-inside: auto;
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    /* Cover: same layout as screen — one exact A4 sheet, no print-only overrides */
+    .page.cover {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* A blurred box-shadow rasterises as a hard dark band in PDF export — drop it on the
+       cover hero and lean on the border for separation instead. */
+    .cover-hero-shot {
+      box-shadow: none;
+      border-color: rgba(255,255,255,0.25);
+    }
+
+    /* Spacing tweaks only — never crop screenshots */
+    .run-head { margin-bottom: 10px; padding-bottom: 5px; }
+    .lead { margin-bottom: 10px; }
+    .capture-note { margin: -4px 0 8px; }
+    .gal { gap: 10px; }
+    .gal.tri { gap: 10px !important; }
+    .mock { break-inside: avoid; page-break-inside: avoid; }
+    .mock img,
+    .in-situ img,
+    .portal-shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      object-fit: unset;
+    }
+    table.licmp { font-size: 8.3px; }
+    table.licmp th, table.licmp td { padding: 2px 5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="print-hint" role="note">
+  <b>Save as PDF:</b> set <b>Margins → None</b> and tick <b>Background graphics</b> so the PDF matches this preview.
+</div>
+
+<!-- Semantic icons for feature cards (logo reserved for headers / cover) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <defs>
+    <style>
+      symbol :is(path, circle, rect, line) { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      symbol [fill="currentColor"] { fill: currentColor; stroke: none; }
+    </style>
+  </defs>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2v6h-6"/><path d="M3 12V6a4 4 0 0 1 4-4h5"/><path d="M7 22v-6h6"/><path d="M21 12v6a4 4 0 0 1-4 4h-5"/></symbol>
+  <symbol id="i-calendar-range" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><path d="M10 2h4"/><path d="M12 14V8"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2.7-1.5"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/></symbol>
+  <symbol id="i-calendar-plus" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></symbol>
+  <symbol id="i-slides" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M7 11h10M7 7h6"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a3 3 0 0 1 0 6v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a3 3 0 0 1 0-6V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2Z"/><path d="M12 6v12"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 10-12h-7l1-8Z"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a9 9 0 1 0-8.5-12"/><circle cx="8" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M12 7v10M9 10h6M9 14h6"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7" r="3"/><path d="M22 19v-1a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M7 8h10v4a5 5 0 0 1-10 0Z"/></symbol>
+  <symbol id="i-cloud-down" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.7-1.5A4 4 0 0 1 18 18Z"/><path d="M12 12v8M9 17l3 3 3-3"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"/><path d="m3 7.5 9 4.5 9-4.5"/><path d="M3 12.5 12 17l9-4.5"/><path d="M3 17.5 12 22l9-4.5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-screens" viewBox="0 0 24 24"><rect x="2" y="5" width="14" height="10" rx="2"/><rect x="8" y="9" width="14" height="10" rx="2"/><path d="M9 19h2M15 23h2"/></symbol>
+  <symbol id="i-calendar-check" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><path d="M17 14h.01"/><path d="M3 10h18"/></symbol>
+</svg>
+
+<!-- ══════════════════════════ PAGE 1 — COVER ══════════════════════════ -->
+<div class="page cover">
+  <div class="topbar">
+    <img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true">
+    <div class="wordmark"><span class="wm-heavy">Masjid</span><span class="wm-light">Connect</span></div>
+    <div class="product-pill">Display</div>
+  </div>
+
+  <div class="hero">
+    <h1>The masjid display<br>that <em>runs itself.</em></h1>
+    <div class="sub">
+      Prayer times, announcements, events and real-time alerts on every screen —
+      scheduled weeks in advance, updated in seconds, and reliable even when the
+      internet isn't. No more Friday-morning rush.
+    </div>
+
+    <div class="cover-hero-shot">
+      <img src="brochure-assets/ls-stack-verse.png" alt="MasjidConnect Display — classic stack layout with verse of the day and prayer times">
+    </div>
+
+    <div class="strapline">
+      <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Playlist scheduling</span>
+      <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Auto prayer times</span>
+      <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> Works offline</span>
+      <span class="chip"><img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> One-off cost · no lock-in</span>
+    </div>
+
+    <div class="prepared">
+      <div class="for">
+        Product brochure
+        <b>MasjidConnect Display</b>
+      </div>
+      <div class="who">
+        UK-operated · Built by committee members<br>
+        <b>www.masjidconnect.co.uk</b><br>
+        Version 1.0 · June 2026
+      </div>
+    </div>
+
+    <div class="trust-strip">
+      <div class="ts"><div class="tv">Free to start</div><div class="tl">No credit card required</div></div>
+      <div class="ts"><div class="tv">Pay once</div><div class="tl">Lifetime licence · no monthly fee</div></div>
+      <div class="ts"><div class="tv">14-day guarantee</div><div class="tl">Money-back, no questions</div></div>
+      <div class="ts"><div class="tv">UK masajid</div><div class="tl">Trusted across the country</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ PAGE 2 — THE CHALLENGE ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Why masajid switch</div>
+  </div>
+
+  <div class="eyebrow">The challenge</div>
+  <h2 class="section">Keeping screens right shouldn't be a weekly chore</h2>
+  <div class="rule"></div>
+  <p class="lead">
+    Most masajid run their displays on a TV slideshow, a free app, or a one-off setup a
+    volunteer built. They all share the same problem: <strong>someone has to remember to change them</strong> —
+    every week, before every event, the moment prayer times shift.
+  </p>
+
+  <div class="split">
+    <div class="col problem">
+      <h3><span class="tag">Today</span> The manual treadmill</h3>
+      <div class="pa-row"><span class="mk">✕</span><span><b>The Friday rush.</b> Content has to be swapped for Jumu'ah every single week — and checked that it actually worked before the jama'ah arrives.</span></div>
+      <div class="pa-row"><span class="mk">✕</span><span><b>No scheduling.</b> Nothing changes on its own. Every update is hands-on, in the moment, by whoever is around.</span></div>
+      <div class="pa-row"><span class="mk">✕</span><span><b>Times drift out of date.</b> Daylight saving, Ramadan and seasonal changes mean prayer times need re-entering by hand.</span></div>
+      <div class="pa-row"><span class="mk">✕</span><span><b>Ongoing subscriptions.</b> A monthly fee that never ends, with features locked behind higher tiers.</span></div>
+      <div class="pa-row"><span class="mk">✕</span><span><b>Single point of failure.</b> When the internet drops or that one volunteer is away, the screen goes blank or wrong.</span></div>
+    </div>
+    <div class="col answer">
+      <h3><span class="tag">With MasjidConnect</span> Set it once</h3>
+      <div class="pa-row"><span class="mk">✓</span><span><b>Schedule Jumu'ah forever.</b> Build the Friday layout once and it appears automatically every Friday — and reverts on its own afterwards.</span></div>
+      <div class="pa-row"><span class="mk">✓</span><span><b>Plan weeks ahead.</b> Ramadan, fundraisers, Eid, school holidays — queue them up by date and time, then forget about them.</span></div>
+      <div class="pa-row"><span class="mk">✓</span><span><b>Prayer times calculate themselves.</b> Set location and method once; DST and seasonal shifts are handled automatically.</span></div>
+      <div class="pa-row"><span class="mk">✓</span><span><b>One-off cost.</b> A lifetime software licence you own — no per-screen monthly subscription.</span></div>
+      <div class="pa-row"><span class="mk">✓</span><span><b>Runs offline.</b> Prayer times and content are cached on the device — fullest experience on our Display Unit; the screen keeps going when the internet drops.</span></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">0</div><div class="l">Weekly manual swaps</div></div>
+    <div class="stat"><div class="n">~20<small style="font-size:11px">min</small></div><div class="l">To set up a screen</div></div>
+    <div class="stat"><div class="n">24/7</div><div class="l">Cached content offline</div></div>
+    <div class="stat"><div class="n">£0</div><div class="l">Monthly licence fee</div></div>
+  </div>
+
+  <p class="lead" style="margin-top:18px; max-width:100%;">
+    Prayer times, Jumu'ah, Ramadan, janazah notices, parking calls — the screens follow the masjid calendar,
+    not the other way around.
+  </p>
+
+  <div class="contents">
+    <b>In this brochure:</b> The challenge · Scheduling · Features · Layout gallery · Hardware · Choosing a package · Pricing (6 pages) · Comparison · FAQ · Next steps
+  </div>
+
+  <div class="trust-wall">
+    <div class="tw-label">Trusted by masajid across the UK</div>
+    <div class="tw-grid">
+      <div class="tw-row tw-row-top">
+        <div class="tw-cell">
+          <div class="tw-logo"><img src="brochure-assets/trust/lye-ghausia-jamia-masjid.webp" alt=""></div>
+          <div class="tw-name">Lye Ghausia Jamia Masjid</div>
+        </div>
+        <div class="tw-cell">
+          <div class="tw-logo"><img src="brochure-assets/trust/OMS-bathstreet.webp" alt=""></div>
+          <div class="tw-name">Oxford Mosque Society</div>
+        </div>
+        <div class="tw-cell">
+          <div class="tw-logo"><img src="brochure-assets/trust/the-ayla-centre.webp" alt=""></div>
+          <div class="tw-name">The Ayla Centre</div>
+        </div>
+      </div>
+      <div class="tw-row tw-row-bottom">
+        <div class="tw-cell">
+          <div class="tw-logo"><img src="brochure-assets/trust/leagrave-hall-masjid.webp" alt=""></div>
+          <div class="tw-name">Leagrave Hall Masjid</div>
+        </div>
+        <div class="tw-cell">
+          <div class="tw-logo"><img src="brochure-assets/trust/harrogate-islamic-centre.webp" alt=""></div>
+          <div class="tw-name">Harrogate Islamic Centre</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="run-foot">
+    <div class="gov">MasjidConnect</div>
+    <div>Page 2</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ PAGE 3 — AUTOMATION (HERO) ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Scheduling &amp; automation</div>
+  </div>
+
+  <div class="eyebrow">Scheduling</div>
+  <h2 class="section">Playlists that switch on their own</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    You build <strong>playlists</strong> — sets of slides — and assign each one a schedule.
+    The display switches between them automatically. Set your Jumu'ah screen once; it runs every Friday.
+  </p>
+
+  <div class="auto-wrap">
+    <div class="auto-head">
+      <img class="logo-mark" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true">
+      <b>A typical week — on autopilot</b>
+      <span class="sub">Built once · repeats on its own</span>
+    </div>
+    <div class="auto-body">
+      <div class="timeline">
+        <div class="tl-track">
+          <div class="tl-day">Mon</div><div class="tl-day">Tue</div><div class="tl-day">Wed</div>
+          <div class="tl-day">Thu</div><div class="tl-day fri">Fri</div><div class="tl-day">Sat</div><div class="tl-day">Sun</div>
+        </div>
+        <div class="tl-bars">
+          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
+          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
+          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
+          <div class="tl-cell"><div class="tl-block tl-default">Everyday</div></div>
+          <div class="tl-cell"><div class="tl-block tl-jumuah">Jumu'ah</div><div class="tl-block tl-event">Everyday</div></div>
+          <div class="tl-cell"><div class="tl-block tl-event" style="top:3px;">Weekend class</div></div>
+          <div class="tl-cell"><div class="tl-block tl-event" style="top:3px;">Weekend class</div></div>
+        </div>
+      </div>
+
+      <div class="legend" style="margin:12px 0 14px;">
+        <span class="lk"><span class="sw" style="background:var(--midnight-light)"></span> Default playlist</span>
+        <span class="lk"><span class="sw" style="background:var(--gold-dark)"></span> Friday Jumu'ah (recurring)</span>
+        <span class="lk"><span class="sw" style="background:var(--emerald)"></span> Time / day-scoped playlist</span>
+      </div>
+
+      <div class="rule-list">
+        <div class="rule-item">
+          <span class="rule-badge rb-default">Default</span>
+          <span class="desc"><b>Everyday content</b> — verses, announcements, prayer countdown. Shows whenever nothing more specific is scheduled.</span>
+          <span class="prio">Priority 0</span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-badge rb-recurring">Recurring</span>
+          <span class="desc"><b>Jumu'ah screen</b> — every <b>Friday, 11:30–14:00</b>. Khutbah reminder, silent-phones notice, Jumu'ah timings.</span>
+          <span class="prio">Priority 10</span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-badge rb-recurring">Recurring</span>
+          <span class="desc"><b>Weekend madrasah</b> — <b>Sat &amp; Sun</b>, class times and parent reminders.</span>
+          <span class="prio">Priority 5</span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-badge rb-range">Date range</span>
+          <span class="desc"><b>Ramadan timetable</b> — runs <b>1–30 Ramadan only</b>, then disappears by itself. Suhoor/iftar, taraweeh, i'tikaf sign-up.</span>
+          <span class="prio">Priority 20</span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-badge rb-range">Date range</span>
+          <span class="desc"><b>Eid &amp; fundraiser</b> — appears for the dates you set, highest priority, overrides everything beneath it.</span>
+          <span class="prio">Priority 30</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-strip">
+    <div class="qq">&ldquo;We run three screens at Lye Ghausia now. Jumu'ah playlists switch themselves, prayer times stay right, and when we need a janazah or parking message out quickly, it hits every screen in seconds. It's the first display system I've used that actually feels built for a masjid.&rdquo;</div>
+    <div class="qa"><b>Osman</b> · Committee lead · Lye Ghausia Jamia Masjid, West Midlands</div>
+  </div>
+
+  <div class="grid-3">
+    <div class="fcard">
+      <div class="ico gd"><svg aria-hidden="true"><use href="#i-repeat"/></svg></div>
+      <h4>Recurring rules</h4>
+      <p>Pick the days of the week and a time window. "Every Friday afternoon" or "weekday mornings" — set once, repeats forever.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico em"><svg aria-hidden="true"><use href="#i-calendar-range"/></svg></div>
+      <h4>Date-range campaigns</h4>
+      <p>Give a playlist a start and end date. It switches on and off on its own — for Ramadan, Eid and appeals.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico"><svg aria-hidden="true"><use href="#i-layers"/></svg></div>
+      <h4>Priority stacking</h4>
+      <p>When rules overlap, the higher priority wins. Layer special content on top of everyday content without deleting anything.</p>
+    </div>
+  </div>
+
+  <div class="run-foot">
+    <div class="gov">MasjidConnect</div>
+    <div>Page 3</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ PAGE 4 — FEATURE SET ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Features</div>
+  </div>
+
+  <div class="eyebrow">What's included</div>
+  <h2 class="section">Prayer times, content and alerts on every screen</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Prayer times, Jumu'ah, Ramadan, urgent community messages, and fundraising — on every screen, without a separate tool for each.
+  </p>
+
+  <div class="grid-3" style="gap:11px;">
+    <div class="fcard">
+      <div class="ico gd"><svg aria-hidden="true"><use href="#i-clock"/></svg></div>
+      <h4>Automatic prayer times</h4>
+      <p>Set location and calculation method once. Adhan and Iqamah times calculate daily, adjusting for daylight saving automatically.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico em"><svg aria-hidden="true"><use href="#i-timer"/></svg></div>
+      <h4>Live Iqamah countdowns</h4>
+      <p>A prominent countdown to the next jamaat, with a clear &ldquo;jamaat in progress&rdquo; state and post-jamaat supplication.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico rd"><svg aria-hidden="true"><use href="#i-alert"/></svg></div>
+      <h4>Real-time alerts</h4>
+      <p>Push a full-screen message to every display in seconds — janazah, parking, building access, or safety — overriding all content.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico"><svg aria-hidden="true"><use href="#i-wifi-off"/></svg></div>
+      <h4>Works offline</h4>
+      <p>Prayer times and content are cached on the device. Full offline operation on our Display Unit; third-party sticks and TV browsers may need a connection more often.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico gd"><svg aria-hidden="true"><use href="#i-moon"/></svg></div>
+      <h4>Ramadan mode</h4>
+      <p>Switches on automatically by the Hijri calendar — suhoor &amp; iftar times, imsak, taraweeh and Ramadan styling.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico"><svg aria-hidden="true"><use href="#i-slides"/></svg></div>
+      <h4>Content slides</h4>
+      <p>Qur'an verses, hadith, du'as, the 99 Names, announcements, events, video clips and custom images — all rotating automatically.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico em"><svg aria-hidden="true"><use href="#i-ticket"/></svg></div>
+      <h4>Events &amp; ticketing</h4>
+      <p>Promote events on screen with dates, times and details — with optional ticketing for fundraisers and dinners.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico"><svg aria-hidden="true"><use href="#i-monitor"/></svg></div>
+      <h4>Web admin portal</h4>
+      <p>Manage every screen, playlist and alert from any browser or phone — no app to install. Update an announcement in 30 seconds.</p>
+    </div>
+  </div>
+
+  <div class="more-features">
+    <h4>+6 more included</h4>
+    <ul>
+      <li><b>Tomorrow's jama'ah</b> — show tomorrow's times or roll prayers forward automatically</li>
+      <li><b>On-screen donations</b> — QR giving via card, Apple Pay or Google Pay</li>
+      <li><b>Real-time updates</b> — changes appear the moment you save; remote refresh &amp; restart</li>
+      <li><b>Your branding &amp; wording</b> — custom colours; Zuhr/Dhuhr, Jamaat/Iqamah as you prefer</li>
+      <li><b>Portrait &amp; landscape</b> — every layout designed for both orientations</li>
+      <li><b>Role-based access</b> — lock real-time alerts to trusted admins only</li>
+    </ul>
+  </div>
+
+  <div class="callout soft">
+    <div class="ico em"><svg aria-hidden="true"><use href="#i-layers"/></svg></div>
+    <p class="copy"><b>Community App (£129/yr, optional).</b> The same prayer times, events and donation links you publish on
+      displays also appear in the MasjidConnect app for worshippers on their phones — update once, hall and pocket stay in sync.
+      Growth and Pro tiers can add Members CRM and donor management in the same account.</p>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 4</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 5 — LAYOUT GALLERY (LANDSCAPE) ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Layout gallery · 1 of 4</div>
+  </div>
+
+  <div class="eyebrow">Choose your look — landscape</div>
+  <h2 class="section">Layout structures for wall-mounted TVs</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Every screen is built from <strong>zones</strong> you can show, hide, resize and rearrange — header, prayer times,
+    Jumu'ah bar, countdown, content and footer. Below are the four core landscape structures. Mix any content type into each.
+  </p>
+
+  <p class="capture-note">Screenshots from the live display app.</p>
+
+  <div class="gal">
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/ls-stack-verse.png" alt="Classic Stack layout — verse of the day with prayer strip">
+      <div class="cap">
+        <div class="name"><span class="dot"></span>Classic Stack</div>
+        <div class="meta">Content fills the screen, prayer times as a strip along the bottom. The most popular all-rounder.</div>
+        <div class="tags"><span class="mtag">Structure: Stack</span><span class="mtag">Prayer: Strip</span></div>
+      </div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/ls-sidebar-right.png" alt="Prayer sidebar on the right with countdown">
+      <div class="cap">
+        <div class="name"><span class="dot"></span>Prayer Sidebar (Right)</div>
+        <div class="meta">Prayer sidebar on the right — clock, dates, prayer grid and countdown built into the sidebar. No separate header bar.</div>
+        <div class="tags"><span class="mtag">Structure: Sidebar-right</span><span class="mtag">Clock: Prayer sidebar</span></div>
+      </div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/ls-sidebar-left.png" alt="Prayer sidebar on the left with Asmāʾ al-Ḥusnā content">
+      <div class="cap">
+        <div class="name"><span class="dot"></span>Prayer Sidebar (Left)</div>
+        <div class="meta">Mirrored layout — integrated prayer sidebar on the left; content fills the hall view. No masjid name chrome.</div>
+        <div class="tags"><span class="mtag">Structure: Sidebar-left</span><span class="mtag">Clock: Prayer sidebar</span></div>
+      </div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/ls-split-top.png" alt="Split top band layout with announcement content">
+      <div class="cap">
+        <div class="name"><span class="dot"></span>Split Top Band</div>
+        <div class="meta">Clock and prayer times locked in a top band; a large content area below for notices and campaigns.</div>
+        <div class="tags"><span class="mtag">Structure: Split-top</span><span class="mtag">Clock: Top band</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 5</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 6 — CONTENT SLIDE TYPES ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Layout gallery · 2 of 4</div>
+  </div>
+
+  <div class="eyebrow">Choose your content</div>
+  <h2 class="section">Slide types that rotate in the content zone</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Drop any of these into a playlist and they cycle automatically, each for a duration you set.
+    Every slide inherits your chosen layout and theme.
+  </p>
+
+  <p class="capture-note">Production screenshots — same fonts and layouts as on your screens.</p>
+
+  <div class="gal tri" style="gap:13px;">
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-verse.png" alt="Verse and Hadith slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Verse &amp; Hadith</div><div class="meta">Qur'an āyāt and authentic hadith with translation and reference.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-dua.png" alt="Duʿāʾ slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Du'ā</div><div class="meta">Supplications with Arabic, transliteration, translation and source.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-asma.png" alt="Asmāʾ al-Ḥusnā slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Asmāʾ al-Ḥusnā</div><div class="meta">The 99 beautiful Names, cycling one at a time.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-announcement.png" alt="Announcement slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Announcement</div><div class="meta">Notices and reminders, updated from your phone in seconds.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-event.png" alt="Event slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Event</div><div class="meta">Date, time and venue — with optional ticketing built in.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-donation.png" alt="Donation QR slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Donation / QR</div><div class="meta">Instant card &amp; wallet giving with a live appeal total.</div></div>
+    </div>
+
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 6</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 7 — SLIDES (CONT.) + REAL-TIME ALERT ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Layout gallery · 3 of 4</div>
+  </div>
+
+  <div class="gal tri" style="gap:13px; margin-top:0;">
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-eid.png" alt="Custom image slide — Lye Ghausia Eid ul-Adha poster">
+      <div class="cap"><div class="name"><span class="dot"></span>Custom Image / PDF</div><div class="meta">Upload your own posters, flyers or designed slides.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-jumuah.png" alt="Jumu'ah special slide">
+      <div class="cap"><div class="name"><span class="dot"></span>Jumu'ah Special</div><div class="meta">Auto-scheduled every Friday with khutbah/jamaat timings.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/slide-video.png" alt="Video slide — MasjidConnect display in situ">
+      <div class="cap"><div class="name"><span class="dot"></span>Video</div><div class="meta">Upload MP4 or WebM clips — timetables, appeals, or welcome messages.</div></div>
+    </div>
+
+  </div>
+
+  <div class="alert-showcase" style="margin-top:14px;">
+    <div class="mock">
+      <img class="shot ls" src="brochure-assets/realtime-alert.png" alt="Real-time alert full-screen takeover — janazah notice">
+      <div class="cap">
+        <div class="name"><span class="dot"></span>Real-time alert</div>
+        <div class="meta">Not a playlist slide — a full-screen takeover for janazah, parking, access or safety messages, sent from your phone to every screen instantly.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 7</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 8 — PORTRAIT + THEMES ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Layout gallery · 4 of 4</div>
+  </div>
+
+  <div class="eyebrow">Choose your look — portrait</div>
+  <h2 class="section">Portrait layouts &amp; your own colours</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Mounting vertically in an entrance or corridor? Portrait layouts are designed separately from landscape,
+    so proportions stay correct. Apply your masjid's colours to any layout.
+  </p>
+
+  <div style="display:grid; grid-template-columns: 0.42fr 0.42fr 1fr; gap:15px; align-items:start;">
+
+    <div class="mock">
+      <img class="shot pt" src="brochure-assets/pt-full.png" alt="Portrait full stack layout">
+      <div class="cap"><div class="name"><span class="dot"></span>Portrait — Full Stack</div><div class="meta">Header, prayer panel, Jumu'ah bar, countdown, content &amp; footer.</div></div>
+    </div>
+
+    <div class="mock">
+      <img class="shot pt" src="brochure-assets/pt-prayer-focus.png" alt="Portrait prayer focus layout">
+      <div class="cap"><div class="name"><span class="dot"></span>Portrait — Prayer Focus</div><div class="meta">Big countdown with the full timetable — content hidden.</div></div>
+    </div>
+
+    <!-- Themes + zone toolkit -->
+    <div>
+      <div style="font-size:11px; font-weight:800; color:var(--midnight); margin-bottom:8px;">Make it yours — colour themes</div>
+      <div class="themes" style="margin-bottom:16px;">
+        <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-stack-verse.png" alt="Midnight theme"><div class="nm">Midnight (default)</div></div>
+        <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-theme-emerald.png" alt="Emerald theme"><div class="nm">Emerald</div></div>
+        <div class="theme"><img class="prev shot-thumb" src="brochure-assets/ls-ramadan.png" alt="Ramadan theme"><div class="nm">Ramadan</div></div>
+        <div class="theme"><div class="prev" style="background:linear-gradient(160deg,#2b1840,#160a24); color:#d9b3ff">Aa</div><div class="nm">Custom colours</div></div>
+      </div>
+      <div style="font-size:8.5px; color:var(--muted); margin-bottom:14px;">Set background, accent, highlight and text colours — or match your masjid's existing brand exactly.</div>
+
+      <div style="font-size:11px; font-weight:800; color:var(--midnight); margin-bottom:8px;">Build from zones</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        <span class="mtag" style="font-size:8px; padding:4px 8px;">Header / Clock</span>
+        <span class="mtag" style="font-size:8px; padding:4px 8px;">Prayer Times</span>
+        <span class="mtag" style="font-size:8px; padding:4px 8px;">Jumu'ah Bar</span>
+        <span class="mtag" style="font-size:8px; padding:4px 8px;">Countdown</span>
+        <span class="mtag" style="font-size:8px; padding:4px 8px;">Content</span>
+        <span class="mtag" style="font-size:8px; padding:4px 8px;">Footer Ticker</span>
+      </div>
+      <div style="font-size:8.5px; color:var(--muted); margin-top:10px; line-height:1.5;">
+        Show, hide, resize and reorder any zone. Toggle the Gregorian date, Hijri date, masjid name, imsak/suhoor,
+        tomorrow's jama'ah and supplication screens — independently for landscape and portrait.
+      </div>
+    </div>
+  </div>
+
+  <div class="callout dark">
+    <div class="ico" style="background:rgba(255,255,255,0.12); color:var(--gold);"><svg aria-hidden="true"><use href="#i-slides"/></svg></div>
+    <div class="copy">
+      <div class="title">Don't want to design from scratch?</div>
+      Start from a template and adjust it, or we configure your screens during an installed package.
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 8</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 9 — HARDWARE & RELIABILITY ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Hardware &amp; reliability · 1 of 3</div>
+  </div>
+
+  <div class="eyebrow">Choose your device</div>
+  <h2 class="section">Ways to run a display — our unit or yours</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%; margin-bottom:10px;">
+    MasjidConnect runs in a web browser. You do <strong>not</strong> have to use our hardware — but our
+    <strong>MasjidConnect Display Unit</strong> is the option we design, warrant, and fully support. Any HDMI TV
+    from 24″ to 85″ works in landscape or portrait.
+  </p>
+
+  <div class="in-situ-grid">
+    <div class="in-situ">
+      <img src="brochure-assets/real-display-1.webp" alt="MasjidConnect portrait display showing prayer times and jamaat countdown in a UK masjid prayer hall">
+      <div class="cap"><b>Lye Ghausia Jamia Masjid</b>Prayer times and jamaat countdown on the wall — a live install using MasjidConnect Display.</div>
+    </div>
+    <div class="in-situ">
+      <img src="brochure-assets/real-display-2.webp" alt="Multiple MasjidConnect screens in a masjid prayer hall">
+      <div class="cap"><b>Multiple screens, one dashboard</b>Screens across the prayer hall, all updated from the same admin portal.</div>
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 9</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 10 — PORTAL & SECURITY ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Hardware &amp; reliability · 2 of 3</div>
+  </div>
+
+  <div class="portal-shot" style="margin-top:0;">
+    <img src="brochure-assets/portal-screens.png" alt="MasjidConnect admin portal — screen list with online status, layouts, and remote controls">
+    <div class="cap"><b>Admin portal — every screen in one place.</b> See which displays are online, push a real-time alert to all of them, or refresh and restart remotely — from your phone or laptop.</div>
+  </div>
+
+  <div class="security-callout">
+    <div class="ico em"><svg aria-hidden="true"><use href="#i-shield"/></svg></div>
+    <div class="sec-body">
+      <h4>Security &amp; data — built for committee scrutiny</h4>
+      <p>MasjidConnect is a <b>UK-operated</b> platform. Admin data and content are hosted on secure cloud infrastructure with <b>GDPR-aligned</b> practices.</p>
+      <ul>
+        <li><b>Outbound-only devices</b> — displays connect out to our servers; no inbound ports on your network</li>
+        <li><b>Role-based alerts</b> — restrict full-screen emergency broadcasts to trusted admins only</li>
+        <li><b>Local caching</b> — content is stored on the device for offline operation; devices do not expose access into your LAN</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 10</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 11 — HARDWARE OPTIONS & SETUP ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Hardware · 3 of 3</div>
+  </div>
+
+  <div class="eyebrow">Device options</div>
+  <h2 class="section" style="margin-bottom:8px;">Pick how you run each screen</h2>
+  <div class="rule" style="margin-bottom:12px;"></div>
+
+  <div class="grid-2" style="margin-bottom:12px;">
+    <div class="fcard" style="border-color:var(--gold); background:#fffef8;">
+      <div class="ico gd" style="margin-bottom:6px;"><svg aria-hidden="true"><use href="#i-box"/></svg></div>
+      <h4 style="font-size:11px;">MasjidConnect Display Unit <span style="font-size:7px; font-weight:800; color:var(--gold-dark); text-transform:uppercase; letter-spacing:0.5px;">Recommended</span></h4>
+      <p style="font-size:8.6px;">Our signage computer with MasjidConnect OS pre-installed. Offline mode, automatic updates, Wi‑Fi recovery, and <b>12-month manufacturer warranty</b>. Included in installed packages or from <b>£189</b> standalone. <b>Care plans and Display Guard cover hardware we supply.</b></p>
+    </div>
+    <div class="fcard">
+      <div class="ico em" style="margin-bottom:6px;"><svg aria-hidden="true"><use href="#i-monitor"/></svg></div>
+      <h4 style="font-size:11px;">Android TV or Fire TV Stick</h4>
+      <p style="font-size:8.6px;">Pair via the on-screen browser or kiosk app. Works well for a single screen if you already have a stick. Offline behaviour is limited compared with our Display Unit.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico" style="margin-bottom:6px;"><svg aria-hidden="true"><use href="#i-plug"/></svg></div>
+      <h4 style="font-size:11px;">PC or laptop (kiosk mode)</h4>
+      <p style="font-size:8.6px;">Useful for trials or a temporary screen. Run Chromium or Edge in full-screen kiosk mode and pair with the QR code. Your team manages the machine, updates, and power.</p>
+    </div>
+    <div class="fcard">
+      <div class="ico" style="margin-bottom:6px;"><svg aria-hidden="true"><use href="#i-screens"/></svg></div>
+      <h4 style="font-size:11px;">Smart TV browser</h4>
+      <p style="font-size:8.6px;">The quickest way to try MasjidConnect on a TV you already own. Depends on the TV's built-in browser staying updated. Fine for evaluation; most masajid move to a Display Unit or stick for reliability.</p>
+    </div>
+  </div>
+
+  <div class="proc-box warn" style="margin-bottom:14px;">
+    <h4>Support &amp; warranty — our hardware vs yours</h4>
+    <p><b>Platform Support</b> (free with every licence) covers <b>software bugs</b> on any device you pair.
+      <b>Care plans, on-site visits, Display Guard urgent call-outs, and hardware replacement</b> apply to
+      <b>MasjidConnect Display Units supplied by MasjidConnect</b> only — not Android sticks, smart TVs, PCs, or
+      any third-party box you source yourself. Display Units we supply include a <b>12-month manufacturer warranty</b>
+      (return-to-base) for manufacturing defects.</p>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:12px;">
+    <div>
+      <div style="font-size:10px; font-weight:800; color:var(--midnight); margin-bottom:6px;">Display Unit — what's in the box</div>
+      <table class="spec">
+        <tr><th>Device</th><td>MasjidConnect Display Unit — pre-configured signage computer</td></tr>
+        <tr><th>Software</th><td>MasjidConnect OS — auto-updating, offline-first</td></tr>
+        <tr><th>Connectivity</th><td>Wi‑Fi 5, Bluetooth, Gigabit Ethernet</td></tr>
+        <tr><th>Display output</th><td>HDMI — up to 4K@60Hz</td></tr>
+        <tr><th>Included</th><td>Ventilated case, power supply, HDMI cable, quick-start card</td></tr>
+        <tr><th>Warranty</th><td>12-month manufacturer warranty (return-to-base)</td></tr>
+        <tr><th>Standalone price</th><td>£189 if bought separately (final price)</td></tr>
+      </table>
+    </div>
+    <div>
+      <div style="font-size:10px; font-weight:800; color:var(--midnight); margin-bottom:6px;">Display Unit — network &amp; security</div>
+      <div class="proc-box">
+        <ul>
+          <li><b>Wi‑Fi or Ethernet</b> — on first boot, a temporary hotspot lets you enter your masjid's credentials from a phone</li>
+          <li><b>Outbound only</b> — connects to our servers; no inbound ports on your network</li>
+          <li><b>Offline-first</b> — prayer times and playlists cached locally (strongest on our Display Unit)</li>
+          <li><b>Compact</b> — mounts behind most TVs; silent, passive cooling</li>
+        </ul>
+      </div>
+      <div style="font-size:10px; font-weight:800; color:var(--midnight); margin:8px 0 5px;">Display Unit setup — four steps</div>
+      <div class="steps" style="grid-template-columns:repeat(4,1fr); margin-top:0; gap:6px;">
+        <div class="step" style="background:var(--paper-soft); border-color:var(--line); padding:7px;">
+          <div class="sn" style="width:16px;height:16px;font-size:8px;">1</div><h5 style="color:var(--midnight);font-size:8.5px;">Plug in</h5><p style="color:var(--muted);font-size:7.5px;">Unit → TV + power</p>
+        </div>
+        <div class="step" style="background:var(--paper-soft); border-color:var(--line); padding:7px;">
+          <div class="sn" style="width:16px;height:16px;font-size:8px;">2</div><h5 style="color:var(--midnight);font-size:8.5px;">Pair</h5><p style="color:var(--muted);font-size:7.5px;">Scan QR code</p>
+        </div>
+        <div class="step" style="background:var(--paper-soft); border-color:var(--line); padding:7px;">
+          <div class="sn" style="width:16px;height:16px;font-size:8px;">3</div><h5 style="color:var(--midnight);font-size:8.5px;">Configure</h5><p style="color:var(--muted);font-size:7.5px;">Layout + playlists</p>
+        </div>
+        <div class="step" style="background:var(--paper-soft); border-color:var(--line); padding:7px;">
+          <div class="sn" style="width:16px;height:16px;font-size:8px;">4</div><h5 style="color:var(--midnight);font-size:8.5px;">Done</h5><p style="color:var(--muted);font-size:7.5px;">Runs itself</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 11</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 12 — CHOOSE YOUR PACKAGE ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Choosing a package</div>
+  </div>
+
+  <div class="eyebrow">Start here</div>
+  <h2 class="section">Which package fits your masjid?</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+  Not sure where to begin? Match your situation below — the detailed pricing tables on the following pages spell out every limit.
+  </p>
+
+  <div class="path-grid">
+    <div class="path-card">
+      <div class="sit">Try it first</div>
+      <h4>One screen, your own TV</h4>
+      <p>Pair a Fire Stick, smart TV browser, or PC in kiosk mode. Start on the <b>Free</b> tier to test, then move to <b>Starter (£349)</b> when you want scheduling and real-time announcements on up to 3 screens.</p>
+    </div>
+    <div class="path-card rec">
+      <div class="sit">Most masajid</div>
+      <h4>2–10 screens or multiple halls</h4>
+      <p><b>Growth licence (£499)</b> — recurring Jumu'ah and Ramadan scheduling, unlimited playlists, ticketing and CRM. Or <b>Growth Installed (from £1,199)</b> if you want us to supply, mount and hand over a Display Unit.</p>
+    </div>
+    <div class="path-card">
+      <div class="sit">Hands-off install</div>
+      <h4>One screen, fitted for you</h4>
+      <p><b>Starter Installed (from £899)</b> — we visit, mount the TV, pair the Display Unit, set your layout and Jumu'ah playlist, then hand over. Final price confirmed in writing after your postcode and scope.</p>
+    </div>
+    <div class="path-card">
+      <div class="sit">Networks &amp; multi-site</div>
+      <h4>Several masajid or many screens</h4>
+      <p><b>Pro licence (£999)</b> — unlimited screens, multi-site support, Priority Care in year one, and the lowest donation fees. <b>Pro Installed (from £1,799)</b> for large rollouts we scope per building.</p>
+    </div>
+  </div>
+
+  <div class="path-bridge">
+    <b>Software only or installed?</b> Licences are a one-off payment you own — add our Display Unit (£189 standalone) or choose an installed package if you want us on site. Optional care plans (£279/yr+) are for hands-on help, not for keeping the software running.
+  </div>
+
+  <div class="proc-box" style="margin-top:14px;">
+    <h4>Still deciding? Three quick questions</h4>
+    <p><b>How many screens?</b> One hall entrance is often Starter; a main hall plus side rooms usually means Growth.<br>
+    <b>Who will maintain it?</b> Tech-confident volunteers can self-serve; care plans suit committees without a regular IT volunteer.<br>
+    <b>Your own hardware or ours?</b> Our Display Unit is recommended for offline mode and warranty — but MasjidConnect runs on devices you already own.</p>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 12</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 13 — SOFTWARE LICENCES ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Pricing · 1 of 6</div>
+  </div>
+
+  <div class="eyebrow">Own it — don't rent it</div>
+  <h2 class="section">Lifetime software licences</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Pay once for your software licence and it is yours for the life of the product for your masjid.
+    <strong>No monthly subscription, no auto-renewal on the licence itself.</strong> The only annual costs
+    are optional services you choose to add — care plans and the Community App listing — because they
+    carry real ongoing labour.
+  </p>
+
+  <div class="tier-grid">
+    <div class="tier">
+      <div class="th"><div class="tn">Free</div><div class="price">£0</div><div class="once">Lifetime</div></div>
+      <div class="tb"><ul>
+        <li>1 display screen</li>
+        <li>1 layout &amp; 1 playlist (5 slides)</li>
+        <li>Prayer times + CSV import</li>
+        <li>1 admin user</li>
+        <li>Platform Support (bugs)</li>
+      </ul></div>
+    </div>
+    <div class="tier">
+      <div class="th"><div class="tn">Starter</div><div class="price">£349</div><div class="once">One-off · lifetime</div></div>
+      <div class="tb"><ul>
+        <li>Up to 3 screens</li>
+        <li>Full content library</li>
+        <li>Basic scheduling</li>
+        <li>Real-time announcements</li>
+        <li>Up to 3 admin users</li>
+      </ul></div>
+    </div>
+    <div class="tier feat">
+      <div class="th"><span class="pop">Most popular</span><div class="tn">Growth</div><div class="price">£499</div><div class="once">One-off · lifetime</div></div>
+      <div class="tb"><ul>
+        <li>Up to 10 screens</li>
+        <li>Advanced scheduling</li>
+        <li>Unlimited playlists</li>
+        <li>Event ticketing</li>
+        <li>Members CRM &amp; donations</li>
+      </ul></div>
+    </div>
+    <div class="tier">
+      <div class="th"><div class="tn">Pro</div><div class="price">£999</div><div class="once">One-off · lifetime</div></div>
+      <div class="tb"><ul>
+        <li>Unlimited screens</li>
+        <li>Multi-site support</li>
+        <li>1 yr Priority Care included</li>
+        <li>Lowest donation fees (1%)</li>
+        <li>Programmes &amp; facilities</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <div class="proc-box" style="margin-top:12px;">
+    <h4>Why most masajid choose Growth over Starter</h4>
+    <p>For <strong>£150 more</strong> than Starter you get 10 screens instead of 3, plus recurring and date-range
+      scheduling — Jumu'ah every Friday, Ramadan timetables that start and stop on their own — ticketing, CRM, and
+      lower donation fees. If you have more than one hall or entrance screen, Growth is usually the right tier.</p>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 13</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 14 — LICENCE FEATURE COMPARISON ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Pricing · 2 of 6</div>
+  </div>
+
+  <div class="eyebrow">Compare tiers</div>
+  <h2 class="section">What's included in each licence</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%; margin-bottom:10px;">
+    Every tier is a <strong>one-off lifetime licence</strong>. This table matches our published plan limits —
+    ✕ means not included; figures and limits are per masjid unless noted.
+  </p>
+
+  <table class="licmp">
+    <thead>
+      <tr>
+        <th class="feat-h">Feature</th>
+        <th>Free<br><span style="font-weight:600;opacity:0.85">£0</span></th>
+        <th>Starter<br><span style="font-weight:600;opacity:0.85">£349</span></th>
+        <th class="growth-h">Growth<br><span style="font-weight:600;opacity:0.85">£499</span></th>
+        <th>Pro<br><span style="font-weight:600;opacity:0.85">£999</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="cat"><td colspan="5">Display &amp; playlists</td></tr>
+      <tr>
+        <td class="feat">Display screens</td>
+        <td><span class="val">1</span></td><td><span class="val">3</span></td>
+        <td class="growth-col"><span class="val">10</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Screen layouts</td>
+        <td><span class="val">1</span></td><td><span class="val">3</span></td>
+        <td class="growth-col"><span class="val">10</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Admin users</td>
+        <td><span class="val">1</span></td><td><span class="val">3</span></td>
+        <td class="growth-col"><span class="val">Unlimited</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Content library</td>
+        <td><span class="val">Basic</span></td><td><span class="val">Full</span></td>
+        <td class="growth-col"><span class="val">Full</span></td><td><span class="val">Full</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Playlists</td>
+        <td><span class="val">1</span></td><td><span class="val">3</span></td>
+        <td class="growth-col"><span class="val">Unlimited</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Slides per playlist</td>
+        <td><span class="val">5</span></td><td><span class="val">10</span></td>
+        <td class="growth-col"><span class="val">Unlimited</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Playlist scheduling</td>
+        <td class="no">✕</td>
+        <td><span class="val">Basic</span></td>
+        <td class="growth-col"><span class="val">Recurring + date range</span></td>
+        <td><span class="val">Recurring + date range</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Real-time screen announcements</td>
+        <td class="no">✕</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Remove MasjidConnect branding</td>
+        <td class="no">✕</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Multi-site support</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col no">✕</td><td class="yes">✓</td>
+      </tr>
+
+      <tr class="cat"><td colspan="5">Prayer times &amp; website</td></tr>
+      <tr>
+        <td class="feat">Prayer time management</td>
+        <td class="yes">✓</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Prayer time CSV import</td>
+        <td class="yes">✓</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Seasonal Jamaat patterns</td>
+        <td class="no">✕</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Jamaat periods</td>
+        <td><span class="val">1</span></td><td><span class="val">Unlimited</span></td>
+        <td class="growth-col"><span class="val">Unlimited</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Jumu'ah schedules</td>
+        <td><span class="val">1</span></td><td><span class="val">Unlimited</span></td>
+        <td class="growth-col"><span class="val">Unlimited</span></td><td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Website widgets</td>
+        <td><span class="val">1 (Prayer Times)</span></td>
+        <td><span class="val">3 (all types)</span></td>
+        <td class="growth-col"><span class="val">10 (with analytics)</span></td>
+        <td><span class="val">Unlimited</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Widget customisation</td>
+        <td class="no">✕</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Calendar PDF download</td>
+        <td class="no">✕</td><td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Widget analytics</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Calendar templates &amp; sponsors</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Batch calendar generation</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">White-label website widgets</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col no">✕</td><td class="yes">✓</td>
+      </tr>
+
+      <tr class="cat"><td colspan="5">Events, giving &amp; community</td></tr>
+      <tr>
+        <td class="feat">Events</td>
+        <td><span class="val">2 active</span></td>
+        <td><span class="val">5 active</span></td>
+        <td class="growth-col"><span class="val">Unlimited + ticketing</span></td>
+        <td><span class="val">Unlimited + ticketing</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Donations (platform fee + processing)</td>
+        <td><span class="val">3.5%</span></td><td><span class="val">2.5%</span></td>
+        <td class="growth-col"><span class="val">1.5%</span></td><td><span class="val">1%</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Donor management</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Members CRM</td>
+        <td class="no">✕</td><td class="no">✕</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Community App listing</td>
+        <td><span class="val">Add-on £129/yr</span></td>
+        <td><span class="val">Add-on £129/yr</span></td>
+        <td class="growth-col"><span class="val">Add-on £129/yr</span></td>
+        <td><span class="val">Add-on £129/yr</span></td>
+      </tr>
+
+      <tr class="cat"><td colspan="5">Support &amp; installation</td></tr>
+      <tr>
+        <td class="feat">Platform Support (software bugs)</td>
+        <td><span class="val">Email · 5 days</span></td>
+        <td><span class="val">Email · 5 days</span></td>
+        <td class="growth-col"><span class="val">Email · 5 days</span></td>
+        <td><span class="val">Email · 5 days</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Hands-on care plan</td>
+        <td><span class="val">From £279/yr</span></td>
+        <td><span class="val">From £279/yr</span></td>
+        <td class="growth-col"><span class="val">From £279/yr</span></td>
+        <td><span class="val">Priority Care yr 1 · then £449/yr</span></td>
+      </tr>
+      <tr>
+        <td class="feat">Installed package available</td>
+        <td><span class="val">DIY guides</span></td>
+        <td class="yes">✓</td>
+        <td class="growth-col yes">✓</td><td class="yes">✓</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid-2">
+    <div class="proc-box warn">
+      <h4>Lifetime licence — what you are buying</h4>
+      <p>Your licence does not expire and we do not charge a monthly fee to keep displays running. Software updates
+        and security fixes are included. Optional care plans are for hands-on help — not for keeping the software on.
+        14-day money-back guarantee on first-time licence purchases; see our Refund Policy.</p>
+    </div>
+    <div class="price-disclaimer">
+      <b>Prices are final.</b> We are not VAT registered. Figures match our published pricing when this document was
+      prepared — confirm current rates before you order. Upgrade from your admin dashboard if the masjid outgrows its tier.
+      <b>Roadmap features</b> (programmes, facilities, volunteer management, API access, financial reports) are listed at
+      <b>masjidconnect.co.uk/pricing</b> — availability may change after this brochure was printed.
+    </div>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 14</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 15 — INSTALLED PACKAGES ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Pricing · 3 of 6</div>
+  </div>
+
+  <div class="eyebrow">Done for you</div>
+  <h2 class="section">Installed packages — from prices, scoped to your masjid</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Installed prices are <strong>starting points</strong>, not fixed quotes. Every package below includes
+    <strong>one screen</strong> in our free travel radius. Additional screens, distance, mounting complexity,
+    and time on site all affect the final figure — we quote before you commit.
+  </p>
+
+  <div class="grid-3" style="margin-bottom:12px;">
+    <div class="fcard" style="background:#fff;">
+      <h4 style="font-size:12px;">Starter Installed <span style="float:right; color:var(--emerald-dark)">from £899</span></h4>
+      <p style="margin-top:4px;">Starter licence + Display Unit + qualified electrician install, mount, pair, and volunteer training for <b>one screen</b>.</p>
+    </div>
+    <div class="fcard" style="background:#fff; border-color:var(--gold);">
+      <h4 style="font-size:12px;">Growth Installed <span style="float:right; color:var(--emerald-dark)">from £1,199</span></h4>
+      <p style="margin-top:4px;"><b style="color:var(--gold-dark)">Most popular.</b> Growth licence + install + Members CRM, ticketing &amp; donor setup for <b>one screen</b>.</p>
+    </div>
+    <div class="fcard" style="background:#fff;">
+      <h4 style="font-size:12px;">Pro Installed <span style="float:right; color:var(--emerald-dark)">from £1,799</span></h4>
+      <p style="margin-top:4px;">Pro licence + multi-site configuration + <b>1 year Priority Care</b> included. Scoped to your organisation on discovery.</p>
+    </div>
+  </div>
+
+  <div class="proc-box warn">
+    <h4>Why "from" — and when the price goes up</h4>
+    <ul>
+      <li><b>More screens:</b> Each package includes one installed screen. Most masajid want 2–4 (main hall, sisters' area, entrance). Additional installed screens are <b>from £349 each</b> — each adds mounting, wiring, pairing, and on-site time.</li>
+      <li><b>Larger rollouts:</b> A Growth licence with 6–7 supplied screens is a much longer install — often a full day or more. We quote this separately; we cannot absorb multi-screen labour at a single-screen price.</li>
+      <li><b>Travel distance:</b> Install travel is free within 50 miles of Oxfordshire. 50–100 miles carries a <b>£75 surcharge</b>. Beyond that we batch visits or arrange remote-assisted setup — see travel bands on the next page.</li>
+      <li><b>Your building:</b> Standard wall mount and fused spur are included. Major electrical work, heritage buildings, or unusual cable runs are quoted after a site check.</li>
+    </ul>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 15</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 16 — INSTALL SCOPE & TRAVEL ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Pricing · 4 of 6</div>
+  </div>
+
+  <div class="eyebrow">Install scope</div>
+  <h2 class="section">What's included — and how travel works</h2>
+  <div class="rule"></div>
+
+  <div class="grid-2" style="margin-top:4px; gap:12px;">
+    <div class="proc-box">
+      <h4>What's included in a standard install (one screen)</h4>
+      <ul>
+        <li>Half-day on-site visit (typical for one screen)</li>
+        <li>MasjidConnect Display Unit — pre-configured, supplied &amp; installed by us</li>
+        <li>Screen mounted &amp; wired by a qualified electrician</li>
+        <li>Landscape or portrait — your choice of location</li>
+        <li>Paired to your account; prayer times &amp; first content set up with you</li>
+        <li>Hands-on training for the volunteers who will run it</li>
+        <li>Supply your own TV? We still mount, wire, and configure it</li>
+      </ul>
+    </div>
+    <div class="proc-box">
+      <h4>What's not included (quoted separately if needed)</h4>
+      <ul>
+        <li>New mains circuits beyond a standard fused spur</li>
+        <li>Structural work on listed or heritage buildings without a prior survey</li>
+        <li>Supply of the TV/monitor itself (unless agreed in your quote)</li>
+        <li>Ongoing care beyond any plan included with your package</li>
+      </ul>
+      <p style="margin-top:8px;"><b>Example quote:</b> Growth Installed (from £1,199) + 2 extra screens (from £349 each) + travel if outside free radius = <b>from ~£1,897</b> before any site-specific adjustments. We confirm in writing before booking.</p>
+    </div>
+  </div>
+
+  <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--emerald-dark); margin:14px 0 6px;">Install travel from our Oxfordshire base</div>
+  <div style="border:1px solid var(--line); border-radius:9px; padding:8px 12px; background:#fff;">
+    <div class="travel-row" style="font-weight:800; color:var(--muted); font-size:7.5px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid var(--line);">
+      <div>Band</div><div>Radius</div><div>Surcharge</div><div>Examples</div>
+    </div>
+    <div class="travel-row">
+      <div class="tl">Free install travel</div><div>Within 50 miles</div><div class="ts">Included</div>
+      <div>Oxford, Reading, Slough, High Wycombe, Milton Keynes, Luton, Coventry, Northampton</div>
+    </div>
+    <div class="travel-row">
+      <div class="tl">Short travel surcharge</div><div>50–100 miles</div><div class="ts">+£75</div>
+      <div>Birmingham, most of London, Leicester, Bristol, Cambridge</div>
+    </div>
+    <div class="travel-row">
+      <div class="tl">Further afield</div><div>100+ miles</div><div class="ts">Let's talk</div>
+      <div>We batch visits to the North &amp; beyond, or get you live with remote-assisted setup</div>
+    </div>
+  </div>
+
+  <div class="price-note" style="margin-top:10px;">
+  Prefer to self-install? Buy a software licence only and follow our setup guides — typically live in under 20 minutes per screen.
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 16</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 17 — SUPPORT & MAINTENANCE ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Pricing · 5 of 6</div>
+  </div>
+
+  <div class="eyebrow">Support &amp; maintenance</div>
+  <h2 class="section">What you get without paying yearly — and what care plans add</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Every licence includes <strong>Platform Support</strong> for software faults at no annual fee — on any device
+    you pair. Optional care plans add hands-on help with fixed session limits and reply times.
+    <strong>Hardware warranty, on-site display work, and Display Guard urgent cover apply only to MasjidConnect
+    Display Units we supply</strong> — not third-party sticks, TVs, or PCs.
+  </p>
+
+  <div class="callout dark" style="margin-top:0;">
+    <div class="ico" style="background:rgba(255,255,255,0.12); color:var(--gold);"><svg aria-hidden="true"><use href="#i-shield"/></svg></div>
+    <div class="copy">
+      <div class="title">Platform Support — included with every licence (no annual fee)</div>
+      <b>Email</b> us about software faults · We aim to reply within <b>5 working days</b> ·
+      <b>Monday–Friday, 9am–5pm UK</b> (not bank holidays) ·
+      Covers bugs in our software on <b>any paired device</b> — <b>not</b> setup help, content changes, training,
+      your masjid's Wi‑Fi, or hardware on devices we did not supply.
+      Found a real bug? We fix it free. It does not use up any paid help sessions.
+    </div>
+  </div>
+
+  <div style="font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:var(--emerald-dark); margin-bottom:6px;">Optional annual care plans</div>
+  <table class="supp">
+    <thead>
+      <tr>
+        <th style="width:16%"></th>
+        <th class="plat" style="width:21%">Platform<br><span style="font-weight:600; opacity:0.85">Free with licence</span></th>
+        <th style="width:21%">Care<br><span style="font-weight:600; opacity:0.85">£279/yr · £249 yr 1 after install</span></th>
+        <th style="width:21%">Priority Care<br><span style="font-weight:600; opacity:0.85">£549/yr</span></th>
+        <th style="width:21%">Display Guard<br><span style="font-weight:600; opacity:0.85">£899/yr</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="lbl">Best for</td>
+        <td class="plat-col">Reporting software faults only</td>
+        <td>Volunteers who need occasional remote help</td>
+        <td>Busy masajid wanting phone access &amp; visits</td>
+        <td>Urgent help if a screen goes blank on Jumu'ah or in Ramadan</td>
+      </tr>
+      <tr>
+        <td class="lbl">How you contact us</td>
+        <td class="plat-col">Email</td>
+        <td>Email &amp; WhatsApp</td>
+        <td>Email, WhatsApp &amp; phone</td>
+        <td>Same as Priority Care</td>
+      </tr>
+      <tr>
+        <td class="lbl">Reply time</td>
+        <td class="plat-col">Within 5 working days</td>
+        <td>Within 2 working days</td>
+        <td>By midday next working day</td>
+        <td>Same + urgent cover below</td>
+      </tr>
+      <tr>
+        <td class="lbl">Help sessions / yr</td>
+        <td class="plat-col">Faults only — no session cap</td>
+        <td>6 × 30 minutes</td>
+        <td>12 × 30 minutes</td>
+        <td>12 + 4 urgent emergencies</td>
+      </tr>
+      <tr>
+        <td class="lbl">Screens covered</td>
+        <td class="plat-col">N/A (faults only)</td>
+        <td>Up to 5</td>
+        <td>Up to 10</td>
+        <td>Up to 15</td>
+      </tr>
+      <tr>
+        <td class="lbl">On-site visits</td>
+        <td class="plat-col">Not included</td>
+        <td>Not included</td>
+        <td>1/yr (£99 labour + travel)</td>
+        <td>2/yr (£99 labour + travel each)</td>
+      </tr>
+      <tr>
+        <td class="lbl">Volunteer training</td>
+        <td class="plat-col">Online guides</td>
+        <td>Not included</td>
+        <td>1 online session/yr (45 min)</td>
+        <td>2 online sessions/yr</td>
+      </tr>
+      <tr>
+        <td class="lbl">Hardware covered</td>
+        <td class="plat-col">Software only</td>
+        <td>Our Display Units only</td>
+        <td>Our Display Units only</td>
+        <td>Our Display Units only</td>
+      </tr>
+      <tr>
+        <td class="lbl">Manufacturer warranty</td>
+        <td class="plat-col">Not included</td>
+        <td>12 months on units we supply</td>
+        <td>12 months on units we supply</td>
+        <td>12 months on units we supply</td>
+      </tr>
+      <tr>
+        <td class="lbl">Urgent display cover</td>
+        <td class="plat-col">Not included</td>
+        <td>Not included</td>
+        <td>Not included</td>
+        <td>Fri 10am–2pm &amp; Ramadan eves 6–10pm — blank screen prioritised, remote fix within 4 hrs</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 17</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 18 — SUPPORT DETAIL ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>Pricing · 6 of 6</div>
+  </div>
+
+  <div class="eyebrow">Support detail</div>
+  <h2 class="section">Sessions, on-site visits &amp; add-ons</h2>
+  <div class="rule"></div>
+
+  <div class="grid-2" style="margin-top:4px;">
+    <div class="proc-box warn">
+      <h4>Third-party devices — what care plans do and don't cover</h4>
+      <p>If you pair an <b>Android stick, smart TV, or your own PC</b>, a care plan session can still help your
+        volunteers with <b>settings and content</b> — but stick freezes, TV browser updates and laptop failures are
+        yours to resolve. Hardware warranty, on-site cover and Display Guard apply to <b>Display Units we supply</b>
+        (see the support table on page 17).</p>
+    </div>
+    <div class="proc-box">
+      <h4>What counts as a help session?</h4>
+      <p>One issue we work on with you, up to <b>30 minutes</b>. Settings, content, pairing, prayer-time CSVs,
+        and remote troubleshooting on <b>paired screens</b> use your plan's sessions. The same issue within a week
+        still counts as one session. Software bugs are fixed under Platform Support and do not use sessions.</p>
+    </div>
+  </div>
+
+  <div class="proc-box">
+    <h4>On-site visit scope (Priority Care &amp; Display Guard — our Display Units only)</h4>
+    <p><b>Included:</b> Re-pair a MasjidConnect Display Unit, verify configuration, Wi‑Fi reconnection — up to 90 minutes on site.<br>
+      <b>Not included:</b> Electrical work, new cabling, mounting new screens, third-party devices, or hardware replacement
+      after the <b>12-month manufacturer warranty</b> expires. Extra visits: £199 labour + travel.</p>
+  </div>
+
+  <div class="price-note" style="margin-top:8px;">
+    <b>Add-ons:</b> Extra site £149/yr · +5 screens £89/yr · 4 extra help sessions £320 · Community App listing £129/yr.
+    On-screen donations carry a platform fee by tier (Free 3.5% → Pro 1%) plus payment-processing fees.
+    Pro licence includes Priority Care year 1, then renews at <b>£449/yr</b> while Pro is active.
+    <b>Working days</b> = Monday–Friday UK time, not weekends or bank holidays.
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 18</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 19 — COMPARISON ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>How we compare</div>
+  </div>
+
+  <div class="eyebrow">Why MasjidConnect</div>
+  <h2 class="section">Built for masajid — not adapted for them</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%;">
+    Generic signage and consumer apps weren't designed around the five daily prayers, Jumu'ah, Ramadan or emergencies.
+    Here's how MasjidConnect stacks up against the common alternatives.
+  </p>
+
+  <table class="cmp">
+    <thead>
+      <tr>
+        <th style="width:30%">Capability</th>
+        <th class="mc">MasjidConnect</th>
+        <th>Subscription masjid apps</th>
+        <th>Generic digital signage</th>
+        <th>TV slideshow / free app</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="feat">Automated scheduling</td>
+        <td class="mc-col yes">✓ Recurring + date-range</td>
+        <td class="no">Limited / manual</td>
+        <td>Basic playlists</td>
+        <td class="no">✕ Manual every time</td>
+      </tr>
+      <tr>
+        <td class="feat">Auto prayer times (DST &amp; Ramadan)</td>
+        <td class="mc-col yes">✓ Automatic</td>
+        <td>Usually</td>
+        <td class="no">✕ None</td>
+        <td class="no">✕ Manual entry</td>
+      </tr>
+      <tr>
+        <td class="feat">Iqamah countdowns</td>
+        <td class="mc-col yes">✓</td>
+        <td>Usually</td>
+        <td class="no">✕</td>
+        <td class="no">✕</td>
+      </tr>
+      <tr>
+        <td class="feat">Real-time alerts to all screens</td>
+        <td class="mc-col yes">✓ Instant</td>
+        <td class="no">Rare</td>
+        <td class="no">✕</td>
+        <td class="no">✕</td>
+      </tr>
+      <tr>
+        <td class="feat">Works offline</td>
+        <td class="mc-col yes">✓ Cached on device</td>
+        <td class="no">Often cloud-only</td>
+        <td class="no">Varies</td>
+        <td class="no">✕ Goes blank</td>
+      </tr>
+      <tr>
+        <td class="feat">On-screen donations &amp; events</td>
+        <td class="mc-col yes">✓ Built in</td>
+        <td>Sometimes</td>
+        <td class="no">✕</td>
+        <td class="no">✕</td>
+      </tr>
+      <tr>
+        <td class="feat">Pricing model</td>
+        <td class="mc-col yes">✓ One-off, you own it</td>
+        <td class="no">Ongoing subscription</td>
+        <td class="no">Per-screen subscription</td>
+        <td>Free / cheap</td>
+      </tr>
+      <tr>
+        <td class="feat">You own the hardware</td>
+        <td class="mc-col yes">✓ Display Unit — or bring your own</td>
+        <td class="no">Often rented</td>
+        <td class="no">Often rented</td>
+        <td>Your own TV</td>
+      </tr>
+      <tr>
+        <td class="feat">Software bug fixes (any device)</td>
+        <td class="mc-col yes">✓ Platform Support included</td>
+        <td>Varies</td>
+        <td class="no">Often paid only</td>
+        <td class="no">✕ None</td>
+      </tr>
+      <tr>
+        <td class="feat">Hardware warranty &amp; care-plan device cover</td>
+        <td class="mc-col yes">✓ 12-month warranty on our Display Units</td>
+        <td class="no">Varies / rented</td>
+        <td class="no">Varies</td>
+        <td class="no">✕ None</td>
+      </tr>
+      <tr>
+        <td class="feat">Designed for masajid</td>
+        <td class="mc-col yes">✓ Made for masajid</td>
+        <td>Yes</td>
+        <td class="no">✕ Generic</td>
+        <td class="no">✕ Generic</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid-3" style="margin-top:18px;">
+    <div class="fcard" style="background:var(--paper-soft)">
+      <div class="ico gd"><svg aria-hidden="true"><use href="#i-calendar-check"/></svg></div>
+      <h4>No more Friday rush</h4>
+      <p>The main reason masajid switch — Jumu'ah content that schedules itself every week.</p>
+    </div>
+    <div class="fcard" style="background:var(--paper-soft)">
+      <div class="ico em"><svg aria-hidden="true"><use href="#i-wallet"/></svg></div>
+      <h4>No monthly licence fee</h4>
+      <p>Pay once for a licence you own. Add a care plan if you want hands-on help — never a fee just to keep displays running.</p>
+    </div>
+    <div class="fcard" style="background:var(--paper-soft)">
+      <div class="ico"><svg aria-hidden="true"><use href="#i-wifi-off"/></svg></div>
+      <h4>Works without Wi‑Fi</h4>
+      <p>Offline-first on our Display Unit; instant real-time alerts when online — for the day the network drops before Jumu'ah.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:16px; font-size:8px; color:var(--muted); font-style:italic;">
+    Comparison reflects typical offerings in each category and is provided as general guidance for evaluation;
+    specific competitor features vary by provider and plan.
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 19</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 20 — PROCUREMENT & FAQ ══════════════════════════ -->
+<div class="page">
+  <div class="run-head">
+    <div class="brandlet"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div>For your committee</div>
+  </div>
+
+  <div class="eyebrow">Questions &amp; answers</div>
+  <h2 class="section">What treasurers and trustees ask</h2>
+  <div class="rule"></div>
+  <p class="lead" style="max-width:100%; margin-bottom:12px;">
+    Scope, limits, and worked examples — the detail committees need before they vote.
+  </p>
+
+  <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--emerald-dark); margin-bottom:8px;">From masajid using MasjidConnect</div>
+  <div class="outcome-grid" style="margin-bottom:10px;">
+    <div class="outcome">
+      <div class="oq">&ldquo;We run three screens at Lye Ghausia. Jumu'ah playlists switch themselves and prayer times stay right without anyone babysitting the TVs.&rdquo;</div>
+      <div class="oa"><b>Osman</b> · Committee lead<br>Lye Ghausia Jamia Masjid · West Midlands</div>
+    </div>
+    <div class="outcome">
+      <div class="oq">&ldquo;Ramadan timetable switched on by itself and switched off after Eid. That used to be a volunteer job every year — now we just schedule it once.&rdquo;</div>
+      <div class="oa"><b>Committee member</b><br>Oxford Mosque Society · Oxfordshire</div>
+    </div>
+    <div class="outcome">
+      <div class="oq">&ldquo;When we need a janazah or parking message out quickly, it hits every screen in seconds. When broadband dropped before Jumu'ah, prayer times still showed from the cache.&rdquo;</div>
+      <div class="oa"><b>Adel Saeed</b><br>YCA Cultural Centre Masjid</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:14px;">
+    <div>
+      <div class="faq-item">
+        <div class="fq">Can we use our own Fire Stick or smart TV instead of your Display Unit?</div>
+        <div class="fa">Yes. MasjidConnect runs in a browser on Android TV, Fire TV Stick, a PC in kiosk mode, or many smart TV browsers — fine for trying it out or a single screen. Our Display Unit is what we recommend for offline mode, automatic updates, and hardware we supply and warrant. <b>Care plans, on-site visits, Display Guard, and the 12-month manufacturer warranty apply only to MasjidConnect Display Units supplied by us.</b> Software bugs are still fixed under Platform Support on any device.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Do we have to pay every year just to keep the screens running?</div>
+        <div class="fa">No. The software licence is a one-off payment — yours for the life of the product for your masjid. Annual fees apply only to optional services: care plans (hands-on volunteer help) and the Community App listing (£129/yr). Platform Support for software bugs is included with every licence at no annual cost.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">What if we need help but don't want a care plan?</div>
+        <div class="fa">You still have Platform Support for software faults on any paired device (email, 5 working days). Care plans add remote help with settings and content, and you can book paid sessions for one-off setup help. Many masajid self-serve using our guides; others choose Care after their first Ramadan.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Why are installed packages "from" prices?</div>
+        <div class="fa">Because every masjid is different. One screen in Oxfordshire is not the same job as six screens in Birmingham with long cable runs. We quote in writing after understanding your screen count, locations, travel, and building — before you book. Multi-screen rollouts are priced for the labour involved; we do not subsidise large installs at single-screen rates.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Can we upgrade later?</div>
+        <div class="fa">Yes. Upgrade your licence tier from the admin dashboard when you need more screens or features. Contact us for multi-site or network pricing if you manage several masajid.</div>
+      </div>
+    </div>
+    <div>
+      <div class="faq-item">
+        <div class="fq">What about refunds?</div>
+        <div class="fa">14-day money-back guarantee on first-time lifetime licence purchases, subject to our Refund Policy. Installed packages are scoped and scheduled separately — your written quote will state the terms that apply.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Where is our data held?</div>
+        <div class="fa">MasjidConnect is a UK-operated platform. Admin data and content are hosted on secure cloud infrastructure. Display devices cache content locally for offline operation; they do not expose inbound access to your network. A full privacy policy is available on our website.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">We're migrating from another system — can you help?</div>
+        <div class="fa">Yes. We can import prayer times and help rebuild playlists during install or a care-plan session. Tell us what you use today on your discovery call and we will scope migration as part of your quote.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Who owns our content and data?</div>
+        <div class="fa">Your masjid owns the content you publish. MasjidConnect stores admin data and media on secure UK-hosted cloud infrastructure. You can export your data; we do not hold your masjid hostage. See our privacy policy at <b>masjidconnect.co.uk/privacy</b> for retention and GDPR details.</div>
+      </div>
+      <div class="faq-item">
+        <div class="fq">Total cost — a realistic example</div>
+        <div class="fa"><b>Growth Installed</b> from £1,199 (one-off — includes one installed screen) + <b>2 extra installed screens</b> from £349 each + optional <b>Care</b> £279/yr = <b>from ~£1,897 one-off + £279/yr</b> for a three-screen masjid (plus travel if outside free radius). We confirm exact figures before you commit.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="proc-box" style="margin-top:12px;">
+    <h4>Document control</h4>
+    <p>Version <b>1.0</b> · Published <b>June 2026</b> · MasjidConnect Display product brochure.
+      Pricing and support terms match our published rates at that date. A written quotation overrides this document for installed work.</p>
+  </div>
+
+  <div class="run-foot"><div class="gov">MasjidConnect</div><div>Page 20</div></div>
+</div>
+
+<!-- ══════════════════════════ PAGE 21 — NEXT STEPS / BACK ══════════════════════════ -->
+<div class="page dark" style="display:flex; flex-direction:column;">
+  <div class="run-head" style="border-bottom-color:rgba(255,255,255,0.12);">
+    <div class="brandlet" style="color:#fff;"><img class="logo-mark sm" src="brochure-assets/mark-gold.svg" alt="" aria-hidden="true"> MasjidConnect Display</div>
+    <div style="color:rgba(255,255,255,0.5)">Next steps</div>
+  </div>
+
+  <div class="cta-band">
+    <h3>Take the <em>weekly screen swap</em> off your plate</h3>
+    <p>We can have a screen running in your masjid in under an hour — layout chosen, Jumu'ah and Ramadan schedules set, handover done. For installed packages we visit on a mutually agreed date after your written quote is accepted.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="sn">1</div>
+        <h5>Book a walkthrough</h5>
+        <p>A short call to see it live and map it to your masjid's setup and screens.</p>
+      </div>
+      <div class="step">
+        <div class="sn">2</div>
+        <h5>Get a written quote</h5>
+        <p>Tell us your screen count and postcode — we confirm scope, travel, and final pricing before you book.</p>
+      </div>
+      <div class="step">
+        <div class="sn">3</div>
+        <h5>Go live</h5>
+        <p>We help you set up, schedule and hand over. Then it runs itself.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:26px; text-align:center;">
+    <div style="font-size:13px; color:rgba(255,255,255,0.8); font-weight:600;">Schedule Jumu'ah once. It runs every Friday after that.</div>
+  </div>
+
+  <div class="contact-box" style="border-color:rgba(255,255,255,0.15); margin-top:auto;">
+    <div class="cc brand">
+      <img class="logo-full" src="brochure-assets/logo-gold.svg" alt="MasjidConnect">
+      <div class="tl">Display software for masajid.</div>
+    </div>
+    <div class="cc det" style="background:#fff;">
+      <div class="crow"><div class="cl">Website</div><div class="cv"><a href="https://www.masjidconnect.co.uk">www.masjidconnect.co.uk</a></div></div>
+      <div class="crow"><div class="cl">Email</div><div class="cv"><a href="mailto:support@masjidconnect.co.uk">support@masjidconnect.co.uk</a></div></div>
+      <div class="crow"><div class="cl">Phone / WhatsApp</div><div class="cv"><a href="https://wa.me/447438900462">+44 7438 900462</a></div></div>
+      <div class="crow" style="margin-bottom:0;"><div class="cl">Book a demo</div><div class="cv"><a href="https://cal.com/masjidconnect/demo">cal.com/masjidconnect/demo</a></div></div>
+    </div>
+  </div>
+
+  <div class="qr-block">
+    <img src="brochure-assets/qr-demo-booking.png" alt="QR code — book a MasjidConnect demo at cal.com/masjidconnect/demo">
+    <div class="ql">
+      <b>Scan to book a walkthrough</b>
+      cal.com/masjidconnect/demo — see it live and map it to your masjid's screens.
+    </div>
+  </div>
+  <div class="qr-cta">Product overview: <a href="https://www.masjidconnect.co.uk/mosque-digital-signage">masjidconnect.co.uk/mosque-digital-signage</a></div>
+
+  <div class="run-foot" style="color:rgba(255,255,255,0.4); border-top-color:rgba(255,255,255,0.12);">
+    <div class="gov">MasjidConnect</div>
+    <div>Page 21</div>
+  </div>
+</div>
+
+</body>
+</html>

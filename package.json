@@ -21,7 +21,9 @@
     "package:only": "bash scripts/package-release.sh --skip-build",
     "version:bump:major": "npm version major --no-git-tag-version",
     "version:bump:minor": "npm version minor --no-git-tag-version",
-    "version:bump:patch": "npm version patch --no-git-tag-version"
+    "version:bump:patch": "npm version patch --no-git-tag-version",
+    "brochure:media": "node scripts/generate-brochure-media.mjs",
+    "brochure:capture": "node scripts/capture-brochure.mjs"
   },
   "dependencies": {
     "@fontsource/amiri": "^5.2.8",
@@ -58,6 +60,7 @@
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",
     "jsdom": "^25.0.1",
+    "puppeteer-core": "^23.11.1",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.15.0",

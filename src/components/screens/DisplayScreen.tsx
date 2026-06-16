@@ -153,6 +153,33 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     }];
   }
 
+  // --- VIDEO: looping video clip (advances when the clip ends) ---
+  if (typeof type === 'string' && type.toUpperCase() === 'VIDEO') {
+    const videoUrl =
+      typeof content.videoUrl === 'string' ? content.videoUrl.trim() : '';
+    const mimeType =
+      typeof content.mimeType === 'string' ? content.mimeType.trim() : '';
+    const allowedMime = new Set(['video/mp4', 'video/webm']);
+    if (videoUrl === '' || !allowedMime.has(mimeType)) {
+      return [];
+    }
+    const titleRaw = item.title ?? item.contentItem?.title;
+    const title = typeof titleRaw === 'string' ? titleRaw : undefined;
+    const fullscreen = parseMediaFullscreenFlag(content.fullscreen);
+    const mediaFit = resolveMediaFit(content);
+    return [{
+      id: item.id ?? `sched-${index}`,
+      type: 'VIDEO',
+      title,
+      duration: resolveItemDuration(item, content),
+      videoUrl,
+      mediaFit,
+      fullscreen,
+      // Default muted unless explicitly opted into sound.
+      muted: content.muted !== false,
+    }];
+  }
+
   const isAsmaAlHusna =
     typeof type === 'string' && type.toUpperCase() === 'ASMA_AL_HUSNA';
 
