@@ -72,6 +72,12 @@ export interface PairingStatusResponse {
   isPaired: boolean;
   /** When true, display must call PUT /api/screens/pair before fetching credentials */
   needsDevicePairing?: boolean;
+  /** Embedded credentials from check-simple (PairingHistory path) */
+  credentials?: {
+    apiKey?: string;
+    screenId?: string;
+    masjidId?: string;
+  };
 }
 
 /**

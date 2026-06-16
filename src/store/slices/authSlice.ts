@@ -156,10 +156,7 @@ export const checkPairingStatus = createAsyncThunk(
 
       // Step 2a: check-simple STEP 2 (PairingHistory path) embeds full credentials directly.
       // Use them immediately — no extra network call needed.
-      const rawStatus = statusResponse.data as Record<string, unknown>;
-      const embedded = rawStatus.credentials as
-        | { apiKey?: string; screenId?: string; masjidId?: string }
-        | undefined;
+      const embedded = statusResponse.data.credentials;
 
       if (!statusResponse.data.needsDevicePairing && embedded?.apiKey && embedded?.screenId) {
         logger.info('[Auth] Using credentials embedded in check-simple response');
