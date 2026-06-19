@@ -584,6 +584,12 @@ describe('usePrayerTimes', () => {
   });
 
   it('exposes upcoming Friday jummah whenever week data includes a future Friday row', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Freeze before Isha so the hook stays on "today" (after Isha it rolls to
+    // tomorrow and isJumuahToday follows Saturday — flaky on CI evenings).
+    const friday = dayjs.tz('2026-06-19', TEST_TZ).hour(11).minute(0).second(0).millisecond(0);
+    vi.setSystemTime(friday.toDate());
+
     const dayRow = (date: string, jummah?: { jummahJamaat: string; jummahKhutbah: string }) => ({
       date,
       fajr: '05:30',
@@ -600,7 +606,7 @@ describe('usePrayerTimes', () => {
       ...jummah,
     });
 
-    const start = dayjs().tz(TEST_TZ).startOf('day');
+    const start = friday.startOf('day');
     const rows = [];
     for (let i = 0; i < 10; i++) {
       const d = start.add(i, 'day');
@@ -621,6 +627,7 @@ describe('usePrayerTimes', () => {
       content: {
         ...contentState,
         prayerTimes: weekPrayerTimes,
+        masjidTimezone: TEST_TZ,
         timeFormat: '12h',
       },
     });
@@ -632,10 +639,14 @@ describe('usePrayerTimes', () => {
         children,
       );
     const { result } = renderHook(() => usePrayerTimes(), { wrapper });
-    await waitFor(() => {
-      expect(result.current.upcomingJumuahJamaatRaw).toBe('13:30');
-      expect(result.current.upcomingJumuahKhutbahRaw).toBe('13:00');
-    });
-    expect(result.current.isJumuahToday).toBe(start.day() === 5);
+    try {
+      await waitFor(() => {
+        expect(result.current.upcomingJumuahJamaatRaw).toBe('13:30');
+        expect(result.current.upcomingJumuahKhutbahRaw).toBe('13:00');
+      });
+      expect(result.current.isJumuahToday).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
