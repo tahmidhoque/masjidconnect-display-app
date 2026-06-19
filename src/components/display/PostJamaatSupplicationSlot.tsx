@@ -10,12 +10,19 @@ import { POST_JAMAAT_SUPPLICATIONS } from '@/constants/scheduledSupplications';
 import SupplicationScreen from './SupplicationScreen';
 
 /** Per-dua display time (ms). Longer than phones/jamaat slides — congregation needs time to read. */
-const CYCLE_MS = 14_000;
+const CYCLE_MS = 30_000;
 
 /** Crossfade out duration (ms). Matches ContentCarousel. */
 const FADE_OUT_MS = 700;
 
-const PostJamaatSupplicationSlot: React.FC = () => {
+interface PostJamaatSupplicationSlotProps {
+  /** True in portrait layout — forwarded to SupplicationScreen fit loop. */
+  compact?: boolean;
+}
+
+const PostJamaatSupplicationSlot: React.FC<PostJamaatSupplicationSlotProps> = ({
+  compact = false,
+}) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
 
@@ -46,7 +53,7 @@ const PostJamaatSupplicationSlot: React.FC = () => {
       key={supplication.id}
       className={`h-full w-full min-h-0 ${phase === 'in' ? 'animate-fade-in' : 'animate-fade-out'}`}
     >
-      <SupplicationScreen supplication={supplication} />
+      <SupplicationScreen supplication={supplication} compact={compact} />
     </div>
   );
 };

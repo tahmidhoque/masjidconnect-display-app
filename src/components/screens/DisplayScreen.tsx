@@ -683,7 +683,7 @@ const DisplayScreenInner: React.FC = () => {
   const contentSlot = useMemo(() => {
     if (adhanSupplicationActive) {
       return (
-        <SupplicationScreen supplication={POST_ADHAN_SUPPLICATION} />
+        <SupplicationScreen supplication={POST_ADHAN_SUPPLICATION} compact={isPortrait} />
       );
     }
 
@@ -693,7 +693,7 @@ const DisplayScreenInner: React.FC = () => {
       case 'in-prayer':
         if (inPrayerSubPhase === 'post-jamaat-supplication') {
           return (
-            <PostJamaatSupplicationSlot />
+            <PostJamaatSupplicationSlot compact={isPortrait} />
           );
         }
         // post-jamaat delay: jamaat has finished — return to carousel but keep prayer highlighted

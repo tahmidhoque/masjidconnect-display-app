@@ -13,10 +13,13 @@ import {
   visibleTextLength,
   classifyContentDensity,
   computeFontSizes,
+  computeSupplicationFontSizes,
   getScalingForItem,
+  getScalingForSupplication,
   getBodyFontSizeMultiplier,
   getTierConfig,
 } from './contentScaling';
+import { POST_ADHAN_SUPPLICATION } from '@/constants/scheduledSupplications';
 import type { CarouselItem } from './ContentCarousel';
 
 describe('visibleTextLength', () => {
@@ -166,5 +169,19 @@ describe('computeFontSizes / getScalingForItem', () => {
     const tier3 = computeFontSizes(3, getTierConfig(3).baseMultiplier);
     expect(tier1.titleSize).toBeGreaterThan(tier3.titleSize);
     expect(tier1.bodySize).toBeGreaterThan(tier3.bodySize);
+  });
+});
+
+describe('getScalingForSupplication', () => {
+  it('classifies post-adhan supplication using the dua tier rules', () => {
+    const result = getScalingForSupplication(POST_ADHAN_SUPPLICATION);
+    expect(result.tier).toBeGreaterThanOrEqual(1);
+    expect(result.tier).toBeLessThanOrEqual(4);
+  });
+
+  it('scales supplication Arabic larger than body text at the same multiplier', () => {
+    const sizes = computeSupplicationFontSizes(2, 1.6);
+    expect(sizes.arabicSize).toBeGreaterThan(sizes.translationSize);
+    expect(sizes.translationSize).toBeGreaterThan(sizes.referenceSize);
   });
 });

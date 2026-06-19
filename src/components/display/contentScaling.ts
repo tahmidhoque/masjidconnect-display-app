@@ -306,6 +306,95 @@ export function getTierConfig(tier: DensityTier): TierConfig {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Scheduled supplication scaling (post-adhan / post-jamaat)          */
+/* ------------------------------------------------------------------ */
+
+/** Base rem sizes for supplication typography at multiplier 1×. */
+const SUPPLICATION_BASE_SIZES = {
+  arabic: 3,
+  transliteration: 1.3,
+  translation: 1.55,
+  reference: 0.8,
+} as const;
+
+export interface SupplicationFontSizeConfig {
+  arabicSize: number;
+  transliterationSize: number;
+  translationSize: number;
+  referenceSize: number;
+}
+
+export interface SupplicationScalingInput {
+  id: string;
+  arabicText: string;
+  transliteration: string;
+  translation: string;
+  reference: string;
+}
+
+/**
+ * Classify a hard-coded supplication using the same density tiers as carousel
+ * duʿā slides so portrait/landscape sizing stays consistent.
+ */
+export function getScalingForSupplication(
+  supplication: SupplicationScalingInput,
+): ScalingResult {
+  const item: CarouselItem = {
+    id: supplication.id,
+    type: 'dua',
+    arabicBody: supplication.arabicText,
+    transliteration: supplication.transliteration,
+    body: supplication.translation,
+    source: supplication.reference,
+  };
+  return getScalingForItem(item);
+}
+
+/** Compute supplication font sizes (rem) for a tier + multiplier. */
+export function computeSupplicationFontSizes(
+  tier: DensityTier,
+  multiplier: number,
+): SupplicationFontSizeConfig {
+  const weights = TIER_CONFIGS[tier].elementWeights;
+  const round = (n: number) => Math.round(n * 100) / 100;
+
+  return {
+    arabicSize: round(
+      SUPPLICATION_BASE_SIZES.arabic * multiplier * weights.arabic,
+    ),
+    transliterationSize: round(
+      SUPPLICATION_BASE_SIZES.transliteration * multiplier * weights.body,
+    ),
+    translationSize: round(
+      SUPPLICATION_BASE_SIZES.translation * multiplier * weights.body,
+    ),
+    referenceSize: round(
+      SUPPLICATION_BASE_SIZES.reference * multiplier * weights.body,
+    ),
+  };
+}
+
+/** Apply supplication font sizes as CSS custom properties on a DOM element. */
+export function applySupplicationFontSizeProps(
+  el: HTMLElement,
+  sizes: SupplicationFontSizeConfig,
+): void {
+  el.style.setProperty('--supplication-arabic-size', `${sizes.arabicSize}rem`);
+  el.style.setProperty(
+    '--supplication-transliteration-size',
+    `${sizes.transliterationSize}rem`,
+  );
+  el.style.setProperty(
+    '--supplication-translation-size',
+    `${sizes.translationSize}rem`,
+  );
+  el.style.setProperty(
+    '--supplication-reference-size',
+    `${sizes.referenceSize}rem`,
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Auto-scroll constants (used by the carousel component)             */
 /* ------------------------------------------------------------------ */
 
