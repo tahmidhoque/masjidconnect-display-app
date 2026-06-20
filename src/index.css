@@ -586,6 +586,197 @@ html, body {
   line-height: 1;
 }
 
+/* ============================================================
+   UK rear number plate (vehicle parking alerts)
+   ============================================================ */
+
+.vehicle-alert-overlay {
+  background-color: #0d1117;
+  color: #ffffff;
+}
+
+/*
+ * Portrait / CSS-rotated displays: the overlay sits in a swapped-dimension box
+ * (100vh × 100vw). vw still refers to the browser viewport, so landscape vw
+ * values overflow. Size everything from the overlay container instead.
+ */
+.vehicle-alert-overlay--portrait {
+  container-type: size;
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-header,
+.vehicle-alert-overlay--portrait .vehicle-alert-footer {
+  padding-left: 4cqw;
+  padding-right: 4cqw;
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-body {
+  padding-left: 4cqw;
+  padding-right: 4cqw;
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-header-label {
+  gap: 2cqw;
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-header-icon {
+  width: clamp(0.875rem, 3.5cqw, 1.75rem);
+  height: clamp(0.875rem, 3.5cqw, 1.75rem);
+}
+
+.vehicle-alert-overlay--portrait .emergency-category-label {
+  font-size: clamp(0.65rem, 3.2cqw, 1.1rem);
+}
+
+.vehicle-alert-overlay--portrait .emergency-clock {
+  font-size: clamp(1.5rem, 7.5cqw, 3.5rem);
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-clock-period {
+  font-size: clamp(0.9rem, 3.5cqw, 1.75rem);
+  font-weight: 500;
+  opacity: 0.75;
+  margin-left: 0.35em;
+}
+
+.vehicle-alert-overlay--portrait .emergency-countdown {
+  font-size: clamp(0.65rem, 3cqw, 1rem);
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-reason {
+  margin-top: 4cqh;
+  max-width: 94%;
+  font-size: clamp(0.95rem, 4.5cqw, 1.85rem);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.vehicle-alert-overlay--portrait .uk-rear-plate {
+  width: min(94cqw, 100%);
+}
+
+.vehicle-alert-overlay--portrait .uk-rear-plate__registration {
+  font-size: clamp(1.25rem, 17cqw, 4.5rem);
+}
+
+.vehicle-alert-overlay--portrait .uk-rear-plate__gb {
+  font-size: clamp(0.5rem, 3.8cqw, 1.25rem);
+}
+
+/* Landscape (default) chrome padding */
+.vehicle-alert-header,
+.vehicle-alert-footer {
+  padding-left: 5vw;
+  padding-right: 5vw;
+}
+
+.vehicle-alert-body {
+  padding-left: 5vw;
+  padding-right: 5vw;
+}
+
+.vehicle-alert-header-label {
+  gap: 1vw;
+}
+
+.vehicle-alert-header-icon {
+  width: 1.8vw;
+  height: 1.8vw;
+}
+
+.vehicle-alert-header-clock {
+  gap: 0.4vw;
+}
+
+.vehicle-alert-clock-period {
+  font-size: 2.2vw;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.vehicle-alert-reason {
+  margin-top: 3vw;
+  max-width: 85vw;
+  font-size: 2.8vw;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.vehicle-alert-wordmark {
+  font-size: 1.1vw;
+  letter-spacing: 0.05em;
+}
+
+.vehicle-alert-overlay--portrait .vehicle-alert-wordmark {
+  font-size: clamp(0.6rem, 2.8cqw, 1rem);
+}
+
+.uk-rear-plate {
+  display: flex;
+  align-items: stretch;
+  width: min(88vw, 72rem);
+  max-width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
+  aspect-ratio: 520 / 111;
+  border: 0.45em solid #000000;
+  border-radius: 0.55em;
+  background-color: #f9d71c;
+  box-shadow:
+    0 0.35em 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 0 0.08em rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  animation: vehicle-plate-enter 0.45s ease-out forwards;
+  container-type: inline-size;
+}
+
+.uk-rear-plate__band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 11.5%;
+  min-width: 11.5%;
+  background: linear-gradient(180deg, #003399 0%, #002266 100%);
+  padding-bottom: 12%;
+}
+
+.uk-rear-plate__gb {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: clamp(0.55rem, 4cqw, 2rem);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.uk-rear-plate__registration {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4%;
+  min-width: 0;
+  color: #000000;
+  font-family: 'Arial Black', 'Helvetica Neue', 'Poppins', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: clamp(1.75rem, 18cqw, 8.5rem);
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@keyframes vehicle-plate-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(0.5em);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Scrollbar hidden (for carousel-style content) */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

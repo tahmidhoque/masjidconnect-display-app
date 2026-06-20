@@ -33,6 +33,7 @@ import { useCurrentTime } from '@/hooks/useCurrentTime';
 import { getTimeDisplayParts } from '@/utils/dateUtils';
 import type { RotationDegrees } from '@/types/realtime';
 import logger from '@/utils/logger';
+import VehicleAlertContent from '@/components/display/VehicleAlertContent';
 
 /* ------------------------------------------------------------------ */
 /*  Colour helpers                                                     */
@@ -44,6 +45,7 @@ const CATEGORY_COLORS: Record<AlertCategory, string> = {
   janazah:   '#263238',
   schedule:  '#1565C0',
   community: '#00695C',
+  vehicle:   '#121212',
   custom:    '#6A1B9A',
 };
 
@@ -112,6 +114,12 @@ function getCategoryMeta(category: AlertCategory): CategoryMeta {
       return {
         icon: <Megaphone className={iconClass} />,
         label: 'ANNOUNCEMENT',
+        showCountdownInHeader: true,
+      };
+    case 'vehicle':
+      return {
+        icon: <Megaphone className={iconClass} />,
+        label: 'VEHICLE NOTICE',
         showCountdownInHeader: true,
       };
     case 'custom':
@@ -420,15 +428,24 @@ const EmergencyAlertOverlay: React.FC = () => {
   const displayAlert = alertDataRef.current;
   if (!displayAlert) return null;
 
-  const content = (
-    <AlertContent
-      alert={displayAlert}
-      isExiting={isExiting}
-      remainingMs={remainingMs}
-      rotationDegrees={rotationDegrees}
-      timeFormat={timeFormat}
-    />
-  );
+  const content =
+    displayAlert.category === 'vehicle' ? (
+      <VehicleAlertContent
+        alert={displayAlert}
+        isExiting={isExiting}
+        remainingMs={remainingMs}
+        rotationDegrees={rotationDegrees}
+        timeFormat={timeFormat}
+      />
+    ) : (
+      <AlertContent
+        alert={displayAlert}
+        isExiting={isExiting}
+        remainingMs={remainingMs}
+        rotationDegrees={rotationDegrees}
+        timeFormat={timeFormat}
+      />
+    );
 
   if (rotationDegrees !== 0) {
     const swapDimensions = rotationDegrees === 90 || rotationDegrees === 270;

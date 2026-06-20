@@ -716,6 +716,7 @@ export type AlertCategory =
   | "janazah"
   | "schedule"
   | "community"
+  | "vehicle"
   | "custom";
 
 /** Urgency level — drives animation intensity and typography weight */

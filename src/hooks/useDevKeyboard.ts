@@ -13,6 +13,8 @@
  *   Ctrl + Shift + 5  — Community (high) alert     (15 s)
  *   Ctrl + Shift + 6  — Custom (medium) alert      (15 s)
  *   Ctrl + Shift + 7  — Safety (medium) alert      (15 s)
+ *   Ctrl + Shift + 8  — Vehicle plate alert        (15 s)
+ *   Ctrl + Shift + V  — Vehicle plate alert        (15 s, mnemonic)
  *   Ctrl + Shift + 0  — Clear current alert
  *   Ctrl + Shift + R  — Toggle Ramadan mode
  *   Ctrl + Shift + J  — Cycle prayer display (phones → adhan dua → jamaat → … → auto)
@@ -34,11 +36,12 @@
  *   window.__devCyclePrayerDisplay()      — same as Ctrl+Shift+J
  *   window.__devToggleAdhanSupplication() — same as Ctrl+Shift+A
  *   window.__devToggleJamaatBlackout()    — same as Ctrl+Shift+B
- *   window.__devCycleTomorrowChange()     — same as Ctrl+Alt+Shift+M
+ *   window.__devTriggerVehiclePlateAlert() — same as Ctrl+Shift+V / Ctrl+Shift+8
  */
 
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store';
 import {
   createTestAlert,
   clearCurrentAlert,
@@ -80,8 +83,8 @@ declare global {
     __devCyclePrayerDisplay?: () => void;
     __devToggleAdhanSupplication?: () => void;
     __devToggleJamaatBlackout?: () => void;
-    /** Console fallback — same effect as Ctrl+Alt+Shift+M */
-    __devCycleTomorrowChange?: () => void;
+    /** Console fallback — same effect as Ctrl+Shift+V / Ctrl+Shift+8 */
+    __devTriggerVehiclePlateAlert?: () => void;
   }
 }
 
@@ -99,12 +102,19 @@ const ALERT_MAP: Record<string, string> = {
   '%': '5', '5': '5',
   '^': '6', '6': '6',
   '&': '7', '7': '7',
+  '*': '8', '8': '8',
 };
 
 /** Characters that mean "clear" (Shift+0 = ')' on US layout) */
 const CLEAR_KEYS = new Set(['0', ')']);
 
 const TEST_ALERT_DURATION = 15; // seconds
+const VEHICLE_PLATE_ALERT_TYPE = '8';
+
+function triggerVehiclePlateTestAlert(dispatch: AppDispatch): void {
+  logger.info('[DevKeyboard] Triggering vehicle plate test alert');
+  dispatch(createTestAlert({ type: VEHICLE_PLATE_ALERT_TYPE, duration: TEST_ALERT_DURATION }));
+}
 
 /**
  * Cycle the Ramadan mode dev override flag on `window`.
@@ -252,6 +262,8 @@ const useDevKeyboard = (): void => {
       'Ctrl+Shift+5': 'Community HIGH alert (15 s)',
       'Ctrl+Shift+6': 'Custom MEDIUM alert (15 s)',
       'Ctrl+Shift+7': 'Safety MEDIUM alert (15 s)',
+      'Ctrl+Shift+8': 'Vehicle plate alert (15 s)',
+      'Ctrl+Shift+V': 'Vehicle plate alert (15 s)',
       'Ctrl+Shift+0': 'Clear current alert',
       'Ctrl+Shift+R': 'Cycle Ramadan mode (on → off → auto)',
       'Ctrl+Shift+J': 'Cycle prayer display (phones → adhan dua → jamaat → … → auto)',
@@ -277,9 +289,10 @@ const useDevKeyboard = (): void => {
     window.__devToggleAdhanSupplication = toggleAdhanSupplicationDevForce;
     window.__devToggleJamaatBlackout = toggleJamaatBlackoutDevForce;
     window.__devCycleTomorrowChange = toggleTomorrowJamaatChangeForce;
+    window.__devTriggerVehiclePlateAlert = () => triggerVehiclePlateTestAlert(dispatch);
     // eslint-disable-next-line no-console
     console.log(
-      '%cConsole: __devCyclePrayerDisplay(), __devToggleAdhanSupplication(), __devToggleJamaatBlackout(), __devCycleTomorrowChange()',
+      '%cConsole: __devCyclePrayerDisplay(), __devToggleAdhanSupplication(), __devToggleJamaatBlackout(), __devCycleTomorrowChange(), __devTriggerVehiclePlateAlert()',
       'color: #93c5fd; font-style: italic',
     );
 
@@ -375,6 +388,13 @@ const useDevKeyboard = (): void => {
           return;
         }
 
+        // Vehicle plate alert (V or v) — UK rear-plate overlay
+        if (e.key === 'V' || e.key === 'v') {
+          e.preventDefault();
+          triggerVehiclePlateTestAlert(dispatch);
+          return;
+        }
+
         const alertType = ALERT_MAP[e.key];
 
         if (alertType) {
@@ -406,6 +426,7 @@ const useDevKeyboard = (): void => {
       delete window.__devToggleAdhanSupplication;
       delete window.__devToggleJamaatBlackout;
       delete window.__devCycleTomorrowChange;
+      delete window.__devTriggerVehiclePlateAlert;
     };
   }, [dispatch]);
 };

@@ -224,7 +224,7 @@ const AppRoutes: React.FC = () => {
 const App: React.FC = () => {
   const dispatch = useDispatch();
 
-  /** Dev-only keyboard shortcuts (Alt+1–7 for alerts, Escape to clear) */
+  /** Dev-only keyboard shortcuts (Ctrl+Shift+1–8 / V for vehicle plate, Escape to clear) */
   useDevKeyboard();
 
   /** Production WiFi keyboard shortcut (Ctrl+Shift+W) */

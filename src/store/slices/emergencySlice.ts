@@ -230,7 +230,7 @@ const emergencySlice = createSlice({
         color: string | null;
       }
 
-      // Keyed by dev shortcut number (1–7)
+      // Keyed by dev shortcut number (1–8)
       const testAlerts: Record<string, TestAlertTemplate> = {
         "1": {
           title: "Fire Evacuation Alert",
@@ -265,9 +265,9 @@ const emergencySlice = createSlice({
           color: null,
         },
         "5": {
-          title: "Please Move Your Vehicle",
+          title: "Community Announcement",
           message:
-            "A vehicle is blocking access and needs to be moved immediately. Registration: AB12 CDE. Please return to your vehicle as soon as possible.",
+            "Weekly halaqa continues after Isha this Friday. All are welcome. Jazakumullahu khayran.",
           category: "community",
           urgency: "high",
           color: null,
@@ -286,6 +286,13 @@ const emergencySlice = createSlice({
             "Enhanced security measures are currently in effect. Please report any suspicious activity to masjid staff immediately.",
           category: "safety",
           urgency: "medium",
+          color: null,
+        },
+        "8": {
+          title: "Please move your vehicle",
+          message: "AB12 CDE",
+          category: "vehicle",
+          urgency: "high",
           color: null,
         },
       };
