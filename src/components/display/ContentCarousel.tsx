@@ -40,6 +40,7 @@ import MediaPdfPage from './MediaPdfPage';
 
 const EventSlide = lazy(() => import('./EventSlide'));
 const DonationSlide = lazy(() => import('./DonationSlide'));
+const CourseSlide = lazy(() => import('./CourseSlide'));
 const VideoSlide = lazy(() => import('./VideoSlide'));
 
 /**
@@ -57,6 +58,34 @@ export interface AsmaName {
   transliteration?: string;
   meaning?: string;
   number?: number;
+}
+
+/**
+ * Resolved COURSE slide data. The backend hydrates live course catalogue data
+ * (title, schedule, fee, banner) and builds the enrolment QR URL at serve time,
+ * so the display never constructs the URL itself (same contract as DONATION).
+ */
+export interface CourseSlideData {
+  id: string;
+  title: string;
+  /** False when the course was unpublished/archived/made members-only since the slide was created. */
+  available: boolean;
+  /** True when enrolment is currently open (course-level or any open class). */
+  enrolmentOpen: boolean;
+  /** Public enrolment URL for the QR — null when closed/unavailable (no QR shown). */
+  enrollmentUrl: string | null;
+  shortDescription?: string;
+  description?: string;
+  scheduleText?: string;
+  durationLabel?: string;
+  feeLabel?: string;
+  isFree?: boolean;
+  bannerImageUrl?: string;
+  color?: string;
+  instructionText?: string;
+  layout?: 'qr_focus' | 'info_focus';
+  showCapacity?: boolean;
+  placesRemaining?: number | null;
 }
 
 export interface CarouselItem {
@@ -124,6 +153,9 @@ export interface CarouselItem {
     campaignType?: string;
     imageUrl?: string | null;
   } | null;
+
+  /** COURSE: resolved course data + enrolment QR (hydrated by the API). */
+  course?: CourseSlideData;
 }
 
 interface ContentCarouselProps {
@@ -381,14 +413,21 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     [currentItem],
   );
 
+  /** COURSE: fixed enrolment QR / info layout — no typography fit loop. */
+  const isCourseSlide = useMemo(
+    () => currentItem?.type?.toLowerCase() === 'course' && !!currentItem?.course,
+    [currentItem],
+  );
+
   /** Compute the scaling result for the current item (memoised). Event slides use getScalingForEvent. */
   const scalingResult = useMemo(() => {
     if (!currentItem) return null;
     if (isMediaLike) return null;
     if (isDonationSlide) return null;
+    if (isCourseSlide) return null;
     if (isEventSlide && currentItem.event) return getScalingForEvent(currentItem.event);
     return getScalingForItem(currentItem);
-  }, [currentItem, isDonationSlide, isEventSlide, isMediaLike]);
+  }, [currentItem, isDonationSlide, isCourseSlide, isEventSlide, isMediaLike]);
 
   /**
    * Apply the tier's initial font sizes synchronously before the browser paints.
@@ -885,6 +924,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
             ) : isDonationSlide ? (
               <Suspense fallback={null}>
                 <DonationSlide item={item} compact={compact} />
+              </Suspense>
+            ) : isCourseSlide && item.course ? (
+              <Suspense fallback={null}>
+                <CourseSlide course={item.course} compact={compact} />
               </Suspense>
             ) : isVideoSlide && item.videoUrl ? (
               isFullscreenMedia ? (

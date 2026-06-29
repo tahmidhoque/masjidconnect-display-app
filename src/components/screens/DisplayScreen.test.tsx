@@ -361,4 +361,77 @@ describe('scheduleItemToCarouselItems', () => {
     };
     expect(scheduleItemToCarouselItems(scheduleItem, 0)[0].title).toBe('Donate');
   });
+
+  it('maps an open COURSE to a course carousel item with enrolment URL', () => {
+    const scheduleItem = {
+      id: 'course-1',
+      type: 'COURSE',
+      title: 'Enrol: Hifz Programme',
+      content: {
+        courseId: 'c1',
+        available: true,
+        enrolmentOpen: true,
+        enrollmentUrl:
+          'https://portal.example.org/courses/m1/hifz?source=screen_qr',
+        title: 'Hifz Programme',
+        shortDescription: 'Memorisation classes for all ages',
+        scheduleText: 'Mon–Thu, 5–7pm',
+        durationLabel: '6 years',
+        feeLabel: '£60 per term',
+        isFree: false,
+        layout: 'qr_focus',
+        showCapacity: true,
+        placesRemaining: 4,
+      },
+    };
+    const ci = scheduleItemToCarouselItems(scheduleItem, 0)[0];
+    expect(ci.type).toBe('COURSE');
+    expect(ci.title).toBe('Hifz Programme');
+    expect(ci.course?.enrolmentOpen).toBe(true);
+    expect(ci.course?.enrollmentUrl).toContain('/courses/m1/hifz');
+    expect(ci.course?.scheduleText).toBe('Mon–Thu, 5–7pm');
+    expect(ci.course?.feeLabel).toBe('£60 per term');
+    expect(ci.course?.layout).toBe('qr_focus');
+    expect(ci.course?.showCapacity).toBe(true);
+    expect(ci.course?.placesRemaining).toBe(4);
+  });
+
+  it('maps a closed COURSE with no enrolment URL', () => {
+    const scheduleItem = {
+      id: 'course-2',
+      type: 'COURSE',
+      content: {
+        courseId: 'c2',
+        available: true,
+        enrolmentOpen: false,
+        enrollmentUrl: null,
+        title: 'Arabic Foundations',
+        layout: 'info_focus',
+      },
+    };
+    const ci = scheduleItemToCarouselItems(scheduleItem, 0)[0];
+    expect(ci.type).toBe('COURSE');
+    expect(ci.course?.enrolmentOpen).toBe(false);
+    expect(ci.course?.enrollmentUrl).toBeNull();
+    expect(ci.course?.layout).toBe('info_focus');
+  });
+
+  it('defaults COURSE layout to qr_focus and places to null when omitted', () => {
+    const scheduleItem = {
+      id: 'course-3',
+      type: 'COURSE',
+      content: {
+        courseId: 'c3',
+        available: true,
+        enrolmentOpen: true,
+        enrollmentUrl: 'https://portal.example.org/courses/m/c?source=screen_qr',
+        title: 'Tajweed Intensive',
+        isFree: true,
+      },
+    };
+    const ci = scheduleItemToCarouselItems(scheduleItem, 0)[0];
+    expect(ci.course?.layout).toBe('qr_focus');
+    expect(ci.course?.isFree).toBe(true);
+    expect(ci.course?.placesRemaining).toBeNull();
+  });
 });

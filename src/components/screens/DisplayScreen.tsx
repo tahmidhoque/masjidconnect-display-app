@@ -331,6 +331,65 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     }];
   }
 
+  // --- COURSE: enrolment QR + live course info (resolved content from API) ---
+  const isCourse = typeof type === 'string' && type.toUpperCase() === 'COURSE';
+  if (isCourse) {
+    const c = typeof content === 'object' && content !== null ? content : {};
+    const optStr = (v: unknown): string | undefined =>
+      typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
+
+    const rawCourseTitle = item.title ?? item.contentItem?.title;
+    const courseTitle =
+      optStr((c as { title?: unknown }).title) ??
+      (typeof rawCourseTitle === 'string' && rawCourseTitle !== 'No Title'
+        ? rawCourseTitle.trim()
+        : undefined) ??
+      'Course';
+
+    const rawUrl = (c as { enrollmentUrl?: unknown }).enrollmentUrl;
+    const enrollmentUrl =
+      typeof rawUrl === 'string' && rawUrl.trim() !== '' ? rawUrl.trim() : null;
+
+    const layoutRaw = (c as { layout?: unknown }).layout;
+    const courseLayout: 'qr_focus' | 'info_focus' =
+      layoutRaw === 'info_focus' || layoutRaw === 'qr_focus' ? layoutRaw : 'qr_focus';
+
+    const placesRaw = (c as { placesRemaining?: unknown }).placesRemaining;
+    const placesRemaining =
+      typeof placesRaw === 'number' && Number.isFinite(placesRaw) ? placesRaw : null;
+
+    const course: NonNullable<CarouselItem['course']> = {
+      id: item.contentItem?.id ?? item.id ?? `sched-${index}`,
+      title: courseTitle,
+      // Default true so legacy/edge payloads without the flag still render.
+      available: (c as { available?: unknown }).available !== false,
+      enrolmentOpen: (c as { enrolmentOpen?: unknown }).enrolmentOpen === true,
+      enrollmentUrl,
+      shortDescription: optStr((c as { shortDescription?: unknown }).shortDescription),
+      description: optStr((c as { description?: unknown }).description),
+      scheduleText: optStr((c as { scheduleText?: unknown }).scheduleText),
+      durationLabel: optStr((c as { durationLabel?: unknown }).durationLabel),
+      feeLabel: optStr((c as { feeLabel?: unknown }).feeLabel),
+      isFree: (c as { isFree?: unknown }).isFree === true,
+      bannerImageUrl: optStr((c as { bannerImageUrl?: unknown }).bannerImageUrl),
+      color: optStr((c as { color?: unknown }).color),
+      instructionText: optStr((c as { instructionText?: unknown }).instructionText),
+      layout: courseLayout,
+      showCapacity: (c as { showCapacity?: unknown }).showCapacity === true,
+      placesRemaining,
+    };
+
+    return [
+      {
+        id: item.id ?? `sched-${index}`,
+        type: 'COURSE',
+        title: courseTitle,
+        duration: resolveItemDuration(item, c),
+        course,
+      },
+    ];
+  }
+
   // --- Single-item fallback (all other types, or ASMA_AL_HUSNA without a names array) ---
 
   // Title: for Asma ul Husna with a flat single-name payload, prefer meaning as heading
