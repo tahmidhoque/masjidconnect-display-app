@@ -36,6 +36,7 @@
  *   window.__devCyclePrayerDisplay()      — same as Ctrl+Shift+J
  *   window.__devToggleAdhanSupplication() — same as Ctrl+Shift+A
  *   window.__devToggleJamaatBlackout()    — same as Ctrl+Shift+B
+ *   window.__devCycleTomorrowChange()     — same as Ctrl+Alt+Shift+M
  *   window.__devTriggerVehiclePlateAlert() — same as Ctrl+Shift+V / Ctrl+Shift+8
  */
 
@@ -83,6 +84,8 @@ declare global {
     __devCyclePrayerDisplay?: () => void;
     __devToggleAdhanSupplication?: () => void;
     __devToggleJamaatBlackout?: () => void;
+    /** Console fallback — same effect as Ctrl+Alt+Shift+M */
+    __devCycleTomorrowChange?: () => void;
     /** Console fallback — same effect as Ctrl+Shift+V / Ctrl+Shift+8 */
     __devTriggerVehiclePlateAlert?: () => void;
   }
