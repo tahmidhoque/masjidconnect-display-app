@@ -156,6 +156,14 @@ export interface CarouselItem {
 
   /** COURSE: resolved course data + enrolment QR (hydrated by the API). */
   course?: CourseSlideData;
+
+  /**
+   * Slide presentation mode — `fullscreen` takes over the entire display
+   * (hides prayer panel, header and footer); `inline` stays within the
+   * carousel content area. Defaults to `inline` when absent.
+   * MEDIA_SLIDE and VIDEO use `mediaFit` instead (smart/cover = fullscreen).
+   */
+  displayMode?: 'fullscreen' | 'inline';
 }
 
 interface ContentCarouselProps {
@@ -406,6 +414,20 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     if (!isMediaSlide) return false;
     return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
   }, [isMediaSlide, isVideoSlide, currentItem, effectiveMediaFit]);
+
+  /**
+   * Non-media slides with displayMode: 'fullscreen' — the slide content
+   * (text, event, donation, course) takes over the entire display area via
+   * the same portal mechanism used by fullscreen media.
+   */
+  const isFullscreenContent = useMemo(() => {
+    if (!currentItem) return false;
+    if (isMediaSlide || isVideoSlide) return false;
+    return currentItem.displayMode === 'fullscreen';
+  }, [currentItem, isMediaSlide, isVideoSlide]);
+
+  /** Unified fullscreen flag — true when any slide type uses the portal overlay. */
+  const isFullscreen = isFullscreenMedia || isFullscreenContent;
 
   /** DONATION: fixed QR / thermometer layout — no typography fit loop. */
   const isDonationSlide = useMemo(
@@ -738,8 +760,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
     ? (typeof selectedName.number === 'number' ? `Name ${selectedName.number} of 99` : undefined)
     : item.source;
 
-  /** In-flow shell hidden while portal paints fullscreen media over prayer strip + footer. */
-  const slideEnterAnimation = isFullscreenMedia
+  /** In-flow shell hidden while portal paints fullscreen content over prayer strip + footer. */
+  const slideEnterAnimation = isFullscreen
     ? 'opacity-0 pointer-events-none'
     : isMediaLike
       ? phase === 'out'
@@ -800,12 +822,29 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       ? (document.getElementById('orientation-portal-root') ?? document.body)
       : null;
 
-  const fullscreenPortal =
+  const portalContentLayerClass =
+    phase === 'out'
+      ? 'animate-fade-out gpu-accelerated flex flex-1 min-h-0 flex-col overflow-hidden'
+      : phase === 'in' && isFitted
+        ? 'animate-fade-in gpu-accelerated flex flex-1 min-h-0 flex-col overflow-hidden'
+        : 'pointer-events-none opacity-0 gpu-accelerated flex flex-1 min-h-0 flex-col overflow-hidden';
+
+  const fullscreenPaginationBar = safeItems.length > 1 && (
+    <div
+      className="pointer-events-none absolute bottom-0 left-0 right-0 z-[9010] flex justify-center pb-4"
+      data-carousel-pagination="fullscreen"
+    >
+      <div className="pointer-events-none rounded-full border border-border/50 bg-midnight/95 px-4 py-2 shadow-[0_4px_20px_rgba(0,0,0,0.45)]">
+        {paginationDots}
+      </div>
+    </div>
+  );
+
+  const fullscreenMediaPortal =
     fullscreenPortalRoot &&
     isFullscreenMedia &&
     (item.mediaUrl || item.videoUrl) &&
     createPortal(
-      /* Do not add `relative` here: it overrides `fixed` in Tailwind and collapses the overlay (absolute children do not give the box height). z-[9000] is below emergency (9999) and WiFi (9998). */
       <div
         data-fullscreen-media-overlay=""
         className="fixed inset-0 z-[9000] flex min-h-0 w-full flex-col overflow-hidden bg-midnight gpu-accelerated"
@@ -871,27 +910,95 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
             </div>
           )}
         </div>
-        {safeItems.length > 1 && (
+        {fullscreenPaginationBar}
+      </div>,
+      fullscreenPortalRoot,
+    );
+
+  const fullscreenContentPortal =
+    fullscreenPortalRoot &&
+    isFullscreenContent &&
+    createPortal(
+      <div
+        data-fullscreen-content-overlay=""
+        className="fixed inset-0 z-[9000] flex min-h-0 w-full flex-col overflow-hidden bg-midnight gpu-accelerated"
+      >
+        <div
+          key={item.id}
+          ref={isFullscreenContent ? containerRef : undefined}
+          data-fullscreen-portal-content=""
+          className={portalContentLayerClass}
+          style={{ padding: 'clamp(1.5rem, 3vw, 3rem)' }}
+        >
           <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 z-[9010] flex justify-center pb-4"
-            data-carousel-pagination="fullscreen"
+            ref={isFullscreenContent ? contentRef : undefined}
+            className={`flex flex-1 min-h-0 flex-col ${needsScroll ? '' : 'justify-center'} ${isEventSlide || isDonationSlide || isCourseSlide ? '' : 'gap-4'}`}
+            style={safetyScale < 1 ? { transform: `scale(${safetyScale})`, transformOrigin: 'top center' } : undefined}
           >
-            <div className="pointer-events-none rounded-full border border-border/50 bg-midnight/95 px-4 py-2 shadow-[0_4px_20px_rgba(0,0,0,0.45)]">
-              {paginationDots}
-            </div>
+            {isEventSlide && item.event ? (
+              <Suspense fallback={null}>
+                <EventSlide event={item.event} compact={compact} />
+              </Suspense>
+            ) : isDonationSlide ? (
+              <Suspense fallback={null}>
+                <DonationSlide item={item} compact={compact} />
+              </Suspense>
+            ) : isCourseSlide && item.course ? (
+              <Suspense fallback={null}>
+                <CourseSlide course={item.course} compact={compact} />
+              </Suspense>
+            ) : (
+              <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col min-w-0 w-full">
+                <div
+                  ref={isFullscreenContent ? scrollRef : undefined}
+                  className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar' : ''}`}
+                >
+                  {item.imageUrl && (
+                    <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
+                      <img src={item.imageUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+                    </div>
+                  )}
+                  {displayTitle && <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>}
+                  {displayArabic && (
+                    <p className="arabic-text text-carousel-arabic text-gold leading-relaxed" style={{ textAlign: effectiveTextAlign }}>
+                      {displayArabic}
+                    </p>
+                  )}
+                  {item.transliteration && (
+                    <p className="text-carousel-body text-text-secondary leading-relaxed" dir="ltr">{item.transliteration}</p>
+                  )}
+                  {displayBody && (item.bodyIsHTML ? (
+                    <div
+                      className="text-carousel-body text-text-secondary leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayBody) }}
+                      dir="auto"
+                    />
+                  ) : (
+                    <p className="text-carousel-body text-text-secondary leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
+                      {displayBody}
+                    </p>
+                  ))}
+                  {displaySource && (
+                    <p className="text-carousel-body text-text-muted text-[0.9em] italic">— {displaySource}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+        {fullscreenPaginationBar}
       </div>,
       fullscreenPortalRoot,
     );
 
   return (
     <>
-      {fullscreenPortal}
+      {fullscreenMediaPortal}
+      {fullscreenContentPortal}
       <div className="relative flex h-full w-full flex-col overflow-hidden">
       {/* Measurement container — always clip; content adapts via font sizes */}
       <div
-        ref={containerRef}
+        ref={isFullscreenContent ? undefined : containerRef}
         className="flex-1 min-h-0 w-full overflow-hidden"
       >
         {/* Animated crossfade wrapper.
@@ -910,14 +1017,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         >
           {/* Content wrapper — when needsScroll, fills container so scroll region has constrained height. */}
           <div
-            ref={contentRef}
+            ref={isFullscreenContent ? undefined : contentRef}
             className={`flex flex-col min-w-0 w-full max-w-full ${needsScroll || isMediaLike || isDonationSlide ? 'flex-1 min-h-0' : 'flex-shrink-0'} ${isMediaLike ? '' : 'gap-4'}`}
             style={safetyScale < 1 ? {
               transform: `scale(${safetyScale})`,
               transformOrigin: 'top center',
             } : undefined}
           >
-            {isEventSlide && item.event ? (
+            {isFullscreenContent ? (
+              /* Fullscreen content renders in portal — inline placeholder only. */
+              <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
+            ) : isEventSlide && item.event ? (
               <Suspense fallback={null}>
                 <EventSlide event={item.event} compact={compact} />
               </Suspense>
@@ -1041,7 +1151,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       </div>
 
       {/* Pagination — in-flow when not viewport-fullscreen; fullscreen uses portal bar */}
-      {safeItems.length > 1 && !isFullscreenMedia && (
+      {safeItems.length > 1 && !isFullscreen && (
         <div className="shrink-0 flex items-center justify-center pt-1.5">
           {paginationDots}
         </div>

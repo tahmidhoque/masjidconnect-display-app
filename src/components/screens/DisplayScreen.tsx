@@ -101,6 +101,11 @@ function resolveItemDuration(item: any, content: any): number | undefined {
  * Supports common API shapes: body, description, message, text, and string content.
  * Exported for unit tests (DUA and other type mapping).
  */
+/** Extract displayMode from content blob — only non-media types use this. */
+function resolveDisplayMode(content: Record<string, unknown>): CarouselItem['displayMode'] {
+  return content.displayMode === 'fullscreen' ? 'fullscreen' : undefined;
+}
+
 export function scheduleItemToCarouselItems(item: any, index: number): CarouselItem[] {
   // Events V2: schedule item carries the full event object — render via EventSlide
   if (item.eventId && item.event && typeof item.event.startAt === 'string') {
@@ -195,10 +200,12 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
       content.asma;
 
     if (Array.isArray(namesArray) && namesArray.length > 0) {
+      const contentObj = typeof content === 'object' && content !== null ? content as Record<string, unknown> : {};
       return [{
         id: item.id ?? `sched-${index}`,
         type,
         duration: resolveItemDuration(item, content),
+        displayMode: resolveDisplayMode(contentObj),
         names: namesArray.map((name: any) => ({
           arabic:
             name.arabic ?? name.arabicName ?? name.arabic_name,
@@ -240,6 +247,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
       transliteration,
       source,
       duration: resolveItemDuration(item, contentObj),
+      displayMode: resolveDisplayMode(contentObj as Record<string, unknown>),
     }];
   }
 
@@ -328,6 +336,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
       ...(donationProvider !== undefined ? { donationProvider } : {}),
       donationShowProgress,
       donationCampaign,
+      displayMode: resolveDisplayMode(c as Record<string, unknown>),
     }];
   }
 
@@ -386,6 +395,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
         title: courseTitle,
         duration: resolveItemDuration(item, c),
         course,
+        displayMode: resolveDisplayMode(c as Record<string, unknown>),
       },
     ];
   }
@@ -451,6 +461,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
   const validTextAlign =
     textAlign === 'center' || textAlign === 'right' ? textAlign : undefined;
 
+  const contentRecord = typeof content === 'object' && content !== null ? content as Record<string, unknown> : {};
   return [{
     id: item.id ?? `sched-${index}`,
     type: typeof type === 'string' ? type : 'Content',
@@ -463,6 +474,7 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     source: content.source ?? content.reference,
     imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
     duration: resolveItemDuration(item, content),
+    displayMode: resolveDisplayMode(contentRecord),
   }];
 }
 
