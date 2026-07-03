@@ -17,7 +17,7 @@ import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn, execSync } from 'node:child_process';
+import { spawn, spawnSync, execSync } from 'node:child_process';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const APP_DIR = resolve(__dirname, '..');
@@ -81,6 +81,26 @@ function nmcli(args, opts = {}) {
     if (opts.allowFail) return '';
     throw e;
   }
+}
+
+/**
+ * nmcli with an argv array — no shell involved, so SSIDs and passwords
+ * containing quotes, $, backticks, spaces, etc. are passed through verbatim.
+ * MUST be used for anything that embeds user input (connect, forget).
+ */
+function nmcliArgs(argv, opts = {}) {
+  const isConnectOp = argv.includes('connect') || (argv[0] === 'con' && argv[1] === 'up');
+  const timeout = opts.timeout ?? (isConnectOp ? 90_000 : 15_000);
+  const r = spawnSync('sudo', ['/usr/bin/nmcli', ...argv], {
+    encoding: 'utf8',
+    timeout,
+    env: { ...process.env, PATH: SYSTEM_PATH },
+  });
+  if (r.error || r.status !== 0) {
+    if (opts.allowFail) return '';
+    throw (r.error || new Error((r.stderr || `nmcli exited with status ${r.status}`).trim()));
+  }
+  return (r.stdout || '').trim();
 }
 
 /**
@@ -176,7 +196,12 @@ function parseNmcliWifiList(raw) {
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     // nmcli -t uses : as separator; SSIDs with colons are escaped with \\:
-    const parts = line.replace(/\\:/g, '\x00').split(':').map(p => p.replace(/\x00/g, ':'));
+    // Private-use sentinel so SSID colons (escaped as \:) never collide with field separators.
+    const NMCLI_COLON_SENTINEL = '\uFFFE';
+    const parts = line
+      .replace(/\\:/g, NMCLI_COLON_SENTINEL)
+      .split(':')
+      .map(p => p.replaceAll(NMCLI_COLON_SENTINEL, ':'));
     const ssid = (parts[0] || '').trim();
     if (!ssid || seen.has(ssid)) continue;
     seen.add(ssid);
@@ -236,7 +261,7 @@ function getWifiScan() {
 /**
  * Connect to a WiFi network using nmcli.
  */
-function connectWifi(ssid, password, security) {
+function connectWifi(ssid, password) {
   if (!ssid || typeof ssid !== 'string') {
     return { success: false, error: 'SSID is required' };
   }
@@ -247,14 +272,14 @@ function connectWifi(ssid, password, security) {
     for (const line of existing.split('\n')) {
       const [name, type] = line.split(':');
       if (type === '802-11-wireless' && name === ssid) {
-        nmcli(`con delete "${name}"`, { allowFail: true });
+        nmcliArgs(['con', 'delete', name], { allowFail: true });
       }
     }
 
     if (password && password.length > 0) {
-      nmcli(`dev wifi connect "${ssid}" password "${password}" ifname wlan0`);
+      nmcliArgs(['dev', 'wifi', 'connect', ssid, 'password', password, 'ifname', 'wlan0']);
     } else {
-      nmcli(`dev wifi connect "${ssid}" ifname wlan0`);
+      nmcliArgs(['dev', 'wifi', 'connect', ssid, 'ifname', 'wlan0']);
     }
 
     return { success: true, message: `Connected to ${ssid}` };
@@ -267,9 +292,9 @@ function connectWifi(ssid, password, security) {
  * Forget (delete) a saved WiFi connection profile.
  */
 function forgetWifi(name) {
-  if (!name) return { success: false, error: 'Connection name is required' };
+  if (!name || typeof name !== 'string') return { success: false, error: 'Connection name is required' };
   try {
-    nmcli(`con delete "${name}"`);
+    nmcliArgs(['con', 'delete', name]);
     return { success: true };
   } catch (e) {
     return { success: false, error: `Failed to forget: ${(e.message || String(e)).slice(0, 200)}` };
@@ -409,8 +434,8 @@ const server = createServer((req, res) => {
       req.on('data', (chunk) => { body += chunk; });
       req.on('end', () => {
         try {
-          const { ssid, password, security } = JSON.parse(body || '{}');
-          const result = connectWifi(ssid, password, security);
+          const { ssid, password } = JSON.parse(body || '{}');
+          const result = connectWifi(ssid, password);
           res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(result));
         } catch (e) {

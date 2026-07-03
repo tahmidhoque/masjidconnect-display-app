@@ -1,0 +1,5 @@
+# Start the RTC → system clock sync the moment the RTC device appears.
+# The Pi 5's built-in RTC driver loads asynchronously — a service that runs
+# only at sysinit checks for /dev/rtc0 before udev has created it and skips.
+# On Pi 3/4 (no RTC) this rule simply never fires.
+ACTION=="add", SUBSYSTEM=="rtc", KERNEL=="rtc0", TAG+="systemd", ENV{SYSTEMD_WANTS}+="masjidconnect-rtc-sync.service"

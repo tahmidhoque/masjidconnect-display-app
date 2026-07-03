@@ -203,80 +203,23 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
   # Update marker when we have connectivity (e.g. forced setup with working network)
   have_connectivity && mark_wifi_connected
 
-  # State machine: first-run (serial) vs known-wifi-offline (parallel)
-  KNOWN_WIFI_OFFLINE=false
   if [ "$FORCE_WIFI_SETUP" = false ] && known_wifi_offline; then
-    KNOWN_WIFI_OFFLINE=true
-    log "Known Wi-Fi offline — parallel path (display + background hotspot)"
-  fi
-
-  # ------------------------------------------------------------------
-  # PARALLEL PATH: known wifi worked before, now offline. Start display
-  # immediately with stale content; run hotspot in background so user
-  # can reconnect from phone without blocking the screen.
-  # ------------------------------------------------------------------
-  if [ "$KNOWN_WIFI_OFFLINE" = true ]; then
-    rfkill unblock wifi 2>/dev/null || true
-    rfkill unblock wlan 2>/dev/null || true
-    rfkill unblock all  2>/dev/null || true
-    sleep 1
-
-    WLAN_IFACE=$(iw dev 2>/dev/null | awk '/^\tInterface / {print $2; exit}')
-    [ -z "$WLAN_IFACE" ] && WLAN_IFACE=$(ls -d /sys/class/net/wlan* 2>/dev/null | head -1 | xargs basename)
-    [ -z "$WLAN_IFACE" ] && WLAN_IFACE=$(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -E '^(wlan|wlp|wlx)' | head -1)
-
-    if [ -n "$WLAN_IFACE" ] && [ -f "$HOTSPOT_SCRIPT" ] && [ -f "$WIFI_SETUP_SERVER" ]; then
-      export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
-      log "Parallel: WiFi offline — deferring hotspot; giving NM 60s to reconnect"
-      touch "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
-      (
-        # Wait up to 60s for NetworkManager to finish authenticating.
-        # 5GHz auth + DHCP can take 15–30s; this avoids switching to AP mode
-        # prematurely which would interrupt an in-progress connection.
-        for deferred_check in $(seq 1 30); do
-          if have_connectivity; then
-            log "Parallel: WiFi recovered after $((deferred_check * 2))s — hotspot not needed"
-            mkdir -p "$WIFI_STATE_DIR" 2>/dev/null || true
-            touch "$WIFI_CONNECTED_MARKER" 2>/dev/null || true
-            rm -f "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
-            exit 0
-          fi
-          sleep 2
-        done
-        log "Parallel: WiFi not recovered after 60s — starting hotspot on $WLAN_IFACE"
-        # Set per-PHY regulatory domain before hotspot start (brcmfmac CLM fix)
-        REGDOM="${WIFI_COUNTRY:-GB}"
-        iw reg set "$REGDOM" 2>/dev/null || true
-        _PHY=$(iw dev "$WLAN_IFACE" info 2>/dev/null | awk '/wiphy/ {print "phy" $2}' || echo "phy0")
-        iw phy "$_PHY" reg set "$REGDOM" 2>/dev/null || true
-        sleep 1
-        sudo "$HOTSPOT_SCRIPT" scan "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
-        sudo "$HOTSPOT_SCRIPT" start "$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1 || true
-        sleep 1
-        sudo "$WIFI_SETUP_SERVER" --ap-mode --iface="$WLAN_IFACE" >>"$KIOSK_LOG" 2>&1
-      ) &
-      log "Parallel: deferred hotspot launcher running in background"
-    else
-      log "Parallel: no wlan interface, skipping background hotspot"
-      rm -f "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
-    fi
-    # Fall through to main kiosk launch — do not wait for connectivity
+    # ------------------------------------------------------------------
+    # Known Wi-Fi, temporarily offline: start the display immediately with
+    # cached content. The Wi-Fi watchdog service owns runtime recovery — it
+    # retries the saved connection and brings up the setup hotspot if the
+    # outage persists; the app shows the hotspot instructions banner.
+    # ------------------------------------------------------------------
+    log "Known Wi-Fi offline — starting display; watchdog handles recovery/hotspot"
   else
   # ------------------------------------------------------------------
-  # SERIAL PATH: first run or no known wifi. Block until setup complete.
+  # FIRST-RUN SETUP: no network has ever worked on this device. Block on
+  # the full-screen setup UI until the user connects (or explicitly skips).
   # ------------------------------------------------------------------
-  # RPi 4 and RPi 5: unblock rfkill FIRST. On RPi 5 the built-in Wi-Fi
-  # (CYW43455 over PCIe) is often soft-blocked until explicitly unblocked,
-  # which prevents iw/ip from showing any wireless interface.
-  # ------------------------------------------------------------------
-  rfkill unblock wifi 2>/dev/null || true
-  rfkill unblock wlan 2>/dev/null || true
-  rfkill unblock all  2>/dev/null || true
-  sleep 1
-
-  # Find the wireless interface. iw dev lists all; also fall back to scanning
-  # /sys/class/net for any interface the kernel exposes as type "wlan".
-  # Retry for up to 30 s (RPi 5 driver can be slow to register after unblock).
+  # Find the wireless interface. Blocked/rfkilled radios still appear in
+  # iw dev, so detection works even before the hotspot script (running as
+  # root) unblocks rfkill. Retry for up to 30 s (RPi 5 driver can be slow
+  # to register).
   HAS_WLAN=false
   WLAN_IFACE=""
 
@@ -326,45 +269,24 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
     export WIFI_HOTSPOT_IFACE="$WLAN_IFACE"
     log "Using interface: $WIFI_HOTSPOT_IFACE"
 
-    # Detailed NM diagnostics before AP startup — captures the state that determines
+    # Diagnostics before AP startup — captures the state that determines
     # whether the hotspot will work. Visible via: cat /tmp/kiosk.log
+    # (rfkill unblock and regulatory-domain setup need root; the hotspot
+    # script does both internally, so no sudo-less attempts here.)
     log "NM pre-hotspot diagnostics:"
     log "  NM active: $(systemctl is-active NetworkManager 2>/dev/null || echo 'not-running')"
     log "  wpa_supplicant enabled: $(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo 'unknown')"
     log "  device state: $(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | grep -E "(${WIFI_HOTSPOT_IFACE}|wifi)" | tr '\n' '|' || echo 'unavailable')"
-    log "  NM managed: $(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep "^${WIFI_HOTSPOT_IFACE}:" | cut -d: -f2 || echo 'unavailable')"
-    log "  networkd active: $(systemctl is-active systemd-networkd 2>/dev/null || echo 'not-running')"
     log "  reg domain: $(iw reg get 2>/dev/null | grep 'country' | head -1 || echo 'unavailable')"
 
-    # Set regulatory domain before starting the hotspot.
-    # brcmfmac (Broadcom WiFi on RPi) requires BOTH steps:
-    #   1. `iw reg set GB`     — kernel cfg80211 regulatory domain
-    #   2. `iw phy phy0 reg set GB` — per-PHY nl80211 command that propagates into
-    #      the brcmfmac firmware CLM (Country Locale Matrix). Without this the CLM
-    #      stays at country 99 ("unset"), disabling AP beacon transmission silently.
-    REGDOM="${WIFI_COUNTRY:-GB}"
-    iw reg set "$REGDOM" 2>/dev/null || true
-    PHY_NAME=$(iw dev "$WIFI_HOTSPOT_IFACE" info 2>/dev/null | awk '/wiphy/ {print "phy" $2}' || echo "phy0")
-    if iw phy "$PHY_NAME" reg set "$REGDOM" 2>/dev/null; then
-      log "Per-PHY (${PHY_NAME}) CLM set to ${REGDOM}"
-    else
-      log "iw phy reg set failed (non-fatal) — will retry inside hotspot script"
-    fi
-    sleep 1
-    log "  reg domain after set: $(iw reg get 2>/dev/null | tr '\n' ' ' || echo 'unavailable')"
-
-    # Warn on known failure conditions so they appear in logs before the hotspot fails
-    WPA_STATE=$(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo "unknown")
-    if [ "$WPA_STATE" = "masked" ]; then
-      log "WARNING: wpa_supplicant.service is masked — AP mode will FAIL. Attempting unmask..."
-      systemctl unmask wpa_supplicant.service 2>/dev/null || true
-    fi
     IFACE_MANAGED=$(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep "^${WIFI_HOTSPOT_IFACE}:" | cut -d: -f2 || echo "")
     if [ "${IFACE_MANAGED}" = "unmanaged" ]; then
       log "WARNING: ${WIFI_HOTSPOT_IFACE} is unmanaged by NM — attempting to set managed..."
       nmcli device set "$WIFI_HOTSPOT_IFACE" managed yes 2>/dev/null || true
       sleep 2
     fi
+
+    touch "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
 
     log "Pre-scanning networks..."
     sudo "$HOTSPOT_SCRIPT" scan "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 \
@@ -388,7 +310,6 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
       log "  NM devices: $(nmcli -t -f DEVICE,TYPE,STATE,CONNECTION dev 2>/dev/null | tr '\n' '|' || echo 'unavailable')"
       log "  NM general: $(nmcli general status 2>/dev/null | head -4 | tr '\n' '|' || echo 'unavailable')"
       log "  wpa_supplicant: $(systemctl is-enabled wpa_supplicant.service 2>/dev/null || echo 'unknown') / active=$(systemctl is-active wpa_supplicant.service 2>/dev/null || echo 'unknown')"
-      log "  networkd: $(systemctl is-active systemd-networkd 2>/dev/null || echo 'not-running')"
       log "  HINT: Ctrl+Alt+F2 for a debug console. Run: cat /tmp/kiosk.log | grep -i error"
     fi
     sleep 1
@@ -415,11 +336,15 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
       log "Instructions page (Chromium PID=$INSTRUCTIONS_PID)"
     fi
 
-    log "Waiting for Wi-Fi config (timeout 300s)..."
-    for i in $(seq 1 300); do
+    # Wait until the device is configured or the user explicitly skips.
+    # No timeout: a first-run device with no network cannot do anything
+    # useful, and the old 300 s cut-off stranded users mid-setup (hotspot
+    # torn down with no way back except a power cycle).
+    log "Waiting for Wi-Fi config (no timeout — Skip button on the setup page exits)..."
+    while true; do
       [ -f "$WIFI_FLAG" ] && { log "Flag file set"; break; }
       have_connectivity && { log "Connectivity detected"; break; }
-      sleep 1
+      sleep 2
     done
 
     # Keep INSTRUCTIONS_PID alive — we kill it just before the main kiosk
@@ -432,6 +357,7 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
     fi
     sudo "$HOTSPOT_SCRIPT" stop "$WIFI_HOTSPOT_IFACE" >>"$KIOSK_LOG" 2>&1 || true
     rm -f "$WIFI_FLAG"
+    rm -f "$WIFI_HOTSPOT_ACTIVE_MARKER" 2>/dev/null || true
 
     if ! have_connectivity; then
       log "Waiting for network after AP teardown..."
@@ -463,10 +389,11 @@ if [ "$FORCE_WIFI_SETUP" = true ] || [ "$BOOT_CONNECTIVITY" = false ]; then
         "${HOME:-/tmp}/.config/chromium-wifi-setup")
       log "No-Wi-Fi screen (Chromium PID=$NOWIFI_PID)"
 
-      for i in $(seq 1 300); do
+      # Wait until Ethernet is plugged in or the user presses "Continue".
+      while true; do
         [ -f "$WIFI_FLAG" ] && break
         have_connectivity && break
-        sleep 1
+        sleep 2
       done
 
       # Keep NOWIFI_PID alive for the same reason as INSTRUCTIONS_PID above.

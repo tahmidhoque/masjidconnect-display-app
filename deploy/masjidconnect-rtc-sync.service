@@ -1,37 +1,48 @@
 # =============================================================================
 # MasjidConnect RTC Hardware Clock Sync (Raspberry Pi 5)
 #
-# The Raspberry Pi 5 has a built-in PCF85063A RTC chip. When enabled via
-# dtoverlay=i2c-rtc,pcf85063 in config.txt, it appears as /dev/rtc0.
+# The Raspberry Pi 5 has a built-in RTC (on the PMIC, enabled by default in
+# the device tree — no dtoverlay needed). It appears as /dev/rtc0 once the
+# kernel driver loads. Fit the official RTC battery to keep time across
+# power-off; without it the RTC is only valid across reboots.
 #
-# This service reads the hardware RTC and sets the system clock from it early
-# in boot — before systemd-timesyncd has had a chance to connect to NTP.
-# This ensures prayer times are accurate immediately on boot even without
-# internet, because the RTC has kept time since the last NTP sync.
+# This service reads the hardware RTC and sets the system clock from it —
+# so prayer times are accurate immediately on boot even without internet.
 #
-# ConditionPathExists=/dev/rtc0 means this service is a no-op on
-# Raspberry Pi 3 and Pi 4 (which have no hardware RTC).
+# It is started by udev the moment /dev/rtc0 appears (see
+# /etc/udev/rules.d/99-masjidconnect-rtc.rules) — NOT only at sysinit, where
+# the RTC device usually does not exist yet and a ConditionPathExists check
+# would silently skip. On Pi 3/4 (no RTC) the udev rule never fires.
+#
+# Guard: the RTC time is only applied if it is AHEAD of the current system
+# clock. A battery-less RTC after power loss reads ~epoch and must not
+# clobber the (better) fake-hwclock restored time; a valid RTC is always
+# ahead of fake-hwclock's last saved timestamp.
+#
+# Requires hwclock from the util-linux-extra package (NOT in util-linux on
+# Debian Bookworm — a missing package here means the RTC is never read).
 #
 # After NTP synchronises the system clock, the Linux kernel automatically
-# writes the corrected time back to the RTC every 11 minutes via its
-# built-in "11-minute mode" (STA_SYNCHRONIZED flag in adjtimex).
+# writes the corrected time back to the RTC every 11 minutes ("11-minute
+# mode"), so the RTC stays accurate for the next offline boot.
 # =============================================================================
 
 [Unit]
 Description=MasjidConnect RTC Hardware Clock Sync
-# Only run when the RTC device is present (Raspberry Pi 5 only)
 ConditionPathExists=/dev/rtc0
 DefaultDependencies=no
-# Run before time-dependent services so they get accurate time
-Before=systemd-timesyncd.service time-sync.target sysinit.target
-# Run after the local filesystem is mounted and udev has finished creating device nodes
-After=local-fs.target systemd-udevd.service
+# When started during early boot, run before time-dependent services.
+# When started later by udev, these orderings are simply no-ops.
+Before=systemd-timesyncd.service time-sync.target
+After=local-fs.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=no
-TimeoutStartSec=10
-ExecStart=/bin/bash -c 'hwclock --hctosys --rtc=/dev/rtc0 && echo "[masjidconnect-rtc-sync] System clock set from RTC: $(date)"'
+TimeoutStartSec=15
+# Logic lives in a script — systemd's own $ / ${} expansion in ExecStart
+# makes inline shell here fragile.
+ExecStart=/bin/bash /opt/masjidconnect/deploy/rtc-sync.sh /dev/rtc0
 StandardOutput=journal
 StandardError=journal
 

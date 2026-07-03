@@ -1,0 +1,18 @@
+# =============================================================================
+# MasjidConnect HTTPS Time Fallback — timer
+#
+# Runs shortly after boot (giving NTP a head start) and every 15 minutes.
+# The service exits immediately when NTP is already synchronised, so this is
+# a no-op on healthy networks.
+# =============================================================================
+
+[Unit]
+Description=Periodic HTTPS time fallback check
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

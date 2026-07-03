@@ -44,6 +44,10 @@ log_err() { echo "$(date '+%Y-%m-%d %H:%M:%S') [wifi-hotspot] ERROR: $*"  | tee 
 do_scan() {
   log "Scanning for networks on ${IFACE}..."
 
+  # Unblock any rfkill soft-block first — a blocked radio scans nothing.
+  rfkill unblock wifi 2>/dev/null || true
+  rfkill unblock wlan 2>/dev/null || true
+
   # Set regulatory domain before scanning.
   # Without the per-PHY set, brcmfmac CLM stays at country 99 which restricts
   # visible channels — many 2.4 GHz networks will be hidden from scan results.
@@ -174,6 +178,24 @@ do_start() {
       || log "iw phy reg set failed (non-fatal)"
     sleep 1
     log "Regulatory state after set: $(iw reg get 2>/dev/null | tr '\n' ' ' || echo unavailable)"
+  fi
+
+  # ---------------------------------------------------------------------------
+  # Captive portal DNS: NM's shared-mode dnsmasq reads this conf-dir. Resolving
+  # every hostname to the AP address makes phone captive-portal probes hit the
+  # setup server, so the sign-in sheet opens automatically on connect.
+  # Written here (not only at image build) so devices updated over the air get
+  # the fix without reflashing. Only consulted while a shared connection is up.
+  # ---------------------------------------------------------------------------
+  local CAPTIVE_CONF="/etc/NetworkManager/dnsmasq-shared.d/00-masjidconnect-captive.conf"
+  if [ ! -f "$CAPTIVE_CONF" ]; then
+    mkdir -p /etc/NetworkManager/dnsmasq-shared.d 2>/dev/null || true
+    printf '%s\n' \
+      '# MasjidConnect setup hotspot: answer all DNS queries with the AP address' \
+      '# so captive-portal detection opens the WiFi setup page automatically.' \
+      "address=/#/${AP_IP}" \
+      > "$CAPTIVE_CONF" 2>/dev/null && log "Captive-portal DNS conf written" \
+      || log "Could not write captive-portal DNS conf (non-fatal)"
   fi
 
   # ---------------------------------------------------------------------------

@@ -1,0 +1,17 @@
+# =============================================================================
+# MasjidConnect HTTPS Time Fallback — service (run by the matching .timer)
+#
+# Steps the system clock from the portal's HTTPS Date header when NTP is
+# blocked/unsynchronised. See deploy/http-time-sync.sh for details.
+# =============================================================================
+
+[Unit]
+Description=MasjidConnect HTTPS time fallback (when NTP is blocked)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/masjidconnect/deploy/http-time-sync.sh
+StandardOutput=journal
+StandardError=journal

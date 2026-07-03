@@ -71,6 +71,22 @@ const DEV = process.env.WIFI_SETUP_DEV === '1' || process.env.WIFI_SETUP_DEV ===
 let connectingInProgress = false;
 let lastConnectError = '';
 
+/**
+ * WiFi regulatory domain. Starts from the build default and is updated with
+ * the country the user submits on the setup form, so devices shipped with a
+ * GB image work correctly in other countries.
+ */
+let wifiCountry = (process.env.WIFI_COUNTRY || 'GB').toUpperCase();
+
+/**
+ * Touched on every API request. The WiFi watchdog checks this file's mtime so
+ * it never recycles the hotspot while someone is actively using the setup page.
+ */
+const ACTIVITY_FILE = '/tmp/masjidconnect-wifi-setup-activity';
+function touchActivity() {
+  try { writeFileSync(ACTIVITY_FILE, String(Date.now())); } catch { /* non-fatal */ }
+}
+
 function send(res, status, body, contentType = 'application/json') {
   res.writeHead(status, {
     'Content-Type': contentType,
@@ -118,6 +134,21 @@ function run(cmd, opts = {}) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Apply the WiFi regulatory domain at kernel and firmware (CLM) level.
+ * brcmfmac needs the per-PHY command too — without it the firmware CLM stays
+ * at country 99 which restricts channels and disables AP transmission.
+ */
+function applyRegDomain() {
+  run(`iw reg set ${wifiCountry} 2>/dev/null`, { allowFail: true });
+  run(
+    'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
+    `  iw phy "$phy" reg set ${wifiCountry} 2>/dev/null || true; ` +
+    'done',
+    { allowFail: true },
+  );
 }
 
 /** GET /api/scan — list SSIDs. In AP mode, reads from the pre-scan cache. */
@@ -227,12 +258,17 @@ function checkConnectivity() {
 
 /** POST /api/connect — create NetworkManager profile and connect */
 function handleConnect(body) {
-  const { ssid, password = '' } = body;
+  const { ssid, password = '', country = '' } = body;
   if (!ssid || typeof ssid !== 'string' || !ssid.trim()) {
     return { ok: false, error: 'Please select or enter a network name' };
   }
   if (DEV) {
     return { ok: true, _dev: true };
+  }
+  // Honour the country the user picked — regulatory domain affects which
+  // channels station mode may use (and AP broadcast on hotspot restart).
+  if (typeof country === 'string' && /^[A-Za-z]{2}$/.test(country.trim())) {
+    wifiCountry = country.trim().toUpperCase();
   }
   const pass = typeof password === 'string' ? password : String(password || '').trim();
   const ssidTrimmed = ssid.trim();
@@ -311,17 +347,10 @@ async function apModeConnectAsync() {
     await sleep(1000);
 
     // 2. Re-apply regulatory domain at kernel and firmware (CLM) level.
-    //    brcmfmac resets its CLM country during mode transitions; re-applying GB
+    //    brcmfmac resets its CLM country during mode transitions; re-applying it
     //    here ensures station-mode authentication works on 2.4 GHz channels.
-    run('iw reg set GB 2>/dev/null', { allowFail: true });
-    // Apply to all phys (avoids hardcoding phy0 on multi-radio devices)
-    run(
-      'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
-      '  iw phy "$phy" reg set GB 2>/dev/null || true; ' +
-      'done',
-      { allowFail: true },
-    );
-    process.stderr.write('[wifi-setup] Regulatory domain re-applied (GB)\n');
+    applyRegDomain();
+    process.stderr.write(`[wifi-setup] Regulatory domain re-applied (${wifiCountry})\n`);
     await sleep(1000);
 
     // 3. Wait for the interface to leave AP mode and reach a connectable state.
@@ -393,14 +422,9 @@ async function apModeConnectAsync() {
       writeFileSync(CONNECT_STATUS_FILE, JSON.stringify({ connected: false, error: lastConnectError }));
 
       // Re-apply regulatory domain before restarting AP (required for broadcast)
-      run('iw reg set GB 2>/dev/null', { allowFail: true });
-      run(
-        'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
-        '  iw phy "$phy" reg set GB 2>/dev/null || true; ' +
-        'done',
-        { allowFail: true },
-      );
+      applyRegDomain();
       await sleep(500);
+      process.env.WIFI_COUNTRY = wifiCountry;
       run(`${HOTSPOT_SCRIPT} scan ${IFACE}`, { allowFail: true });
       await sleep(500);
       run(`${HOTSPOT_SCRIPT} start ${IFACE}`, { allowFail: true });
@@ -412,13 +436,8 @@ async function apModeConnectAsync() {
 
     // Best-effort AP restart so the user isn't left with nothing
     try {
-      run('iw reg set GB 2>/dev/null', { allowFail: true });
-      run(
-        'for phy in $(ls /sys/class/ieee80211/ 2>/dev/null); do ' +
-        '  iw phy "$phy" reg set GB 2>/dev/null || true; ' +
-        'done',
-        { allowFail: true },
-      );
+      applyRegDomain();
+      process.env.WIFI_COUNTRY = wifiCountry;
       run(`${HOTSPOT_SCRIPT} start ${IFACE}`, { allowFail: true });
     } catch { /* best effort */ }
   }
@@ -909,6 +928,13 @@ function isCaptivePortalProbe(pathname) {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${HOST}:${PORT}`);
   const pathname = url.pathname;
+
+  // Record setup activity (API calls only — captive-portal probes and the Pi's
+  // own instructions page polling must not count as user activity, or the
+  // watchdog would never recycle an unused hotspot).
+  if (pathname.startsWith('/api/') && pathname !== '/api/status') {
+    touchActivity();
+  }
 
   // Captive portal probes — redirect to setup page (AP mode only)
   if (AP_MODE && isCaptivePortalProbe(pathname)) {

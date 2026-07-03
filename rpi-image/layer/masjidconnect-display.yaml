@@ -12,7 +12,7 @@
 # X-Env-Var-wifi_ssid: Optional. WiFi SSID to bake into image (or use wifi.conf in source root).
 # X-Env-Var-wifi_password: Optional. WiFi passphrase (or use wifi.conf).
 # X-Env-Var-wifi_country: Optional. Two-letter country code (e.g. GB). Default GB.
-# X-Env-Var-timezone: Optional. IANA timezone (e.g. Europe/London, America/New_York). Default UTC.
+# X-Env-Var-timezone: Optional. IANA timezone (e.g. Europe/London, America/New_York). Default Europe/London.
 # X-Env-Var-timezone-Desc: Sets the system timezone so DST is applied correctly. Overridable at runtime via TIMEZONE= in /boot/firmware/masjidconnect-wifi.conf.
 # METAEND
 ---
@@ -25,6 +25,10 @@ mmdebstrap:
     - curl
     - ca-certificates
     - plymouth
+    # plymouth-themes provides the "script" plugin (script.so) used by the
+    # custom masjidconnect boot splash theme. Without it plymouth-set-default-theme
+    # fails and the boot shows a blank/text boot instead of the branded splash.
+    - plymouth-themes
     - initramfs-tools
     - xserver-xorg-core
     - xserver-xorg
@@ -48,6 +52,9 @@ mmdebstrap:
     - raspi-config
     - tzdata
     - fake-hwclock
+    # hwclock lives in util-linux-extra on Bookworm (NOT util-linux). Without it
+    # the RTC sync service fails 203/EXEC and the Pi 5 RTC is never read.
+    - util-linux-extra
     - dnsmasq
   customize-hooks:
     # Install Node.js 20 from NodeSource (build host needs network)
@@ -102,10 +109,20 @@ mmdebstrap:
         grep -q "^gpu_mem=" "$CFG" && sed -i 's/^gpu_mem=.*/gpu_mem=128/' "$CFG" || echo "gpu_mem=128" >> "$CFG"
         grep -q "^disable_splash=" "$CFG" || echo "disable_splash=1" >> "$CFG"
         grep -q "^disable_overscan=" "$CFG" && sed -i 's/^disable_overscan=.*/disable_overscan=1/' "$CFG" || echo "disable_overscan=1" >> "$CFG"
+        # Pi 5 RTC battery: if units ship with the official RECHARGEABLE RTC
+        # battery, uncomment the following line on the flashed SD card to
+        # enable trickle charging (do NOT enable for non-rechargeable cells).
+        grep -q "rtc_bbat_vchg" "$CFG" || printf '%s\n' '# Uncomment to trickle-charge a rechargeable Pi 5 RTC battery:' '#dtparam=rtc_bbat_vchg=3000000' >> "$CFG"
       fi
     # Disable HDMI overscan (KMS) so display is not cut off on TVs
     - chroot $1 raspi-config nonint do_overscan_kms 1 1 || true
-    # Silent boot: redirect console to tty2 so no kernel/init text on tty1 (X11 kiosk uses tty1).
+    # Silent, branded boot:
+    #   quiet loglevel=0 logo.nologo    — no kernel messages or Tux logo
+    #   console=tty2                    — kernel/init text goes to tty2, not the kiosk VT
+    #   vt.global_cursor_default=0      — no blinking cursor on the VT
+    #   splash plymouth.ignore-serial-consoles — REQUIRED for Plymouth to show the
+    #     branded splash at all (without "splash" Plymouth never starts)
+    #   systemd.show_status=false       — no "[ OK ] Started ..." lines even on slow units
     # POSIX sh — mmdebstrap hooks run with sh, not bash, so no [[ ]] or bash-isms.
     - |
       CMDLINE="$1/boot/firmware/cmdline.txt"
@@ -113,7 +130,7 @@ mmdebstrap:
       if [ -f "$CMDLINE" ]; then
         line=$(cat "$CMDLINE")
         REGDOM="${IGconf_masjidconnect_wifi_country:-GB}"
-        for param in quiet loglevel=0 logo.nologo console=tty2 vt.global_cursor_default=0 "cfg80211.ieee80211_regdom=${REGDOM}"; do
+        for param in quiet loglevel=0 logo.nologo console=tty2 vt.global_cursor_default=0 splash plymouth.ignore-serial-consoles systemd.show_status=false "cfg80211.ieee80211_regdom=${REGDOM}"; do
           case " $line " in
             *" $param "*) ;;
             *) line="$line $param" ;;
@@ -136,9 +153,15 @@ mmdebstrap:
         LINE="auth sufficient pam_succeed_if.so user = $U tty = tty1"
         grep -qF "pam_succeed_if.so user = $U tty = tty1" "$1/etc/pam.d/login" || { echo "$LINE" | cat - "$1/etc/pam.d/login" > "$1/etc/pam.d/login.tmp" && mv "$1/etc/pam.d/login.tmp" "$1/etc/pam.d/login"; }
       fi
-    # Append kiosk start to UID 1000 .profile (console tty1 only)
+    # Append kiosk start to UID 1000 .profile (console tty1 only).
+    # No `clear` — that would wipe the retained Plymouth splash frame and flash a
+    # black screen; X11 repaints the display itself when it starts.
     - |
-      chroot "$1" /bin/bash -c 'H=$(getent passwd 1000 | cut -d: -f6); [ -n "$H" ] && { touch "$H/.profile"; echo "" >> "$H/.profile"; echo "# MasjidConnect kiosk (console only — clear screen and hide cursor before launching X)" >> "$H/.profile"; echo "[ \"\$(tty)\" = \"/dev/tty1\" ] 2>/dev/null && { clear; setterm --cursor off 2>/dev/null; exec /opt/masjidconnect/deploy/start-kiosk-x11.sh; }" >> "$H/.profile"; chown 1000:1000 "$H/.profile"; }'
+      chroot "$1" /bin/bash -c 'H=$(getent passwd 1000 | cut -d: -f6); [ -n "$H" ] && { touch "$H/.profile"; echo "" >> "$H/.profile"; echo "# MasjidConnect kiosk (console only — hide cursor and launch X over the retained splash)" >> "$H/.profile"; echo "[ \"\$(tty)\" = \"/dev/tty1\" ] 2>/dev/null && { setterm --cursor off 2>/dev/null; exec /opt/masjidconnect/deploy/start-kiosk-x11.sh; }" >> "$H/.profile"; chown 1000:1000 "$H/.profile"; }'
+    # .hushlogin suppresses the "Last login: ..." line and motd that login(1)
+    # would otherwise print on the kiosk VT during autologin.
+    - |
+      chroot "$1" /bin/bash -c 'H=$(getent passwd 1000 | cut -d: -f6); [ -n "$H" ] && { touch "$H/.hushlogin"; chown 1000:1000 "$H/.hushlogin"; }'
     # Enable getty@tty2 for debug access (Ctrl+Alt+F2 on a keyboard connected to the Pi).
     # The kernel console is redirected to tty2 via console=tty2 in cmdline.txt, so this
     # gives a login shell for running nmcli, reading /tmp/kiosk.log, etc. when the hotspot
@@ -171,9 +194,10 @@ mmdebstrap:
         'plugins=keyfile' \
         '# Do not honour /etc/network/interfaces — NM manages everything' \
         'no-auto-default=*' \
-        '# Use NM built-in DHCP server for ipv4.method=shared (AP/hotspot mode).' \
-        '# Avoids spawning a separate dnsmasq process which can fail if port 67/53' \
-        '# is already in use or the dnsmasq binary is missing/masked.' \
+        '# Use the built-in DHCP *client* (station mode). Note: for ipv4.method=shared' \
+        '# (the setup hotspot) NM always spawns the dnsmasq binary for DHCP+DNS and' \
+        '# reads /etc/NetworkManager/dnsmasq-shared.d/ — the captive portal relies on it,' \
+        '# so the dnsmasq package must stay installed (its standalone service masked).' \
         'dhcp=internal' \
         '' \
         '[keyfile]' \
@@ -193,6 +217,21 @@ mmdebstrap:
         'level=INFO' \
         > "$1/etc/NetworkManager/NetworkManager.conf"
       chmod 644 "$1/etc/NetworkManager/NetworkManager.conf"
+    # Captive portal DNS for the setup hotspot. NM spawns dnsmasq for
+    # ipv4.method=shared connections with --conf-dir=/etc/NetworkManager/dnsmasq-shared.d.
+    # address=/#/192.168.4.1 resolves EVERY hostname to the Pi while the hotspot is
+    # active, so phone captive-portal probes (connectivitycheck.gstatic.com,
+    # captive.apple.com, ...) reach the setup server and the sign-in sheet opens
+    # automatically. Without this, DNS fails on the hotspot and users must type
+    # 192.168.4.1 by hand. Only used in shared/AP mode — never affects station mode.
+    - |
+      mkdir -p "$1/etc/NetworkManager/dnsmasq-shared.d"
+      printf '%s\n' \
+        '# MasjidConnect setup hotspot: answer all DNS queries with the AP address' \
+        '# so captive-portal detection opens the WiFi setup page automatically.' \
+        'address=/#/192.168.4.1' \
+        > "$1/etc/NetworkManager/dnsmasq-shared.d/00-masjidconnect-captive.conf"
+      chmod 644 "$1/etc/NetworkManager/dnsmasq-shared.d/00-masjidconnect-captive.conf"
     # Install a tiny one-shot service that sets the WiFi regulatory domain at boot,
     # before NetworkManager starts. This is required for brcmfmac (Broadcom WiFi on
     # RPi) because `cfg80211.ieee80211_regdom=GB` in cmdline.txt only sets the kernel
@@ -257,46 +296,73 @@ mmdebstrap:
         'PollIntervalMinSec=32' \
         'PollIntervalMaxSec=2048' \
         > "$1/etc/systemd/timesyncd.conf"
-    # fake-hwclock: saves the current time to disk hourly and on shutdown.
-    # On next boot the Pi starts with the saved time rather than the epoch (1970),
-    # which prevents a massive clock jump when NTP syncs — important for avoiding
-    # brief periods where prayer times appear wildly wrong before internet connects.
-    # Drop-in: skip fake-hwclock on RPi 5 where a real hardware RTC (/dev/rtc0) is
-    # present — the RTC keeps time accurately so fake-hwclock is redundant and would
-    # overwrite the accurate RTC time with its (potentially stale) saved timestamp.
+    # fake-hwclock: restores the last saved time at boot so the clock never
+    # starts at the epoch. Always enabled — even on Pi 5, where a battery-less
+    # RTC is invalid after power loss and fake-hwclock is the only fallback.
+    # The RTC sync below only applies the RTC when it is AHEAD of the restored
+    # time, so a valid RTC always wins and an invalid one never clobbers it.
+    - chroot $1 systemctl enable fake-hwclock.service 2>/dev/null || true
+    # fake-hwclock ships an hourly save via cron.hourly, but cron is NOT
+    # installed in this minimal image — without this timer the time is only
+    # saved on clean shutdown, so a power cut resumes with a badly stale clock.
     - |
-      mkdir -p "$1/etc/systemd/system/fake-hwclock.service.d"
       printf '%s\n' \
         '[Unit]' \
-        '# Skip fake-hwclock when the Raspberry Pi 5 hardware RTC (/dev/rtc0) is present.' \
-        '# The real RTC is more accurate; fake-hwclock is only needed on Pi 3/4 (no RTC).' \
-        'ConditionPathNotExists=/dev/rtc0' \
-        > "$1/etc/systemd/system/fake-hwclock.service.d/rtc-override.conf"
-    - chroot $1 systemctl enable fake-hwclock.service 2>/dev/null || true
-    # RPi 5 RTC sync: read the hardware RTC into the system clock at boot.
-    # ConditionPathExists=/dev/rtc0 makes this a no-op on Pi 3/4 (no RTC).
+        'Description=Save current time with fake-hwclock (no cron in this image)' \
+        '' \
+        '[Service]' \
+        'Type=oneshot' \
+        'ExecStart=/usr/sbin/fake-hwclock save' \
+        > "$1/etc/systemd/system/masjidconnect-fake-hwclock-save.service"
+      printf '%s\n' \
+        '[Unit]' \
+        'Description=Hourly fake-hwclock save' \
+        '' \
+        '[Timer]' \
+        'OnBootSec=15min' \
+        'OnUnitActiveSec=1h' \
+        'AccuracySec=5min' \
+        '' \
+        '[Install]' \
+        'WantedBy=timers.target' \
+        > "$1/etc/systemd/system/masjidconnect-fake-hwclock-save.timer"
+      chroot "$1" systemctl enable masjidconnect-fake-hwclock-save.timer 2>/dev/null || true
+    # RPi 5 RTC sync: read the built-in RTC into the system clock. Started by a
+    # udev rule the moment /dev/rtc0 appears (the driver loads asynchronously —
+    # a sysinit-only unit races udev and skips on its ConditionPathExists).
+    # Also enabled at sysinit as belt-and-braces for the warm-reboot case where
+    # the device node already exists; the script is idempotent.
     # After NTP syncs, the Linux kernel automatically writes the corrected time
     # back to the RTC every 11 minutes via its built-in "11-minute mode".
     - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-rtc-sync.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-rtc-sync.service $1/etc/systemd/system/ || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/rtc-sync.sh 2>/dev/null || true'
     - chroot $1 systemctl enable masjidconnect-rtc-sync.service 2>/dev/null || true
+    - mkdir -p "$1/etc/udev/rules.d" && cp "${SRCROOT}/layer/udev/99-masjidconnect-rtc.rules" "$1/etc/udev/rules.d/"
+    # HTTPS time fallback: some venue networks block NTP (UDP 123). This timer
+    # steps the clock from the portal's HTTPS Date header whenever NTP has not
+    # synchronised — a no-op on healthy networks. Critical for prayer times.
+    - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-http-time.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-http-time.service $1/etc/systemd/system/ || true'
+    - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-http-time.timer ] && cp $1/opt/masjidconnect/deploy/masjidconnect-http-time.timer $1/etc/systemd/system/ || true'
+    - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/http-time-sync.sh 2>/dev/null || true'
+    - chroot $1 systemctl enable masjidconnect-http-time.timer 2>/dev/null || true
     # Timezone: set the system timezone. Correct timezone is required for DST (daylight saving)
     # to be applied automatically — NTP always provides UTC, the OS converts using the timezone.
-    # Default: UTC. Override at build time with IGconf_masjidconnect_timezone (e.g. Europe/London).
-    # Can also be changed at runtime by placing TIMEZONE=<zone> in /boot/firmware/masjidconnect-wifi.conf.
+    # Default: Europe/London (the product's home market — an image left at UTC shows
+    # times 1 hour behind for the entire British Summer Time half of the year).
+    # Override at build time with IGconf_masjidconnect_timezone, or at runtime by
+    # placing TIMEZONE=<zone> in /boot/firmware/masjidconnect-wifi.conf.
     - |
-      TZ="${IGconf_masjidconnect_timezone:-UTC}"
+      TZ="${IGconf_masjidconnect_timezone:-Europe/London}"
       # Guard: reject empty or metadata placeholder values
-      case "$TZ" in "Optional."*|""|"UTC") TZ="UTC" ;; esac
-      if [ "$TZ" != "UTC" ]; then
-        if chroot "$1" timedatectl set-timezone "$TZ" 2>/dev/null; then
-          echo "Timezone set to $TZ"
-        elif [ -f "$1/usr/share/zoneinfo/$TZ" ]; then
-          ln -sf "/usr/share/zoneinfo/$TZ" "$1/etc/localtime"
-          echo "$TZ" > "$1/etc/timezone"
-          echo "Timezone set to $TZ (via symlink)"
-        else
-          echo "WARNING: Unknown timezone '$TZ' — leaving as UTC"
-        fi
+      case "$TZ" in "Optional."*|"") TZ="Europe/London" ;; esac
+      if chroot "$1" timedatectl set-timezone "$TZ" 2>/dev/null; then
+        echo "Timezone set to $TZ"
+      elif [ -f "$1/usr/share/zoneinfo/$TZ" ]; then
+        ln -sf "/usr/share/zoneinfo/$TZ" "$1/etc/localtime"
+        echo "$TZ" > "$1/etc/timezone"
+        echo "Timezone set to $TZ (via symlink)"
+      else
+        echo "WARNING: Unknown timezone '$TZ' — leaving image default (UTC)"
       fi
     # WiFi boot-partition config: apply credentials dropped on FAT32 /boot/firmware before networking starts
     - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-wifi-bootconf.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-wifi-bootconf.service $1/etc/systemd/system/ || true'
@@ -306,14 +372,32 @@ mmdebstrap:
     - '[ -f $1/opt/masjidconnect/deploy/masjidconnect-wifi-watchdog.service ] && cp $1/opt/masjidconnect/deploy/masjidconnect-wifi-watchdog.service $1/etc/systemd/system/ || true'
     - chroot $1 /bin/bash -c 'chmod +x /opt/masjidconnect/deploy/wifi-watchdog.sh 2>/dev/null || true'
     - chroot $1 systemctl enable masjidconnect-wifi-watchdog.service 2>/dev/null || true
-    # Custom boot splash: copy rpi-image/assets/splash.png into Plymouth pix theme and set as default
+    # Branded boot splash: install the self-contained masjidconnect Plymouth theme
+    # (script plugin from plymouth-themes + our splash.png) and rebuild the
+    # initramfs so the splash appears from early boot.
+    # NOTE: the old approach (theme "pix") never worked — pix is a Raspberry Pi OS
+    # package (pix-plym-splash) that is not installed in this image, so setting it
+    # as default silently failed and no splash was ever shown.
     - |
+      THEME_DIR="$1/usr/share/plymouth/themes/masjidconnect"
+      mkdir -p "$THEME_DIR"
+      cp "${SRCROOT}/layer/plymouth/masjidconnect.plymouth" "$THEME_DIR/"
+      cp "${SRCROOT}/layer/plymouth/masjidconnect.script" "$THEME_DIR/"
       if [ -f "${SRCROOT}/assets/splash.png" ]; then
-        mkdir -p "$1/usr/share/plymouth/themes/pix"
-        cp "${SRCROOT}/assets/splash.png" "$1/usr/share/plymouth/themes/pix/splash.png"
-        chroot "$1" plymouth-set-default-theme pix 2>/dev/null || true
-        chroot "$1" /bin/bash -c 'update-initramfs -u' || true
+        cp "${SRCROOT}/assets/splash.png" "$THEME_DIR/splash.png"
       fi
+      chroot "$1" plymouth-set-default-theme masjidconnect || echo "WARNING: plymouth-set-default-theme failed"
+      chroot "$1" update-initramfs -u || echo "WARNING: update-initramfs failed"
+    # Keep the last splash frame on screen after boot finishes instead of clearing
+    # to a black VT. xinitrc-kiosk paints over it once X11 starts, so the user sees
+    # splash -> app with no flash of console in between.
+    - |
+      mkdir -p "$1/etc/systemd/system/plymouth-quit.service.d"
+      printf '%s\n' \
+        '[Service]' \
+        'ExecStart=' \
+        'ExecStart=-/usr/bin/plymouth quit --retain-splash' \
+        > "$1/etc/systemd/system/plymouth-quit.service.d/retain-splash.conf"
     # Optional background image (e.g. for in-app or loading); copy to /opt/masjidconnect for app use
     - |
       if [ -f "${SRCROOT}/assets/background.png" ]; then

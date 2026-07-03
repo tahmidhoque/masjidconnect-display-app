@@ -13,7 +13,8 @@
 
 [Unit]
 Description=MasjidConnect WiFi Watchdog
-After=network.target wpa_supplicant@wlan0.service
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
 
 [Service]
 Type=simple

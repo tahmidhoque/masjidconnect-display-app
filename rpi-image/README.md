@@ -2,7 +2,7 @@
 
 Build a **bootable Raspberry Pi image** with the MasjidConnect Display App pre-installed. Flash the image to an SD card and boot — no manual install steps on the Pi.
 
-The image targets **Raspberry Pi 5** (and Pi 4). Boot is configured for: **no RPI branding or splash** (early GPU splash disabled, black Plymouth splash by default), **silent boot** (no console text on the display; kernel/init output is on a different VT), and **direct launch into full-screen kiosk** (X11 + Chromium; no desktop GUI).
+The image targets **Raspberry Pi 5** (and Pi 4). Boot is configured for: **no RPI branding**, a **branded MasjidConnect Plymouth splash** shown from early boot (custom `masjidconnect` script theme; the last splash frame is retained until X11 paints over it, so there is no flash of console), **silent boot** (no kernel/systemd/getty/Xorg text on the display; kernel output goes to tty2), and **direct launch into full-screen kiosk** (X11 + Chromium; no desktop GUI).
 
 Uses [rpi-image-gen](https://github.com/raspberrypi/rpi-image-gen) (official Raspberry Pi image builder). The image runs the app under **X11** (Xorg + xinit) + Chromium in kiosk mode; no full desktop or Wayland.
 
@@ -56,7 +56,7 @@ Use the Pi 3 config so the image targets Pi 3 (arm64) instead of Pi 5.
 
 ## Custom boot splash and background image
 
-- **Boot splash**: A **black splash** is included by default (`rpi-image/assets/splash.png`) so the image has no RPI branding on boot. Replace it with your own **`rpi-image/assets/splash.png`** to use a custom Plymouth boot image; it is installed into the Plymouth pix theme.
+- **Boot splash**: The branded MasjidConnect splash (`rpi-image/assets/splash.png`) is shown via a self-contained Plymouth **script theme** (`rpi-image/layer/plymouth/masjidconnect.{plymouth,script}`), installed as the default theme and baked into the initramfs. The theme scales the image to fit any display and uses the brand navy (`#0A2647`) as the background so the splash → X11 → app transition is seamless. Replace **`rpi-image/assets/splash.png`** with your own 1920×1080 PNG to customise it.
 - **Background image** (optional): Place **`rpi-image/assets/background.png`** to copy it to `/opt/masjidconnect/background.png` in the image (e.g. for in-app use). Use PNG; recommended size matches your display (e.g. 1920×1080).
 
 ---
@@ -97,7 +97,27 @@ You can bake your mosque’s WiFi into the image so the Pi connects automaticall
 
 **Without WiFi:** If you do not create `wifi.conf` or run `configure-wifi.sh`, the image is unchanged — use Ethernet or configure WiFi on the Pi after boot (e.g. via SSH and `raspi-config` or `nmtui`).
 
-**End users who only have the image (no repo):** Pi Imager’s OS customisation (gear icon) is **greyed out for custom images** (it only works with official Raspberry Pi OS). So when you distribute the pre-built `.img` to a mosque, they cannot set WiFi in the Imager. Instead, the image includes an **on-device WiFi setup screen**: if the Pi boots with **no internet** (e.g. no Ethernet, no WiFi configured), a full-screen GUI appears **before** the display app loads. The user can scan for networks, enter the password, connect, then click “Start display”. No SSH or terminal needed. If they have Ethernet or already have WiFi baked in, the setup screen is skipped and the kiosk starts as usual.
+**End users who only have the image (no repo):** Pi Imager’s OS customisation (gear icon) is **greyed out for custom images** (it only works with official Raspberry Pi OS). So when you distribute the pre-built `.img` to a mosque, they cannot set WiFi in the Imager. Instead, WiFi is managed on-device via **NetworkManager** with a setup access point:
+
+- **First boot with no internet**: the display shows full-screen instructions. On a phone, join the open WiFi network **`MasjidConnect-Setup`** — the setup page **opens automatically** (captive portal; all DNS on the hotspot resolves to the Pi). If it doesn’t pop up, browse to **`192.168.4.1`**. Pick the mosque’s network, enter the password (and country if not GB), tap Connect. The hotspot stays up indefinitely until WiFi is configured or “Skip” is pressed — there is no timeout that strands the device.
+- **Changing WiFi later (router replaced, password changed)**: no reflash or SSH needed. The WiFi watchdog first retries the saved connection (radio unblock → NetworkManager restart → interface reset). If the display is still offline after a few minutes, it **automatically raises the `MasjidConnect-Setup` hotspot again** while the display keeps showing cached content, and the app shows a banner with the connection steps. If nobody uses the hotspot for ~10 minutes it drops back to station mode and retries the saved WiFi, cycling until either recovers.
+- **Ethernet**: plugging in a cable always works; the hotspot tears itself down automatically once connectivity returns by any path.
+- **SD-card method** (no phone needed): drop a `masjidconnect-wifi.conf` file (SSID/PASSWORD/COUNTRY, see `wifi.conf.example`) on the FAT32 boot partition from any computer; it is applied and deleted on next boot.
+
+---
+
+## Time, timezone and the Pi 5 RTC
+
+Accurate time is critical (prayer times). The image layers four time sources, best wins:
+
+1. **NTP** (systemd-timesyncd, pool + Cloudflare/Google fallbacks) whenever online.
+2. **HTTPS fallback** (`masjidconnect-http-time.timer`, every 15 min): if NTP is blocked by the venue's network (UDP 123 is often filtered), the clock is stepped from the portal's HTTPS `Date` header. No-op when NTP is synchronised.
+3. **Pi 5 built-in RTC**: read into the system clock by `masjidconnect-rtc-sync.service`, triggered by udev the moment `/dev/rtc0` appears. Applied only when the RTC is *ahead* of the current clock, so an unset (battery-less) RTC never clobbers better time. After any NTP/HTTPS sync, the kernel writes the corrected time back to the RTC (11-minute mode). **Fit the official RTC battery** so time survives power-off; if using the rechargeable one, uncomment `dtparam=rtc_bbat_vchg=3000000` in `config.txt`.
+4. **fake-hwclock** (all models): restores the last saved time at boot; saved hourly by a systemd timer (cron is not installed) and on shutdown.
+
+**Timezone defaults to `Europe/London`** (so UK DST/BST is correct out of the box). Override at build time with `IGconf_masjidconnect_timezone=<IANA zone>`, or at runtime by adding `TIMEZONE=<zone>` to `/boot/firmware/masjidconnect-wifi.conf`.
+
+**Troubleshooting — clock off by exactly 1 hour**: the device is in the wrong timezone (e.g. UTC during British Summer Time). Check `timedatectl` over SSH; fix with `sudo timedatectl set-timezone Europe/London` or the boot-partition `TIMEZONE=` method. **Off by minutes**: NTP is not syncing — check `timedatectl` (`NTP synchronized`), `journalctl -u systemd-timesyncd`, and `/tmp/http-time-sync.log`.
 
 ---
 
@@ -179,7 +199,7 @@ Insert the SD card, power on, and connect to the same network (e.g. Ethernet). T
   - Node.js 20 (from NodeSource)
   - Chromium, X11 (xserver-xorg, xinit, x11-xserver-utils), unclutter, curl
   - App at `/opt/masjidconnect` (from your `masjidconnect-display-*.tar.gz`), including `deploy/xinitrc-kiosk` for the X11 kiosk client
-  - Boot config: `disable_splash=1` in `config.txt`; `quiet`, `loglevel=0`, `logo.nologo`, `console=tty2` in `cmdline.txt` (silent boot, no text on display); default black Plymouth splash (no RPI branding).
+  - Boot config: `disable_splash=1` in `config.txt` (no rainbow square); `quiet loglevel=0 logo.nologo console=tty2 splash plymouth.ignore-serial-consoles systemd.show_status=false vt.global_cursor_default=0` in `cmdline.txt` (silent boot, branded Plymouth splash); `plymouth quit --retain-splash` drop-in + getty `--noclear --noissue` + `.hushlogin` so no console text ever appears between splash and kiosk.
   - systemd units:
     - `masjidconnect-display.service` — Node server (`deploy/server.mjs`) on port 3001
     - `masjidconnect-kiosk.service` — installed but **not enabled**; kiosk starts via **console autologin** instead (see below).
@@ -404,7 +424,9 @@ If you get **"Cannot open virtual console 1 (Permission denied)"** in the X log,
 | `layer/xorg.conf.d/99-vc4.conf` | Xorg OutputClass for vc4 (fixes "Cannot run in framebuffer mode" on Pi 4/5). |
 | `layer/masjidconnect-kiosk-setup.service` | Oneshot: adds UID 1000 user to render/video/tty at boot for GPU and console access. |
 | `layer/masjidconnect-console-vt1.service` | Oneshot: runs `chvt 1` after Plymouth so the display shows tty1 (kiosk) not kernel log (tty2). |
-| `assets/splash.png` | Default black boot splash (Plymouth); replace for custom splash. |
+| `layer/plymouth/masjidconnect.plymouth` | Plymouth theme descriptor for the branded boot splash (script plugin). |
+| `layer/plymouth/masjidconnect.script` | Plymouth script: navy background + splash.png scaled/centred; no spinner or text. |
+| `assets/splash.png` | Branded boot splash image (Plymouth); replace for custom splash. |
 | `assets/background.png` | Optional background image (copied to `/opt/masjidconnect/background.png`). |
 | `wifi.conf` | Optional: SSID, PASSWORD, COUNTRY (one per line) to bake WiFi into the image; use `configure-wifi.sh` or copy from `wifi.conf.example`. Gitignored. |
 | `wifi.conf.example` | Template for manual WiFi config. |

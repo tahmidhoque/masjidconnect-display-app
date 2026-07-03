@@ -1,0 +1,37 @@
+// MasjidConnect Plymouth boot splash.
+// Solid brand-navy background with the splash artwork scaled to fit the
+// screen (aspect preserved, centred). No spinner, no text — the artwork
+// carries the branding and the frame is retained until X11 takes over
+// (plymouth quit --retain-splash).
+
+// #0A2647 — must match xsetroot / Chromium default background so the
+// splash → X11 → app transition has no visible colour change.
+Window.SetBackgroundTopColor(0.039, 0.149, 0.278);
+Window.SetBackgroundBottomColor(0.039, 0.149, 0.278);
+
+splash_image = Image("splash.png");
+
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+image_width = splash_image.GetWidth();
+image_height = splash_image.GetHeight();
+
+scale_x = screen_width / image_width;
+scale_y = screen_height / image_height;
+if (scale_x < scale_y)
+  scale = scale_x;
+else
+  scale = scale_y;
+
+scaled_width = image_width * scale;
+scaled_height = image_height * scale;
+scaled_image = splash_image.Scale(scaled_width, scaled_height);
+
+splash_sprite = Sprite(scaled_image);
+splash_sprite.SetPosition((screen_width - scaled_width) / 2,
+                          (screen_height - scaled_height) / 2,
+                          0);
+
+// Keep the splash static during system-update mode as well.
+fun refresh_callback() { }
+Plymouth.SetRefreshFunction(refresh_callback);

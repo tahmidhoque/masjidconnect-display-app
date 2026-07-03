@@ -21,8 +21,10 @@
 
 [Unit]
 Description=MasjidConnect WiFi Boot Config Apply
-# Run before networking so credentials are in place before wpa_supplicant starts
-Before=network-pre.target wpa_supplicant@wlan0.service systemd-networkd.service
+# Run before networking so credentials are in place before NetworkManager starts.
+# NetworkManager Wants/After network-pre.target, so Before=network-pre.target is
+# sufficient — the explicit NetworkManager.service ordering is belt-and-braces.
+Before=network-pre.target NetworkManager.service
 After=local-fs.target
 # Only activate when at least one config file is present on the boot partition
 ConditionPathExists=|/boot/firmware/masjidconnect-wifi.conf
