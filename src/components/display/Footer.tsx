@@ -19,7 +19,12 @@ const NO_UPDATE_CLEAR_MS = 8_000;
 /** Injected at build time by Vite (from package.json). */
 const APP_VERSION = import.meta.env.VITE_APP_VERSION;
 
-const Footer: React.FC = () => {
+interface FooterProps {
+  /** Optional node before the connection status (e.g. the masjid logo). */
+  leading?: React.ReactNode;
+}
+
+const Footer: React.FC<FooterProps> = ({ leading }) => {
   const dispatch = useAppDispatch();
   const updatePhase = useAppSelector(selectUpdatePhase);
 
@@ -31,7 +36,8 @@ const Footer: React.FC = () => {
   }, [updatePhase, dispatch]);
 
   return (
-    <div className="flex items-center justify-between text-body font-medium w-full">
+    <div className="flex items-center justify-between gap-3 text-body font-medium w-full">
+      {leading}
       <div className="min-w-0 flex-1">
         <ConnectionBanner />
       </div>

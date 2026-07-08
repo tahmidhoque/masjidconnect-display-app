@@ -174,6 +174,8 @@ export interface ContentState {
   // Masjid information
   masjidName: string | null;
   masjidTimezone: string | null;
+  /** Resolved masjid logo URL — only present when the plan includes displayLogo (Growth+). */
+  masjidLogoUrl: string | null;
 
   // UI settings
   carouselTime: number;
@@ -215,6 +217,7 @@ const initialState: ContentState = {
   events: null,
   masjidName: DEFAULT_MASJID_NAME,
   masjidTimezone: null,
+  masjidLogoUrl: null,
   carouselTime: 30,
   timeFormat: "12h", // Default to 12-hour format (admin portal can override via displaySettings.timeFormat)
   displaySettings: null,
@@ -596,6 +599,8 @@ export const refreshContent = createAsyncThunk(
       const masjidName = extractMasjidName(content);
       const masjidTimezone =
         content.masjid?.timezone || content.data?.masjid?.timezone || null;
+      const masjidLogoUrl =
+        content.masjid?.logoUrl || content.data?.masjid?.logoUrl || null;
 
       // Extract and store masjidId if available (for WebSocket connection)
       // This handles cases where the backend includes masjidId in the content response
@@ -650,6 +655,7 @@ export const refreshContent = createAsyncThunk(
         content: content || null,
         masjidName: masjidName || null,
         masjidTimezone: masjidTimezone || null,
+        masjidLogoUrl,
         carouselTime: carouselTime || 30,
         timeFormat,
         displaySettings,
@@ -1109,6 +1115,7 @@ const contentSlice = createSlice({
           state.screenContent = action.payload.content || null;
           state.masjidName = action.payload.masjidName || null;
           state.masjidTimezone = action.payload.masjidTimezone || null;
+          state.masjidLogoUrl = action.payload.masjidLogoUrl ?? null;
           state.carouselTime = action.payload.carouselTime || 30;
           state.timeFormat = action.payload.timeFormat || "12h";
           state.displaySettings = action.payload.displaySettings ?? null;
@@ -1365,6 +1372,8 @@ export const selectMasjidName = (state: { content: ContentState }) =>
   state.content.masjidName;
 export const selectMasjidTimezone = (state: { content: ContentState }) =>
   state.content.masjidTimezone;
+export const selectMasjidLogoUrl = (state: { content: ContentState }) =>
+  state.content.masjidLogoUrl;
 export const selectCarouselTime = (state: { content: ContentState }) =>
   state.content.carouselTime;
 export const selectTimeFormat = (state: { content: ContentState }) =>

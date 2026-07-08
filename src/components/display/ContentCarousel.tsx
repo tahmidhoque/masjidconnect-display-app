@@ -172,6 +172,8 @@ interface ContentCarouselProps {
   interval?: number;
   /** True when rendered inside a portrait layout — forwarded to EventSlide */
   compact?: boolean;
+  /** Fired when a viewport-fullscreen slide becomes active or inactive. */
+  onFullscreenChange?: (active: boolean) => void;
 }
 
 /** Maximum binary-search iterations to prevent infinite loops */
@@ -213,8 +215,14 @@ function applyFontSizeProps(el: HTMLElement, sizes: FontSizeConfig): void {
   el.style.setProperty('--carousel-arabic-size', `${sizes.arabicSize}rem`);
 }
 
-const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30, compact = false }) => {
+const ContentCarousel: React.FC<ContentCarouselProps> = ({
+  items,
+  interval = 30,
+  compact = false,
+  onFullscreenChange,
+}) => {
   const [activeIdx, setActiveIdx] = useState(0);
+  const [fullscreenPortalRoot, setFullscreenPortalRoot] = useState<HTMLElement | null>(null);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const [selectedNameIdx, setSelectedNameIdx] = useState(0);
   const [needsScroll, setNeedsScroll] = useState(false);
@@ -428,6 +436,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
 
   /** Unified fullscreen flag — true when any slide type uses the portal overlay. */
   const isFullscreen = isFullscreenMedia || isFullscreenContent;
+
+  useEffect(() => {
+    onFullscreenChange?.(isFullscreen);
+    return () => onFullscreenChange?.(false);
+  }, [isFullscreen, onFullscreenChange]);
+
+  useEffect(() => {
+    setFullscreenPortalRoot(
+      document.getElementById('orientation-portal-root') ?? document.body,
+    );
+  }, []);
 
   /** DONATION: fixed QR / thermometer layout — no typography fit loop. */
   const isDonationSlide = useMemo(
@@ -806,39 +825,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       </div>
     ) : null;
 
-  /**
-   * Portal target: the `#orientation-portal-root` div sits inside
-   * `OrientationWrapper`'s transformed container. When the screen is rotated
-   * (e.g. portrait = 90°), that ancestor has a CSS `transform`, which makes it
-   * the containing block for `position: fixed` children (per CSS spec). So
-   * `fixed inset-0` inside the portal covers the full *logical* display area
-   * (post-rotation) rather than the raw physical viewport.
-   *
-   * Falls back to `document.body` in test environments (JSDOM) where
-   * `OrientationWrapper` is not rendered.
-   */
-  const fullscreenPortalRoot =
-    typeof document !== 'undefined'
-      ? (document.getElementById('orientation-portal-root') ?? document.body)
-      : null;
-
   const portalContentLayerClass =
     phase === 'out'
       ? 'animate-fade-out gpu-accelerated flex flex-1 min-h-0 flex-col overflow-hidden'
       : phase === 'in' && isFitted
         ? 'animate-fade-in gpu-accelerated flex flex-1 min-h-0 flex-col overflow-hidden'
         : 'pointer-events-none opacity-0 gpu-accelerated flex flex-1 min-h-0 flex-col overflow-hidden';
-
-  const fullscreenPaginationBar = safeItems.length > 1 && (
-    <div
-      className="pointer-events-none absolute bottom-0 left-0 right-0 z-[9010] flex justify-center pb-4"
-      data-carousel-pagination="fullscreen"
-    >
-      <div className="pointer-events-none rounded-full border border-border/50 bg-midnight/95 px-4 py-2 shadow-[0_4px_20px_rgba(0,0,0,0.45)]">
-        {paginationDots}
-      </div>
-    </div>
-  );
 
   const fullscreenMediaPortal =
     fullscreenPortalRoot &&
@@ -851,7 +843,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
       >
         <div
           data-fullscreen-portal-media=""
-          className={`${portalMediaLayerClass}${safeItems.length > 1 ? ' pb-14' : ''}`}
+          className={portalMediaLayerClass}
         >
           {isVideoSlide && item.videoUrl ? (
             <Suspense fallback={null}>
@@ -910,7 +902,6 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
             </div>
           )}
         </div>
-        {fullscreenPaginationBar}
       </div>,
       fullscreenPortalRoot,
     );
@@ -986,7 +977,6 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
             )}
           </div>
         </div>
-        {fullscreenPaginationBar}
       </div>,
       fullscreenPortalRoot,
     );
@@ -1150,7 +1140,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({ items, interval = 30,
         </div>
       </div>
 
-      {/* Pagination — in-flow when not viewport-fullscreen; fullscreen uses portal bar */}
+      {/* Pagination — hidden during viewport-fullscreen slides */}
       {safeItems.length > 1 && !isFullscreen && (
         <div className="shrink-0 flex items-center justify-center pt-1.5">
           {paginationDots}

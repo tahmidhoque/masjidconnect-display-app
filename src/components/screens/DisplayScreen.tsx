@@ -20,11 +20,11 @@
  * Data is sourced from Redux (contentSlice) and hooks.
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { useAppSelector } from '../../store/hooks';
-import { selectMasjidName } from '../../store/slices/contentSlice';
+import { selectMasjidLogoUrl, selectMasjidName } from '../../store/slices/contentSlice';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
 import { orientationToLayoutMode, isPortraitLayout, parseScreenOrientation } from '../../utils/orientation';
@@ -45,6 +45,9 @@ import {
 import {
   Header,
   Footer,
+  FooterLeadingLogo,
+  ContentLogoFrame,
+  LogoRail,
   PrayerTimesPanel,
   PrayerTimesBar,
   PrayerCountdown,
@@ -665,8 +668,36 @@ const DisplayScreenInner: React.FC = () => {
   const resolveHeaderFlags = (options?: LayoutZoneHeaderOptions) => ({
     showDate: options?.showDate ?? defaultShowDate,
     showHijriDate: options?.showHijriDate ?? defaultShowHijriDate,
-    showMasjidName: options?.showMasjidName ?? defaultShowMasjidName,
+    /** Masjid name is layout/mosque behaviour only — zone.options.showMasjidName is legacy. */
+    showMasjidName: defaultShowMasjidName,
   });
+
+  /* ---- Masjid logo (Growth+ plan) — URL is only sent when the plan allows it ---- */
+  const masjidLogoUrl = useAppSelector(selectMasjidLogoUrl);
+  const logoConfig = layoutConfig.logo ?? null;
+  const headerLogoSide: 'left' | 'right' | null =
+    logoConfig?.position === 'top-left' ? 'left' : logoConfig?.position === 'top-right' ? 'right' : null;
+  /**
+   * A horizontal header spans the same top strip a brand rail would use,
+   * so when one is visible the logo docks inline in the header row instead
+   * (avoids duplicating branding). Sidebar headers don't occupy the full
+   * top strip, so the brand rail still renders there.
+   */
+  const headerZoneForLogo = orientationLayout.zones.find(
+    (zone) => zone.visible && zone.component === 'header',
+  );
+  const headerIsHorizontalForLogo =
+    !!headerZoneForLogo &&
+    inferZoneRegion(layoutStructure, 'header', headerZoneForLogo.region) !== 'sidebar';
+  const headerEmbedsLogo =
+    headerIsHorizontalForLogo && headerLogoSide != null && !!masjidLogoUrl && !!logoConfig;
+
+  const footerLogo =
+    masjidLogoUrl && logoConfig?.position === 'footer' ? (
+      <FooterLeadingLogo src={masjidLogoUrl} config={logoConfig} />
+    ) : null;
+  const showContentLogo =
+    headerLogoSide != null && !headerEmbedsLogo && !!masjidLogoUrl && !!logoConfig;
 
   const buildHeaderSlot = (zone: LayoutZone) => {
     const region = inferZoneRegion(layoutStructure, 'header', zone.region);
@@ -687,11 +718,17 @@ const DisplayScreenInner: React.FC = () => {
         timeFormat={timeFormat}
         hijriDateAdjustment={hijriDateAdjustment}
         layout={inSidebar ? 'vertical' : 'horizontal'}
+        portrait={isPortrait && !inSidebar}
+        logo={
+          !inSidebar && headerLogoSide && masjidLogoUrl && logoConfig
+            ? { src: masjidLogoUrl, side: headerLogoSide, size: logoConfig.size, background: logoConfig.background }
+            : null
+        }
       />
     );
   };
 
-  const footerSlot = <Footer />;
+  const footerSlot = <Footer leading={footerLogo} />;
   const prayerPanel = (
     <PrayerTimesPanel
       isRamadan={ramadan.isRamadan}
@@ -739,6 +776,10 @@ const DisplayScreenInner: React.FC = () => {
     ? `${schedule.id}-${schedule.items?.length ?? 0}-${carouselItemsRevision}-${lastContentUpdate ?? ''}-${lastScheduleUpdate ?? ''}`
     : 'no-schedule';
   const [blackoutDevRevision, setBlackoutDevRevision] = useState(0);
+  const [carouselFullscreen, setCarouselFullscreen] = useState(false);
+  const handleCarouselFullscreenChange = useCallback((active: boolean) => {
+    setCarouselFullscreen(active);
+  }, []);
   useEffect(() => {
     const bump = () => setBlackoutDevRevision((n) => n + 1);
     window.addEventListener(PRAYER_DISPLAY_DEV_EVENT, bump);
@@ -775,6 +816,7 @@ const DisplayScreenInner: React.FC = () => {
               items={carouselItems}
               interval={carouselInterval}
               compact={isPortrait}
+              onFullscreenChange={handleCarouselFullscreenChange}
             />
           );
         }
@@ -799,6 +841,7 @@ const DisplayScreenInner: React.FC = () => {
             items={carouselItems}
             interval={carouselInterval}
             compact={isPortrait}
+            onFullscreenChange={handleCarouselFullscreenChange}
           />
         );
     }
@@ -813,6 +856,29 @@ const DisplayScreenInner: React.FC = () => {
     carouselInterval,
     carouselKey,
     isPortrait,
+    handleCarouselFullscreenChange,
+  ]);
+
+  const contentNode = useMemo(() => {
+    if (!showContentLogo || carouselFullscreen || !masjidLogoUrl || !logoConfig) {
+      return contentSlot;
+    }
+    return (
+      <ContentLogoFrame
+        logo={
+          <LogoRail src={masjidLogoUrl} config={logoConfig} portrait={isPortrait} />
+        }
+      >
+        {contentSlot}
+      </ContentLogoFrame>
+    );
+  }, [
+    showContentLogo,
+    carouselFullscreen,
+    masjidLogoUrl,
+    logoConfig,
+    isPortrait,
+    contentSlot,
   ]);
 
   /* Background: geometric Islamic pattern (same for Ramadan and non-Ramadan) */
@@ -890,7 +956,7 @@ const DisplayScreenInner: React.FC = () => {
       label: 'Next prayer countdown',
     },
     content: {
-      node: contentSlot,
+      node: contentNode,
       className: 'relative overflow-visible',
       label: 'Announcements and content',
     },
@@ -903,7 +969,7 @@ const DisplayScreenInner: React.FC = () => {
   };
 
   const renderedZones: RenderedZone[] = orientationLayout.zones
-    .filter((zone) => zone.visible)
+    .filter((zone) => zone.visible && !(carouselFullscreen && zone.component === 'footer'))
     .map((zone) => {
       const component = zone.component;
       const entry = zoneRegistry[component];

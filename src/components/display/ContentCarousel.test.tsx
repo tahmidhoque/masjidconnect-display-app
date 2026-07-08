@@ -240,7 +240,7 @@ describe('ContentCarousel', () => {
     });
   });
 
-  it('shows carousel dots at the bottom of the fullscreen portal when multiple slides', () => {
+  it('does not show carousel dots during viewport fullscreen slides', () => {
     const items = [
       {
         id: 'fs-a',
@@ -260,9 +260,28 @@ describe('ContentCarousel', () => {
       },
     ];
     render(<ContentCarousel items={items} interval={30} compact={false} />);
-    const bar = document.querySelector('[data-carousel-pagination="fullscreen"]');
-    expect(bar).toBeTruthy();
-    expect(bar?.querySelector('[data-carousel-pagination]')).toBeTruthy();
+    expect(document.querySelector('[data-carousel-pagination="fullscreen"]')).toBeNull();
+    expect(document.querySelector('[data-carousel-pagination]')).toBeNull();
+  });
+
+  it('calls onFullscreenChange when a viewport fullscreen slide is active', () => {
+    const onFullscreenChange = vi.fn();
+    const items = [
+      {
+        id: 'fs-1',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://example.com/p.jpg',
+        mediaKind: 'image' as const,
+        fullscreen: true,
+        duration: 15,
+      },
+    ];
+    const { unmount } = render(
+      <ContentCarousel items={items} interval={30} onFullscreenChange={onFullscreenChange} />,
+    );
+    expect(onFullscreenChange).toHaveBeenCalledWith(true);
+    unmount();
+    expect(onFullscreenChange).toHaveBeenCalledWith(false);
   });
 
   it('falls back to text layout when MEDIA_SLIDE row lacks mediaKind', () => {

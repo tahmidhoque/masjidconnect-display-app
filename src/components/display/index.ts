@@ -2,6 +2,7 @@ export { default as ConnectionBanner } from './ConnectionBanner';
 export { default as EmergencyAlertOverlay } from './EmergencyAlertOverlay';
 export { default as Header } from './Header';
 export { default as Footer } from './Footer';
+export { default as MasjidLogo, LogoRail, ContentLogoFrame, FooterLeadingLogo, LogoBadge } from './MasjidLogo';
 export { default as PrayerTimesPanel } from './PrayerTimesPanel';
 export { default as PrayerTimesBar } from './PrayerTimesBar';
 export { default as PrayerStrip } from './PrayerStrip';

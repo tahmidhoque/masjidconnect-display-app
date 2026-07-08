@@ -540,6 +540,8 @@ export interface ScreenContent {
     id?: string; // masjidId - added for WebSocket connection support
     name: string;
     timezone: string;
+    /** Resolved masjid logo URL — only sent when the plan includes displayLogo (Growth+). */
+    logoUrl?: string | null;
   };
   schedule: Schedule;
   scheduledPlaylists?: ScheduledPlaylistAssignment[];
@@ -556,6 +558,8 @@ export interface ScreenContent {
       id?: string; // masjidId - added for WebSocket connection support
       name: string;
       timezone: string;
+      /** Resolved masjid logo URL — only sent when the plan includes displayLogo (Growth+). */
+      logoUrl?: string | null;
       coordinates?: {
         latitude: number;
         longitude: number;

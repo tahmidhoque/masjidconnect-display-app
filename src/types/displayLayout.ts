@@ -100,11 +100,37 @@ export interface LayoutBehaviourOverrides {
   };
 }
 
+/** Where the masjid logo sits on screen (Growth+ plan feature). */
+export const DISPLAY_LOGO_POSITIONS = ['footer', 'top-left', 'top-right'] as const;
+
+export type DisplayLogoPosition = (typeof DISPLAY_LOGO_POSITIONS)[number];
+
+export const DISPLAY_LOGO_SIZES = ['small', 'medium', 'large'] as const;
+
+export type DisplayLogoSize = (typeof DISPLAY_LOGO_SIZES)[number];
+
+export const DISPLAY_LOGO_BACKGROUNDS = ['none', 'light', 'dark'] as const;
+
+export type DisplayLogoBackground = (typeof DISPLAY_LOGO_BACKGROUNDS)[number];
+
+/**
+ * Masjid logo placement for a layout. `null`/absent = no logo. The image URL
+ * arrives separately as `masjid.logoUrl` in screen content and is only sent
+ * when the masjid's plan includes the feature.
+ */
+export interface DisplayLogoConfig {
+  position: DisplayLogoPosition;
+  size: DisplayLogoSize;
+  background: DisplayLogoBackground;
+}
+
 export interface DisplayLayoutConfig {
   version: typeof DISPLAY_LAYOUT_CONFIG_VERSION;
   landscape: OrientationLayoutConfig;
   portrait: OrientationLayoutConfig;
   theme: DisplayThemeOverrides | null;
+  /** Masjid logo placement (Growth+). `null`/absent = no logo shown. */
+  logo?: DisplayLogoConfig | null;
   /** Per-layout behaviour overrides (merged server-side into displaySettings). */
   behaviour?: LayoutBehaviourOverrides | null;
   /**
@@ -289,7 +315,7 @@ function sanitiseZone(raw: unknown): LayoutZone | null {
     const parsed: LayoutZoneHeaderOptions = {};
     if (typeof opts.showDate === 'boolean') parsed.showDate = opts.showDate;
     if (typeof opts.showHijriDate === 'boolean') parsed.showHijriDate = opts.showHijriDate;
-    if (typeof opts.showMasjidName === 'boolean') parsed.showMasjidName = opts.showMasjidName;
+    // showMasjidName in zone.options is deprecated — controlled via layout behaviour only.
     if (typeof opts.showCountdown === 'boolean') parsed.showCountdown = opts.showCountdown;
     if (Object.keys(parsed).length > 0) options = parsed;
   }
@@ -361,6 +387,29 @@ function sanitiseOrientation(raw: unknown): OrientationLayoutConfig | null {
   };
 }
 
+function sanitiseLogo(raw: unknown): DisplayLogoConfig | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const logo = raw as Record<string, unknown>;
+  const position = logo.position;
+  if (
+    typeof position !== 'string' ||
+    !(DISPLAY_LOGO_POSITIONS as readonly string[]).includes(position)
+  ) {
+    return null;
+  }
+  const size =
+    typeof logo.size === 'string' &&
+    (DISPLAY_LOGO_SIZES as readonly string[]).includes(logo.size)
+      ? (logo.size as DisplayLogoSize)
+      : 'medium';
+  const background =
+    typeof logo.background === 'string' &&
+    (DISPLAY_LOGO_BACKGROUNDS as readonly string[]).includes(logo.background)
+      ? (logo.background as DisplayLogoBackground)
+      : 'none';
+  return { position: position as DisplayLogoPosition, size, background };
+}
+
 function sanitiseTheme(raw: unknown): DisplayThemeOverrides | null {
   if (!raw || typeof raw !== 'object') return null;
   const theme = raw as Record<string, unknown>;
@@ -399,5 +448,6 @@ export function sanitiseLayoutConfig(raw: unknown): DisplayLayoutConfig | null {
     landscape,
     portrait,
     theme: sanitiseTheme(config.theme),
+    logo: sanitiseLogo(config.logo),
   };
 }

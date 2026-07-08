@@ -169,7 +169,6 @@ const LayoutRenderer: React.FC<LayoutRendererProps> = ({
         </div>
       )}
       <div className="absolute inset-0 z-[5] pointer-events-none layout-overlay" aria-hidden />
-
       <div
         className="relative z-10 flex flex-col w-full h-full min-h-0"
         style={stackStyle}

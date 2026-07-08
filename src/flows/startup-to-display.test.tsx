@@ -66,6 +66,7 @@ describe('Startup to display flow (reducer state)', () => {
           content: mockScreenContent as never,
           masjidName: 'Test Masjid',
           masjidTimezone: 'Europe/London',
+          masjidLogoUrl: null,
           carouselTime: 30,
           timeFormat: '12h',
           displaySettings: DEFAULT_DISPLAY_SETTINGS,

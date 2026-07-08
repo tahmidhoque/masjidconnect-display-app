@@ -1,16 +1,16 @@
-# Graph Report - masjidconnect-display-app  (2026-06-19)
+# Graph Report - masjidconnect-display-app  (2026-07-08)
 
 ## Corpus Check
-- 287 files · ~800,554 words
+- 308 files · ~831,193 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4449 nodes · 5863 edges · 340 communities (306 shown, 34 thin omitted)
+- 4758 nodes · 6213 edges · 360 communities (322 shown, 38 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ee9d3ac0`
+- Built from commit: `a65ac3ee`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -353,6 +353,25 @@
 - [[_COMMUNITY_Community 337|Community 337]]
 - [[_COMMUNITY_Community 338|Community 338]]
 - [[_COMMUNITY_Community 339|Community 339]]
+- [[_COMMUNITY_Community 340|Community 340]]
+- [[_COMMUNITY_Community 341|Community 341]]
+- [[_COMMUNITY_Community 342|Community 342]]
+- [[_COMMUNITY_Community 343|Community 343]]
+- [[_COMMUNITY_Community 344|Community 344]]
+- [[_COMMUNITY_Community 345|Community 345]]
+- [[_COMMUNITY_Community 346|Community 346]]
+- [[_COMMUNITY_Community 347|Community 347]]
+- [[_COMMUNITY_Community 348|Community 348]]
+- [[_COMMUNITY_Community 349|Community 349]]
+- [[_COMMUNITY_Community 350|Community 350]]
+- [[_COMMUNITY_Community 351|Community 351]]
+- [[_COMMUNITY_Community 352|Community 352]]
+- [[_COMMUNITY_Community 353|Community 353]]
+- [[_COMMUNITY_Community 354|Community 354]]
+- [[_COMMUNITY_Community 355|Community 355]]
+- [[_COMMUNITY_Community 356|Community 356]]
+- [[_COMMUNITY_Community 358|Community 358]]
+- [[_COMMUNITY_Community 359|Community 359]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `useAppSelector` - 38 edges
@@ -367,26 +386,26 @@
 10. `Display App Backend Communication - Quick Reference` - 22 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `partitionZones()` --calls--> `inferZoneRegion()`  [EXTRACTED]
-  src/components/layout/LayoutRenderer.tsx → src/types/displayLayout.ts
 - `JamaatSoonSlot()` --calls--> `usePrayerTimesContext()`  [EXTRACTED]
   src/components/display/JamaatSoonSlot.tsx → src/contexts/PrayerTimesContext.tsx
-- `ForbiddenPrayerNotice()` --calls--> `getTimeDisplayParts()`  [EXTRACTED]
-  src/components/display/ForbiddenPrayerNotice.tsx → src/utils/dateUtils.ts
+- `PrayerTimesHook` --references--> `CurrentForbiddenState`  [EXTRACTED]
+  src/hooks/usePrayerTimes.ts → src/utils/forbiddenPrayerTimes.ts
+- `Window` --references--> `CurrentForbiddenState`  [EXTRACTED]
+  src/hooks/usePrayerTimes.ts → src/utils/forbiddenPrayerTimes.ts
+- `HeaderProps` --references--> `TimeFormat`  [EXTRACTED]
+  src/components/display/Header.tsx → src/api/models.ts
 - `EmergencyState` --references--> `EmergencyAlert`  [EXTRACTED]
   src/store/slices/emergencySlice.ts → src/api/models.ts
-- `App()` --calls--> `useDevKeyboard()`  [EXTRACTED]
-  src/App.tsx → src/hooks/useDevKeyboard.ts
 
-## Communities (340 total, 34 thin omitted)
+## Communities (360 total, 38 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.07
-Nodes (28): AnalyticsDataType, BaseAnalyticsRequest, ContentItem, ContentItemType, ContentOverride, ContentViewAnalyticsData, ContentViewAnalyticsRequest, DuaContent (+20 more)
+Nodes (29): AnalyticsDataType, BaseAnalyticsRequest, ContentItem, ContentItemType, ContentOverride, ContentViewAnalyticsData, ContentViewAnalyticsRequest, DuaContent (+21 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
-Nodes (23): store, authSlice, AuthState, checkPairingStatus, initializeFromStorage, initialState, Orientation, requestPairingCode (+15 more)
+Nodes (25): store, PairingScreen(), useCountdown(), authSlice, AuthState, checkPairingStatus, initializeFromStorage, initialState (+17 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.04
@@ -394,7 +413,7 @@ Nodes (47): Authentication, Base URLs, Caching Strategy, code:javascript (// All
 
 ### Community 3 - "Community 3"
 Cohesion: 0.04
-Nodes (47): 1. Build the app and create the archive, 2. Place the archive for the image build, 3. Clone and prepare rpi-image-gen, 4. Build the image, 5. Flash the SD card, 6. Boot the Pi, Apply autologin on an already-flashed Pi, Building for Raspberry Pi 3 (+39 more)
+Nodes (48): 1. Build the app and create the archive, 2. Place the archive for the image build, 3. Clone and prepare rpi-image-gen, 4. Build the image, 5. Flash the SD card, 6. Boot the Pi, Apply autologin on an already-flashed Pi, Building for Raspberry Pi 3 (+40 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.04
@@ -418,7 +437,7 @@ Nodes (44): Automatically Set (No Action Needed), Best Practices, CI/CD - GitHub
 
 ### Community 9 - "Community 9"
 Cohesion: 0.06
-Nodes (42): TimeFormat, DAYS, Header(), HeaderProps, MONTHS, JumuahBar(), JumuahBarProps, PrayerStripProps (+34 more)
+Nodes (40): Header(), applyJummahSubstitution(), ParsedHijri, RamadanModeData, Window, selectTimeFormat(), calculateApproximateHijriDate(), convertTo24Hour() (+32 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.05
@@ -434,7 +453,7 @@ Nodes (43): Backend Data Analysis, code:block1 (expect(localforageMock.setItem).
 
 ### Community 13 - "Community 13"
 Cohesion: 0.07
-Nodes (27): el, makeWrapper(), fajrTomorrow, ishaToday, makeWrapper(), zuhrToday, { container }, title (+19 more)
+Nodes (29): store, el, makeWrapper(), fajrTomorrow, ishaToday, makeWrapper(), zuhrToday, { container } (+21 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.05
@@ -449,16 +468,16 @@ Cohesion: 0.05
 Nodes (41): API Error Issues?, API Errors, code:bash (npm test), code:bash (npm test -- --testNamePattern="should calculate next prayer"), code:bash (npm test -- prayerTimes.integration), code:bash (npm test -- storage.integration), code:bash (npm test -- errorHandling.integration), code:bash (npm test -- dateUtils) (+33 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.08
-Nodes (48): DisplaySettings, TerminologyKey, DAYS, DISPLAY_NAMES, MONTHS, PrayerStrip(), TimeWithPeriod(), PrayerCueTile() (+40 more)
+Cohesion: 0.09
+Nodes (38): TimeFormat, ForbiddenPrayerNotice(), ForbiddenPrayerNoticeProps, JumuahBarProps, PrayerStripProps, TimeWithPeriod(), PrayerCueTile(), PrayerCueTileProps (+30 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.13
 Nodes (3): MasjidDisplayClient, shouldDebounceLog(), ApiCredentials
 
 ### Community 19 - "Community 19"
-Cohesion: 0.19
-Nodes (16): clearLogHistory(), debug(), error(), info(), isProd(), log(), LogEntry, logHistory (+8 more)
+Cohesion: 0.18
+Nodes (19): App(), clearLogHistory(), debug(), error(), getLastError(), getLogHistory(), info(), isProd() (+11 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.06
@@ -473,8 +492,8 @@ Cohesion: 0.05
 Nodes (37): 1. Admin Connection, 1. Screen Connects, 2. Admin Sends Command, 2. Screen Connection, 3. Command Sent, Browser Console (Display App), code:block1 ([2025-12-27T00:36:28.622Z] [INFO] Admin registered: cmd2c3mn), code:javascript (// Check WebSocket connection) (+29 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.06
-Nodes (19): ScreenContent, clampJamaatSettingMinutes(), clampSupplicationMinutes(), contentSlice, debounceMap, extractDisplaySettings(), initialState, loadPrayerTimesFromStorage (+11 more)
+Cohesion: 0.07
+Nodes (15): Event, clampJamaatSettingMinutes(), clampSupplicationMinutes(), contentSlice, debounceMap, extractDisplaySettings(), initialState, loadPrayerTimesFromStorage (+7 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.05
@@ -509,8 +528,8 @@ Cohesion: 0.06
 Nodes (33): Admin Portal, Admin Portal Not Showing Version, Build Fails, Cleanup After Testing, code:bash (# Option A: Use the release script (recommended)), code:bash (# Build locally (no publish)), code:bash (ls -lh dist/*.deb), code:bash (npm run release:validate) (+25 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.23
-Nodes (10): JamaatSoonSlot(), JamaatSoonSlotProps, normaliseHHmm(), resolveTomorrowChange(), changedMap, fridayMap, map, saturdayMap (+2 more)
+Cohesion: 0.15
+Nodes (14): PrayerTimesContext, PrayerTimesContextValue, PrayerTimesProvider(), JamaatSoonSlot(), JamaatSoonSlotProps, normaliseHHmm(), resolveTomorrowChange(), changedMap (+6 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.06
@@ -534,7 +553,7 @@ Nodes (21): BASE_SIZES, classifyContentDensity(), computeFontSizes(), countChars
 
 ### Community 38 - "Community 38"
 Cohesion: 0.07
-Nodes (8): AlertCategory, clearExpiredAlert, connectToEmergencyService, emergencySlice, EmergencyState, initializeEmergencyService, initialState, state
+Nodes (7): clearExpiredAlert, connectToEmergencyService, emergencySlice, EmergencyState, initializeEmergencyService, initialState, state
 
 ### Community 39 - "Community 39"
 Cohesion: 0.07
@@ -565,8 +584,8 @@ Cohesion: 0.07
 Nodes (26): Auto-update Issues, Auto-updates, Build Process Details, Building for Raspberry Pi, code:bash (# Clone the repository), code:bash (export GH_TOKEN=your_github_token_here), code:bash (./build-rpi-package.sh --all --publish), code:bash (# Install dependencies) (+18 more)
 
 ### Community 46 - "Community 46"
-Cohesion: 0.08
-Nodes (14): BURGUNDY_THEME, EMERALD_THEME, LS_SPLIT_TOP, LS_STACK, LS_STACK_JUMUAH, lsSidebar(), PT_FULL, PT_PRAYER (+6 more)
+Cohesion: 0.07
+Nodes (15): BURGUNDY_THEME, EMERALD_THEME, LS_SPLIT_TOP, LS_STACK, LS_STACK_JUMUAH, lsSidebar(), PT_FULL, PT_PRAYER (+7 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.08
@@ -581,16 +600,16 @@ Cohesion: 0.08
 Nodes (25): compilerOptions, allowImportingTsExtensions, allowJs, allowSyntheticDefaultImports, baseUrl, esModuleInterop, forceConsistentCasingInFileNames, isolatedModules (+17 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.14
-Nodes (15): cleanupEmergencyMiddleware(), emergencyMiddleware(), dispatch, dispatched, dispatchSpy, middleware, mockAddListener, mockCleanup (+7 more)
+Cohesion: 0.12
+Nodes (19): cleanupEmergencyMiddleware(), emergencyMiddleware(), dispatch, dispatched, dispatchSpy, middleware, mockAddListener, mockCleanup (+11 more)
 
 ### Community 52 - "Community 52"
 Cohesion: 0.08
 Nodes (24): Animate complex properties, Assess What "Extraordinary" Means Here, code:block1 (──────────── ⚡ OVERDRIVE ─────────────), code:css (@supports (animation-timeline: scroll()) {), code:javascript (if ('gpu' in navigator) { /* WebGPU */ }), For data-heavy interfaces, For functional UI, For performance-critical UI (+16 more)
 
 ### Community 53 - "Community 53"
-Cohesion: 0.13
-Nodes (18): EmergencyAlertOverlay(), Footer(), InPrayerScreen(), InPrayerScreenProps, SilentPhonesGraphic(), SilentPhonesGraphicProps, SavedProfile, WifiNetwork (+10 more)
+Cohesion: 0.15
+Nodes (14): EmergencyAlertOverlay(), Footer(), FooterProps, SavedProfile, WifiNetwork, WifiSettingsOverlay(), useBuzzerSettings(), playBuzzerPreview() (+6 more)
 
 ### Community 54 - "Community 54"
 Cohesion: 0.08
@@ -605,8 +624,8 @@ Cohesion: 0.09
 Nodes (22): 1. Release process (when you create a new tag), 2. Getting the app on an RPi first, 3.1 Install an “old” version on the Pi, 3.2 Create a test release (newer version), 3.3 Trigger the update on the Pi, 3.4 If something goes wrong, 3.5 Quick checklist, 3. Testing the self-update (FORCE_UPDATE) with a test release (+14 more)
 
 ### Community 57 - "Community 57"
-Cohesion: 0.14
-Nodes (11): AsmaName, ContentCarousel(), ContentCarouselProps, DonationSlide, EventSlide, VideoSlide, FontSizeConfig, MediaPdfPageProps (+3 more)
+Cohesion: 0.13
+Nodes (12): AsmaName, ContentCarousel(), ContentCarouselProps, CourseSlide, DonationSlide, EventSlide, VideoSlide, FontSizeConfig (+4 more)
 
 ### Community 58 - "Community 58"
 Cohesion: 0.09
@@ -641,28 +660,28 @@ Cohesion: 0.31
 Nodes (9): isPortraitLayout(), LayoutMode, ORIENTATION_TO_DEGREES, orientationToLayoutMode(), orientationToRotationDegrees(), parseRotationDegrees(), parseScreenOrientation(), VALID_DEGREES (+1 more)
 
 ### Community 67 - "Community 67"
-Cohesion: 0.34
+Cohesion: 0.36
 Nodes (5): createErrorResponse(), normalizeApiResponse(), validateApiResponse(), ApiResponse, VersionInfo
 
 ### Community 68 - "Community 68"
 Cohesion: 0.15
-Nodes (16): APP_DIR, connectWifi(), __dirname, DIST_DIR, forgetWifi(), getEthernetStatus(), getSavedWifi(), getWifiScan() (+8 more)
+Nodes (17): APP_DIR, connectWifi(), __dirname, DIST_DIR, forgetWifi(), getEthernetStatus(), getSavedWifi(), getWifiScan() (+9 more)
 
 ### Community 69 - "Community 69"
-Cohesion: 0.18
-Nodes (13): apModeConnectAsync(), _args, CAPTIVE_PORTAL_PATHS, checkConnectivity(), enableWifiOnBoot(), handleConnect(), handleScan(), handleStartDisplay() (+5 more)
+Cohesion: 0.16
+Nodes (15): apModeConnectAsync(), applyRegDomain(), _args, CAPTIVE_PORTAL_PATHS, checkConnectivity(), enableWifiOnBoot(), handleConnect(), handleScan() (+7 more)
 
 ### Community 70 - "Community 70"
 Cohesion: 0.15
-Nodes (16): APP_DIR, connectWifi(), __dirname, DIST_DIR, forgetWifi(), getEthernetStatus(), getSavedWifi(), getWifiScan() (+8 more)
+Nodes (17): APP_DIR, connectWifi(), __dirname, DIST_DIR, forgetWifi(), getEthernetStatus(), getSavedWifi(), getWifiScan() (+9 more)
 
 ### Community 71 - "Community 71"
-Cohesion: 0.18
-Nodes (13): apModeConnectAsync(), _args, CAPTIVE_PORTAL_PATHS, checkConnectivity(), enableWifiOnBoot(), handleConnect(), handleScan(), handleStartDisplay() (+5 more)
+Cohesion: 0.16
+Nodes (15): apModeConnectAsync(), applyRegDomain(), _args, CAPTIVE_PORTAL_PATHS, checkConnectivity(), enableWifiOnBoot(), handleConnect(), handleScan() (+7 more)
 
 ### Community 72 - "Community 72"
-Cohesion: 0.18
-Nodes (18): SalahKey, Window, clampJamaatMinutes(), jamaatPhaseMinutesForDisplayPrayer(), jamaatPhaseMinutesForSalah(), postJamaatDelayMinutes(), postJamaatSupplicationWindowMinutes(), prayerNameToSalahKey() (+10 more)
+Cohesion: 0.17
+Nodes (19): DisplaySettings, SalahKey, Window, clampJamaatMinutes(), jamaatPhaseMinutesForDisplayPrayer(), jamaatPhaseMinutesForSalah(), postJamaatDelayMinutes(), postJamaatSupplicationWindowMinutes() (+11 more)
 
 ### Community 73 - "Community 73"
 Cohesion: 0.18
@@ -753,12 +772,12 @@ Cohesion: 0.15
 Nodes (12): Assess Current Layout, Break Card Grid Monotony, Choose the Right Layout Tool, Create Visual Rhythm, Establish a Spacing System, Improve Layout Systematically, Manage Depth & Elevation, MANDATORY PREPARATION (+4 more)
 
 ### Community 98 - "Community 98"
-Cohesion: 0.15
-Nodes (12): bar, { container }, img, items, mediaLayer, overlay, pdfRoot, React (+4 more)
+Cohesion: 0.14
+Nodes (13): bar, { container }, img, items, mediaLayer, onFullscreenChange, overlay, pdfRoot (+5 more)
 
 ### Community 99 - "Community 99"
 Cohesion: 0.09
-Nodes (23): Event, Schedule, ScheduledPlaylistAssignment, ScheduleItem, buildPlaylistsBoundaryKey(), buildPlaylistsContentRevision(), buildPrayerTimesBoundaryKey(), after (+15 more)
+Nodes (20): Schedule, ScheduleItem, buildPlaylistsBoundaryKey(), buildPlaylistsContentRevision(), buildPrayerTimesBoundaryKey(), after, base, baseKey (+12 more)
 
 ### Community 100 - "Community 100"
 Cohesion: 0.15
@@ -769,8 +788,8 @@ Cohesion: 0.15
 Nodes (12): 🎉 65 Working Tests | 100% Pass Rate | 0.7s Runtime, code:bash (# Run all working tests), code:block8 (src/), Future Improvements (Optional), Long Term, MasjidConnect Display App - Testing, Quick Start, Short Term (+4 more)
 
 ### Community 102 - "Community 102"
-Cohesion: 0.12
-Nodes (21): clamp(), DEFAULT_LAYOUT_CONFIG, DISPLAY_LAYOUT_CONFIG_VERSION, inferPrayerTimesLayout(), LAYOUT_REGIONS, LAYOUT_STRUCTURES, LAYOUT_ZONE_COMPONENTS, LayoutBehaviourOverrides (+13 more)
+Cohesion: 0.09
+Nodes (28): clamp(), DEFAULT_LAYOUT_CONFIG, DISPLAY_LAYOUT_CONFIG_VERSION, DISPLAY_LOGO_BACKGROUNDS, DISPLAY_LOGO_POSITIONS, DISPLAY_LOGO_SIZES, DisplayLogoPosition, isPrayerOnlyLayout() (+20 more)
 
 ### Community 103 - "Community 103"
 Cohesion: 0.22
@@ -781,8 +800,8 @@ Cohesion: 0.09
 Nodes (20): HeartbeatRequest, HeartbeatResponse, RemoteCommand, CredentialEventType, CredentialListener, Credentials, CredentialValidation, STORAGE_KEYS (+12 more)
 
 ### Community 105 - "Community 105"
-Cohesion: 0.13
-Nodes (20): PrayerTimesContext, PrayerTimesContextValue, PrayerTimesProvider(), usePrayerTimesContext(), isJamaatBlackoutDevForced(), useJamaatBuzzer(), usePrayerPhase(), usePrayerTimes() (+12 more)
+Cohesion: 0.11
+Nodes (32): TerminologyKey, usePrayerTimesContext(), CountdownDisplayProps, InPrayerScreen(), InPrayerScreenProps, JumuahBar(), CountdownTarget, PrayerCountdown() (+24 more)
 
 ### Community 106 - "Community 106"
 Cohesion: 0.17
@@ -813,16 +832,16 @@ Cohesion: 0.17
 Nodes (11): Integration Tests (34 tests) ✅, Long Term (Optional), Manual Testing ✅, Overview, Recommendations, Short Term (Do Now), Skipped Tests (132 tests) ⏭️, Skipped Tests Documentation (+3 more)
 
 ### Community 113 - "Community 113"
-Cohesion: 0.09
-Nodes (30): PrayerTimes, ForbiddenPrayerNotice(), ForbiddenPrayerNoticeProps, buildTomorrowsJamaats(), findUpcomingFridayJummahInWeek(), FormattedPrayerTime, getJamaatTime(), parseYmdInTz() (+22 more)
+Cohesion: 0.10
+Nodes (26): PrayerTimes, buildTomorrowsJamaats(), findUpcomingFridayJummahInWeek(), FormattedPrayerTime, getJamaatTime(), parseYmdInTz(), PRAYER_NAMES, PRAYERS_WITH_JAMAAT (+18 more)
 
 ### Community 114 - "Community 114"
 Cohesion: 0.18
 Nodes (10): Assess Current Typography, Establish Hierarchy, Fix Readability, Font Selection, Improve Typography Systematically, MANDATORY PREPARATION, Plan Typography Improvements, Refine Details (+2 more)
 
 ### Community 115 - "Community 115"
-Cohesion: 0.21
-Nodes (10): useAppLoader(), App(), AppRoutes(), DisplayScreen, LoadingScreen, PairingScreen, ScreenType, useLoadingRotationDegrees() (+2 more)
+Cohesion: 0.25
+Nodes (7): useAppLoader(), AppRoutes(), DisplayScreen, LoadingScreen, PairingScreen, ScreenType, useLoadingRotationDegrees()
 
 ### Community 116 - "Community 116"
 Cohesion: 0.18
@@ -865,8 +884,8 @@ Cohesion: 0.22
 Nodes (7): BuzzerSettings, BuzzerSettingsApi, clampVolume(), DEFAULTS, getSnapshot(), readFromStorage(), subscribers
 
 ### Community 126 - "Community 126"
-Cohesion: 0.18
-Nodes (9): Architecture, code:bash (npm run dev           # Start dev server (port 3001)), code:bash (npx vitest run src/path/to/file.test.ts), Commands, Detailed Rules, Environment, Git & Releases, Non-Negotiable Rules (+1 more)
+Cohesion: 0.14
+Nodes (12): Architecture, code:bash (npm run dev           # Dev server (port 3001)), code:bash (npx vitest run src/path/to/file.test.ts), Commands, Deployment Topology (context for debugging), Detailed Rules, Environment, Git & Releases (+4 more)
 
 ### Community 127 - "Community 127"
 Cohesion: 0.31
@@ -913,8 +932,8 @@ Cohesion: 0.20
 Nodes (10): Automated Build & Release, code:bash (git tag v1.2.0), code:bash (git push origin main), code:bash (npm test -- --watchAll=false), code:bash (npm run version:bump:minor), code:bash (npm run release:prepare), code:bash (git add package.json), Manual Workflow Trigger (+2 more)
 
 ### Community 138 - "Community 138"
-Cohesion: 0.19
-Nodes (17): applyPrayerDisplayDevPreset(), clearPrayerDisplayDevOverrides(), cyclePrayerDisplayDevState(), defaultPrayerName(), dispatchPrayerDisplayDevChange(), findCurrentCycleIndex(), InPrayerSubPhaseDev, PRAYER_DISPLAY_DEV_CYCLE (+9 more)
+Cohesion: 0.18
+Nodes (18): applyPrayerDisplayDevPreset(), clearPrayerDisplayDevOverrides(), cyclePrayerDisplayDevState(), defaultPrayerName(), dispatchPrayerDisplayDevChange(), findCurrentCycleIndex(), InPrayerSubPhaseDev, isJamaatBlackoutDevForced() (+10 more)
 
 ### Community 139 - "Community 139"
 Cohesion: 0.22
@@ -989,8 +1008,8 @@ Cohesion: 0.54
 Nodes (7): do_scan(), do_start(), do_status(), do_stop(), log(), log_err(), wifi-hotspot.sh script
 
 ### Community 157 - "Community 157"
-Cohesion: 0.57
-Nodes (7): have_connectivity(), log(), recover_level_1(), recover_level_2(), recover_level_3(), wifi_is_configured(), wifi-watchdog.sh script
+Cohesion: 0.35
+Nodes (11): have_connectivity(), hotspot_running(), log(), recover_level_1(), recover_level_2(), recover_level_3(), setup_server_running(), start_recovery_hotspot() (+3 more)
 
 ### Community 158 - "Community 158"
 Cohesion: 0.25
@@ -1009,8 +1028,8 @@ Cohesion: 0.25
 Nodes (7): Best Practices, Communication, Release Timing, Support, Table of Contents, Version Management & Release Strategy, Versioning Guidelines
 
 ### Community 162 - "Community 162"
-Cohesion: 0.57
-Nodes (7): have_connectivity(), log(), recover_level_1(), recover_level_2(), recover_level_3(), wifi_is_configured(), wifi-watchdog.sh script
+Cohesion: 0.35
+Nodes (11): have_connectivity(), hotspot_running(), log(), recover_level_1(), recover_level_2(), recover_level_3(), setup_server_running(), start_recovery_hotspot() (+3 more)
 
 ### Community 163 - "Community 163"
 Cohesion: 0.40
@@ -1501,8 +1520,8 @@ Cohesion: 0.67
 Nodes (3): code:javascript (// In browser console:), code:javascript (window.rpiConfig.updateConfig({), Reverting Changes (If Needed)
 
 ### Community 292 - "Community 292"
-Cohesion: 0.09
-Nodes (14): store, store, mockGetCredentials, preloaded, { result }, store, listener, unsub (+6 more)
+Cohesion: 0.10
+Nodes (13): store, mockGetCredentials, preloaded, { result }, store, listener, unsub, mockApiCredentials (+5 more)
 
 ### Community 293 - "Community 293"
 Cohesion: 0.67
@@ -1517,64 +1536,64 @@ Cohesion: 0.67
 Nodes (3): Later (If Needed), 🎯 Next Steps (Optional), Now
 
 ### Community 317 - "Community 317"
-Cohesion: 0.12
-Nodes (11): BASE_SPACING, LayoutRendererProps, partitionZones(), PortraitLayoutProps, BASE_SPACING, RenderedZone, ZoneStackLayoutProps, LayoutRegion (+3 more)
+Cohesion: 0.08
+Nodes (16): BASE_SPACING, LayoutRendererProps, partitionZones(), PortraitLayoutProps, Orientation, REF_LANDSCAPE, REF_PORTRAIT, ReferenceViewportProps (+8 more)
 
 ### Community 318 - "Community 318"
-Cohesion: 0.10
-Nodes (18): CACHE_EXPIRATION, CacheItem, debounceMap, EndpointBackoff, offlineStorage, POLLING_INTERVALS, STORAGE_KEYS, AnalyticsRequest (+10 more)
+Cohesion: 0.11
+Nodes (17): CACHE_EXPIRATION, CacheItem, debounceMap, EndpointBackoff, offlineStorage, POLLING_INTERVALS, STORAGE_KEYS, AnalyticsRequest (+9 more)
 
 ### Community 319 - "Community 319"
 Cohesion: 0.12
 Nodes (13): ConnectionBanner(), ConnectionStatus, ConnectionStatusType, preloaded, { result }, store, useConnectionStatus(), selectIsAuthenticated() (+5 more)
 
 ### Community 321 - "Community 321"
-Cohesion: 0.12
-Nodes (17): AlertUrgency, AlertContent(), CATEGORY_COLORS, CategoryMeta, formatCountdown(), getAlertBackgroundColor(), getCategoryMeta(), getTextColor() (+9 more)
+Cohesion: 0.11
+Nodes (18): AlertCategory, AlertUrgency, AlertContent(), CATEGORY_COLORS, CategoryMeta, formatCountdown(), getAlertBackgroundColor(), getCategoryMeta() (+10 more)
 
 ### Community 322 - "Community 322"
 Cohesion: 0.46
 Nodes (7): DisplayThemeOverrides, buildThemeStyle(), hexToRgba(), parseHex(), Rgb, shadeHexColour(), toChannel()
 
 ### Community 323 - "Community 323"
-Cohesion: 0.19
-Nodes (10): VideoSlideProps, resolveItemDuration(), scheduleItemToCarouselItems(), normalizedItem, result, scheduleItem, MEDIA_FIT_VALUES, MediaFit (+2 more)
+Cohesion: 0.13
+Nodes (17): eventToCarouselItem(), resolveDisplayMode(), resolveItemDuration(), scheduleItemToCarouselItems(), normalizedItem, result, scheduleItem, selectDisplayLayoutConfig (+9 more)
 
 ### Community 324 - "Community 324"
 Cohesion: 0.24
 Nodes (7): CarouselItem, BrandedQrFrame(), DonationSlideProps, formatMoney(), logoSizeForQr(), ThermometerBlock(), WALLET_BADGES
 
 ### Community 325 - "Community 325"
-Cohesion: 0.16
-Nodes (7): root, persistConfig, persistedReducer, persistor, rootReducer, stateValidationTransform, store
+Cohesion: 0.22
+Nodes (3): root, persistor, store
 
 ### Community 326 - "Community 326"
-Cohesion: 0.29
-Nodes (4): Orientation, REF_LANDSCAPE, REF_PORTRAIT, ReferenceViewportProps
+Cohesion: 0.09
+Nodes (27): DAYS, DAYS_SHORT, HeaderLogo, HeaderProps, MONTHS, MONTHS_SHORT, BACKGROUND_CHIP, FOOTER_HEIGHT (+19 more)
 
 ### Community 327 - "Community 327"
 Cohesion: 0.24
 Nodes (9): CHROME_PATHS, __dirname, main(), ONLY, OUT_DIR, PORTRAIT, SCENARIOS, sizeFor() (+1 more)
 
 ### Community 328 - "Community 328"
-Cohesion: 0.33
-Nodes (4): { container }, onEnded, onReady, video
+Cohesion: 0.22
+Nodes (6): { container }, onEnded, onReady, video, VideoSlideProps, MediaFit
 
 ### Community 329 - "Community 329"
-Cohesion: 0.16
-Nodes (13): config, DEFAULTS, EnvironmentConfig, CountdownTarget, PrayerCountdown(), alreadyBuzzedToday(), DedupeState, loadDedupe() (+5 more)
+Cohesion: 0.17
+Nodes (11): config, DEFAULTS, EnvironmentConfig, alreadyBuzzedToday(), DedupeState, loadDedupe(), markBuzzedToday(), todayKey() (+3 more)
 
 ### Community 330 - "Community 330"
 Cohesion: 0.33
 Nodes (3): LandscapeLayoutProps, { container }, stack
 
 ### Community 331 - "Community 331"
-Cohesion: 0.33
-Nodes (7): PairingScreen(), useCountdown(), getAdminBaseUrl(), getApiBaseUrl(), getPairingUrl(), base, url
+Cohesion: 0.43
+Nodes (5): getAdminBaseUrl(), getApiBaseUrl(), getPairingUrl(), base, url
 
 ### Community 332 - "Community 332"
-Cohesion: 0.08
-Nodes (22): AppLoaderState, AppLoadingPhase, DEFAULT_TASKS, createFallbackSchedule(), loadCachedContent, normalizeScheduleData(), refreshAllContent, refreshEvents (+14 more)
+Cohesion: 0.11
+Nodes (17): createFallbackSchedule(), normalizeScheduleData(), refreshEvents, refreshPrayerTimes, refreshSchedule, badItem, content, events (+9 more)
 
 ### Community 333 - "Community 333"
 Cohesion: 0.50
@@ -1589,32 +1608,92 @@ Cohesion: 0.36
 Nodes (11): useScheduledPlaylist(), formatTimeInTz(), getDayOfWeekInTz(), getEffectiveDayForRecurring(), getNextBoundary(), hasTimeComponent(), isWithinDateRange(), isWithinTimeWindow() (+3 more)
 
 ### Community 337 - "Community 337"
-Cohesion: 0.20
-Nodes (7): active, assignments, mockPrayerTimes, next, now, prayerAssignment, recurringAssignment
+Cohesion: 0.18
+Nodes (8): ScheduledPlaylistAssignment, active, assignments, mockPrayerTimes, next, now, prayerAssignment, recurringAssignment
 
 ### Community 338 - "Community 338"
 Cohesion: 0.29
 Nodes (5): AlertContentProps, OrientationWrapperProps, { container }, inner, RotationDegrees
 
+### Community 339 - "Community 339"
+Cohesion: 0.24
+Nodes (7): AppLoaderState, AppLoadingPhase, DEFAULT_TASKS, LoadingTask, LoadingScreenProps, loadCachedContent, refreshAllContent
+
+### Community 340 - "Community 340"
+Cohesion: 0.09
+Nodes (19): 0. Confirm the backend contract, 1. Extend `CarouselItem`, 2. Add a mapping branch in the schedule-item mapper, 3. Create the slide component, 4. Register the render branch in `ContentCarousel`, 5. (Optional) export it, 6. Tests, 7. Preview it (+11 more)
+
+### Community 341 - "Community 341"
+Cohesion: 0.09
+Nodes (21): 1. Change countdown / phase behaviour safely, 2. Add a prayer-adjacent display element, 3. Debug wrong times / wrong highlighted prayer / clock drift, 4. Work on tomorrow's-jamaat-change announcements, code:block1 (useCurrentTime  ──►  useMasjidTime  ──►  usePrayerTimes  ──►), code:ts (import { nowMinutesInTz, toMinutesFromMidnight } from '../ut), code:bash (# The safety net — run these for any change in this domain:), Countdown components (+13 more)
+
+### Community 342 - "Community 342"
+Cohesion: 0.10
+Nodes (19): 1. Add a field to an existing slice, 2. Add a new async thunk that calls the API, 3. Add a selector / consume state in a component, 4. Test a slice change, code:ts (setCarouselTime: (state, action: PayloadAction<number>) => {), code:ts (export const selectCarouselTime = (state: { content: Content), code:ts (builder), code:ts (export const selectDisplaySettings = (state: { content: Cont) (+11 more)
+
+### Community 343 - "Community 343"
+Cohesion: 0.10
+Nodes (20): 1. Test a new Redux slice (or a new reducer/action in an existing slice), 2. Test a new hook, 3. Test a new display component, 4. Test a service singleton, 5. Fix a failing test properly (vs masking it), code:bash (npm run lint                              # 1. ESLint — zero), code:ts (import { describe, it, expect } from 'vitest';), code:ts (import { describe, it, expect, vi, beforeEach, afterEach } f) (+12 more)
+
+### Community 344 - "Community 344"
+Cohesion: 0.10
+Nodes (19): 1. Cut a release start-to-finish (the standard procedure), 2. Hotfix a live release, 3. Roll back a bad release, 4. Deploy a local build to a test Pi (no release needed), 5. Verify an installation / debug an update, code:bash (npm run version:bump:patch   # or :minor / :major), code:bash (git tag v<version>), code:bash (sudo /opt/masjidconnect/deploy/install-release.sh          #) (+11 more)
+
+### Community 345 - "Community 345"
+Cohesion: 0.11
+Nodes (18): 1. Add or change a design token, 2. Style a new component correctly, 3. Make a layout/component work in both orientations, 4. Avoid Pi performance traps (checklist for any visual change), code:bash (npm run lint     # must pass), Fonts (offline rule: self-hosted only), Gotchas & failure modes, Mental model (+10 more)
+
+### Community 346 - "Community 346"
+Cohesion: 0.12
+Nodes (15): 1. Add a new API endpoint end-to-end, 2. Change a response model safely, 3. Debug a failing API call, API Integration, code:ts (// src/api/apiClient.ts), code:ts (export const SCREEN_ENDPOINTS = {), code:ts (public async getMyThing(options?: { cacheBust?: boolean; for), code:bash (curl -v "$API_URL/api/screen/content" -H "Authorization: Bea) (+7 more)
+
+### Community 347 - "Community 347"
+Cohesion: 0.12
+Nodes (15): 1. Make a coordinated cross-repo change (e.g. new field on screen content), 2. Find how an endpoint the display calls is implemented, 3. Change or add a realtime event, 4. Change the carousel? Update the admin preview too, code:bash (curl -s -H "Authorization: Bearer <screen-apiKey>" http://lo), Gotchas & failure modes, Mental model, Realtime (Socket.io) contract (+7 more)
+
+### Community 348 - "Community 348"
+Cohesion: 0.13
+Nodes (13): 1. Add a new realtime event end-to-end, 2. Add a new remote-control command, 3. Debug "display not receiving updates", code:block1 (Admin portal (backend repo apps/admin — Next.js)), code:ts (this.socket.on('announcement:flash', (data: unknown) => this), code:bash (npm run lint                                                ), Gotchas & failure modes, Mental model (+5 more)
+
+### Community 349 - "Community 349"
+Cohesion: 0.14
+Nodes (13): 1. Blank or white screen, 2. Stuck on the loading screen, 3. App restarts / reloads unexpectedly, 4. Memory leaks / slow degradation over days, 5. Stale content (screen shows old data), 6. Emergency alert stuck on screen, code:bash (npm run lint          # required before any change is "done"), Debugging Runtime Issues (+5 more)
+
+### Community 350 - "Community 350"
+Cohesion: 0.15
+Nodes (12): 1. Add a new cached data type with offline fallback, 2. Adjust sync cadence / behaviour, 3. Debug stale data / cache invalidation, code:ts (} else if (cacheKey === CACHE_KEYS.NOTICES) {), code:bash (npm run lint), Gotchas & failure modes, Mental model, Offline Storage & Sync (+4 more)
+
+### Community 351 - "Community 351"
+Cohesion: 0.15
+Nodes (12): 1. Debug a device that won't pair, 2. Debug a device that lost its pairing, 3. Change the pairing/init flow safely, 4. Factory reset, code:bash (npm run lint), Gotchas & failure modes, Mental model, Pairing & Authentication (+4 more)
+
+### Community 352 - "Community 352"
+Cohesion: 0.17
+Nodes (11): Architecture, CLAUDE.md, code:bash (npm run dev           # Dev server (port 3001)), Commands, Deployment Topology (context for debugging), Environment, Git & Releases, Non-Negotiable Rules (+3 more)
+
+### Community 353 - "Community 353"
+Cohesion: 0.32
+Nodes (4): CourseSlideData, BrandedQrFrame(), CourseSlideProps, logoSizeForQr()
+
 ## Knowledge Gaps
-- **2247 isolated node(s):** `version`, `source`, `sourceType`, `computedHash`, `source` (+2242 more)
+- **2417 isolated node(s):** `version`, `source`, `sourceType`, `computedHash`, `source` (+2412 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **34 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **38 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ApiClient` connect `Community 47` to `Community 81`, `Community 82`, `Community 318`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `MasjidDisplayClient` connect `Community 18` to `Community 19`, `Community 67`, `Community 318`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `PrayerTimes` connect `Community 113` to `Community 0`, `Community 99`, `Community 67`, `Community 105`, `Community 43`, `Community 332`, `Community 46`, `Community 336`, `Community 337`, `Community 23`, `Community 187`, `Community 318`?**
-  _High betweenness centrality (0.003) - this node is a cross-community bridge._
+- **Why does `ApiClient` connect `Community 47` to `Community 81`, `Community 354`, `Community 82`?**
+  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+- **Why does `SyncService` connect `Community 29` to `Community 104`?**
+  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+- **Why does `RealtimeService` connect `Community 92` to `Community 65`?**
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **What connects `version`, `source`, `sourceType` to the rest of the system?**
-  _2247 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2417 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.059379217273954114 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05807200929152149 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
   _Cohesion score 0.041666666666666664 - nodes in this community are weakly interconnected._
