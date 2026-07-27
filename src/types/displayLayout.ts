@@ -87,7 +87,7 @@ export interface LayoutBehaviourOverrides {
   minutesAfterJamaatUntilNextPrayerBySalah?: Partial<
     Record<'fajr' | 'zuhr' | 'asr' | 'maghrib' | 'isha', number>
   >;
-  jamaatInProgressMode?: 'screen' | 'dark';
+  jamaatInProgressMode?: 'screen' | 'dark' | 'content';
   timeFormat?: '12h' | '24h';
   postAdhanSupplication?: {
     enabled?: boolean;
@@ -264,6 +264,70 @@ export function resolvePrayerFocusZoneSize(
     default:
       return 0;
   }
+}
+
+/**
+ * Content carousel Auto (size 0) should still claim leftover vertical space when
+ * it is the only flexible zone — otherwise slide height changes cause layout jump.
+ * Explicit Small–Maximum weights are honoured as flex shares with siblings.
+ */
+export function resolveContentZoneSize(zone: LayoutZone, zones: LayoutZone[]): number {
+  if (zone.component !== 'content') return zone.size;
+  if (zone.size > 0) return zone.size;
+
+  const hasOtherFlexible = zones.some((entry) => {
+    if (!entry.visible || entry.id === zone.id) return false;
+    // Jumu'ah bar and footer are always intrinsic on the device.
+    if (entry.component === 'jumuah-bar' || entry.component === 'footer') {
+      return false;
+    }
+    return entry.size > 0;
+  });
+
+  return hasOtherFlexible ? 0 : 1;
+}
+
+/**
+ * Effective flex weight after component-specific rules.
+ * - jumuah-bar: always intrinsic (height is content-driven; use fontScale)
+ * - content: Auto claims leftover when sole flexible zone
+ * - prayer-only layouts: resolvePrayerFocusZoneSize
+ */
+export function resolveEffectiveZoneSize(
+  zone: LayoutZone,
+  zones: LayoutZone[],
+  structure: LayoutStructure,
+): number {
+  if (zone.component === 'jumuah-bar') return 0;
+  if (zone.component === 'content') return resolveContentZoneSize(zone, zones);
+  return resolvePrayerFocusZoneSize(zone, zones, structure);
+}
+
+/**
+ * Size-aware rem height bands for the horizontal prayer-times strip.
+ * Replaces the old hard `min-h-[8rem] max-h-[18rem]` clamp so Small–Maximum
+ * presets produce visibly different heights. Auto (0) stays intrinsic.
+ *
+ * Bands map to ZONE_SIZE_PRESETS weights (3 / 5 / 8 / 12); custom values snap
+ * to the nearest preset.
+ */
+export function prayerStripHeightClassName(size: number): string {
+  if (size <= 0) return 'min-h-0';
+
+  const bands: Array<{ weight: number; className: string }> = [
+    { weight: 3, className: 'min-h-[6rem] max-h-[10rem]' },
+    { weight: 5, className: 'min-h-[8rem] max-h-[12rem]' },
+    { weight: 8, className: 'min-h-[10rem] max-h-[15rem]' },
+    { weight: 12, className: 'min-h-[12rem] max-h-[18rem]' },
+  ];
+
+  let nearest = bands[0];
+  for (const band of bands) {
+    if (Math.abs(band.weight - size) < Math.abs(nearest.weight - size)) {
+      nearest = band;
+    }
+  }
+  return nearest.className;
 }
 
 function sanitiseStructure(raw: unknown): LayoutStructure {

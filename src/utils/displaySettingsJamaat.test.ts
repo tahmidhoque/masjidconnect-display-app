@@ -29,7 +29,8 @@ describe("prayerNameToSalahKey", () => {
   it("maps display names to salah keys", () => {
     expect(prayerNameToSalahKey("Fajr")).toBe("fajr");
     expect(prayerNameToSalahKey("Zuhr")).toBe("zuhr");
-    expect(prayerNameToSalahKey("Jumuah")).toBe("zuhr");
+    expect(prayerNameToSalahKey("Jumuah")).toBe("jumuah");
+    expect(prayerNameToSalahKey("Jumu'ah")).toBe("jumuah");
     expect(prayerNameToSalahKey("Asr")).toBe("asr");
     expect(prayerNameToSalahKey("Maghrib")).toBe("maghrib");
     expect(prayerNameToSalahKey("Isha")).toBe("isha");

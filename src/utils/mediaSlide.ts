@@ -14,9 +14,9 @@ export function parseMediaFullscreenFlag(raw: unknown): boolean {
 
 /**
  * How a MEDIA_SLIDE asset is fitted to the display area:
- * - `smart`   — edge-to-edge; whole image shown over a blurred zoomed copy of itself
- *               (best for posters whose aspect ratio differs from the screen)
- * - `cover`   — edge-to-edge; fills the screen, edges may be cropped
+ * - `smart`   — fills the content/carousel zone; whole image over a blurred zoomed
+ *               copy of itself (prayer chrome stays visible)
+ * - `cover`   — true fullscreen portal; fills the entire display, edges may be cropped
  * - `contain` — inline within the carousel content box; whole image, plain letterbox
  */
 export type MediaFit = 'smart' | 'contain' | 'cover';

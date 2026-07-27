@@ -21,6 +21,11 @@ import { resolveTerminology } from '../../utils/prayerTerminology';
 export interface SilentPhonesGraphicProps {
   /** Landscape: two-column row — large graphic left, message and badge right. */
   landscapeSplit?: boolean;
+  /**
+   * Terminology-resolved prayer name for the badge
+   * (e.g. "Maghrib" → "Maghrib Jamaat is about to begin").
+   */
+  prayerName?: string | null;
 }
 
 const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
@@ -94,9 +99,13 @@ const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
 
 const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
   landscapeSplit = false,
+  prayerName = null,
 }) => {
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
+  const badgeText = prayerName
+    ? `${prayerName} ${jamaatLabel} is about to begin`
+    : `${jamaatLabel} is about to begin`;
 
   if (landscapeSplit) {
     return (
@@ -117,7 +126,7 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
             </p>
           </div>
           <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
-            {jamaatLabel} is about to begin
+            {badgeText}
           </span>
         </div>
       </div>
@@ -139,7 +148,7 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
         </p>
       </div>
       <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
-        {jamaatLabel} is about to begin
+        {badgeText}
       </span>
     </div>
   );

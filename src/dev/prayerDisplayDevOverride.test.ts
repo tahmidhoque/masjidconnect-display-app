@@ -22,8 +22,13 @@ describe('prayerDisplayDevOverride', () => {
     vi.unstubAllEnvs();
   });
 
-  it('cycles from auto to jamaat-soon then post-adhan supplication', () => {
+  it('cycles from auto through pre-jamaat-countdown, jamaat-soon, then post-adhan supplication', () => {
     expect(resolvePrayerDisplayDevOverride('Asr')).toBeNull();
+
+    cyclePrayerDisplayDevState();
+    expect(resolvePrayerDisplayDevOverride('Asr')).toMatchObject({
+      phase: 'pre-jamaat-countdown',
+    });
 
     cyclePrayerDisplayDevState();
     expect(resolvePrayerDisplayDevOverride('Asr')).toMatchObject({

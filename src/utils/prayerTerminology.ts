@@ -59,3 +59,23 @@ export function prayerRowNameToTerminologyKey(rowName: string): TerminologyKey |
   return null;
 }
 
+/**
+ * Resolve a phase/row prayer name for on-screen copy (InPrayer, silent phones, etc.).
+ * Friday Zuhr → jummah terminology; otherwise terminology for the row key.
+ * Zuhr fallback matches the strip (`Dhuhr`) when terminology is unset.
+ */
+export function resolvePhasePrayerLabel(
+  rowName: string | null | undefined,
+  terminology: TerminologyMap,
+  options?: { isJumuahToday?: boolean },
+): string {
+  if (!rowName) return '';
+  if (options?.isJumuahToday && rowName === 'Zuhr') {
+    return resolveTerminology(terminology, 'jummah', 'Jumuah');
+  }
+  const key = prayerRowNameToTerminologyKey(rowName);
+  if (!key) return rowName;
+  const fallback = key === 'zuhr' ? 'Dhuhr' : rowName;
+  return resolveTerminology(terminology, key, fallback);
+}
+

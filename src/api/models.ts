@@ -296,12 +296,13 @@ export interface AnalyticsResponse {
 /**
  * Time format preference for displaying times
  * - '12h': 12-hour format with AM/PM (e.g., "4:30 PM")
+ * - '12h-nop': 12-hour format without AM/PM (e.g., "4:30")
  * - '24h': 24-hour format (e.g., "16:30")
  */
-export type TimeFormat = "12h" | "24h";
+export type TimeFormat = "12h" | "12h-nop" | "24h";
 
 /** Prayer row keys for per-salah jamaat-in-progress overrides (portal display settings). */
-export type SalahKey = "fajr" | "zuhr" | "asr" | "maghrib" | "isha";
+export type SalahKey = "fajr" | "zuhr" | "asr" | "maghrib" | "isha" | "jumuah";
 
 /**
  * Screen content configuration settings
@@ -322,8 +323,8 @@ export interface DisplaySettings {
   ramadanMode: "auto" | "on" | "off";
   /** Resolved value: true if Ramadan mode should be shown (based on ramadanMode + Hijri date) */
   isRamadanActive: boolean;
-  /** "12h" = 5:30 AM, "24h" = 05:30 */
-  timeFormat: "12h" | "24h";
+  /** "12h" = 5:30 AM, "12h-nop" = 5:30, "24h" = 05:30 */
+  timeFormat: TimeFormat;
   /** Show imsak/sehri time in the prayer times section */
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */
@@ -376,8 +377,18 @@ export interface DisplaySettings {
     durationMinutes: number;
   };
 
-  /** During jamaat: `screen` = in-progress graphic, `dark` = full black overlay. */
-  jamaatInProgressMode?: 'screen' | 'dark';
+  /** During jamaat: `screen` = in-progress graphic, `dark` = full black overlay, `content` = show a specific carousel item. */
+  jamaatInProgressMode?: 'screen' | 'dark' | 'content';
+  /** When jamaatInProgressMode === 'content', the ID of the carousel item to display. */
+  jamaatInProgressContentId?: string | null;
+
+  /** Show a dedicated countdown overlay N seconds before jamaat. */
+  preJamaatCountdownEnabled?: boolean;
+  /** Seconds before jamaat to start the countdown overlay (30–120, default 60). */
+  preJamaatCountdownSeconds?: number;
+
+  /** Show pagination dots and other carousel chrome (default true). */
+  showCarouselChrome?: boolean;
 
   /**
    * Mosque-specific terminology overrides (admin-controlled).
@@ -511,11 +522,23 @@ export interface PrayerTimes {
   ishaJamaat: string;
   jummahKhutbah?: string;
   jummahJamaat?: string;
+  /**
+   * All Jumu'ah sessions for this day (dual Jumu'ah). Prefer over the single
+   * jummahKhutbah/jummahJamaat pair when present. Sorted by jamaat time.
+   */
+  jumuahSessions?: JumuahSession[];
   data?: PrayerTimes[]; // For new API format that returns an array of days
   success?: boolean;
   error?: null | string;
   timestamp?: string;
   cacheControl?: { maxAge?: number; staleWhileRevalidate?: number };
+}
+
+/** One Jumu'ah session (khutbah + jamaat) for dual-Jumu'ah mosques. */
+export interface JumuahSession {
+  label: string;
+  khutbah: string | null;
+  jamaat: string;
 }
 
 export interface ContentOverride {

@@ -162,12 +162,13 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   }, [nextPrayer?.name, isJumuahToday, terminology]);
 
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
+  const adhanLabel = resolveTerminology(terminology, 'adhan', 'Adhan');
   const countdownLabel = useMemo(
     () =>
       countingToJamaat
         ? (displayName ? `${displayName} ${jamaatLabel} in` : `${jamaatLabel} in`)
-        : (displayName ? `${displayName} prayer in` : 'Next prayer in'),
-    [countingToJamaat, displayName, jamaatLabel],
+        : (displayName ? `${displayName} ${adhanLabel} in` : 'Next prayer in'),
+    [countingToJamaat, displayName, jamaatLabel, adhanLabel],
   );
 
   if (!nextPrayer) {

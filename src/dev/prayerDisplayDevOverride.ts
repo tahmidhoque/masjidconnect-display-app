@@ -26,6 +26,7 @@ interface PrayerDisplayDevPreset {
 /** Full carousel-band states for Ctrl+Shift+J (supplications + jamaat flow). */
 const PRAYER_DISPLAY_DEV_CYCLE: (PrayerDisplayDevPreset | null)[] = [
   null,
+  { label: 'pre-jamaat countdown', phase: 'pre-jamaat-countdown' },
   { label: 'jamaat-soon (silent phones)', phase: 'jamaat-soon' },
   { label: 'post-adhan supplication', phase: 'countdown-jamaat', adhanSupplicationActive: true },
   { label: 'in-prayer / jamaat', phase: 'in-prayer', inPrayerSubPhase: 'jamaat' },
@@ -189,6 +190,10 @@ export function resolvePrayerDisplayDevOverride(
       prayerName: name,
       inPrayerSubPhase: sub ?? 'jamaat',
     };
+  }
+
+  if (phase === 'pre-jamaat-countdown') {
+    return { phase: 'pre-jamaat-countdown', prayerName: name };
   }
 
   if (phase) {

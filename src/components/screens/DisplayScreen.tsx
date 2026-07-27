@@ -40,7 +40,8 @@ import {
   inferPrayerTimesLayout,
   inferZoneRegion,
   isPrayerOnlyLayout,
-  resolvePrayerFocusZoneSize,
+  prayerStripHeightClassName,
+  resolveEffectiveZoneSize,
 } from '../../types/displayLayout';
 import {
   Header,
@@ -59,9 +60,10 @@ import {
   SupplicationScreen,
   PostJamaatSupplicationSlot,
   JamaatBlackoutOverlay,
+  PreJamaatCountdownSlot,
 } from '../display';
 import { POST_ADHAN_SUPPLICATION } from '@/constants/scheduledSupplications';
-import { isJamaatBlackoutMode } from '@/utils/displaySettingsSupplications';
+import { isJamaatBlackoutMode, isJamaatContentMode } from '@/utils/displaySettingsSupplications';
 import {
   PRAYER_DISPLAY_DEV_EVENT,
   isJamaatBlackoutDevForced,
@@ -79,7 +81,7 @@ import {
   selectDisplayLayoutRevision,
 } from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag, resolveMediaFit } from '../../utils/mediaSlide';
-import { resolveTerminology } from '../../utils/prayerTerminology';
+import { resolvePhasePrayerLabel } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -464,6 +466,16 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
   const validTextAlign =
     textAlign === 'center' || textAlign === 'right' ? textAlign : undefined;
 
+  const textDir = content.dir;
+  const validTextDir =
+    textDir === 'ltr' || textDir === 'rtl' ? textDir : undefined;
+
+  const textColor = content.color;
+  const validTextColor =
+    textColor === 'primary' || textColor === 'secondary' || textColor === 'muted' || textColor === 'gold'
+      ? textColor
+      : undefined;
+
   const contentRecord = typeof content === 'object' && content !== null ? content as Record<string, unknown> : {};
   return [{
     id: item.id ?? `sched-${index}`,
@@ -473,6 +485,8 @@ export function scheduleItemToCarouselItems(item: any, index: number): CarouselI
     bodyIsHTML: typeof body === 'string' && body.length > 0 && (content.isHTML === true || /<[a-z][^>]*>/i.test(body)) ? true : undefined,
     bodyFontSize: validFontSize,
     textAlign: validTextAlign,
+    textDir: validTextDir,
+    textColor: validTextColor,
     arabicBody: typeof arabicBody === 'string' ? arabicBody : undefined,
     source: content.source ?? content.reference,
     imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
@@ -636,16 +650,14 @@ const DisplayScreenInner: React.FC = () => {
   const displaySettings = useAppSelector(selectDisplaySettings);
 
   /**
-   * On Fridays the in-prayer screen for the Zuhr slot must read "Jumu'ah" so
-   * the congregation sees "Jumu'ah Jamaat in progress" rather than "Zuhr".
-   * The label string itself is API-driven via `displaySettings.terminology`
-   * (key: `jummah`); we only swap when the phase has resolved to the Zuhr
-   * slot on a Friday so non-Zuhr prayers and non-Friday days are unchanged.
+   * In-prayer / silent-phones labels must honour custom terminology (e.g. Dhuhr).
+   * Friday Zuhr slot swaps to jummah via {@link resolvePhasePrayerLabel}.
    */
-  const inPrayerScreenName =
-    isJumuahToday && phasePrayerName === 'Zuhr'
-      ? resolveTerminology(displaySettings?.terminology, 'jummah', 'Jumuah')
-      : phasePrayerName;
+  const inPrayerScreenName = resolvePhasePrayerLabel(
+    phasePrayerName,
+    displaySettings?.terminology,
+    { isJumuahToday },
+  );
 
   /* ---- Layout config (admin layout editor; falls back to built-in default) ---- */
   const layoutConfig = useAppSelector(selectDisplayLayoutConfig);
@@ -800,8 +812,15 @@ const DisplayScreenInner: React.FC = () => {
     }
 
     switch (prayerPhase) {
+      case 'pre-jamaat-countdown':
+        return <PreJamaatCountdownSlot compact={isPortrait} />;
       case 'jamaat-soon':
-        return <JamaatSoonSlot landscapeSplit={!isPortrait} />;
+        return (
+          <JamaatSoonSlot
+            landscapeSplit={!isPortrait}
+            prayerName={inPrayerScreenName}
+          />
+        );
       case 'in-prayer':
         if (inPrayerSubPhase === 'post-jamaat-supplication') {
           return (
@@ -817,6 +836,7 @@ const DisplayScreenInner: React.FC = () => {
               interval={carouselInterval}
               compact={isPortrait}
               onFullscreenChange={handleCarouselFullscreenChange}
+              showChrome={displaySettings?.showCarouselChrome !== false}
             />
           );
         }
@@ -826,6 +846,24 @@ const DisplayScreenInner: React.FC = () => {
           (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced())
         ) {
           return <div className="h-full w-full bg-black" aria-hidden />;
+        }
+        // content mode: show a specific carousel item during jamaat
+        if (isJamaatContentMode(displaySettings)) {
+          const targetId = displaySettings?.jamaatInProgressContentId;
+          const match = targetId
+            ? carouselItems.find((ci) => ci.id === targetId)
+            : undefined;
+          if (match) {
+            return (
+              <ContentCarousel
+                key={`jamaat-content-${match.id}`}
+                items={[match]}
+                interval={9999}
+                compact={isPortrait}
+                showChrome={false}
+              />
+            );
+          }
         }
         return (
           <InPrayerScreen
@@ -842,6 +880,7 @@ const DisplayScreenInner: React.FC = () => {
             interval={carouselInterval}
             compact={isPortrait}
             onFullscreenChange={handleCarouselFullscreenChange}
+            showChrome={displaySettings?.showCarouselChrome !== false}
           />
         );
     }
@@ -975,7 +1014,7 @@ const DisplayScreenInner: React.FC = () => {
       const entry = zoneRegistry[component];
       const region = inferZoneRegion(layoutStructure, component, zone.region);
       const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
-      const effectiveSize = resolvePrayerFocusZoneSize(
+      const effectiveSize = resolveEffectiveZoneSize(
         zone,
         orientationLayout.zones,
         layoutStructure,
@@ -996,9 +1035,10 @@ const DisplayScreenInner: React.FC = () => {
           ? 'h-full min-h-0 flex flex-col prayer-sidebar--focus'
           : 'h-full min-h-0 flex flex-col';
       } else if (prayerVariant === 'strip') {
+        // Prayer-only: expand to fill. Otherwise size-aware rem bands (Auto = intrinsic).
         className = prayerOnly
           ? 'flex-1 min-h-0 flex flex-col prayer-strip--focus'
-          : 'min-h-[8rem] max-h-[18rem]';
+          : prayerStripHeightClassName(zone.size);
       }
       return {
         id: zone.id,

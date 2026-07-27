@@ -12,6 +12,11 @@
  *                ReferenceViewport scaling)
  *  - spacingScale → multiplies the orientation's base padding and gap
  *
+ * Component-specific size rules are applied upstream in DisplayScreen via
+ * `resolveEffectiveZoneSize` (e.g. jumuah-bar is always intrinsic; content Auto
+ * claims leftover space when it is the only flexible zone; prayer strip uses
+ * rem height bands in addition to flex weight).
+ *
  * Theme overrides arrive as a CSS-variable style object (themeStyle) applied
  * to the root so all Tailwind token utilities re-resolve.
  */

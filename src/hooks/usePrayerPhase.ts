@@ -15,8 +15,10 @@
  *                      lead window even when adhan == jamaat or A is inside the
  *                      lead window.
  *   in-prayer        — Jamaat reached. Calm screen for `jamaatProgressMin`
- *                      (sub-phase 'jamaat') then `delayMin` (sub-phase
- *                      'post-jamaat') sourced from displaySettings.
+ *                      (sub-phase 'jamaat'), then optional post-jamaat dua
+ *                      (sub-phase 'post-jamaat-supplication'). After that the
+ *                      phase exits so countdown advances to the next salah.
+ *                      Prayer-panel highlight delay is handled separately.
  *
  * All comparisons happen in masjid-local minutes-from-midnight via
  * `nowMinutesInTz` + `toMinutesFromMidnight`, so the phase machine works
@@ -31,6 +33,7 @@ import { usePrayerTimesContext } from '../contexts/PrayerTimesContext';
 import { useCurrentTime } from './useCurrentTime';
 import { nowMinutesInTz, toMinutesFromMidnight } from '../utils/dateUtils';
 import logger from '../utils/logger';
+import type { DisplaySettings } from '@/api/models';
 import { useAppSelector } from '@/store/hooks';
 import {
   selectDisplaySettings,
@@ -39,7 +42,6 @@ import {
 import { defaultMasjidTimezone } from '@/config/environment';
 import {
   jamaatPhaseMinutesForDisplayPrayer,
-  postJamaatDelayMinutes,
   postJamaatSupplicationWindowMinutes,
 } from '@/utils/displaySettingsJamaat';
 import { isPostAdhanSupplicationActive } from '@/utils/displaySettingsSupplications';
@@ -56,6 +58,7 @@ import {
 export type PrayerPhase =
   | 'countdown-adhan'
   | 'countdown-jamaat'
+  | 'pre-jamaat-countdown'
   | 'jamaat-soon'
   | 'in-prayer';
 
@@ -85,6 +88,19 @@ export interface PrayerPhaseData {
  * the silent-phones graphic still fires for the full lead time.
  */
 export const JAMAAT_LEAD_MIN = 5;
+
+/**
+ * Resolve the pre-jamaat countdown seconds from display settings.
+ * Returns 0 when the feature is disabled. Clamped 30–120, default 60.
+ */
+export function resolvePreJamaatCountdownSeconds(
+  settings: DisplaySettings | null | undefined,
+): number {
+  if (!settings?.preJamaatCountdownEnabled) return 0;
+  const raw = settings.preJamaatCountdownSeconds;
+  if (typeof raw !== 'number' || Number.isNaN(raw)) return 60;
+  return Math.max(30, Math.min(120, Math.round(raw)));
+}
 
 /* ------------------------------------------------------------------ */
 /*  Dev-mode force flag                                                */
@@ -157,14 +173,13 @@ export const usePrayerPhase = (): PrayerPhaseData => {
     };
 
     const now = nowMinutesInTz(currentTime, masjidTz);
-    const delayMin = postJamaatDelayMinutes(displaySettings);
 
     /**
-     * Resolve the in-prayer window (J ≤ now ≤ J + progress + delay) for a
-     * given prayer. Returns null when the prayer or its jamaat is missing or
-     * we're outside the window. Reused for both the `currentPrayer` and
-     * `nextPrayer` paths so the screen stays on "Jamaat in progress" even
-     * after `nextPrayer` advances to the following salaat.
+     * Resolve the in-prayer window (J ≤ now ≤ J + progress + optional dua).
+     * Returns null when the prayer or its jamaat is missing or we're outside
+     * the window. Reused for both the `currentPrayer` and `nextPrayer` paths
+     * so the screen stays on "Jamaat in progress" even after `nextPrayer`
+     * advances to the following salaat.
      */
     const resolveInPrayer = (
       prayerName: string | undefined,
@@ -176,18 +191,24 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       const progress = jamaatPhaseMinutesForDisplayPrayer(
         displaySettings,
         prayerName,
+        { isJumuahToday },
       );
       const supplicationMin = postJamaatSupplicationWindowMinutes(displaySettings);
-      const totalWindow = progress + supplicationMin + delayMin;
+      // Exit in-prayer as soon as progress (+ optional dua) ends so countdown
+      // returns to the next salah. `minutesAfterJamaatUntilNextPrayer` still
+      // holds the prayer-panel highlight via usePrayerTimes — it is not part of
+      // this content-phase window.
+      const totalWindow = progress + supplicationMin;
       const elapsed = now - J;
       if (elapsed > totalWindow) return null;
       let sub: 'jamaat' | 'post-jamaat-supplication' | 'post-jamaat';
       if (elapsed <= progress) {
         sub = 'jamaat';
-      } else if (elapsed <= progress + supplicationMin) {
+      } else if (supplicationMin > 0 && elapsed <= progress + supplicationMin) {
         sub = 'post-jamaat-supplication';
       } else {
-        sub = 'post-jamaat';
+        // Reachable only if totalWindow rounding leaves a gap; treat as done.
+        return null;
       }
       return { phase: 'in-prayer', prayerName, inPrayerSubPhase: sub };
     };
@@ -247,7 +268,16 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       );
     }
 
-    // 4) Within the silent-phones lead window — fires regardless of A so the
+    // 4a) Pre-jamaat countdown: a dedicated countdown overlay that takes
+    //     priority over jamaat-soon inside its window (N seconds before J).
+    //     The earlier portion of JAMAAT_LEAD_MIN still shows silent-phones.
+    const preCountdownSec = resolvePreJamaatCountdownSeconds(displaySettings);
+    const preCountdownMin = preCountdownSec / 60;
+    if (preCountdownSec > 0 && now >= J - preCountdownMin && now < J) {
+      return { phase: 'pre-jamaat-countdown', prayerName: nextPrayer.name };
+    }
+
+    // 4b) Within the silent-phones lead window — fires regardless of A so the
     //    screen still shows when adhan == jamaat or A is inside the window.
     if (now >= J - JAMAAT_LEAD_MIN && now < J) {
       return { phase: 'jamaat-soon', prayerName: nextPrayer.name };

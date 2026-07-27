@@ -99,6 +99,10 @@ export interface CarouselItem {
   bodyFontSize?: 'small' | 'medium' | 'large';
   /** Text alignment for title and body (default: left) */
   textAlign?: 'left' | 'center' | 'right';
+  /** Text direction override (default: auto-detected from content) */
+  textDir?: 'ltr' | 'rtl';
+  /** Colour token for body text — mapped to Tailwind classes */
+  textColor?: 'primary' | 'secondary' | 'muted' | 'gold';
   /** Arabic body text (rendered with arabic-text class) */
   arabicBody?: string;
   /** Transliteration / Latin script (e.g. for Dua); rendered LTR between Arabic and body */
@@ -174,6 +178,8 @@ interface ContentCarouselProps {
   compact?: boolean;
   /** Fired when a viewport-fullscreen slide becomes active or inactive. */
   onFullscreenChange?: (active: boolean) => void;
+  /** Show pagination dots and other chrome (default true). */
+  showChrome?: boolean;
 }
 
 /** Maximum binary-search iterations to prevent infinite loops */
@@ -220,6 +226,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   interval = 30,
   compact = false,
   onFullscreenChange,
+  showChrome = true,
 }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const [fullscreenPortalRoot, setFullscreenPortalRoot] = useState<HTMLElement | null>(null);
@@ -411,13 +418,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   );
 
   /**
-   * Edge-to-edge stage for posters that fill the screen — cancels layout padding
-   * (see LandscapeLayout / PortraitLayout). Both `smart` (blurred backdrop) and
-   * `cover` (crop) go edge-to-edge; `contain` stays inline within the content box.
+   * True fullscreen portal — only `cover` (and legacy fullscreen→cover).
+   * `smart` stays in the content zone with a blurred backdrop so prayer chrome
+   * remains visible; `contain` stays inline as plain letterbox.
    */
   const isFullscreenMedia = useMemo(() => {
     if (!currentItem) return false;
-    if (effectiveMediaFit !== 'smart' && effectiveMediaFit !== 'cover') return false;
+    if (effectiveMediaFit !== 'cover') return false;
     if (isVideoSlide) return true;
     if (!isMediaSlide) return false;
     return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
@@ -771,6 +778,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   const typeLower = item?.type?.toLowerCase() ?? '';
   const effectiveTextAlign: 'left' | 'center' | 'right' =
     ['verse_hadith', 'asma_al_husna'].includes(typeLower) ? 'center' : (item?.textAlign ?? 'left');
+  const effectiveTextDir = item?.textDir ?? undefined;
+  const TEXT_COLOR_MAP: Record<string, string> = {
+    primary: 'text-text-primary',
+    secondary: 'text-text-secondary',
+    muted: 'text-text-muted',
+    gold: 'text-gold',
+  };
+  const bodyColorClass = item?.textColor ? TEXT_COLOR_MAP[item.textColor] ?? 'text-text-secondary' : 'text-text-secondary';
   const selectedName = item.names?.[selectedNameIdx];
   const displayTitle    = selectedName?.transliteration ?? item.title;
   const displayArabic   = selectedName?.arabic           ?? item.arabicBody;
@@ -862,32 +877,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
             <MediaPdfPage
               url={item.mediaUrl!}
               title={item.title ?? 'Poster'}
-              fit={effectiveMediaFit === 'cover' ? 'cover' : 'contain'}
-              mode={effectiveMediaFit}
+              fit="cover"
+              mode="cover"
               className="min-h-0 flex-1"
               onReady={onMediaAssetLoaded}
             />
-          ) : effectiveMediaFit === 'smart' ? (
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              <img
-                src={item.mediaUrl}
-                alt=""
-                aria-hidden
-                className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-2xl"
-                loading="eager"
-                decoding="async"
-              />
-              <div className="absolute inset-0 bg-midnight/40" aria-hidden />
-              <img
-                src={item.mediaUrl}
-                alt=""
-                className="gpu-accelerated relative h-full w-full object-contain object-center"
-                loading="eager"
-                decoding="async"
-                onLoad={onMediaAssetLoaded}
-                onError={onMediaAssetLoaded}
-              />
-            </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
               <img
@@ -939,7 +933,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 <CourseSlide course={item.course} compact={compact} />
               </Suspense>
             ) : (
-              <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col min-w-0 w-full">
+              <div style={{ textAlign: effectiveTextAlign }} dir={effectiveTextDir} className="flex flex-col min-w-0 w-full">
                 <div
                   ref={isFullscreenContent ? scrollRef : undefined}
                   className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar' : ''}`}
@@ -960,12 +954,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                   )}
                   {displayBody && (item.bodyIsHTML ? (
                     <div
-                      className="text-carousel-body text-text-secondary leading-relaxed"
+                      className={`text-carousel-body ${bodyColorClass} leading-relaxed`}
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayBody) }}
-                      dir="auto"
+                      dir={effectiveTextDir ?? 'auto'}
                     />
                   ) : (
-                    <p className="text-carousel-body text-text-secondary leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
+                    <p className={`text-carousel-body ${bodyColorClass} leading-relaxed`} style={{ whiteSpace: 'pre-wrap' }}>
                       {displayBody}
                     </p>
                   ))}
@@ -1031,16 +1025,16 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
               </Suspense>
             ) : isVideoSlide && item.videoUrl ? (
               isFullscreenMedia ? (
-                /* Smart/cover render edge-to-edge via the fullscreen portal above. */
+                /* Cover — edge-to-edge via the fullscreen portal above. */
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
               ) : (
-                /* Inline 'contain' fit — video within the content box, prayer chrome stays visible. */
+                /* Inline smart/contain — video within the content box. */
                 <div className="flex flex-1 min-h-0 w-full flex-col">
                   <Suspense fallback={null}>
                     <VideoSlide
                       url={item.videoUrl}
                       title={item.title}
-                      fit="contain"
+                      fit={effectiveMediaFit === 'smart' ? 'smart' : 'contain'}
                       muted={item.muted ?? true}
                       loop={safeItems.length <= 1}
                       onReady={onMediaAssetLoaded}
@@ -1054,18 +1048,42 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
               isFullscreenMedia ? (
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
               ) : (
-                /* Inline 'contain' fit — whole poster within the content box,
-                   prayer chrome stays visible. Smart/cover render edge-to-edge
-                   via the fullscreen portal above. */
+                /* Inline smart/contain — fills the content zone; prayer chrome stays visible.
+                   Cover uses the fullscreen portal above. */
                 <div className="flex flex-1 min-h-0 w-full flex-col">
                   {item.mediaKind === 'pdf' ? (
                     <MediaPdfPage
                       url={item.mediaUrl}
                       title={item.title ?? 'Poster'}
                       fit="contain"
+                      mode={effectiveMediaFit === 'smart' ? 'smart' : 'contain'}
                       className="min-h-0 w-full flex-1"
                       onReady={onMediaAssetLoaded}
                     />
+                  ) : effectiveMediaFit === 'smart' ? (
+                    <div
+                      className="relative min-h-0 flex-1 w-full overflow-hidden"
+                      data-media-fit="smart"
+                    >
+                      <img
+                        src={item.mediaUrl}
+                        alt=""
+                        aria-hidden
+                        className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-xl"
+                        loading="eager"
+                        decoding="async"
+                      />
+                      <div className="absolute inset-0 bg-midnight/40" aria-hidden />
+                      <img
+                        src={item.mediaUrl}
+                        alt=""
+                        className="gpu-accelerated relative h-full w-full object-contain object-center"
+                        loading="eager"
+                        decoding="async"
+                        onLoad={onMediaAssetLoaded}
+                        onError={onMediaAssetLoaded}
+                      />
+                    </div>
                   ) : (
                     <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
                       <img
@@ -1079,7 +1097,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 </div>
               )
             ) : (
-              <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col min-w-0 w-full">
+              <div style={{ textAlign: effectiveTextAlign }} dir={effectiveTextDir} className="flex flex-col min-w-0 w-full">
                 {/* Scrollable text region — when needsScroll, flex-1 min-h-0 constrains height for scroll. */}
                 <div
                   ref={scrollRef}
@@ -1102,7 +1120,6 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                   {displayArabic && (
                     <p
                       className="arabic-text text-carousel-arabic text-gold leading-relaxed"
-                      // `.arabic-text` forces `text-align: right` for readability; override for centered verse/names.
                       style={{ textAlign: effectiveTextAlign }}
                     >
                       {displayArabic}
@@ -1117,13 +1134,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
 
                   {displayBody && (item.bodyIsHTML ? (
                     <div
-                      className="text-carousel-body text-text-secondary leading-relaxed"
+                      className={`text-carousel-body ${bodyColorClass} leading-relaxed`}
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayBody) }}
-                      dir="auto"
+                      dir={effectiveTextDir ?? 'auto'}
                     />
                   ) : (
                     <p
-                      className="text-carousel-body text-text-secondary leading-relaxed"
+                      className={`text-carousel-body ${bodyColorClass} leading-relaxed`}
                       style={{ whiteSpace: 'pre-wrap' }}
                     >
                       {displayBody}
@@ -1140,8 +1157,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
         </div>
       </div>
 
-      {/* Pagination — hidden during viewport-fullscreen slides */}
-      {safeItems.length > 1 && !isFullscreen && (
+      {/* Pagination — hidden during viewport-fullscreen slides or when chrome is off */}
+      {showChrome && safeItems.length > 1 && !isFullscreen && (
         <div className="shrink-0 flex items-center justify-center pt-1.5">
           {paginationDots}
         </div>

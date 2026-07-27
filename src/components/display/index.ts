@@ -20,6 +20,7 @@ export { default as SupplicationScreen } from './SupplicationScreen';
 export { default as PostJamaatSupplicationSlot } from './PostJamaatSupplicationSlot';
 export { default as JamaatBlackoutOverlay } from './JamaatBlackoutOverlay';
 export { default as InPrayerScreen } from './InPrayerScreen';
+export { default as PreJamaatCountdownSlot } from './PreJamaatCountdownSlot';
 export { default as ForbiddenPrayerNotice } from './ForbiddenPrayerNotice';
 export { default as EventSlide } from './EventSlide';
 export { default as WifiSettingsOverlay } from './WifiSettingsOverlay';

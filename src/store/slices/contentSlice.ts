@@ -41,7 +41,7 @@ function normalisePrayerTimesForStore(
   return raw;
 }
 
-const SALAH_KEYS: SalahKey[] = ["fajr", "zuhr", "asr", "maghrib", "isha"];
+const SALAH_KEYS: SalahKey[] = ["fajr", "zuhr", "asr", "maghrib", "isha", "jumuah"];
 
 const TERMINOLOGY_KEYS: TerminologyKey[] = [
   "fajr",
@@ -82,6 +82,13 @@ function clampJamaatSettingMinutes(value: unknown, fallback: number): number {
   const n = typeof value === "number" ? value : fallback;
   if (Number.isNaN(n)) return fallback;
   return Math.max(5, Math.min(30, n));
+}
+
+/** Clamp pre-jamaat countdown seconds to [30, 120] with default 60. */
+function clampPreJamaatCountdownSeconds(value: unknown): number {
+  const n = typeof value === "number" ? value : 60;
+  if (Number.isNaN(n)) return 60;
+  return Math.max(30, Math.min(120, Math.round(n)));
 }
 
 /** Normalise per-salah jamaat-in-progress overrides from API (clamp, drop invalid keys). */
@@ -157,6 +164,10 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
     durationMinutes: 3,
   },
   jamaatInProgressMode: 'screen',
+  jamaatInProgressContentId: null,
+  preJamaatCountdownEnabled: false,
+  preJamaatCountdownSeconds: 60,
+  showCarouselChrome: true,
 };
 
 // Debounce map to prevent rapid successive calls
@@ -426,7 +437,13 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
   return {
     ramadanMode: raw.ramadanMode ?? "auto",
     isRamadanActive: raw.isRamadanActive ?? false,
-    timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
+    timeFormat: (raw.timeFormat === "24h"
+      ? "24h"
+      : raw.timeFormat === "12h-nop"
+        ? "12h-nop"
+        : raw.timeFormat === "12h"
+          ? "12h"
+          : undefined) ?? timeFormatFromConfig ?? "12h",
     showImsak: raw.showImsak ?? false,
     tomorrowJamaatMode,
     showTomorrowJamaat: tomorrowJamaatModeUsesColumn(tomorrowJamaatMode),
@@ -440,7 +457,19 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
     minutesAfterJamaatUntilNextPrayerBySalah,
     postAdhanSupplication: normalisePostAdhanSupplication(raw.postAdhanSupplication),
     postJamaatSupplication: normalisePostJamaatSupplication(raw.postJamaatSupplication),
-    jamaatInProgressMode: raw.jamaatInProgressMode === "dark" ? "dark" : "screen",
+    jamaatInProgressMode:
+      raw.jamaatInProgressMode === "dark"
+        ? "dark"
+        : raw.jamaatInProgressMode === "content"
+          ? "content"
+          : "screen",
+    jamaatInProgressContentId:
+      raw.jamaatInProgressMode === "content" && typeof raw.jamaatInProgressContentId === "string"
+        ? raw.jamaatInProgressContentId
+        : null,
+    preJamaatCountdownEnabled: raw.preJamaatCountdownEnabled === true,
+    preJamaatCountdownSeconds: clampPreJamaatCountdownSeconds(raw.preJamaatCountdownSeconds),
+    showCarouselChrome: raw.showCarouselChrome !== false,
     terminology: normaliseTerminology(
       (raw as unknown as { terminology?: unknown; terminologyPreferences?: unknown }).terminology,
     ),

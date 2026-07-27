@@ -32,6 +32,17 @@ export function isJamaatBlackoutMode(
   return settings?.jamaatInProgressMode === 'dark';
 }
 
+/** True when the display should show a specific carousel item during jamaat. */
+export function isJamaatContentMode(
+  settings: DisplaySettings | null | undefined,
+): boolean {
+  return (
+    settings?.jamaatInProgressMode === 'content' &&
+    typeof settings?.jamaatInProgressContentId === 'string' &&
+    settings.jamaatInProgressContentId.length > 0
+  );
+}
+
 export function postAdhanSupplicationDelayMinutes(
   settings: DisplaySettings | null | undefined,
 ): number {

@@ -42,7 +42,7 @@ const Footer: React.FC<FooterProps> = ({ leading }) => {
         <ConnectionBanner />
       </div>
 
-      <div className="footer-branding flex items-center gap-2 shrink-0 ml-auto">
+      <div className="footer-branding flex items-center gap-2 shrink-0 ml-auto text-caption">
         <span className="text-text-muted font-medium">Powered by</span>
         <span className="text-gold font-medium" aria-label="MasjidConnect">
           <span className="font-bold">Masjid</span>Connect

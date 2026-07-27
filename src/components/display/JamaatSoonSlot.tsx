@@ -138,10 +138,13 @@ declare global {
 export interface JamaatSoonSlotProps {
   /** Forwarded to slide components for landscape vs portrait layout. */
   landscapeSplit?: boolean;
+  /** Terminology-resolved prayer name for the silent-phones badge. */
+  prayerName?: string | null;
 }
 
 const JamaatSoonSlot: React.FC<JamaatSoonSlotProps> = ({
   landscapeSplit = false,
+  prayerName = null,
 }) => {
   const { nextPrayer, tomorrowsJamaats } = usePrayerTimesContext();
 
@@ -220,12 +223,20 @@ const JamaatSoonSlot: React.FC<JamaatSoonSlotProps> = ({
 
   /* No tomorrow change → preserve current behaviour exactly. */
   if (!tomorrowChange) {
-    return <SilentPhonesGraphic landscapeSplit={landscapeSplit} />;
+    return (
+      <SilentPhonesGraphic
+        landscapeSplit={landscapeSplit}
+        prayerName={prayerName}
+      />
+    );
   }
 
   const slide =
     activeIdx === 0 ? (
-      <SilentPhonesGraphic landscapeSplit={landscapeSplit} />
+      <SilentPhonesGraphic
+        landscapeSplit={landscapeSplit}
+        prayerName={prayerName}
+      />
     ) : (
       <TomorrowsJamaatChangeSlide
         prayerName={tomorrowChange.prayerName}

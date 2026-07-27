@@ -56,6 +56,12 @@ export const getTimeDisplayParts = (
     return { main, period };
   }
 
+  if (format === "12h-nop") {
+    const displayHours = hours % 12 || 12;
+    const main = `${displayHours}:${minutes.toString().padStart(2, "0")}`;
+    return { main, period: null };
+  }
+
   const main = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
   return { main, period: null };
 };
@@ -83,6 +89,11 @@ export const formatTimeToDisplay = (
 
   if (format === "12h") {
     return formatTimeTo12Hour(timeString);
+  }
+
+  if (format === "12h-nop") {
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, "0")}`;
   }
 
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;

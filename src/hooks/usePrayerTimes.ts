@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PrayerTimes, type DisplaySettings, type TimeFormat } from "../api/models";
+import { PrayerTimes, type DisplaySettings, type TimeFormat, type JumuahSession } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
@@ -111,6 +111,8 @@ interface PrayerTimesHook {
   upcomingJumuahJamaatRaw: string | null;
   /** Next Friday khutbah (HH:mm) for landscape prayer strip. */
   upcomingJumuahKhutbahRaw: string | null;
+  /** All sessions for the upcoming Friday (dual Jumu'ah). Empty when none. */
+  upcomingJumuahSessions: JumuahSession[];
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
   /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
@@ -158,7 +160,8 @@ function buildTomorrowsJamaats(
   const map: Record<string, TomorrowsJamaatEntry> = {};
   let hasAny = false;
   const jummahJamaat =
-    typeof data.jummahJamaat === "string" ? data.jummahJamaat : undefined;
+    parseJumuahSessionsFromDay(data)[0]?.jamaat ??
+    (typeof data.jummahJamaat === "string" ? data.jummahJamaat : undefined);
   for (const name of PRAYERS_WITH_JAMAAT) {
     const jamaat = getJamaatTime(data, name.toLowerCase());
     if (name === "Zuhr" && isFridayDay && jummahJamaat) {
@@ -179,48 +182,75 @@ function buildTomorrowsJamaats(
 }
 
 /**
+ * Normalise jumuahSessions from a day payload, falling back to the legacy
+ * single jummahKhutbah / jummahJamaat pair.
+ */
+function parseJumuahSessionsFromDay(dayData: unknown): JumuahSession[] {
+  if (!dayData || typeof dayData !== "object") return [];
+  const rec = dayData as Record<string, unknown>;
+  if (Array.isArray(rec.jumuahSessions) && rec.jumuahSessions.length > 0) {
+    const parsed: JumuahSession[] = [];
+    for (const raw of rec.jumuahSessions) {
+      if (!raw || typeof raw !== "object") continue;
+      const s = raw as Record<string, unknown>;
+      if (typeof s.jamaat !== "string" || !s.jamaat.trim()) continue;
+      parsed.push({
+        label: typeof s.label === "string" && s.label.trim() ? s.label.trim() : "Jumu'ah",
+        khutbah: typeof s.khutbah === "string" && s.khutbah.trim() ? s.khutbah.trim() : null,
+        jamaat: s.jamaat.trim(),
+      });
+    }
+    if (parsed.length > 0) return parsed;
+  }
+  const jamaat = typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
+  if (!jamaat) return [];
+  return [
+    {
+      label: "Jumu'ah",
+      khutbah: typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null,
+      jamaat,
+    },
+  ];
+}
+
+/**
+ * Target session for countdown / in-prayer: first session whose jamaat+window
+ * has not yet ended; otherwise the last session.
+ */
+function pickJumuahTargetSession(
+  sessions: JumuahSession[],
+  nowMin: number,
+  windowMin: number,
+): JumuahSession | null {
+  if (sessions.length === 0) return null;
+  for (const session of sessions) {
+    const jamaatMin = toMinutesFromMidnight(session.jamaat, "Zuhr");
+    if (jamaatMin < 0) continue;
+    if (nowMin < jamaatMin + windowMin) return session;
+  }
+  return sessions[sessions.length - 1] ?? null;
+}
+
+/**
  * Friday Jumuah replaces Zuhr in the mosque congregational prayer.
  *
- * When the API exposes a separate `jummahJamaat` for the day (and optionally
- * `jummahKhutbah`), substitute the Zuhr row's times in place so every
- * downstream consumer — `calculatePrayersAccurately` for next-prayer
- * selection, `PrayerCountdown` for the live target, `usePrayerPhase` for the
- * in-prayer window, and the prayer panel — sees the Jumuah times for the
- * Zuhr slot. This avoids the prior split where the panel showed `zuhrJamaat`
- * while the countdown targeted `jummahJamaat`, which left a stale countdown
- * window when `zuhrJamaat` fell after `jummahJamaat`.
- *
- * `time` (treated as the slot start, i.e. the adhan equivalent for selection)
- * becomes `jummahKhutbah` when present, otherwise it collapses to
- * `jummahJamaat` (no adhan-only countdown — straight into the jamaat
- * countdown). `jamaat` is always replaced with `jummahJamaat`.
- *
- * Returns silently when `jummahJamaat` is missing — the regular Zuhr times
- * remain in place rather than blanking the row.
- *
- * NOTE: This substitution is reverted by `updateFormattedPrayerTimes` once
- * the Jumuah in-prayer window has elapsed, so the Zuhr row reads as a normal
- * past prayer for the rest of Friday. Next-prayer selection still benefits
- * from the substitution because the revert happens AFTER
- * `calculatePrayersAccurately` runs.
+ * When the API exposes jumuahSessions (or legacy jummahJamaat), substitute the
+ * Zuhr row's times so countdown / phase / panel stay aligned. For dual
+ * Jumu'ah, `targetSession` selects which session drives the live target.
  */
 function applyJummahSubstitution(
   zuhrRow: FormattedPrayerTime,
   dayData: unknown,
   timeFormat: TimeFormat,
+  targetSession?: JumuahSession | null,
 ): void {
   if (!dayData || typeof dayData !== "object") return;
-  const rec = dayData as Record<string, unknown>;
-  const jamaat =
-    typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : undefined;
+  const sessions = parseJumuahSessionsFromDay(dayData);
+  const session = targetSession ?? sessions[0] ?? null;
+  const jamaat = session?.jamaat;
   if (!jamaat) return;
-  const khutbah =
-    typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : undefined;
+  const khutbah = session?.khutbah ?? undefined;
   const slotStart = khutbah ?? jamaat;
-  // Capture the regular zuhrJamaat before overwriting. The UI no longer
-  // renders this alongside today's Jumuah jamaat (Jumuah is the only mosque
-  // congregational prayer on Fridays), but the value is preserved on the row
-  // for downstream consumers that may need the original solar-noon Zuhr.
   const originalZuhrJamaat = zuhrRow.jamaat;
   zuhrRow.time = slotStart;
   zuhrRow.jamaat = jamaat;
@@ -241,53 +271,52 @@ function parseYmdInTz(dateStr: string, tz: string): dayjs.Dayjs | null {
 }
 
 /**
- * First row in the API week array on or after today whose date is Friday and has jummah fields.
+ * First Friday on or after today in the week array that has Jumu'ah session data.
  */
 function findUpcomingFridayJummahInWeek(
   dataArr: (PrayerTimes & { date?: string })[],
   todayYmd: string,
   tz: string,
-): { jamaat: string | null; khutbah: string | null } | null {
+): { sessions: JumuahSession[]; jamaat: string | null; khutbah: string | null } | null {
   for (const row of dataArr) {
     const dateStr = row.date;
     if (!dateStr || typeof dateStr !== "string") continue;
     if (dateStr < todayYmd) continue;
     const local = parseYmdInTz(dateStr, tz);
     if (!local || local.day() !== 5) continue;
-    const rec = row as unknown as Record<string, unknown>;
-    const jamaat =
-      typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
-    const khutbah =
-      typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null;
-    if (!jamaat && !khutbah) continue;
-    return { jamaat, khutbah };
+    const sessions = parseJumuahSessionsFromDay(row);
+    if (sessions.length === 0) continue;
+    return {
+      sessions,
+      jamaat: sessions[0].jamaat,
+      khutbah: sessions[0].khutbah,
+    };
   }
   return null;
 }
 
 /**
- * Jummah times for the landscape strip: upcoming Friday from `data`, or flat Friday-only payload.
+ * Jummah times for the landscape strip / JumuahBar: upcoming Friday sessions.
  */
 function resolveUpcomingFridayJummahRaw(
   dataArr: (PrayerTimes & { date?: string })[] | null,
   todayYmd: string,
   tz: string,
   todayData: unknown,
-): { jamaat: string | null; khutbah: string | null } | null {
+): { sessions: JumuahSession[]; jamaat: string | null; khutbah: string | null } | null {
   if (dataArr?.length) {
     const fromWeek = findUpcomingFridayJummahInWeek(dataArr, todayYmd, tz);
     if (fromWeek) return fromWeek;
   }
   const todayLocal = parseYmdInTz(todayYmd, tz);
   if (!todayLocal || todayLocal.day() !== 5) return null;
-  if (!todayData || typeof todayData !== "object") return null;
-  const rec = todayData as Record<string, unknown>;
-  const jamaat =
-    typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
-  const khutbah =
-    typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null;
-  if (!jamaat && !khutbah) return null;
-  return { jamaat, khutbah };
+  const sessions = parseJumuahSessionsFromDay(todayData);
+  if (sessions.length === 0) return null;
+  return {
+    sessions,
+    jamaat: sessions[0].jamaat,
+    khutbah: sessions[0].khutbah,
+  };
 }
 
 export const usePrayerTimes = (): PrayerTimesHook => {
@@ -345,6 +374,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [upcomingJumuahKhutbahRaw, setUpcomingJumuahKhutbahRaw] = useState<
     string | null
   >(null);
+  const [upcomingJumuahSessions, setUpcomingJumuahSessions] = useState<
+    JumuahSession[]
+  >([]);
   const [forbiddenPrayer, setForbiddenPrayer] =
     useState<CurrentForbiddenState | null>(null);
   const [tomorrowsJamaats, setTomorrowsJamaats] =
@@ -980,6 +1012,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     const applyStripJummahState = () => {
       setUpcomingJumuahJamaatRaw(stripJummah?.jamaat ?? null);
       setUpcomingJumuahKhutbahRaw(stripJummah?.khutbah ?? null);
+      setUpcomingJumuahSessions(stripJummah?.sessions ?? []);
     };
 
     // Helper function to safely extract time
@@ -1110,7 +1143,19 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           displayTime: zuhrRow.displayTime,
           displayJamaat: zuhrRow.displayJamaat,
         };
-        applyJummahSubstitution(zuhrRow, todayData, timeFormat);
+        const fridaySessions = parseJumuahSessionsFromDay(todayData);
+        const fridayWindowMin = totalJamaatPhaseWindowForDisplayPrayer(
+          displaySettings ?? null,
+          "Zuhr",
+          { isJumuahToday: true },
+        );
+        const fridayNowMin = nowMinutesInTz(new Date(), tz);
+        const targetSession = pickJumuahTargetSession(
+          fridaySessions,
+          fridayNowMin,
+          fridayWindowMin,
+        );
+        applyJummahSubstitution(zuhrRow, todayData, timeFormat, targetSession);
       }
     }
 
@@ -1129,13 +1174,17 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     if (isFridayToday && zuhrRevertSnapshot) {
       const zuhrRow = prayers.find((p) => p.name === "Zuhr");
       if (zuhrRow?.isJumuah && zuhrRow.jamaat) {
+        // Dual Jumu'ah: only revert after the *last* session's window ends.
+        const fridaySessions = parseJumuahSessionsFromDay(todayData);
+        const lastSession = fridaySessions[fridaySessions.length - 1];
         const jumuahJamaatMin = toMinutesFromMidnight(
-          zuhrRow.jamaat,
+          lastSession?.jamaat ?? zuhrRow.jamaat,
           "Zuhr",
         );
         const totalWindowMin = totalJamaatPhaseWindowForDisplayPrayer(
           displaySettings ?? null,
           "Zuhr",
+          { isJumuahToday: true },
         );
         const nowMin = nowMinutesInTz(new Date(), tz);
         if (
@@ -1335,27 +1384,26 @@ export const usePrayerTimes = (): PrayerTimesHook => {
       );
       setIsJumuahToday(nowDayjs.add(1, "day").day() === 5);
       const tomorrowObj = tomorrowData as unknown as Record<string, unknown>;
-      if (nowDayjs.add(1, "day").day() === 5 && tomorrowObj.jummahJamaat) {
-        setJumuahTime((tomorrowObj.jummahJamaat as string) ?? null);
-        setJumuahDisplayTime(
-          formatTimeToDisplay(
-            (tomorrowObj.jummahJamaat as string) ?? "",
-            timeFormat,
-          ),
-        );
-        setJumuahKhutbahTime(
-          tomorrowObj.jummahKhutbah
-            ? formatTimeToDisplay(
-                tomorrowObj.jummahKhutbah as string,
-                timeFormat,
-              )
-            : null,
-        );
-        setJumuahKhutbahRaw(
-          typeof tomorrowObj.jummahKhutbah === "string"
-            ? tomorrowObj.jummahKhutbah
-            : null,
-        );
+      if (nowDayjs.add(1, "day").day() === 5 && tomorrowObj) {
+        const sessions = parseJumuahSessionsFromDay(tomorrowObj);
+        const primary = sessions[0];
+        if (primary) {
+          setJumuahTime(primary.jamaat);
+          setJumuahDisplayTime(
+            formatTimeToDisplay(primary.jamaat, timeFormat),
+          );
+          setJumuahKhutbahTime(
+            primary.khutbah
+              ? formatTimeToDisplay(primary.khutbah, timeFormat)
+              : null,
+          );
+          setJumuahKhutbahRaw(primary.khutbah);
+        } else {
+          setJumuahTime(null);
+          setJumuahDisplayTime(null);
+          setJumuahKhutbahTime(null);
+          setJumuahKhutbahRaw(null);
+        }
       } else {
         setJumuahTime(null);
         setJumuahDisplayTime(null);
@@ -1456,15 +1504,34 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     // Set Jumuah time if it's Friday — use nowDayjs.day() directly to avoid stale closure
     // (isJumuahToday state may not have updated yet when this effect runs)
     const isFriday = nowDayjs.day() === 5;
-    if (isFriday && todayData && todayData.jummahJamaat) {
-      setJumuahTime(todayData.jummahJamaat);
-      setJumuahDisplayTime(formatTimeToDisplay(todayData.jummahJamaat, timeFormat));
-      setJumuahKhutbahTime(
-        todayData.jummahKhutbah
-          ? formatTimeToDisplay(todayData.jummahKhutbah, timeFormat)
-          : null,
+    if (isFriday && todayData) {
+      const fridaySessions = parseJumuahSessionsFromDay(todayData);
+      const fridayWindowMin = totalJamaatPhaseWindowForDisplayPrayer(
+        displaySettings ?? null,
+        "Zuhr",
+        { isJumuahToday: true },
       );
-      setJumuahKhutbahRaw(todayData.jummahKhutbah ?? null);
+      const fridayNowMin = nowMinutesInTz(new Date(), tz);
+      const target = pickJumuahTargetSession(
+        fridaySessions,
+        fridayNowMin,
+        fridayWindowMin,
+      );
+      if (target) {
+        setJumuahTime(target.jamaat);
+        setJumuahDisplayTime(formatTimeToDisplay(target.jamaat, timeFormat));
+        setJumuahKhutbahTime(
+          target.khutbah
+            ? formatTimeToDisplay(target.khutbah, timeFormat)
+            : null,
+        );
+        setJumuahKhutbahRaw(target.khutbah);
+      } else {
+        setJumuahTime(null);
+        setJumuahDisplayTime(null);
+        setJumuahKhutbahTime(null);
+        setJumuahKhutbahRaw(null);
+      }
     } else {
       setJumuahTime(null);
       setJumuahDisplayTime(null);
@@ -1624,6 +1691,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahKhutbahRaw,
     upcomingJumuahJamaatRaw,
     upcomingJumuahKhutbahRaw,
+    upcomingJumuahSessions,
     forbiddenPrayer: effectiveForbiddenPrayer,
     tomorrowsJamaats,
   };

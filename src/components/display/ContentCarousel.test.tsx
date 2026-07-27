@@ -159,6 +159,60 @@ describe('ContentCarousel', () => {
     expect(screen.getByText('Email')).toBeInTheDocument();
   });
 
+  it('keeps smart fit MEDIA_SLIDE in the content zone (no fullscreen portal)', () => {
+    const onFullscreenChange = vi.fn();
+    const items = [
+      {
+        id: 'ms-smart',
+        type: 'MEDIA_SLIDE',
+        title: 'Poster',
+        mediaUrl: 'https://cdn.example.com/smart.png',
+        mediaKind: 'image' as const,
+        mediaFit: 'smart' as const,
+        duration: 20,
+      },
+    ];
+    render(
+      <ContentCarousel
+        items={items}
+        interval={30}
+        onFullscreenChange={onFullscreenChange}
+      />,
+    );
+    expect(document.querySelector('[data-fullscreen-media-overlay]')).toBeNull();
+    expect(document.querySelector('[data-media-fit="smart"]')).toBeTruthy();
+    expect(onFullscreenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('opens fullscreen portal for cover MEDIA_SLIDE but not for smart', () => {
+    const coverItems = [
+      {
+        id: 'ms-cover',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://cdn.example.com/cover.png',
+        mediaKind: 'image' as const,
+        mediaFit: 'cover' as const,
+        duration: 20,
+      },
+    ];
+    const { unmount } = render(<ContentCarousel items={coverItems} interval={30} />);
+    expect(document.querySelector('[data-fullscreen-media-overlay]')).toBeTruthy();
+    unmount();
+
+    const smartItems = [
+      {
+        id: 'ms-smart-2',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://cdn.example.com/smart2.png',
+        mediaKind: 'image' as const,
+        mediaFit: 'smart' as const,
+        duration: 20,
+      },
+    ];
+    render(<ContentCarousel items={smartItems} interval={30} />);
+    expect(document.querySelector('[data-fullscreen-media-overlay]')).toBeNull();
+  });
+
   it('renders MEDIA_SLIDE image with object-cover when fullscreen', () => {
     const items = [
       {
