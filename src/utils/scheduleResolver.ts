@@ -54,18 +54,20 @@ function getDayOfWeekInTz(date: Date, tz: string): number {
  * Check if the current time is within a RECURRING time window.
  * Handles cross-midnight (e.g. 22:00–02:00).
  * Normalises time strings so "9:00" and "09:00" compare correctly.
- * API sends startTime/endTime in UTC; compare against current time in UTC.
+ *
+ * Admin stores startTime/endTime as masjid-local clock strings (HH:mm), matching
+ * the backend PlaylistAssignmentService — compare in the masjid timezone, not UTC.
  */
 function isWithinTimeWindow(
   now: Date,
   startTime: string | null,
   endTime: string | null,
-  _timezoneStr: string
+  timezoneStr: string
 ): boolean {
   const start = normaliseTimeString(startTime);
   const end = normaliseTimeString(endTime);
   if (!start || !end) return true; // all-day
-  const t = formatTimeInTz(now, 'UTC');
+  const t = formatTimeInTz(now, timezoneStr || DEFAULT_TZ);
   if (start <= end) {
     return t >= start && t < end;
   }
@@ -83,23 +85,23 @@ function getEffectiveDayForRecurring(
   endTime: string | null,
   timezoneStr: string
 ): number {
+  const tz = timezoneStr || DEFAULT_TZ;
   if (!startTime || !endTime) {
-    return getDayOfWeekInTz(now, timezoneStr);
+    return getDayOfWeekInTz(now, tz);
   }
   const start = normaliseTimeString(startTime);
   const end = normaliseTimeString(endTime);
-  if (!start || !end) return getDayOfWeekInTz(now, timezoneStr);
-  const t = formatTimeInTz(now, 'UTC');
+  if (!start || !end) return getDayOfWeekInTz(now, tz);
+  const t = formatTimeInTz(now, tz);
   if (start <= end) {
-    return getDayOfWeekInTz(now, timezoneStr);
+    return getDayOfWeekInTz(now, tz);
   }
-  // Cross-midnight: if we're in the "after midnight" part (t < end) in UTC,
-  // use previous UTC day for daysOfWeek
+  // Cross-midnight: if we're in the "after midnight" part (t < end) in the
+  // masjid timezone, use the previous local calendar day for daysOfWeek.
   if (t < end) {
-    const prevDay = dayjs(now).utc().subtract(1, 'day');
-    return prevDay.isoWeekday(); // Previous UTC day for cross-midnight in UTC
+    return dayjs(now).tz(tz).subtract(1, 'day').isoWeekday();
   }
-  return getDayOfWeekInTz(now, timezoneStr);
+  return getDayOfWeekInTz(now, tz);
 }
 
 /**
@@ -310,14 +312,21 @@ export function getNextBoundary(
       const [sh, sm] = startNorm.split(':').map(Number);
       const [eh, em] = endNorm.split(':').map(Number);
       const isCrossMidnight = startNorm > endNorm;
-      // API sends startTime/endTime in UTC; build boundaries in UTC to match isWithinTimeWindow
-      const nowUtc = dayjs(now).utc();
+      // Clock times are masjid-local — build boundaries in the masjid timezone.
+      const localToday = nowD.startOf('day');
       for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
-        const dayStart = nowUtc.add(dayOffset, 'day');
+        const dayStart = localToday.add(dayOffset, 'day');
         const startAt = dayStart.hour(sh).minute(sm).second(0).millisecond(0).toDate().getTime();
         const endAt = dayStart.hour(eh).minute(em).second(0).millisecond(0).toDate().getTime();
         if (isCrossMidnight) {
-          const endNext = nowUtc.add(dayOffset + 1, 'day').hour(eh).minute(em).second(0).millisecond(0).toDate().getTime();
+          const endNext = localToday
+            .add(dayOffset + 1, 'day')
+            .hour(eh)
+            .minute(em)
+            .second(0)
+            .millisecond(0)
+            .toDate()
+            .getTime();
           if (endAt > nowMs && (nearest === null || endAt < nearest)) nearest = endAt;
           if (endNext > nowMs && (nearest === null || endNext < nearest)) nearest = endNext;
         }
