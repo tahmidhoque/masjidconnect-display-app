@@ -7,6 +7,7 @@ import {
 } from "../../types/displayLayout";
 import syncService from "../../services/syncService";
 import storageService from "../../services/storageService";
+import mediaCacheService, { collectHttpUrls } from "../../services/mediaCacheService";
 import logger from "../../utils/logger";
 import { parseScreenOrientation, parseRotationDegrees, orientationToRotationDegrees } from "../../utils/orientation";
 import { setScreenOrientation } from "./uiSlice";
@@ -650,6 +651,19 @@ export const refreshContent = createAsyncThunk(
           rotationDegrees,
         });
       }
+
+      // Prefetch Supabase Storage media into the local Cache API so kiosks
+      // do not re-download posters/videos on every carousel cycle (Cached Egress).
+      const mediaUrls = collectHttpUrls({
+        content,
+        schedule,
+        events,
+        masjidLogoUrl,
+        scheduledPlaylists: scheduledPlaylistsArray,
+      });
+      void mediaCacheService.prefetchAndRetain(mediaUrls).catch((err) => {
+        logger.warn('[Content] Media prefetch failed', { error: String(err) });
+      });
 
       return {
         content: content || null,

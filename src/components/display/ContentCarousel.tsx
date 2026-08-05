@@ -37,11 +37,34 @@ import {
 } from './contentScaling';
 import type { FontSizeConfig } from './contentScaling';
 import MediaPdfPage from './MediaPdfPage';
+import { useCachedMediaUrlMap } from '@/hooks/useCachedMediaUrl';
 
 const EventSlide = lazy(() => import('./EventSlide'));
 const DonationSlide = lazy(() => import('./DonationSlide'));
 const CourseSlide = lazy(() => import('./CourseSlide'));
 const VideoSlide = lazy(() => import('./VideoSlide'));
+
+/** Collect remote media URLs from carousel items for local Cache API resolution. */
+function collectItemMediaUrls(items: CarouselItem[]): string[] {
+  const urls: string[] = [];
+  for (const it of items) {
+    if (typeof it.mediaUrl === 'string' && it.mediaUrl.trim()) urls.push(it.mediaUrl.trim());
+    if (typeof it.videoUrl === 'string' && it.videoUrl.trim()) urls.push(it.videoUrl.trim());
+    if (typeof it.imageUrl === 'string' && it.imageUrl.trim()) urls.push(it.imageUrl.trim());
+    const banner = it.course?.bannerImageUrl;
+    if (typeof banner === 'string' && banner.trim()) urls.push(banner.trim());
+    const evt = it.event as { bannerImageUrl?: string | null; thumbnailImageUrl?: string | null } | undefined;
+    if (evt) {
+      if (typeof evt.bannerImageUrl === 'string' && evt.bannerImageUrl.trim()) {
+        urls.push(evt.bannerImageUrl.trim());
+      }
+      if (typeof evt.thumbnailImageUrl === 'string' && evt.thumbnailImageUrl.trim()) {
+        urls.push(evt.thumbnailImageUrl.trim());
+      }
+    }
+  }
+  return urls;
+}
 
 /**
  * Upper bound (seconds) for how long a single VIDEO slide can stay on screen.
@@ -254,7 +277,19 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
 
   const safeItems = useMemo(() => (items.length > 0 ? items : []), [items]);
 
-  /** Stable identity for the active slide's media — avoids resetting preload when `items` is a new array reference each Redux render. */
+  const mediaRemoteUrls = useMemo(() => collectItemMediaUrls(safeItems), [safeItems]);
+  const mediaUrlMap = useCachedMediaUrlMap(mediaRemoteUrls);
+  const resolveMediaUrl = useCallback(
+    (url: string | undefined | null): string | undefined => {
+      if (typeof url !== 'string') return undefined;
+      const trimmed = url.trim();
+      if (!trimmed) return undefined;
+      return mediaUrlMap.get(trimmed) ?? trimmed;
+    },
+    [mediaUrlMap],
+  );
+
+  /** Stable identity for the active slide's media — uses remote URL so blob swap does not reset preload. */
   const mediaPreloadKey = useMemo(() => {
     if (safeItems.length === 0) return '';
     const it = safeItems[Math.min(activeIdx, safeItems.length - 1)];
@@ -346,7 +381,8 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
       setMediaSlideAssetReady(true);
       return;
     }
-    const url = typeof it.mediaUrl === 'string' ? it.mediaUrl.trim() : '';
+    const remoteUrl = typeof it.mediaUrl === 'string' ? it.mediaUrl.trim() : '';
+    const url = resolveMediaUrl(remoteUrl) ?? remoteUrl;
     if (!url || (it.mediaKind !== 'image' && it.mediaKind !== 'pdf')) {
       setMediaSlideAssetReady(true);
       return;
@@ -378,7 +414,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
     return () => {
       if (pdfRevealTimer) clearTimeout(pdfRevealTimer);
     };
-  }, [mediaPreloadKey]);
+  }, [mediaPreloadKey, resolveMediaUrl]);
 
   const currentItem = safeItems[activeIdx] ?? safeItems[0];
   const isEventSlide = !!currentItem?.event;
@@ -756,15 +792,40 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
     };
   }, [needsScroll, activeIdx]);
 
-  if (safeItems.length === 0) {
+  const item = currentItem;
+
+  const resolvedMediaUrl = resolveMediaUrl(item?.mediaUrl);
+  const resolvedVideoUrl = resolveMediaUrl(item?.videoUrl);
+  const resolvedImageUrl = resolveMediaUrl(item?.imageUrl);
+  const resolvedEvent = useMemo(() => {
+    if (!item?.event) return undefined;
+    const evt = item.event;
+    return {
+      ...evt,
+      bannerImageUrl:
+        resolveMediaUrl(evt.bannerImageUrl ?? undefined) ?? evt.bannerImageUrl ?? null,
+      thumbnailImageUrl:
+        resolveMediaUrl(evt.thumbnailImageUrl ?? undefined) ??
+        evt.thumbnailImageUrl ??
+        null,
+    };
+  }, [item?.event, resolveMediaUrl]);
+  const resolvedCourse = useMemo(() => {
+    if (!item?.course) return undefined;
+    const banner = item.course.bannerImageUrl;
+    return {
+      ...item.course,
+      bannerImageUrl: resolveMediaUrl(banner) ?? banner,
+    };
+  }, [item?.course, resolveMediaUrl]);
+
+  if (safeItems.length === 0 || !item) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-text-muted text-body">No content to display</p>
       </div>
     );
   }
-
-  const item = currentItem;
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
   // from the randomly selected entry rather than from the item-level fields.
@@ -845,10 +906,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
           data-fullscreen-portal-media=""
           className={portalMediaLayerClass}
         >
-          {isVideoSlide && item.videoUrl ? (
+          {isVideoSlide && resolvedVideoUrl ? (
             <Suspense fallback={null}>
               <VideoSlide
-                url={item.videoUrl}
+                url={resolvedVideoUrl}
                 title={item.title}
                 fit={effectiveMediaFit}
                 muted={item.muted ?? true}
@@ -860,7 +921,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
             </Suspense>
           ) : item.mediaKind === 'pdf' ? (
             <MediaPdfPage
-              url={item.mediaUrl!}
+              url={resolvedMediaUrl!}
               title={item.title ?? 'Poster'}
               fit={effectiveMediaFit === 'cover' ? 'cover' : 'contain'}
               mode={effectiveMediaFit}
@@ -870,7 +931,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
           ) : effectiveMediaFit === 'smart' ? (
             <div className="relative min-h-0 flex-1 overflow-hidden">
               <img
-                src={item.mediaUrl}
+                src={resolvedMediaUrl}
                 alt=""
                 aria-hidden
                 className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-2xl"
@@ -879,7 +940,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
               />
               <div className="absolute inset-0 bg-midnight/40" aria-hidden />
               <img
-                src={item.mediaUrl}
+                src={resolvedMediaUrl}
                 alt=""
                 className="gpu-accelerated relative h-full w-full object-contain object-center"
                 loading="eager"
@@ -891,7 +952,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
               <img
-                src={item.mediaUrl}
+                src={resolvedMediaUrl}
                 alt=""
                 className="gpu-accelerated h-full w-full object-cover object-center"
                 loading="eager"
@@ -926,17 +987,17 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
             className={`flex flex-1 min-h-0 flex-col ${needsScroll ? '' : 'justify-center'} ${isEventSlide || isDonationSlide || isCourseSlide ? '' : 'gap-4'}`}
             style={safetyScale < 1 ? { transform: `scale(${safetyScale})`, transformOrigin: 'top center' } : undefined}
           >
-            {isEventSlide && item.event ? (
+            {isEventSlide && resolvedEvent ? (
               <Suspense fallback={null}>
-                <EventSlide event={item.event} compact={compact} />
+                <EventSlide event={resolvedEvent} compact={compact} />
               </Suspense>
             ) : isDonationSlide ? (
               <Suspense fallback={null}>
                 <DonationSlide item={item} compact={compact} />
               </Suspense>
-            ) : isCourseSlide && item.course ? (
+            ) : isCourseSlide && resolvedCourse ? (
               <Suspense fallback={null}>
-                <CourseSlide course={item.course} compact={compact} />
+                <CourseSlide course={resolvedCourse} compact={compact} />
               </Suspense>
             ) : (
               <div style={{ textAlign: effectiveTextAlign }} className="flex flex-col min-w-0 w-full">
@@ -944,9 +1005,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                   ref={isFullscreenContent ? scrollRef : undefined}
                   className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar' : ''}`}
                 >
-                  {item.imageUrl && (
+                  {resolvedImageUrl && (
                     <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
-                      <img src={item.imageUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+                      <img src={resolvedImageUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
                     </div>
                   )}
                   {displayTitle && <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>}
@@ -1017,19 +1078,19 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
             {isFullscreenContent ? (
               /* Fullscreen content renders in portal — inline placeholder only. */
               <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
-            ) : isEventSlide && item.event ? (
+            ) : isEventSlide && resolvedEvent ? (
               <Suspense fallback={null}>
-                <EventSlide event={item.event} compact={compact} />
+                <EventSlide event={resolvedEvent} compact={compact} />
               </Suspense>
             ) : isDonationSlide ? (
               <Suspense fallback={null}>
                 <DonationSlide item={item} compact={compact} />
               </Suspense>
-            ) : isCourseSlide && item.course ? (
+            ) : isCourseSlide && resolvedCourse ? (
               <Suspense fallback={null}>
-                <CourseSlide course={item.course} compact={compact} />
+                <CourseSlide course={resolvedCourse} compact={compact} />
               </Suspense>
-            ) : isVideoSlide && item.videoUrl ? (
+            ) : isVideoSlide && resolvedVideoUrl ? (
               isFullscreenMedia ? (
                 /* Smart/cover render edge-to-edge via the fullscreen portal above. */
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
@@ -1038,7 +1099,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 <div className="flex flex-1 min-h-0 w-full flex-col">
                   <Suspense fallback={null}>
                     <VideoSlide
-                      url={item.videoUrl}
+                      url={resolvedVideoUrl}
                       title={item.title}
                       fit="contain"
                       muted={item.muted ?? true}
@@ -1050,7 +1111,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                   </Suspense>
                 </div>
               )
-            ) : isMediaSlide && item.mediaUrl ? (
+            ) : isMediaSlide && resolvedMediaUrl ? (
               isFullscreenMedia ? (
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
               ) : (
@@ -1060,7 +1121,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 <div className="flex flex-1 min-h-0 w-full flex-col">
                   {item.mediaKind === 'pdf' ? (
                     <MediaPdfPage
-                      url={item.mediaUrl}
+                      url={resolvedMediaUrl}
                       title={item.title ?? 'Poster'}
                       fit="contain"
                       className="min-h-0 w-full flex-1"
@@ -1069,7 +1130,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                   ) : (
                     <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
                       <img
-                        src={item.mediaUrl}
+                        src={resolvedMediaUrl}
                         alt=""
                         className="gpu-accelerated max-h-full max-w-full object-contain"
                         onLoad={onMediaAssetLoaded}
@@ -1085,10 +1146,10 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                   ref={scrollRef}
                   className={`flex flex-col gap-4 min-w-0 ${needsScroll ? 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar' : ''}`}
                 >
-                  {item.imageUrl && (
+                  {resolvedImageUrl && (
                     <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
                       <img
-                        src={item.imageUrl}
+                        src={resolvedImageUrl}
                         alt=""
                         className="max-w-full max-h-full object-contain rounded-lg"
                       />

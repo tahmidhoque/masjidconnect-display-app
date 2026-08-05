@@ -37,6 +37,23 @@ export default defineConfig({
         // SW-level API caching caused stale layout/content until hard refresh.
         runtimeCaching: [
           {
+            // Supabase Storage public objects (images, PDF, video) — CacheFirst
+            // so kiosks do not re-download carousel media every cycle.
+            urlPattern: ({ url }) =>
+              url.pathname.includes('/storage/v1/object/public/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'supabase-storage-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
             handler: 'CacheFirst',
             options: {

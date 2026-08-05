@@ -8,6 +8,9 @@
  * Plays once and fires `onEnded` so the carousel advances; when it is the only
  * slide (`loop`) it loops instead of ending. Follows the project memory rule:
  * all listeners are removed and the media buffer released on unmount.
+ *
+ * Prefer passing a stable blob: URL from mediaCacheService so remount after
+ * carousel cycles reloads from disk/Cache API instead of re-hitting Supabase.
  */
 
 import React, { useEffect, useRef } from 'react';

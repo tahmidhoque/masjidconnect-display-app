@@ -25,6 +25,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { useAppSelector } from '../../store/hooks';
 import { selectMasjidLogoUrl, selectMasjidName } from '../../store/slices/contentSlice';
+import { useCachedMediaUrl } from '@/hooks/useCachedMediaUrl';
 import { ORIENTATION_FORCE_EVENT } from '../../hooks/useDevKeyboard';
 
 import { orientationToLayoutMode, isPortraitLayout, parseScreenOrientation } from '../../utils/orientation';
@@ -673,7 +674,9 @@ const DisplayScreenInner: React.FC = () => {
   });
 
   /* ---- Masjid logo (Growth+ plan) — URL is only sent when the plan allows it ---- */
-  const masjidLogoUrl = useAppSelector(selectMasjidLogoUrl);
+  const remoteMasjidLogoUrl = useAppSelector(selectMasjidLogoUrl);
+  /** Prefer Cache API / blob URL so logo does not re-hit Supabase egress. */
+  const masjidLogoUrl = useCachedMediaUrl(remoteMasjidLogoUrl) ?? remoteMasjidLogoUrl;
   const logoConfig = layoutConfig.logo ?? null;
   const headerLogoSide: 'left' | 'right' | null =
     logoConfig?.position === 'top-left' ? 'left' : logoConfig?.position === 'top-right' ? 'right' : null;
