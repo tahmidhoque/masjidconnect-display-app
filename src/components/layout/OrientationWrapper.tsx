@@ -6,6 +6,10 @@
  * rotated inner div is used with width/height swapped for 90° and 270° (FR-4, FR-5).
  *
  * Child layouts must use `w-full h-full` (percentage-based) so they fill the rotated container.
+ *
+ * Theme CSS-variable overrides (`themeStyle`) are applied on this wrapper — not only on
+ * LayoutRenderer — so fullscreen content portalled into `#orientation-portal-root`
+ * inherits the mosque palette (bg-midnight, text-gold, etc.).
  */
 
 import React from 'react';
@@ -14,21 +18,32 @@ import type { RotationDegrees } from '@/types/realtime';
 interface OrientationWrapperProps {
   /** Rotation in degrees (0, 90, 180, 270). Applied directly from WebSocket or derived from orientation. */
   rotationDegrees: RotationDegrees;
+  /**
+   * CSS-variable overrides for a custom display theme. Must wrap both layout children
+   * and `#orientation-portal-root` so fullscreen portals use the same palette.
+   */
+  themeStyle?: React.CSSProperties;
   children: React.ReactNode;
 }
 
 const OrientationWrapper: React.FC<OrientationWrapperProps> = ({
   rotationDegrees,
+  themeStyle,
   children,
 }) => {
   if (rotationDegrees === 0) {
     return (
-      <div className="fixed inset-0 w-screen h-screen overflow-hidden">
+      <div
+        className="fixed inset-0 w-screen h-screen overflow-hidden"
+        style={themeStyle}
+        {...(themeStyle ? { 'data-display-theme-root': '' } : {})}
+      >
         {children}
         {/*
          * Portal target for fullscreen media overlays. Sitting here (inside the
          * no-rotation branch), a `position: fixed` child portalled into this div
          * behaves like a normal `fixed inset-0` — covering the full physical viewport.
+         * Theme vars on the parent ensure portalled slides keep mosque colours.
          */}
         <div id="orientation-portal-root" />
       </div>
@@ -38,7 +53,11 @@ const OrientationWrapper: React.FC<OrientationWrapperProps> = ({
   const swapDimensions = rotationDegrees === 90 || rotationDegrees === 270;
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden">
+    <div
+      className="fixed inset-0 w-screen h-screen overflow-hidden"
+      style={themeStyle}
+      {...(themeStyle ? { 'data-display-theme-root': '' } : {})}
+    >
       <div
         className="gpu-accelerated absolute"
         style={{
@@ -59,6 +78,7 @@ const OrientationWrapper: React.FC<OrientationWrapperProps> = ({
          * contained by this transformed block (not the raw viewport). That means
          * `fixed inset-0` covers the full *logical* display area in the configured
          * orientation, rather than the physical screen rectangle.
+         * Theme vars inherit from the outer wrapper so fullscreen slides match the layout.
          */}
         <div id="orientation-portal-root" />
       </div>

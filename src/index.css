@@ -453,9 +453,9 @@ html, body {
 }
 
 .badge-dua {
-  background: rgba(21, 101, 192, 0.2);
+  background: color-mix(in srgb, var(--color-dua) 20%, transparent);
   color: var(--color-dua-light);
-  border: 1px solid rgba(21, 101, 192, 0.4);
+  border: 1px solid color-mix(in srgb, var(--color-dua) 40%, transparent);
 }
 
 /* Divider */

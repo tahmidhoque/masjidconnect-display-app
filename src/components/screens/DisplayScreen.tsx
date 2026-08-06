@@ -890,7 +890,9 @@ const DisplayScreenInner: React.FC = () => {
   const layoutMode = orientationOverride ?? orientationToLayoutMode(orientation);
 
   /**
-   * Custom theme colours (CSS-variable overrides on the layout root).
+   * Custom theme colours (CSS-variable overrides).
+   * Applied on OrientationWrapper so layout zones AND fullscreen portals
+   * (`#orientation-portal-root`) inherit the same palette.
    * Skipped while Ramadan mode is active — the seasonal green/gold palette
    * (html[data-theme="ramadan"]) takes precedence over mosque customisation.
    */
@@ -1016,7 +1018,7 @@ const DisplayScreenInner: React.FC = () => {
     });
 
   return (
-    <OrientationWrapper rotationDegrees={rotationDegrees}>
+    <OrientationWrapper rotationDegrees={rotationDegrees} themeStyle={themeStyle}>
       <ReferenceViewport orientation={layoutMode}>
         <LayoutRenderer
           key={`${layoutRevision}-${lastContentUpdate ?? ''}`}

@@ -13,7 +13,8 @@
  *  - spacingScale → multiplies the orientation's base padding and gap
  *
  * Theme overrides arrive as a CSS-variable style object (themeStyle) applied
- * to the root so all Tailwind token utilities re-resolve.
+ * to the root so all Tailwind token utilities re-resolve. DisplayScreen also
+ * applies the same style on OrientationWrapper so fullscreen portals inherit it.
  */
 
 import React from 'react';

@@ -77,6 +77,9 @@ export function buildThemeStyle(
     '--color-gold': theme.highlight,
     '--color-gold-light': shadeHexColour(theme.highlight, 0.2),
     '--color-gold-dark': shadeHexColour(theme.highlight, -0.18),
+    // Dua badges / accents follow the mosque accent rather than a fixed blue.
+    '--color-dua': theme.accent,
+    '--color-dua-light': shadeHexColour(theme.accent, 0.25),
     '--color-text-primary': theme.textPrimary,
     '--color-text-secondary': textSecondary
       ? hexToRgba(theme.textSecondary, textSecondary.a)

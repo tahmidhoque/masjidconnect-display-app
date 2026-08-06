@@ -249,6 +249,19 @@ const dua = () => ({
   },
 });
 
+/** Fullscreen dua — used to verify theme colours reach the portal overlay. */
+const duaFullscreen = () => {
+  const base = dua();
+  return {
+    ...base,
+    id: 'sc-dua-fullscreen',
+    content: {
+      ...base.content,
+      displayMode: 'fullscreen',
+    },
+  };
+};
+
 const asma = () => ({
   id: 'sc-asma',
   order: 0,
@@ -526,6 +539,13 @@ export const SCENARIOS: Record<string, Scenario> = {
     orientation: 'LANDSCAPE',
     layout: config('landscape', LS_STACK, BURGUNDY_THEME),
     scheduleItems: [verse()],
+  },
+  /** Fullscreen dua under a custom theme — portal must inherit mosque colours. */
+  'ls-theme-purple-dua-fullscreen': {
+    id: 'ls-theme-purple-dua-fullscreen',
+    orientation: 'LANDSCAPE',
+    layout: config('landscape', LS_STACK, PURPLE_THEME),
+    scheduleItems: [duaFullscreen()],
   },
   'ls-ramadan': {
     id: 'ls-ramadan',
