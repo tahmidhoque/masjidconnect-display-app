@@ -198,4 +198,23 @@ describe('buildPrayerTimesBoundaryKey', () => {
   it('is empty when prayer times are absent', () => {
     expect(buildPrayerTimesBoundaryKey(null)).toBe('');
   });
+
+  it('changes when a day inside the multi-day { data: [...] } shape changes', () => {
+    const wrapped = {
+      data: [
+        { ...prayerTimes, date: '2026-09-01' },
+        { ...prayerTimes, date: '2026-09-02' },
+      ],
+    } as PrayerTimes;
+    const updated = {
+      data: [
+        { ...prayerTimes, date: '2026-09-01' },
+        { ...prayerTimes, date: '2026-09-02', asrJamaat: '16:30' },
+      ],
+    } as PrayerTimes;
+    expect(buildPrayerTimesBoundaryKey(wrapped)).not.toBe('');
+    expect(buildPrayerTimesBoundaryKey(updated)).not.toBe(
+      buildPrayerTimesBoundaryKey(wrapped),
+    );
+  });
 });

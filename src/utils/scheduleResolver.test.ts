@@ -3,7 +3,11 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { PrayerTimes, ScheduledPlaylistAssignment } from '@/api/models';
-import { getNextBoundary, resolveActiveSchedule } from './scheduleResolver';
+import {
+  getNextBoundary,
+  resolveActiveSchedule,
+  resolvePrayerTimesForDate,
+} from './scheduleResolver';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -100,6 +104,53 @@ describe('resolveActiveSchedule', () => {
   });
 
   /**
+   * Day-filtered prayer windows: a non-empty daysOfWeek restricts the window
+   * to those local days (JS 0=Sun … 6=Sat); empty applies every day.
+   * 2026-06-19 is a Friday, 2026-06-16 a Tuesday, in Europe/London.
+   */
+  it('applies the optional daysOfWeek filter to PRAYER_WINDOW assignments', () => {
+    const fridayOnlyWindow = makeAssignment({
+      assignmentId: 'friday-evening',
+      type: 'PRAYER_WINDOW',
+      priority: 5,
+      daysOfWeek: [5],
+      startPrayer: 'MAGHRIB',
+      endPrayer: 'ISHA',
+      startPrayerAnchor: 'ADHAN',
+      endPrayerAnchor: 'ADHAN',
+      schedule: {
+        id: 'friday-evening',
+        name: 'Friday Evening',
+        description: null,
+        isDefault: false,
+        isActive: true,
+        items: [],
+      },
+    });
+    const fallback = makeAssignment({
+      assignmentId: 'default-1',
+      type: 'DEFAULT',
+    });
+
+    const friday = resolveActiveSchedule(
+      [fridayOnlyWindow, fallback],
+      localInstant('2026-06-19', '19:00'),
+      TZ,
+      mockPrayerTimes,
+    );
+    expect(friday?.assignmentId).toBe('friday-evening');
+
+    // Same in-window time on a Tuesday must fall through to the default.
+    const tuesday = resolveActiveSchedule(
+      [fridayOnlyWindow, fallback],
+      localInstant('2026-06-16', '19:00'),
+      TZ,
+      mockPrayerTimes,
+    );
+    expect(tuesday?.assignmentId).toBe('default-1');
+  });
+
+  /**
    * Regression: admin stores HH:mm in masjid-local time. During BST (UTC+1),
    * comparing against UTC shifts the window by an hour and schedules appear
    * not to come into effect at the configured local start.
@@ -181,6 +232,177 @@ describe('resolveActiveSchedule', () => {
     expect(
       resolveActiveSchedule([overnight, fallback], localInstant('2026-08-01', '02:00'), TZ)?.assignmentId,
     ).toBe('default');
+  });
+});
+
+describe('resolvePrayerTimesForDate', () => {
+  const day = (date: string, asr: string, maghrib: string): PrayerTimes => ({
+    ...mockPrayerTimes,
+    date,
+    asr,
+    maghrib,
+  });
+
+  it('picks the matching day from the multi-day { data: [...] } store shape', () => {
+    const wrapped = {
+      data: [
+        day('2026-09-01', '17:48', '20:03'),
+        day('2026-09-02', '17:46', '20:01'),
+      ],
+    } as PrayerTimes;
+    const resolved = resolvePrayerTimesForDate(
+      wrapped,
+      localInstant('2026-09-02', '10:00'),
+      TZ,
+    );
+    expect(resolved?.asr).toBe('17:46');
+  });
+
+  it('falls back to the first entry when no date matches', () => {
+    const wrapped = {
+      data: [day('2026-09-01', '17:48', '20:03')],
+    } as PrayerTimes;
+    const resolved = resolvePrayerTimesForDate(
+      wrapped,
+      localInstant('2026-09-05', '10:00'),
+      TZ,
+    );
+    expect(resolved?.asr).toBe('17:48');
+  });
+
+  it('returns flat single-day objects unchanged', () => {
+    expect(
+      resolvePrayerTimesForDate(mockPrayerTimes, localInstant('2026-09-01', '10:00'), TZ),
+    ).toBe(mockPrayerTimes);
+  });
+});
+
+/**
+ * Regression suite modelling a real customer configuration (masjid
+ * cmqsb4uxf0000ks04ux5naoni, Europe/London) that surfaced two bugs:
+ *
+ * 1. Prayer times arrive as a multi-day array stored as `{ data: [...] }`;
+ *    passing the wrapper into the window maths left every prayer boundary
+ *    undefined, so PRAYER_WINDOW playlists never activated on the display.
+ * 2. matchesRecurring accepted a "1=Sunday" day convention alongside the
+ *    canonical JS 0=Sunday one, so every RECURRING rule also fired on the
+ *    preceding day (Friday Jummah content showing on Thursday).
+ *
+ * Assignments (as stored in ScreenPlaylistAssignment):
+ * - PRAYER_WINDOW "Friday After Asr"    p3  ASR adhan → MAGHRIB adhan (daily)
+ * - RECURRING     "Friday After Jummah" p2  Fri 13:45–14:15
+ * - RECURRING     "Daily Rotation"      p1  Thu 12:10–12:15
+ * - RECURRING     "Friday Jummah"       p1  Fri 13:00–13:45
+ * - DEFAULT       "Day to day"          p0
+ */
+describe('resolveActiveSchedule — complex customer schedule (regression)', () => {
+  const weekPrayerTimes = {
+    data: [
+      { ...mockPrayerTimes, date: '2026-08-31', fajr: '04:24', zuhr: '13:10', asr: '17:49', maghrib: '20:05', isha: '21:00' },
+      { ...mockPrayerTimes, date: '2026-09-01', fajr: '04:27', zuhr: '13:10', asr: '17:48', maghrib: '20:03', isha: '20:57' },
+      { ...mockPrayerTimes, date: '2026-09-02', fajr: '04:29', zuhr: '13:10', asr: '17:46', maghrib: '20:01', isha: '20:55' },
+      { ...mockPrayerTimes, date: '2026-09-03', fajr: '04:31', zuhr: '13:09', asr: '17:44', maghrib: '19:58', isha: '20:52' },
+      { ...mockPrayerTimes, date: '2026-09-04', fajr: '04:33', zuhr: '13:09', asr: '17:42', maghrib: '19:56', isha: '20:50' },
+    ],
+  } as PrayerTimes;
+
+  const assignments: ScheduledPlaylistAssignment[] = [
+    makeAssignment({
+      assignmentId: 'friday-after-asr',
+      type: 'PRAYER_WINDOW',
+      priority: 3,
+      startPrayer: 'ASR',
+      endPrayer: 'MAGHRIB',
+      startPrayerAnchor: 'ADHAN',
+      endPrayerAnchor: 'ADHAN',
+      schedule: { id: 's-after-asr', name: 'Friday After Asr', description: null, isDefault: false, isActive: true, items: [] },
+    }),
+    makeAssignment({
+      assignmentId: 'friday-after-jummah',
+      type: 'RECURRING',
+      priority: 2,
+      daysOfWeek: [5],
+      startTime: '13:45',
+      endTime: '14:15',
+      schedule: { id: 's-after-jummah', name: 'Friday After Jummah', description: null, isDefault: false, isActive: true, items: [] },
+    }),
+    makeAssignment({
+      assignmentId: 'daily-rotation',
+      type: 'RECURRING',
+      priority: 1,
+      daysOfWeek: [4],
+      startTime: '12:10',
+      endTime: '12:15',
+      schedule: { id: 's-rotation', name: 'Daily Rotation', description: null, isDefault: false, isActive: true, items: [] },
+    }),
+    makeAssignment({
+      assignmentId: 'friday-jummah',
+      type: 'RECURRING',
+      priority: 1,
+      daysOfWeek: [5],
+      startTime: '13:00',
+      endTime: '13:45',
+      schedule: { id: 's-jummah', name: 'Friday Jummah', description: null, isDefault: false, isActive: true, items: [] },
+    }),
+    makeAssignment({
+      assignmentId: 'day-to-day',
+      type: 'DEFAULT',
+      priority: 0,
+      schedule: { id: 's-default', name: 'Day to day', description: null, isDefault: true, isActive: true, items: [] },
+    }),
+  ];
+
+  const activeAt = (date: string, time: string) =>
+    resolveActiveSchedule(assignments, localInstant(date, time), TZ, weekPrayerTimes)
+      ?.assignmentId;
+
+  // 2026-09-04 is a Friday
+  it('runs the full Friday timeline', () => {
+    expect(activeAt('2026-09-04', '12:00')).toBe('day-to-day');
+    expect(activeAt('2026-09-04', '13:00')).toBe('friday-jummah');
+    expect(activeAt('2026-09-04', '13:44')).toBe('friday-jummah');
+    expect(activeAt('2026-09-04', '13:45')).toBe('friday-after-jummah');
+    expect(activeAt('2026-09-04', '14:14')).toBe('friday-after-jummah');
+    expect(activeAt('2026-09-04', '14:15')).toBe('day-to-day');
+    // Asr adhan 17:42 → Maghrib adhan 19:56 (prayer window)
+    expect(activeAt('2026-09-04', '17:41')).toBe('day-to-day');
+    expect(activeAt('2026-09-04', '17:42')).toBe('friday-after-asr');
+    expect(activeAt('2026-09-04', '19:55')).toBe('friday-after-asr');
+    expect(activeAt('2026-09-04', '19:56')).toBe('day-to-day');
+  });
+
+  it('activates the prayer window from the multi-day store shape (bug 1)', () => {
+    // 2026-09-01 is a Tuesday: Asr 17:48 → Maghrib 20:03. Prayer windows apply
+    // daily (no day-of-week support), so the window must activate here too.
+    expect(activeAt('2026-09-01', '18:30')).toBe('friday-after-asr');
+    expect(activeAt('2026-09-01', '17:47')).toBe('day-to-day');
+    expect(activeAt('2026-09-01', '20:03')).toBe('day-to-day');
+  });
+
+  it('does not fire Friday playlists on Thursday (bug 2)', () => {
+    // 2026-09-03 is a Thursday. Previously the "1=Sunday" convention check made
+    // daysOfWeek [5] (Friday) match on Thursday as well.
+    expect(activeAt('2026-09-03', '13:20')).toBe('day-to-day');
+    expect(activeAt('2026-09-03', '13:50')).toBe('day-to-day');
+    // Thursday's own rule still fires.
+    expect(activeAt('2026-09-03', '12:12')).toBe('daily-rotation');
+  });
+
+  it('does not fire Thursday playlists on Wednesday (bug 2)', () => {
+    // 2026-09-02 is a Wednesday; daysOfWeek [4] (Thursday) must not match.
+    expect(activeAt('2026-09-02', '12:12')).toBe('day-to-day');
+  });
+
+  it('computes prayer-window boundaries from the multi-day store shape', () => {
+    // Tuesday 17:00 → next boundary is Asr adhan 17:48 for that day.
+    const next = getNextBoundary(
+      assignments,
+      localInstant('2026-09-01', '17:00'),
+      TZ,
+      weekPrayerTimes,
+    );
+    expect(next).not.toBeNull();
+    expect(dayjs(next!).tz(TZ).format('YYYY-MM-DD HH:mm')).toBe('2026-09-01 17:48');
   });
 });
 

@@ -7,6 +7,7 @@ import {
   getPrayerWindowBoundaryMinutes,
   getUpcomingPrayerWindowBoundaries,
   isWithinPrayerWindow,
+  matchesPrayerWindowDays,
 } from './prayerWindowSchedule';
 
 dayjs.extend(utc);
@@ -78,6 +79,63 @@ describe('isWithinPrayerWindow', () => {
     expect(isWithinPrayerWindow(now, maghribToIshaWindow, mockPrayerTimes, TZ)).toBe(
       false,
     );
+  });
+});
+
+describe('matchesPrayerWindowDays', () => {
+  // 2026-06-16 is a Tuesday; 2026-06-19 is a Friday; 2026-06-20 is a Saturday.
+  const ishaToFajrWindow = {
+    startPrayer: 'ISHA' as const,
+    endPrayer: 'FAJR' as const,
+    startPrayerAnchor: 'ADHAN' as const,
+    endPrayerAnchor: 'ADHAN' as const,
+    startPrayerOffsetMinutes: 0,
+    endPrayerOffsetMinutes: 0,
+  };
+
+  it('applies every day when daysOfWeek is empty or missing', () => {
+    const now = localInstant('2026-06-16', '19:00');
+    expect(
+      matchesPrayerWindowDays(now, maghribToIshaWindow, [], mockPrayerTimes, TZ),
+    ).toBe(true);
+    expect(
+      matchesPrayerWindowDays(now, maghribToIshaWindow, undefined, mockPrayerTimes, TZ),
+    ).toBe(true);
+  });
+
+  it('matches only the configured days (JS 0=Sun … 6=Sat)', () => {
+    const friday = localInstant('2026-06-19', '19:00');
+    const tuesday = localInstant('2026-06-16', '19:00');
+    expect(
+      matchesPrayerWindowDays(friday, maghribToIshaWindow, [5], mockPrayerTimes, TZ),
+    ).toBe(true);
+    expect(
+      matchesPrayerWindowDays(tuesday, maghribToIshaWindow, [5], mockPrayerTimes, TZ),
+    ).toBe(false);
+  });
+
+  it('attributes the after-midnight tail of an overnight window to the previous day', () => {
+    // Friday Isha → Saturday Fajr: Saturday 01:00 still belongs to Friday.
+    const saturdayNight = localInstant('2026-06-20', '01:00');
+    expect(
+      matchesPrayerWindowDays(saturdayNight, ishaToFajrWindow, [5], mockPrayerTimes, TZ),
+    ).toBe(true);
+    expect(
+      matchesPrayerWindowDays(saturdayNight, ishaToFajrWindow, [6], mockPrayerTimes, TZ),
+    ).toBe(false);
+    // Before midnight the window belongs to its own day.
+    const fridayEvening = localInstant('2026-06-19', '20:30');
+    expect(
+      matchesPrayerWindowDays(fridayEvening, ishaToFajrWindow, [5], mockPrayerTimes, TZ),
+    ).toBe(true);
+  });
+
+  it('accepts 7 as an ISO Sunday alias', () => {
+    // 2026-06-21 is a Sunday.
+    const sunday = localInstant('2026-06-21', '19:00');
+    expect(
+      matchesPrayerWindowDays(sunday, maghribToIshaWindow, [7], mockPrayerTimes, TZ),
+    ).toBe(true);
   });
 });
 

@@ -70,7 +70,7 @@ export function buildPlaylistsBoundaryKey(
     .map((p) => {
       const prayerSig =
         p.type === 'PRAYER_WINDOW'
-          ? `:${p.startPrayer ?? ''}:${p.endPrayer ?? ''}:${p.startPrayerAnchor ?? ''}:${p.endPrayerAnchor ?? ''}:${p.startPrayerOffsetMinutes ?? 0}:${p.endPrayerOffsetMinutes ?? 0}`
+          ? `:${p.startPrayer ?? ''}:${p.endPrayer ?? ''}:${p.startPrayerAnchor ?? ''}:${p.endPrayerAnchor ?? ''}:${p.startPrayerOffsetMinutes ?? 0}:${p.endPrayerOffsetMinutes ?? 0}:${(p.daysOfWeek ?? []).join(',')}`
           : '';
       return `${p.assignmentId}:${p.type}:${p.schedule?.id ?? ''}${prayerSig}`;
     })
@@ -78,24 +78,37 @@ export function buildPlaylistsBoundaryKey(
     .join('|');
 }
 
-/** Fingerprint prayer times so boundary timers reset when the timetable changes. */
+/**
+ * Fingerprint prayer times so boundary timers reset when the timetable changes.
+ * Handles both the flat single-day shape and the multi-day `{ data: [...] }`
+ * shape produced by normalisePrayerTimesForStore.
+ */
 export function buildPrayerTimesBoundaryKey(
   prayerTimes: PrayerTimes | null | undefined,
 ): string {
   if (!prayerTimes) return '';
-  return [
-    prayerTimes.fajr,
-    prayerTimes.sunrise,
-    prayerTimes.zuhr,
-    prayerTimes.asr,
-    prayerTimes.maghrib,
-    prayerTimes.isha,
-    prayerTimes.fajrJamaat,
-    prayerTimes.zuhrJamaat,
-    prayerTimes.asrJamaat,
-    prayerTimes.maghribJamaat,
-    prayerTimes.ishaJamaat,
-  ].join('|');
+  const days: PrayerTimes[] =
+    Array.isArray(prayerTimes.data) && prayerTimes.data.length > 0
+      ? prayerTimes.data
+      : [prayerTimes];
+  return days
+    .map((d) =>
+      [
+        d.date,
+        d.fajr,
+        d.sunrise,
+        d.zuhr,
+        d.asr,
+        d.maghrib,
+        d.isha,
+        d.fajrJamaat,
+        d.zuhrJamaat,
+        d.asrJamaat,
+        d.maghribJamaat,
+        d.ishaJamaat,
+      ].join('|'),
+    )
+    .join('||');
 }
 
 /**

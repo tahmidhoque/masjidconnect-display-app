@@ -13,6 +13,7 @@ import isoWeek from 'dayjs/plugin/isoWeek';
 import type { ScheduledPlaylistAssignment, PrayerTimes } from '@/api/models';
 import {
   isWithinPrayerWindow,
+  matchesPrayerWindowDays,
   getUpcomingPrayerWindowBoundaries,
   type PrayerWindowFields,
 } from '@/utils/prayerWindowSchedule';
@@ -105,6 +106,35 @@ function getEffectiveDayForRecurring(
 }
 
 /**
+ * Resolve the prayer-times record for the local calendar day of `now`.
+ *
+ * The API returns prayer times as a multi-day array which the store keeps as
+ * `{ data: [day0, day1, ...] }` (see normalisePrayerTimesForStore). The window
+ * calculations need a single day's times — passing the wrapper through leaves
+ * `fajr`/`asr`/... undefined and PRAYER_WINDOW assignments silently never match.
+ * Mirrors the day selection in usePrayerTimes: match on `date`, fall back to
+ * the first entry.
+ */
+export function resolvePrayerTimesForDate(
+  prayerTimes: PrayerTimes | PrayerTimes[] | null | undefined,
+  now: Date,
+  timezoneStr: string,
+): PrayerTimes | null {
+  if (!prayerTimes) return null;
+  const days: PrayerTimes[] | null = Array.isArray(prayerTimes)
+    ? prayerTimes
+    : Array.isArray(prayerTimes.data)
+      ? prayerTimes.data
+      : null;
+  if (!days) return prayerTimes as PrayerTimes;
+  if (days.length === 0) return null;
+  const today = dayjs(now).tz(timezoneStr || DEFAULT_TZ).format('YYYY-MM-DD');
+  return (
+    days.find((d) => typeof d.date === 'string' && d.date.startsWith(today)) ?? days[0]
+  );
+}
+
+/**
  * Check if a date string includes a time component (ISO datetime vs date-only).
  */
 function hasTimeComponent(dateStr: string): boolean {
@@ -141,7 +171,12 @@ function isWithinDateRange(
 
 /**
  * Check if a RECURRING assignment matches the current time.
- * Supports both daysOfWeek conventions: 0-6 (Sun-Sat) and 1-7 (ISO Mon-Sun).
+ *
+ * The backend stores daysOfWeek exclusively in the JS convention
+ * (0=Sunday … 6=Saturday, enforced by Zod in PlaylistAssignmentService).
+ * Matching multiple conventions at once (as this previously did) makes every
+ * rule also fire on the preceding day — e.g. a Friday-only Jummah playlist
+ * appearing on Thursday. `7` is accepted as an ISO Sunday alias only.
  */
 function matchesRecurring(
   now: Date,
@@ -154,16 +189,13 @@ function matchesRecurring(
     assignment.endTime,
     timezoneStr
   );
-  // Convert ISO (1-7) to JS (0-6) for API compatibility: ISO 7=Sun -> JS 0
+  // Convert ISO (1-7) to JS (0-6): ISO 7=Sun -> JS 0
   const effectiveDayJS = effectiveDayISO === 7 ? 0 : effectiveDayISO;
-  // 1=Sunday convention (Sun=1, Mon=2, ..., Sat=7) used by some admin UIs
-  const effectiveDay1BasedSun = effectiveDayISO === 7 ? 1 : effectiveDayISO + 1;
   const daysOfWeek = assignment.daysOfWeek ?? [];
   const dayMatches =
     daysOfWeek.length > 0 &&
-    (daysOfWeek.includes(effectiveDayISO) ||
-      daysOfWeek.includes(effectiveDayJS) ||
-      daysOfWeek.includes(effectiveDay1BasedSun));
+    (daysOfWeek.includes(effectiveDayJS) ||
+      (effectiveDayJS === 0 && daysOfWeek.includes(7)));
   if (!dayMatches) return false;
   return isWithinTimeWindow(
     now,
@@ -188,6 +220,7 @@ export function resolveActiveSchedule(
   if (active.length === 0) return null;
 
   const tz = timezoneStr || DEFAULT_TZ;
+  const todayPrayerTimes = resolvePrayerTimesForDate(prayerTimes, now, tz);
 
   // DATE_RANGE: sort by priority desc, pick first match
   const dateRange = active
@@ -197,7 +230,7 @@ export function resolveActiveSchedule(
     if (isWithinDateRange(now, a.startDate, a.endDate, tz)) return a;
   }
 
-  if (prayerTimes) {
+  if (todayPrayerTimes) {
     const prayerWindows = active
       .filter(
         (a) =>
@@ -209,21 +242,19 @@ export function resolveActiveSchedule(
       )
       .sort((a, b) => b.priority - a.priority);
     for (const a of prayerWindows) {
-      if (
-        isWithinPrayerWindow(
-          now,
-          {
-            startPrayer: a.startPrayer!,
-            endPrayer: a.endPrayer!,
-            startPrayerAnchor: a.startPrayerAnchor!,
-            endPrayerAnchor: a.endPrayerAnchor!,
-            startPrayerOffsetMinutes: a.startPrayerOffsetMinutes ?? 0,
-            endPrayerOffsetMinutes: a.endPrayerOffsetMinutes ?? 0,
-          },
-          prayerTimes,
-          tz,
-        )
-      ) {
+      const fields: PrayerWindowFields = {
+        startPrayer: a.startPrayer!,
+        endPrayer: a.endPrayer!,
+        startPrayerAnchor: a.startPrayerAnchor!,
+        endPrayerAnchor: a.endPrayerAnchor!,
+        startPrayerOffsetMinutes: a.startPrayerOffsetMinutes ?? 0,
+        endPrayerOffsetMinutes: a.endPrayerOffsetMinutes ?? 0,
+      };
+      // Optional day filter: empty daysOfWeek applies every day.
+      if (!matchesPrayerWindowDays(now, fields, a.daysOfWeek, todayPrayerTimes, tz)) {
+        continue;
+      }
+      if (isWithinPrayerWindow(now, fields, todayPrayerTimes, tz)) {
         return a;
       }
     }
@@ -256,6 +287,7 @@ export function getNextBoundary(
   if (active.length === 0) return null;
 
   const tz = timezoneStr || DEFAULT_TZ;
+  const todayPrayerTimes = resolvePrayerTimesForDate(prayerTimes, now, tz);
   const nowD = dayjs(now).tz(tz);
   const nowMs = now.getTime();
   let nearest: number | null = null;
@@ -283,7 +315,7 @@ export function getNextBoundary(
       }
     } else if (
       a.type === 'PRAYER_WINDOW' &&
-      prayerTimes &&
+      todayPrayerTimes &&
       a.startPrayer &&
       a.endPrayer &&
       a.startPrayerAnchor &&
@@ -299,7 +331,7 @@ export function getNextBoundary(
       };
       for (const boundary of getUpcomingPrayerWindowBoundaries(
         fields,
-        prayerTimes,
+        todayPrayerTimes,
         now,
         tz,
       )) {

@@ -140,6 +140,48 @@ export function getUpcomingPrayerWindowBoundaries(
   return upcoming;
 }
 
+/**
+ * Returns true when the prayer window applies on the local day of `now`.
+ * Mirrors `matchesPrayerWindowDays` in packages/shared/src/lib/prayer-window-schedule.ts.
+ *
+ * An empty `daysOfWeek` means the window applies every day (the default, and
+ * the shape of all assignments created before day filtering existed). Days use
+ * the JS convention (0=Sunday … 6=Saturday; 7 accepted as an ISO Sunday alias).
+ * For overnight windows (e.g. Isha → Fajr) the after-midnight tail is
+ * attributed to the previous calendar day, matching RECURRING semantics.
+ */
+export function matchesPrayerWindowDays(
+  now: Date,
+  fields: PrayerWindowFields,
+  daysOfWeek: number[] | null | undefined,
+  times: PrayerTimes,
+  timezone: string,
+): boolean {
+  if (!daysOfWeek || daysOfWeek.length === 0) return true;
+
+  const startMin = boundaryMinutes(
+    fields.startPrayer,
+    fields.startPrayerAnchor,
+    fields.startPrayerOffsetMinutes,
+    times,
+  );
+  const endMin = boundaryMinutes(
+    fields.endPrayer,
+    fields.endPrayerAnchor,
+    fields.endPrayerOffsetMinutes,
+    times,
+  );
+  if (startMin === null || endMin === null) return false;
+
+  const currentMin = getLocalMinutesSinceMidnight(now, timezone);
+  const tz = timezone || 'UTC';
+  let day = dayjs(now).tz(tz).day(); // 0=Sunday … 6=Saturday
+  if (startMin > endMin && currentMin < endMin) {
+    day = (day + 6) % 7;
+  }
+  return daysOfWeek.includes(day) || (day === 0 && daysOfWeek.includes(7));
+}
+
 /** Returns true when `now` falls inside the prayer-relative window for today's timetable. */
 export function isWithinPrayerWindow(
   now: Date,
