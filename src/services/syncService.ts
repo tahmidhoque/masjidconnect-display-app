@@ -518,12 +518,16 @@ class SyncService {
     this.updateState('prayerTimes', { isLoading: true, error: null });
 
     try {
+      const forceRefresh = options?.forceRefresh === true;
+      // Clear prayer times cache before force-refresh to prevent stale data
+      if (forceRefresh) {
+        await apiClient.clearPrayerTimesCache();
+      }
       let timezone = timezoneOverride;
       if (!timezone) {
         const screenContent = await storageService.get<{ masjid?: { timezone?: string }; data?: { masjid?: { timezone?: string } } }>('screenContent');
         timezone = screenContent?.masjid?.timezone ?? screenContent?.data?.masjid?.timezone ?? defaultMasjidTimezone;
       }
-      const forceRefresh = options?.forceRefresh === true;
       const response = await apiClient.getPrayerTimes(undefined, timezone, {
         cacheBust: forceRefresh,
         forceNetwork: forceRefresh,

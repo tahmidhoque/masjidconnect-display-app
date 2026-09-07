@@ -885,6 +885,25 @@ class ApiClient {
   }
 
   /**
+   * Clear prayer times HTTP cache so the next getPrayerTimes() fetches fresh (e.g. after content:invalidate type prayer_times).
+   * Prayer times are cached under date-specific keys (cache_prayer_times_YYYY-MM-DD).
+   */
+  public async clearPrayerTimesCache(): Promise<void> {
+    try {
+      const keys = await localforage.keys();
+      const prayerTimesKeys = keys.filter((k) =>
+        k.startsWith(`${CACHE_KEYS.PRAYER_TIMES}_`),
+      );
+      await Promise.all(prayerTimesKeys.map((k) => localforage.removeItem(k)));
+      logger.debug('[ApiClient] Prayer times cache cleared', {
+        keysRemoved: prayerTimesKeys.length,
+      });
+    } catch (error) {
+      logger.error('[ApiClient] Failed to clear prayer times cache', { error });
+    }
+  }
+
+  /**
    * Check if authenticated
    */
   public isAuthenticated(): boolean {
