@@ -319,7 +319,7 @@ html, body {
 }
 
 .card-elevated {
-  background: rgba(10, 38, 71, 0.85);
+  background: color-mix(in srgb, var(--color-midnight) 85%, transparent);
   border-radius: 1rem;
   padding: 1.5rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
@@ -327,7 +327,7 @@ html, body {
 
 /* Panel — larger card for main content sections. Borderless for display readability. */
 .panel {
-  background: rgba(10, 38, 71, 0.6);
+  background: color-mix(in srgb, var(--color-midnight) 60%, transparent);
   border-radius: 1.25rem;
   padding: 2rem;
 }
@@ -1342,15 +1342,9 @@ html, body {
   --layout-overlay: rgba(13, 59, 46, 0.35);
 }
 
-/* Override hardcoded rgba(10,38,71,...) backgrounds used in
-   .card-elevated and .panel with green equivalents */
-[data-theme="ramadan"] .card-elevated {
-  background: rgba(13, 59, 46, 0.85);
-}
-
-[data-theme="ramadan"] .panel {
-  background: rgba(13, 59, 46, 0.6);
-}
+/* Ramadan theme — .card-elevated and .panel now use color-mix(--color-midnight),
+   so they automatically pick up the Ramadan green when the theme is active.
+   No explicit overrides needed. */
 
 /* Badge overrides — use Ramadan gold tints */
 [data-theme="ramadan"] .badge-emerald {
@@ -1369,7 +1363,7 @@ html, body {
 /* Countdown container — clear but not overpowering. */
 .countdown-container {
   position: relative;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
+  background: linear-gradient(90deg, var(--color-surface-hover) 0%, var(--color-surface) 100%);
   border-radius: 0.5rem;
   padding: 0.5rem 1.25rem;
 }
@@ -1410,8 +1404,8 @@ html, body {
 .landscape-prayer-strip {
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(255, 255, 255, 0.03) 100%
+    var(--color-surface) 0%,
+    color-mix(in srgb, var(--color-surface) 50%, transparent) 100%
   );
 }
 
