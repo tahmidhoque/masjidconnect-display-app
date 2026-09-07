@@ -112,7 +112,7 @@ const LIGHT_CREAM_THEME: DisplayThemeOverrides = {
   accent: '#2A7C6F',
   highlight: '#D4A84A',
   textPrimary: '#1A1A1A',
-  textSecondary: 'rgba(26, 26, 26, 0.7)',
+  textSecondary: '#1A1A1AB3',
   tomorrowRoll: '#6B8CAE',
 };
 
