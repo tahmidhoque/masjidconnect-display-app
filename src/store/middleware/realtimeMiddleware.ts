@@ -139,6 +139,11 @@ export const realtimeMiddleware: Middleware = (api: any) => {
         api.dispatch(clearError());
         // WebSocket is up — suppress HTTP heartbeat fallback
         syncService.setHttpHeartbeatEnabled(false);
+        // On reconnect, force full refetch to recover from any missed invalidate events
+        logger.info('[RealtimeMW] WebSocket reconnected — forcing full content refresh');
+        import('../slices/contentSlice').then(({ refreshAllContent }) => {
+          (api.dispatch as AppDispatch)(refreshAllContent({ forceRefresh: true }));
+        });
       }),
     );
 
