@@ -29,6 +29,7 @@ const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
     viewBox="0 0 200 200"
     className={className}
     aria-hidden="true"
+    style={{ '--surface-color': 'var(--color-surface)' } as React.CSSProperties}
   >
     <circle
       cx="100"
@@ -57,7 +58,7 @@ const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
       height="76"
       rx="2"
       ry="2"
-      fill="rgba(255, 255, 255, 0.08)"
+      fill="var(--surface-color)"
       stroke="none"
     />
     <line
