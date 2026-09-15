@@ -8,6 +8,7 @@ import {
   prayerRowNameToTerminologyKey,
   resolvePrayerDisplayName,
   resolveAnnouncementPrayerName,
+  resolveCountdownStartPhrase,
 } from './prayerTerminology';
 import type { TerminologyKey } from '@/api/models';
 
@@ -93,5 +94,25 @@ describe('resolveAnnouncementPrayerName', () => {
   it('returns null when there is no prayer name', () => {
     expect(resolveAnnouncementPrayerName(null, undefined)).toBeNull();
     expect(resolveAnnouncementPrayerName('  ', undefined)).toBeNull();
+  });
+});
+
+describe('resolveCountdownStartPhrase', () => {
+  it('uses "starts in" for the default Start column label', () => {
+    expect(resolveCountdownStartPhrase('Fajr', 'Start')).toBe('Fajr starts in');
+    expect(resolveCountdownStartPhrase('Asr', 'start')).toBe('Asr starts in');
+  });
+
+  it('uses "{name} Adhan in" when the column is labelled Adhan', () => {
+    expect(resolveCountdownStartPhrase('Fajr', 'Adhan')).toBe('Fajr Adhan in');
+  });
+
+  it('uses other custom labels as "{name} {label} in"', () => {
+    expect(resolveCountdownStartPhrase('Zuhr', 'Iqamah')).toBe('Zuhr Iqamah in');
+  });
+
+  it('falls back without a prayer name', () => {
+    expect(resolveCountdownStartPhrase('', 'Start')).toBe('Next prayer starts in');
+    expect(resolveCountdownStartPhrase('', 'Adhan')).toBe('Adhan in');
   });
 });

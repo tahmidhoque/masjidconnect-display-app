@@ -232,7 +232,7 @@ describe('PrayerCountdown — post-Salah countdown to next prayer', () => {
     );
 
     expect(screen.queryByText(/^prayer$/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Asr prayer in/i)).toBeInTheDocument();
+    expect(screen.getByText(/Asr starts in/i)).toBeInTheDocument();
     expect(screen.getByText('h')).toBeInTheDocument();
     expect(screen.getByText('m')).toBeInTheDocument();
   });
@@ -253,7 +253,7 @@ describe('PrayerCountdown — post-Salah countdown to next prayer', () => {
       { wrapper: makeWrapper() },
     );
 
-    expect(screen.getByText(/Asr prayer in/i)).toBeInTheDocument();
+    expect(screen.getByText(/Asr starts in/i)).toBeInTheDocument();
     expect(screen.queryByText(/Jamaat in progress/i)).not.toBeInTheDocument();
   });
 
@@ -273,7 +273,7 @@ describe('PrayerCountdown — post-Salah countdown to next prayer', () => {
       { wrapper: makeWrapper() },
     );
 
-    expect(screen.getByText(/Fajr prayer in/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fajr starts in/i)).toBeInTheDocument();
     expect(screen.queryByText(/^0s$/)).not.toBeInTheDocument();
     expect(screen.getByText('h')).toBeInTheDocument();
   });
@@ -321,8 +321,87 @@ describe('PrayerCountdown — Portal pre-jamaat lead', () => {
       },
     );
 
-    expect(screen.getByText(/Zuhr prayer in/i)).toBeInTheDocument();
+    expect(screen.getByText(/Zuhr starts in/i)).toBeInTheDocument();
     expect(screen.queryByText(/Jamaat in/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('PrayerCountdown — Adhan / starts wording', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  const zuhrToday = {
+    name: 'Zuhr',
+    time: '13:00',
+    jamaat: '13:30',
+    displayTime: '1:00 PM',
+    displayJamaat: '1:30 PM',
+    isNext: true,
+    isCurrent: false,
+    timeUntil: '',
+    jamaatTime: '13:30',
+  };
+
+  it('says "Zuhr starts in" when counting to Adhan with default Start label', () => {
+    vi.setSystemTime(new Date('2026-04-19T09:00:00.000Z')); // 10:00 BST
+
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: zuhrToday,
+      currentPrayer: null,
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="countdown-adhan" />,
+      { wrapper: makeWrapper() },
+    );
+
+    expect(screen.getByText(/Zuhr starts in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/prayer in/i)).not.toBeInTheDocument();
+  });
+
+  it('says "Zuhr Adhan in" when terminology labels the start column Adhan', () => {
+    vi.setSystemTime(new Date('2026-04-19T09:00:00.000Z'));
+
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: zuhrToday,
+      currentPrayer: null,
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="countdown-adhan" />,
+      { wrapper: makeWrapper({ terminology: { adhan: 'Adhan' } }) },
+    );
+
+    expect(screen.getByText(/Zuhr Adhan in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/prayer in/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps "Zuhr Jamaat in" when counting to congregation', () => {
+    vi.setSystemTime(new Date('2026-04-19T12:10:00.000Z')); // 13:10 BST — after 13:00 adhan, before 13:30 jamaat
+
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: zuhrToday,
+      currentPrayer: null,
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="countdown-jamaat" />,
+      { wrapper: makeWrapper() },
+    );
+
+    expect(screen.getByText(/Zuhr Jamaat in/i)).toBeInTheDocument();
   });
 });
 

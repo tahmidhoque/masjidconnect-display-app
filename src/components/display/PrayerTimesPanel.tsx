@@ -28,7 +28,7 @@ import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
 import { prayerRowNameToTerminologyKey, resolveTerminology, resolveTomorrowColumnHeader } from '../../utils/prayerTerminology';
 import {
-  resolvePrayerJamaatDisplay,
+  resolvePrayerTimesDisplay,
   resolveTomorrowJamaatMode,
   tomorrowJamaatModeUsesColumn,
   type TomorrowJamaatDisplayMode,
@@ -185,20 +185,21 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
         {todaysPrayerTimes.map((prayer) => {
           const isNext = prayer.isNext;
           const ramadanLabel = isRamadan && prayer.name === 'Maghrib' ? iftarLabel : undefined;
-          const resolvedJamaat = prayer.jamaat
-            ? resolvePrayerJamaatDisplay({
-                prayerName: prayer.name,
-                todayJamaat: prayer.jamaat,
-                todayIsJumuah: prayer.isJumuah,
-                tomorrowsJamaats,
-                mode: tomorrowJamaatMode,
-                displaySettings: displaySettings ?? null,
-                nowMin,
-                jummahLabel,
-                zuhrLabel,
-              })
-            : null;
-          const isRollForward = resolvedJamaat?.isRollForward === true;
+          const resolvedTimes = resolvePrayerTimesDisplay({
+            prayerName: prayer.name,
+            todayStart: prayer.time,
+            todayJamaat: prayer.jamaat,
+            todayIsJumuah: prayer.isJumuah,
+            tomorrowsJamaats,
+            mode: tomorrowJamaatMode,
+            displaySettings: displaySettings ?? null,
+            nowMin,
+            jummahLabel,
+            zuhrLabel,
+          });
+          const isRollForward = resolvedTimes?.isRollForward === true;
+          const displayStart = resolvedTimes?.startTime || prayer.time;
+          const displayJamaat = resolvedTimes?.jamaatTime ?? null;
 
           return (
             <React.Fragment key={prayer.name}>
@@ -267,24 +268,24 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   )}
                 </div>
 
-                {prayer.jamaat && resolvedJamaat ? (
+                {prayer.jamaat && displayJamaat ? (
                   <>
                     <span className={timeColClass}>
                       <TimeWithPeriod
-                        timeString={prayer.time}
+                        timeString={displayStart}
                         timeFormat={timeFormat}
                         className={`text-prayer-time-adhan ${
                           isNext
                             ? 'text-emerald-light'
                             : isRollForward
-                              ? 'text-text-muted'
+                              ? 'text-prayer-time-roll-forward'
                               : 'text-text-secondary'
                         }`}
                       />
                     </span>
                     <span className={`${timeColClass} flex flex-col ${tomorrowItemsAlignClass}`}>
                       <TimeWithPeriod
-                        timeString={resolvedJamaat.jamaatTime}
+                        timeString={displayJamaat}
                         timeFormat={timeFormat}
                         className={`text-prayer-time-jamaat ${
                           isNext
@@ -294,9 +295,9 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                               : 'text-gold'
                         }`}
                       />
-                      {isRollForward && resolvedJamaat.mismatchLabel ? (
+                      {isRollForward && resolvedTimes?.mismatchLabel ? (
                         <span className="text-caption text-text-muted/80 font-normal leading-tight mt-0.5">
-                          {resolvedJamaat.mismatchLabel}
+                          {resolvedTimes.mismatchLabel}
                         </span>
                       ) : null}
                     </span>
@@ -335,9 +336,15 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                   <>
                     <span className={timeColClass}>
                       <TimeWithPeriod
-                        timeString={prayer.time}
+                        timeString={displayStart}
                         timeFormat={timeFormat}
-                        className={`text-prayer-time-adhan ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
+                        className={`text-prayer-time-adhan ${
+                          isNext
+                            ? 'text-emerald-light'
+                            : isRollForward
+                              ? 'text-prayer-time-roll-forward'
+                              : 'text-text-secondary'
+                        }`}
                       />
                     </span>
                     <span className={timeColClass}>—</span>
@@ -346,9 +353,15 @@ const PrayerTimesPanel: React.FC<PrayerTimesPanelProps> = ({
                 ) : (
                   <div className="col-span-2 flex justify-center">
                     <TimeWithPeriod
-                      timeString={prayer.time}
+                      timeString={displayStart}
                       timeFormat={timeFormat}
-                      className={`text-prayer-time-adhan ${isNext ? 'text-emerald-light' : 'text-text-secondary'}`}
+                      className={`text-prayer-time-adhan ${
+                        isNext
+                          ? 'text-emerald-light'
+                          : isRollForward
+                            ? 'text-prayer-time-roll-forward'
+                            : 'text-text-secondary'
+                      }`}
                     />
                   </div>
                 )}

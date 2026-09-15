@@ -10,7 +10,7 @@ import type { DisplaySettings } from '../../api/models';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
 import { getTimeDisplayParts } from '../../utils/dateUtils';
 import {
-  resolvePrayerJamaatDisplay,
+  resolvePrayerTimesDisplay,
   type TomorrowJamaatDisplayMode,
 } from '../../utils/tomorrowJamaatDisplay';
 import {
@@ -153,20 +153,21 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
   const isSunrise = prayer.name === 'Sunrise';
   const ramadanLabel =
     isRamadan && prayer.name === 'Maghrib' ? iftarLabel : undefined;
-  const resolvedJamaat = prayer.jamaat
-    ? resolvePrayerJamaatDisplay({
-        prayerName: prayer.name,
-        todayJamaat: prayer.jamaat,
-        todayIsJumuah: prayer.isJumuah,
-        tomorrowsJamaats: tomorrowsJamaats ?? null,
-        mode: tomorrowJamaatMode,
-        displaySettings,
-        nowMin,
-        jummahLabel,
-        zuhrLabel,
-      })
-    : null;
-  const isRollForward = resolvedJamaat?.isRollForward === true;
+  const resolvedTimes = resolvePrayerTimesDisplay({
+    prayerName: prayer.name,
+    todayStart: prayer.time,
+    todayJamaat: prayer.jamaat,
+    todayIsJumuah: prayer.isJumuah,
+    tomorrowsJamaats: tomorrowsJamaats ?? null,
+    mode: tomorrowJamaatMode,
+    displaySettings,
+    nowMin,
+    jummahLabel,
+    zuhrLabel,
+  });
+  const isRollForward = resolvedTimes?.isRollForward === true;
+  const displayStart = resolvedTimes?.startTime || prayer.time;
+  const displayJamaat = resolvedTimes?.jamaatTime ?? null;
   const tomorrowAbbrev = resolveTerminology(
     displaySettings?.terminology,
     'tomorrowAbbrev',
@@ -209,10 +210,10 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
       <span
         className={`
           text-prayer-strip-time tabular-nums mt-0.5 text-center leading-none
-          ${isNext ? 'text-emerald-light' : 'text-text-primary'}
+          ${isNext ? 'text-emerald-light' : isRollForward ? 'text-prayer-time-roll-forward' : 'text-text-primary'}
         `}
       >
-        <TimeWithPeriod timeString={prayer.time} timeFormat={timeFormat} />
+        <TimeWithPeriod timeString={displayStart} timeFormat={timeFormat} />
       </span>
 
       {isSunrise ? (
@@ -220,7 +221,7 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
           className={`text-gold/70 mt-0.5 shrink-0 ${isVertical ? 'prayer-cue-tile-sunrise' : 'w-6 h-6'}`}
           aria-hidden
         />
-      ) : prayer.jamaat && resolvedJamaat ? (
+      ) : prayer.jamaat && displayJamaat ? (
         <span
           className={`text-prayer-strip-jamaat-primary mt-0.5 tabular-nums text-center leading-none ${
             isNext
@@ -231,7 +232,7 @@ export const PrayerCueTile: React.FC<PrayerCueTileProps> = ({
           }`}
         >
           <TimeWithPeriod
-            timeString={resolvedJamaat.jamaatTime}
+            timeString={displayJamaat}
             timeFormat={timeFormat}
             className={isRollForward ? '' : 'text-gold font-semibold'}
           />

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { DisplaySettings } from '@/api/models';
 import {
   isPrayerJamaatPhaseComplete,
+  isPrayerSlotComplete,
   resolvePrayerJamaatDisplay,
+  resolvePrayerTimesDisplay,
   resolveTomorrowJamaatMode,
 } from './tomorrowJamaatDisplay';
 
@@ -97,6 +99,97 @@ describe('resolvePrayerJamaatDisplay', () => {
       zuhrLabel: 'Zuhr',
     });
     expect(result?.jamaatTime).toBe('13:30');
+    expect(result?.isRollForward).toBe(false);
+  });
+});
+
+describe('isPrayerSlotComplete', () => {
+  it('rolls sunrise after the sunrise time has passed', () => {
+    expect(isPrayerSlotComplete('Sunrise', '06:30', undefined, baseSettings, 6 * 60 + 31)).toBe(true);
+  });
+
+  it('does not roll sunrise before the sunrise time', () => {
+    expect(isPrayerSlotComplete('Sunrise', '06:30', undefined, baseSettings, 6 * 60 + 15)).toBe(false);
+  });
+
+  it('still waits for the jamaat window on prayers with congregation', () => {
+    expect(
+      isPrayerSlotComplete('Zuhr', '13:00', '13:30', baseSettings, 13 * 60 + 35),
+    ).toBe(false);
+    expect(
+      isPrayerSlotComplete('Zuhr', '13:00', '13:30', baseSettings, 13 * 60 + 51),
+    ).toBe(true);
+  });
+});
+
+describe('resolvePrayerTimesDisplay', () => {
+  const tomorrows = {
+    Zuhr: { jamaat: '13:35', start: '13:05' },
+    Sunrise: { jamaat: '', start: '06:32' },
+  };
+
+  it('keeps today start and jamaat in column mode', () => {
+    const result = resolvePrayerTimesDisplay({
+      prayerName: 'Zuhr',
+      todayStart: '13:00',
+      todayJamaat: '13:30',
+      tomorrowsJamaats: tomorrows,
+      mode: 'column',
+      displaySettings: baseSettings,
+      nowMin: 14 * 60,
+      jummahLabel: 'Jumuah',
+      zuhrLabel: 'Zuhr',
+    });
+    expect(result?.startTime).toBe('13:00');
+    expect(result?.jamaatTime).toBe('13:30');
+    expect(result?.isRollForward).toBe(false);
+  });
+
+  it('swaps start and jamaat to tomorrow after the jamaat window', () => {
+    const result = resolvePrayerTimesDisplay({
+      prayerName: 'Zuhr',
+      todayStart: '13:00',
+      todayJamaat: '13:30',
+      tomorrowsJamaats: tomorrows,
+      mode: 'roll-forward',
+      displaySettings: baseSettings,
+      nowMin: 14 * 60,
+      jummahLabel: 'Jumuah',
+      zuhrLabel: 'Zuhr',
+    });
+    expect(result?.startTime).toBe('13:05');
+    expect(result?.jamaatTime).toBe('13:35');
+    expect(result?.isRollForward).toBe(true);
+  });
+
+  it('swaps sunrise to tomorrow after sunrise has passed', () => {
+    const result = resolvePrayerTimesDisplay({
+      prayerName: 'Sunrise',
+      todayStart: '06:30',
+      tomorrowsJamaats: tomorrows,
+      mode: 'roll-forward',
+      displaySettings: baseSettings,
+      nowMin: 7 * 60,
+      jummahLabel: 'Jumuah',
+      zuhrLabel: 'Zuhr',
+    });
+    expect(result?.startTime).toBe('06:32');
+    expect(result?.jamaatTime).toBeNull();
+    expect(result?.isRollForward).toBe(true);
+  });
+
+  it('keeps today sunrise before sunrise time', () => {
+    const result = resolvePrayerTimesDisplay({
+      prayerName: 'Sunrise',
+      todayStart: '06:30',
+      tomorrowsJamaats: tomorrows,
+      mode: 'roll-forward',
+      displaySettings: baseSettings,
+      nowMin: 6 * 60,
+      jummahLabel: 'Jumuah',
+      zuhrLabel: 'Zuhr',
+    });
+    expect(result?.startTime).toBe('06:30');
     expect(result?.isRollForward).toBe(false);
   });
 });

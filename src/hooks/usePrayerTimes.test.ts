@@ -511,12 +511,17 @@ describe('usePrayerTimes', () => {
           const tomorrowZuhr = result.current.tomorrowsJamaats?.['Zuhr'];
           expect(tomorrowZuhr).toBeDefined();
           expect(tomorrowZuhr?.jamaat).toBe('13:15');
+          expect(tomorrowZuhr?.start).toBe('13:00');
           expect(tomorrowZuhr?.isJumuah).toBe(true);
           expect(tomorrowZuhr?.alternateJamaat).toBe('12:35');
           // Other rows stay simple (no isJumuah / alternate fields).
           const tomorrowAsr = result.current.tomorrowsJamaats?.['Asr'];
           expect(tomorrowAsr?.jamaat).toBe('17:45');
+          expect(tomorrowAsr?.start).toBe('17:30');
           expect(tomorrowAsr?.isJumuah).toBeUndefined();
+          const tomorrowSunrise = result.current.tomorrowsJamaats?.['Sunrise'];
+          expect(tomorrowSunrise?.start).toBe('04:45');
+          expect(tomorrowSunrise?.jamaat).toBe('');
         },
         { timeout: 2000 },
       );

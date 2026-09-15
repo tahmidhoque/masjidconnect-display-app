@@ -1442,10 +1442,16 @@ html, body {
   font-weight: 500;
 }
 
+/* Quiet "Powered by MasjidConnect" — recede vs prayer content */
+.footer-branding {
+  font-size: 0.68em;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  opacity: 0.78;
+  font-weight: 400;
+}
+
 /* Landscape footer — branding always in right corner */
 [data-orientation="landscape"] .footer-branding {
   margin-left: auto;
 }
-
-<｜tool▁call▁end｜><｜tool▁call▁begin｜>
-ReadLints

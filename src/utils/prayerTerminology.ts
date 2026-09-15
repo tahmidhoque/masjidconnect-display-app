@@ -100,3 +100,28 @@ export function resolveAnnouncementPrayerName(
   return resolveTerminology(terminology, key, trimmed);
 }
 
+/**
+ * Countdown phrase when targeting the Adhan / start time (not Jamaat).
+ *
+ * Product wording:
+ * - Default column label is "Start" → "Fajr starts in"
+ * - Custom "Adhan" → "Fajr Adhan in"
+ * - Other custom labels → "Fajr {label} in"
+ *
+ * Replaces the older generic "Fajr prayer in".
+ */
+export function resolveCountdownStartPhrase(
+  displayName: string,
+  adhanLabel: string,
+): string {
+  const name = displayName.trim();
+  const label = adhanLabel.trim();
+  const usesStartsVerb = !label || /^starts?$/i.test(label);
+
+  if (usesStartsVerb) {
+    return name ? `${name} starts in` : 'Next prayer starts in';
+  }
+
+  return name ? `${name} ${label} in` : `${label} in`;
+}
+
