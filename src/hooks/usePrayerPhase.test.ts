@@ -22,6 +22,7 @@ import timezone from 'dayjs/plugin/timezone';
 
 import { usePrayerPhase } from './usePrayerPhase';
 import { AllTheProviders, createTestStore } from '@/test-utils';
+import { DEFAULT_DISPLAY_SETTINGS } from '@/store/slices/contentSlice';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -236,6 +237,42 @@ describe('usePrayerPhase', () => {
       const { result } = renderPhase();
       expect(result.current.phase).toBe('in-prayer');
       expect(result.current.prayerName).toBe('Zuhr');
+    });
+
+    it('uses the jumuah duration key on Friday, not the zuhr override', () => {
+      // jumuah = 25, zuhr = 5. Six minutes after jumuah jamaat (13:45 → 13:51)
+      // stays in the jamaat sub-phase only when the Friday key is honoured.
+      setMasjidTime('13:51');
+      const base = createTestStore().getState();
+      const { result } = renderPhase({
+        ...base,
+        content: {
+          ...base.content,
+          displaySettings: {
+            ...DEFAULT_DISPLAY_SETTINGS,
+            minutesAfterJamaatUntilNextPrayerBySalah: { zuhr: 5, jumuah: 25 },
+          },
+        },
+      });
+      expect(result.current.phase).toBe('in-prayer');
+      expect(result.current.inPrayerSubPhase).toBe('jamaat');
+    });
+
+    it('falls back to the zuhr duration on Friday when jumuah is absent', () => {
+      setMasjidTime('13:51');
+      const base = createTestStore().getState();
+      const { result } = renderPhase({
+        ...base,
+        content: {
+          ...base.content,
+          displaySettings: {
+            ...DEFAULT_DISPLAY_SETTINGS,
+            minutesAfterJamaatUntilNextPrayerBySalah: { zuhr: 5 },
+          },
+        },
+      });
+      expect(result.current.phase).toBe('in-prayer');
+      expect(result.current.inPrayerSubPhase).toBe('post-jamaat');
     });
   });
 

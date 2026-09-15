@@ -13,18 +13,34 @@ function clampJamaatMinutes(value: number, fallback: number): number {
   return Math.max(5, Math.min(30, value));
 }
 
+function readBySalahOverride(
+  bySalah: Partial<Record<SalahKey, number>>,
+  key: SalahKey,
+): number | undefined {
+  const specific = bySalah[key];
+  if (typeof specific === "number" && !Number.isNaN(specific)) return specific;
+  return undefined;
+}
+
 /**
  * Minutes the UI stays on "Jamaat in progress" for the given salah (5–30).
  * Per-salah override wins; else defaultJamaatInProgressMinutes; else 10.
+ * `jumuah` falls back to `zuhr` when the Friday key is absent (older payloads).
  */
 export function jamaatPhaseMinutesForSalah(
   settings: DisplaySettings | null | undefined,
   salahKey: SalahKey,
 ): number {
   const bySalah = settings?.minutesAfterJamaatUntilNextPrayerBySalah ?? {};
-  const specific = bySalah[salahKey];
-  if (typeof specific === "number" && !Number.isNaN(specific)) {
+  const specific = readBySalahOverride(bySalah, salahKey);
+  if (specific !== undefined) {
     return clampJamaatMinutes(specific, DEFAULT_MINUTES);
+  }
+  if (salahKey === "jumuah") {
+    const zuhrFallback = readBySalahOverride(bySalah, "zuhr");
+    if (zuhrFallback !== undefined) {
+      return clampJamaatMinutes(zuhrFallback, DEFAULT_MINUTES);
+    }
   }
   return clampJamaatMinutes(
     settings?.defaultJamaatInProgressMinutes ?? DEFAULT_MINUTES,
@@ -47,12 +63,13 @@ export function postJamaatDelayMinutes(
 
 /**
  * Map display prayer name (FormattedPrayerTime / phase hooks) to API salah key.
- * Jumuah shares Zuhr row — PRD maps to zuhr.
+ * Friday labels (`Jumuah` / `Jummah` / apostrophe variants) map to `jumuah`.
  */
 export function prayerNameToSalahKey(displayName: string): SalahKey | null {
-  const n = displayName.trim().toLowerCase();
+  const n = displayName.trim().toLowerCase().replace(/[’']/g, "");
   if (n === "fajr") return "fajr";
-  if (n === "zuhr" || n === "jumuah") return "zuhr";
+  if (n === "zuhr") return "zuhr";
+  if (n === "jumuah" || n === "jummah") return "jumuah";
   if (n === "asr") return "asr";
   if (n === "maghrib") return "maghrib";
   if (n === "isha") return "isha";
@@ -83,12 +100,14 @@ export function totalJamaatPhaseWindowMinutes(
 /**
  * "Jamaat in progress" minutes for a formatted prayer row name (e.g. Fajr).
  * Unknown names (e.g. Sunrise) use defaultJamaatInProgressMinutes only.
+ * Pass `isJumuah: true` for Friday Zuhr so the distinct `jumuah` key is used.
  */
 export function jamaatPhaseMinutesForDisplayPrayer(
   settings: DisplaySettings | null | undefined,
   displayName: string,
+  options?: { isJumuah?: boolean },
 ): number {
-  const key = prayerNameToSalahKey(displayName);
+  const key = options?.isJumuah ? "jumuah" : prayerNameToSalahKey(displayName);
   if (key == null) {
     return clampJamaatMinutes(
       settings?.defaultJamaatInProgressMinutes ?? DEFAULT_MINUTES,
@@ -101,9 +120,10 @@ export function jamaatPhaseMinutesForDisplayPrayer(
 export function totalJamaatPhaseWindowForDisplayPrayer(
   settings: DisplaySettings | null | undefined,
   displayName: string,
+  options?: { isJumuah?: boolean },
 ): number {
   return (
-    jamaatPhaseMinutesForDisplayPrayer(settings, displayName) +
+    jamaatPhaseMinutesForDisplayPrayer(settings, displayName, options) +
     postJamaatSupplicationWindowMinutes(settings) +
     postJamaatDelayMinutes(settings)
   );

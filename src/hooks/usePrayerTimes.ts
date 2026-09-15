@@ -834,6 +834,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         adhanMin: number;
         jamaatMin: number;
         originalIndex: number;
+        isJumuah: boolean;
       };
 
       // Annotate with numeric minutes; drop entries with no parseable adhan.
@@ -845,6 +846,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           adhanMin: toMinutesFromMidnight(p.time, p.name),
           jamaatMin: p.jamaat ? toMinutesFromMidnight(p.jamaat, p.name) : -1,
           originalIndex: idx,
+          isJumuah: p.isJumuah === true,
         }))
         .filter((p) => p.adhanMin >= 0);
 
@@ -888,6 +890,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
           const totalWindowMin = totalJamaatPhaseWindowForDisplayPrayer(
             displaySettingsForWindow,
             currentSorted.name,
+            { isJumuah: currentSorted.isJumuah },
           );
           const hasJamaat = currentSorted.jamaatMin >= 0;
           const beforeJamaat =
@@ -1147,6 +1150,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
         const totalWindowMin = totalJamaatPhaseWindowForDisplayPrayer(
           displaySettings ?? null,
           "Zuhr",
+          { isJumuah: true },
         );
         const nowMin = nowMinutesInTz(new Date(), tz);
         if (

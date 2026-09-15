@@ -19,6 +19,7 @@ export { default as JamaatSoonSlot } from './JamaatSoonSlot';
 export { default as SupplicationScreen } from './SupplicationScreen';
 export { default as PostJamaatSupplicationSlot } from './PostJamaatSupplicationSlot';
 export { default as JamaatBlackoutOverlay } from './JamaatBlackoutOverlay';
+export { default as JamaatContentOverlay } from './JamaatContentOverlay';
 export { default as InPrayerScreen } from './InPrayerScreen';
 export { default as ForbiddenPrayerNotice } from './ForbiddenPrayerNotice';
 export { default as EventSlide } from './EventSlide';

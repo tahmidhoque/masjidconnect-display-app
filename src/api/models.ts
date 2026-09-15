@@ -301,7 +301,10 @@ export interface AnalyticsResponse {
 export type TimeFormat = "12h" | "24h";
 
 /** Prayer row keys for per-salah jamaat-in-progress overrides (portal display settings). */
-export type SalahKey = "fajr" | "zuhr" | "asr" | "maghrib" | "isha";
+export type SalahKey = "fajr" | "zuhr" | "asr" | "maghrib" | "isha" | "jumuah";
+
+/** During jamaat: in-progress graphic, full black overlay, or library media. */
+export type JamaatInProgressMode = "screen" | "dark" | "content";
 
 /**
  * Screen content configuration settings
@@ -357,6 +360,7 @@ export interface DisplaySettings {
   defaultJamaatInProgressMinutes?: number;
   /**
    * Per-salah overrides for "Jamaat in progress" duration (minutes, 5–30). Omitted keys use defaultJamaatInProgressMinutes.
+   * Portal sends a first-class `jumuah` key for Friday; older payloads omit it and Friday falls back to `zuhr`.
    */
   minutesAfterJamaatUntilNextPrayerBySalah?: Partial<Record<SalahKey, number>>;
 
@@ -376,8 +380,13 @@ export interface DisplaySettings {
     durationMinutes: number;
   };
 
-  /** During jamaat: `screen` = in-progress graphic, `dark` = full black overlay. */
-  jamaatInProgressMode?: 'screen' | 'dark';
+  /** During jamaat: `screen` = in-progress graphic, `dark` = full black overlay, `content` = library media. */
+  jamaatInProgressMode?: JamaatInProgressMode;
+  /**
+   * Content-library item id used when `jamaatInProgressMode` is `content`.
+   * Display resolves it from playlist/schedule media (image/video/poster); missing → screen fallback.
+   */
+  jamaatInProgressContentId?: string | null;
 
   /**
    * Mosque-specific terminology overrides (admin-controlled).

@@ -35,11 +35,16 @@ export function isPrayerJamaatPhaseComplete(
   jamaat: string | undefined,
   displaySettings: DisplaySettings | null | undefined,
   nowMin: number,
+  options?: { isJumuah?: boolean },
 ): boolean {
   if (!jamaat) return false;
   const jamaatMin = toMinutesFromMidnight(jamaat, prayerName);
   if (jamaatMin < 0) return false;
-  const windowMin = totalJamaatPhaseWindowForDisplayPrayer(displaySettings ?? null, prayerName);
+  const windowMin = totalJamaatPhaseWindowForDisplayPrayer(
+    displaySettings ?? null,
+    prayerName,
+    options,
+  );
   return nowMin > jamaatMin + windowMin;
 }
 
@@ -83,7 +88,9 @@ export function resolvePrayerJamaatDisplay({
   const useRollForward =
     mode === 'roll-forward' &&
     !!tomorrowsJamaats &&
-    isPrayerJamaatPhaseComplete(prayerName, todayJamaat, displaySettings, nowMin);
+    isPrayerJamaatPhaseComplete(prayerName, todayJamaat, displaySettings, nowMin, {
+      isJumuah: todayIsJumuah,
+    });
 
   if (!useRollForward) {
     return {

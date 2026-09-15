@@ -386,6 +386,25 @@ describe('contentSlice', () => {
       expect(result.jamaatInProgressMode).toBe('dark');
     });
 
+    it('preserves jamaat content mode, content id, and jumuah duration key', () => {
+      const content = {
+        displaySettings: {
+          jamaatInProgressMode: 'content',
+          jamaatInProgressContentId: '  lib-poster-1  ',
+          minutesAfterJamaatUntilNextPrayerBySalah: { jumuah: 22, zuhr: 8 },
+        },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.jamaatInProgressMode).toBe('content');
+      expect(result.jamaatInProgressContentId).toBe('lib-poster-1');
+      expect(result.minutesAfterJamaatUntilNextPrayerBySalah).toEqual({
+        jumuah: 22,
+        zuhr: 8,
+      });
+    });
+
     it('clamps out-of-range supplication durations and defaults missing blocks to disabled', () => {
       const content = {
         displaySettings: {

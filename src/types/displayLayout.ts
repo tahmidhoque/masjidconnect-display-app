@@ -85,9 +85,10 @@ export interface LayoutBehaviourOverrides {
   minutesAfterJamaatUntilNextPrayer?: number;
   defaultJamaatInProgressMinutes?: number;
   minutesAfterJamaatUntilNextPrayerBySalah?: Partial<
-    Record<'fajr' | 'zuhr' | 'asr' | 'maghrib' | 'isha', number>
+    Record<'fajr' | 'zuhr' | 'asr' | 'maghrib' | 'isha' | 'jumuah', number>
   >;
-  jamaatInProgressMode?: 'screen' | 'dark';
+  jamaatInProgressMode?: 'screen' | 'dark' | 'content';
+  jamaatInProgressContentId?: string | null;
   timeFormat?: '12h' | '24h';
   postAdhanSupplication?: {
     enabled?: boolean;

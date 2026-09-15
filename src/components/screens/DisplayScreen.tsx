@@ -62,9 +62,11 @@ import {
   SupplicationScreen,
   PostJamaatSupplicationSlot,
   JamaatBlackoutOverlay,
+  JamaatContentOverlay,
 } from '../display';
 import { POST_ADHAN_SUPPLICATION } from '@/constants/scheduledSupplications';
 import { isJamaatBlackoutMode } from '@/utils/displaySettingsSupplications';
+import { resolveJamaatInProgressMedia } from '@/utils/jamaatInProgressContent';
 import {
   PRAYER_DISPLAY_DEV_EVENT,
   isJamaatBlackoutDevForced,
@@ -80,6 +82,7 @@ import {
   selectDisplaySettings,
   selectDisplayLayoutConfig,
   selectDisplayLayoutRevision,
+  selectScheduledPlaylists,
 } from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag, resolveMediaFit } from '../../utils/mediaSlide';
 import { resolvePrayerDisplayName } from '../../utils/prayerTerminology';
@@ -570,6 +573,7 @@ function buildCarouselItems(
 const DisplayScreenInner: React.FC = () => {
   const screenContent = useSelector((s: RootState) => s.content.screenContent);
   const { schedule } = useScheduledPlaylist();
+  const scheduledPlaylists = useAppSelector(selectScheduledPlaylists);
   const events = useSelector((s: RootState) => s.content.events);
   /* Dev-mode orientation override (Ctrl+Shift+O) */
   const [orientationOverride, setOrientationOverride] = useState<
@@ -795,6 +799,23 @@ const DisplayScreenInner: React.FC = () => {
     (isJamaatBlackoutMode(displaySettings) ||
       (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced()));
 
+  const jamaatInProgressMedia = useMemo(
+    () =>
+      resolveJamaatInProgressMedia({
+        settings: displaySettings,
+        schedule,
+        playlists: scheduledPlaylists,
+        screenContent,
+      }),
+    [displaySettings, schedule, scheduledPlaylists, screenContent],
+  );
+
+  const jamaatContentActive =
+    prayerPhase === 'in-prayer' &&
+    inPrayerSubPhase === 'jamaat' &&
+    !jamaatBlackoutActive &&
+    jamaatInProgressMedia != null;
+
   const contentSlot = useMemo(() => {
     if (adhanSupplicationActive) {
       return (
@@ -823,10 +844,11 @@ const DisplayScreenInner: React.FC = () => {
             />
           );
         }
-        // jamaat subphase: blackout fills the viewport via overlay; slot stays black underneath
+        // jamaat subphase: blackout / library media fill the viewport via overlay
         if (
           isJamaatBlackoutMode(displaySettings) ||
-          (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced())
+          (blackoutDevRevision >= 0 && isJamaatBlackoutDevForced()) ||
+          jamaatInProgressMedia != null
         ) {
           return <div className="h-full w-full bg-black" aria-hidden />;
         }
@@ -855,6 +877,7 @@ const DisplayScreenInner: React.FC = () => {
     inPrayerSubPhase,
     displaySettings,
     blackoutDevRevision,
+    jamaatInProgressMedia,
     carouselItems,
     carouselInterval,
     carouselKey,
@@ -1038,6 +1061,9 @@ const DisplayScreenInner: React.FC = () => {
         />
       </ReferenceViewport>
       {jamaatBlackoutActive ? <JamaatBlackoutOverlay /> : null}
+      {jamaatContentActive && jamaatInProgressMedia ? (
+        <JamaatContentOverlay media={jamaatInProgressMedia} />
+      ) : null}
     </OrientationWrapper>
   );
 };
