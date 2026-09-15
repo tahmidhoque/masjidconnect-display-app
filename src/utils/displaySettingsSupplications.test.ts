@@ -6,6 +6,8 @@ import { describe, it, expect } from 'vitest';
 import type { DisplaySettings } from '@/api/models';
 import {
   isPostAdhanSupplicationActive,
+  isJamaatBlackoutMode,
+  isJamaatContentMode,
   postAdhanSupplicationDelayMinutes,
   postJamaatSupplicationDurationMinutes,
 } from './displaySettingsSupplications';
@@ -62,5 +64,14 @@ describe('postAdhanSupplication timing', () => {
     };
     expect(postAdhanSupplicationDelayMinutes(s)).toBe(15);
     expect(postJamaatSupplicationDurationMinutes(s)).toBe(4);
+  });
+});
+
+describe('jamaat in-progress mode helpers', () => {
+  it('treats dark as blackout and content as content mode', () => {
+    expect(isJamaatBlackoutMode({ ...baseSettings(), jamaatInProgressMode: 'dark' })).toBe(true);
+    expect(isJamaatContentMode({ ...baseSettings(), jamaatInProgressMode: 'content' })).toBe(true);
+    expect(isJamaatContentMode(baseSettings())).toBe(false);
+    expect(isJamaatBlackoutMode(baseSettings())).toBe(false);
   });
 });

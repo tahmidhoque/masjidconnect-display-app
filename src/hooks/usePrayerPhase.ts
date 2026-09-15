@@ -176,6 +176,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
       const progress = jamaatPhaseMinutesForDisplayPrayer(
         displaySettings,
         prayerName,
+        { isJumuah: isJumuahToday && prayerName === 'Zuhr' },
       );
       const supplicationMin = postJamaatSupplicationWindowMinutes(displaySettings);
       const totalWindow = progress + supplicationMin + delayMin;

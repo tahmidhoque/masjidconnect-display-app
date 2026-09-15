@@ -42,7 +42,7 @@ function normalisePrayerTimesForStore(
   return raw;
 }
 
-const SALAH_KEYS: SalahKey[] = ["fajr", "zuhr", "asr", "maghrib", "isha"];
+const SALAH_KEYS: SalahKey[] = ["fajr", "zuhr", "asr", "maghrib", "isha", "jumuah"];
 
 const TERMINOLOGY_KEYS: TerminologyKey[] = [
   "fajr",
@@ -98,6 +98,13 @@ function normaliseJamaatBySalah(
     }
   }
   return out;
+}
+
+/** Trim and keep a library content id; empty/invalid → null (screen fallback). */
+function normaliseJamaatInProgressContentId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /** Clamp a supplication minute value (rounded) into [min, max], with fallback. */
@@ -158,6 +165,7 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
     durationMinutes: 3,
   },
   jamaatInProgressMode: 'screen',
+  jamaatInProgressContentId: null,
 };
 
 // Debounce map to prevent rapid successive calls
@@ -441,7 +449,15 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
     minutesAfterJamaatUntilNextPrayerBySalah,
     postAdhanSupplication: normalisePostAdhanSupplication(raw.postAdhanSupplication),
     postJamaatSupplication: normalisePostJamaatSupplication(raw.postJamaatSupplication),
-    jamaatInProgressMode: raw.jamaatInProgressMode === "dark" ? "dark" : "screen",
+    jamaatInProgressMode:
+      raw.jamaatInProgressMode === "dark"
+        ? "dark"
+        : raw.jamaatInProgressMode === "content"
+          ? "content"
+          : "screen",
+    jamaatInProgressContentId: normaliseJamaatInProgressContentId(
+      raw.jamaatInProgressContentId,
+    ),
     terminology: normaliseTerminology(
       (raw as unknown as { terminology?: unknown; terminologyPreferences?: unknown }).terminology,
     ),

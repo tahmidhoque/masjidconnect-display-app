@@ -32,6 +32,13 @@ export function isJamaatBlackoutMode(
   return settings?.jamaatInProgressMode === 'dark';
 }
 
+/** True when portal asked for library media during jamaat (may still fall back to screen). */
+export function isJamaatContentMode(
+  settings: DisplaySettings | null | undefined,
+): boolean {
+  return settings?.jamaatInProgressMode === 'content';
+}
+
 export function postAdhanSupplicationDelayMinutes(
   settings: DisplaySettings | null | undefined,
 ): number {

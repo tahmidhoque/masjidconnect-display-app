@@ -29,7 +29,9 @@ describe("prayerNameToSalahKey", () => {
   it("maps display names to salah keys", () => {
     expect(prayerNameToSalahKey("Fajr")).toBe("fajr");
     expect(prayerNameToSalahKey("Zuhr")).toBe("zuhr");
-    expect(prayerNameToSalahKey("Jumuah")).toBe("zuhr");
+    expect(prayerNameToSalahKey("Jumuah")).toBe("jumuah");
+    expect(prayerNameToSalahKey("Jummah")).toBe("jumuah");
+    expect(prayerNameToSalahKey("Jumu'ah")).toBe("jumuah");
     expect(prayerNameToSalahKey("Asr")).toBe("asr");
     expect(prayerNameToSalahKey("Maghrib")).toBe("maghrib");
     expect(prayerNameToSalahKey("Isha")).toBe("isha");
@@ -66,6 +68,25 @@ describe("jamaatPhaseMinutesForSalah", () => {
   it("uses 10 when settings are null", () => {
     expect(jamaatPhaseMinutesForSalah(null, "isha")).toBe(10);
   });
+
+  it("uses the jumuah key when present", () => {
+    const s = {
+      ...baseSettings(),
+      defaultJamaatInProgressMinutes: 10,
+      minutesAfterJamaatUntilNextPrayerBySalah: { zuhr: 5, jumuah: 22 },
+    };
+    expect(jamaatPhaseMinutesForSalah(s, "jumuah")).toBe(22);
+    expect(jamaatPhaseMinutesForSalah(s, "zuhr")).toBe(5);
+  });
+
+  it("falls back from jumuah to zuhr when the Friday key is absent", () => {
+    const s = {
+      ...baseSettings(),
+      defaultJamaatInProgressMinutes: 14,
+      minutesAfterJamaatUntilNextPrayerBySalah: { zuhr: 8 },
+    };
+    expect(jamaatPhaseMinutesForSalah(s, "jumuah")).toBe(8);
+  });
 });
 
 describe("postJamaatDelayMinutes", () => {
@@ -81,6 +102,27 @@ describe("jamaatPhaseMinutesForDisplayPrayer", () => {
   it("uses default only for unmapped names", () => {
     const s = { ...baseSettings(), defaultJamaatInProgressMinutes: 14 };
     expect(jamaatPhaseMinutesForDisplayPrayer(s, "Sunrise")).toBe(14);
+  });
+
+  it("applies jumuah override for Friday Zuhr and Jumuah labels", () => {
+    const s = {
+      ...baseSettings(),
+      defaultJamaatInProgressMinutes: 10,
+      minutesAfterJamaatUntilNextPrayerBySalah: { zuhr: 6, jumuah: 18 },
+    };
+    expect(jamaatPhaseMinutesForDisplayPrayer(s, "Zuhr")).toBe(6);
+    expect(jamaatPhaseMinutesForDisplayPrayer(s, "Zuhr", { isJumuah: true })).toBe(18);
+    expect(jamaatPhaseMinutesForDisplayPrayer(s, "Jumuah")).toBe(18);
+  });
+
+  it("falls back to zuhr for Friday when jumuah key is missing", () => {
+    const s = {
+      ...baseSettings(),
+      defaultJamaatInProgressMinutes: 10,
+      minutesAfterJamaatUntilNextPrayerBySalah: { zuhr: 7 },
+    };
+    expect(jamaatPhaseMinutesForDisplayPrayer(s, "Jumuah")).toBe(7);
+    expect(jamaatPhaseMinutesForDisplayPrayer(s, "Zuhr", { isJumuah: true })).toBe(7);
   });
 });
 
