@@ -1,16 +1,16 @@
 /**
  * JumuahBar
  *
- * Portrait layout: compact bar between the prayer times panel and the countdown
- * showing the upcoming Friday Khutbah and Jamaat (same source as the landscape
- * prayer strip), whenever the API provides jummah times in the week data.
+ * Compact bar showing Friday Khutbah and Jamaat times. Renders every entry in
+ * `jumuahSessions[]` when the API provides dual (or more) congregations, and
+ * falls back to the legacy single khutbah/jamaat pair when the array is absent.
  *
  * Uses gold-tinted styling to draw attention without overwhelming the display.
  * GPU-safe: no backdrop-filter, no box-shadow animations.
  */
 
 import React, { useMemo } from 'react';
-import type { TimeFormat } from '../../api/models';
+import type { JumuahSession, TimeFormat } from '../../api/models';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import { formatTimeToDisplay } from '../../utils/dateUtils';
 import { useAppSelector } from '../../store/hooks';
@@ -24,57 +24,87 @@ interface JumuahBarProps {
   timeFormat?: TimeFormat;
 }
 
+function sessionTimeLine(
+  session: JumuahSession,
+  timeFormat: TimeFormat,
+  khutbahLabel: string,
+  jamaatLabel: string,
+): string {
+  const parts: string[] = [];
+  if (session.khutbah) {
+    parts.push(`${khutbahLabel} ${formatTimeToDisplay(session.khutbah, timeFormat)}`);
+  }
+  if (session.jamaat) {
+    parts.push(`${jamaatLabel} ${formatTimeToDisplay(session.jamaat, timeFormat)}`);
+  }
+  return parts.join(' · ');
+}
+
 const JumuahBar: React.FC<JumuahBarProps> = ({
   compact = false,
   timeFormat = '12h',
 }) => {
-  const { upcomingJumuahJamaatRaw, upcomingJumuahKhutbahRaw } =
-    usePrayerTimesContext();
+  const {
+    upcomingJumuahSessions,
+    upcomingJumuahJamaatRaw,
+    upcomingJumuahKhutbahRaw,
+  } = usePrayerTimesContext();
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
 
-  const jamaatDisplay = useMemo(
-    () =>
-      upcomingJumuahJamaatRaw
-        ? formatTimeToDisplay(upcomingJumuahJamaatRaw, timeFormat)
-        : null,
-    [upcomingJumuahJamaatRaw, timeFormat],
-  );
-  const khutbahDisplay = useMemo(
-    () =>
-      upcomingJumuahKhutbahRaw
-        ? formatTimeToDisplay(upcomingJumuahKhutbahRaw, timeFormat)
-        : null,
-    [upcomingJumuahKhutbahRaw, timeFormat],
-  );
+  const sessions = useMemo((): JumuahSession[] => {
+    if (upcomingJumuahSessions && upcomingJumuahSessions.length > 0) {
+      return upcomingJumuahSessions;
+    }
+    if (!upcomingJumuahJamaatRaw && !upcomingJumuahKhutbahRaw) return [];
+    return [
+      {
+        label: "Jumu'ah",
+        khutbah: upcomingJumuahKhutbahRaw,
+        jamaat: upcomingJumuahJamaatRaw ?? '',
+      },
+    ].filter((session) => session.jamaat || session.khutbah);
+  }, [upcomingJumuahSessions, upcomingJumuahJamaatRaw, upcomingJumuahKhutbahRaw]);
 
-  const hasJamaat = !!jamaatDisplay;
-  const hasKhutbah = !!khutbahDisplay;
-
-  if (!hasJamaat && !hasKhutbah) return null;
+  if (sessions.length === 0) return null;
 
   const jummahLabel = resolveTerminology(terminology, 'jummah', 'Jumuah');
   const khutbahLabel = resolveTerminology(terminology, 'khutbah', 'Khutbah');
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
-
-  const parts: string[] = [];
-  if (hasKhutbah) parts.push(`${khutbahLabel} ${khutbahDisplay}`);
-  if (hasJamaat) parts.push(`${jamaatLabel} ${jamaatDisplay}`);
-  const content = parts.join(' · ');
+  const showSessionLabels = sessions.length > 1;
 
   return (
     <div
       className={`
         flex items-center justify-center rounded-lg border border-gold/20 bg-gold/5
+        min-h-0 w-full
         transition-opacity duration-normal
         ${compact ? 'px-3 py-1.5' : 'px-4 py-2'}
       `}
     >
-      <span className="text-gold font-semibold uppercase tracking-wider text-subheading">
+      <span className="text-gold font-semibold uppercase tracking-wider text-subheading shrink-0">
         {jummahLabel}
       </span>
-      <span className={`text-text-primary text-subheading ${compact ? 'ml-2' : 'ml-3'}`}>
-        {content}
-      </span>
+      <div
+        className={`flex flex-wrap items-center justify-center min-w-0 ${
+          compact ? 'ml-2 gap-x-3 gap-y-1' : 'ml-3 gap-x-5 gap-y-1'
+        }`}
+      >
+        {sessions.map((session, index) => {
+          const line = sessionTimeLine(session, timeFormat, khutbahLabel, jamaatLabel);
+          if (!line) return null;
+          return (
+            <span
+              key={`${session.label}-${session.jamaat}-${index}`}
+              className="text-text-primary text-subheading whitespace-nowrap"
+            >
+              {showSessionLabels ? (
+                <span className="text-gold/90 font-semibold mr-1.5">{session.label}</span>
+              ) : null}
+              {line}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 };

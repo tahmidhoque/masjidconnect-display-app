@@ -41,7 +41,9 @@ import {
   inferPrayerTimesLayout,
   inferZoneRegion,
   isPrayerOnlyLayout,
-  resolvePrayerFocusZoneSize,
+  prayerStripHeightClassName,
+  prayerStripHeightStyle,
+  resolveEffectiveZoneSize,
 } from '../../types/displayLayout';
 import {
   Header,
@@ -908,7 +910,7 @@ const DisplayScreenInner: React.FC = () => {
     return (
       <PrayerTimesBar
         variant={variant}
-        fillHeight={prayerOnly && variant === 'strip'}
+        fillHeight={prayerOnly || (variant === 'strip' && zone.size > 0)}
         hideClock={hasVisibleHeader}
         masjidName={masjidName}
         isRamadan={ramadan.isRamadan}
@@ -939,7 +941,7 @@ const DisplayScreenInner: React.FC = () => {
   /**
    * Component registry: maps a zone's component type to its rendered node and
    * any wrapper constraints carried over from the previous hardcoded layouts
-   * (strip min/max height, landscape footer chrome, carousel overflow).
+   * (prayer-strip height bands, landscape footer chrome, carousel overflow).
    */
   const zoneRegistry: Record<
     LayoutZoneComponent,
@@ -980,7 +982,7 @@ const DisplayScreenInner: React.FC = () => {
       const entry = zoneRegistry[component];
       const region = inferZoneRegion(layoutStructure, component, zone.region);
       const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
-      const effectiveSize = resolvePrayerFocusZoneSize(
+      const effectiveSize = resolveEffectiveZoneSize(
         zone,
         orientationLayout.zones,
         layoutStructure,
@@ -992,6 +994,7 @@ const DisplayScreenInner: React.FC = () => {
             ? buildPrayerTimesSlot(zone)
             : entry.node;
       let className = entry.className;
+      let zoneStyle: React.CSSProperties | undefined;
       if (component === 'prayer-panel') {
         className = prayerOnly
           ? 'flex-1 min-h-0 flex flex-col prayer-panel--focus'
@@ -1001,9 +1004,12 @@ const DisplayScreenInner: React.FC = () => {
           ? 'h-full min-h-0 flex flex-col prayer-sidebar--focus'
           : 'h-full min-h-0 flex flex-col';
       } else if (prayerVariant === 'strip') {
-        className = prayerOnly
-          ? 'flex-1 min-h-0 flex flex-col prayer-strip--focus'
-          : 'min-h-[8rem] max-h-[18rem]';
+        if (prayerOnly) {
+          className = 'flex-1 min-h-0 flex flex-col prayer-strip--focus';
+        } else {
+          className = prayerStripHeightClassName(zone.size);
+          zoneStyle = prayerStripHeightStyle(zone.size);
+        }
       }
       return {
         id: zone.id,
@@ -1012,6 +1018,7 @@ const DisplayScreenInner: React.FC = () => {
         size: effectiveSize,
         fontScale: zone.fontScale,
         className,
+        style: zoneStyle,
         label: entry.label,
         node,
       };

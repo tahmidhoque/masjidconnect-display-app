@@ -31,6 +31,8 @@ export interface RenderedZone {
   fontScale: number;
   /** Extra wrapper classes (component-specific constraints, e.g. strip min/max height). */
   className?: string;
+  /** Extra inline styles (e.g. prayer-strip height bands that must win over min-h-0). */
+  style?: React.CSSProperties;
   /** Accessible label for the zone region. */
   label?: string;
   node: React.ReactNode;
@@ -99,6 +101,7 @@ const ZoneStackLayout: React.FC<ZoneStackLayoutProps> = ({
           const zoneStyle: React.CSSProperties = {
             ...(flexible ? { flex: `${zone.size} 1 0%` } : {}),
             ...(zone.fontScale !== 1 ? { zoom: zone.fontScale } : {}),
+            ...zone.style,
           };
           return (
             <div

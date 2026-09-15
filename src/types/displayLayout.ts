@@ -266,6 +266,128 @@ export function resolvePrayerFocusZoneSize(
   }
 }
 
+/** Friendly presets for the zone size (flex weight) slider — mirror of backend. */
+export const ZONE_SIZE_PRESETS: Array<{ value: number; label: string; hint: string }> = [
+  { value: 0, label: 'Auto', hint: 'Uses only the space the block needs' },
+  { value: 3, label: 'Small', hint: 'A modest share of leftover space' },
+  { value: 5, label: 'Medium', hint: 'Balanced with other flexible blocks' },
+  { value: 8, label: 'Large', hint: 'Takes most of the available space' },
+  { value: 12, label: 'Maximum', hint: 'Expands as much as possible' },
+];
+
+/** Returns the nearest preset label for a zone size value. */
+export function describeZoneSize(size: number): string {
+  const preset = ZONE_SIZE_PRESETS.find((entry) => entry.value === size);
+  if (preset) return preset.label;
+  if (size === 0) return 'Auto';
+  return `Custom (${size})`;
+}
+
+/**
+ * Helper copy for the block-height control.
+ * Pass `component` for zone-specific guidance (Jumu'ah / prayer bar / content).
+ */
+export function zoneSizeHint(size: number, component?: LayoutZoneComponent): string {
+  if (component === 'jumuah-bar') {
+    return "Height follows the Jumu'ah times content. Use Text size below to scale the bar.";
+  }
+  if (component === 'prayer-times') {
+    if (size <= 0) {
+      return 'Fits the prayer tiles — grows only as needed.';
+    }
+    const preset = ZONE_SIZE_PRESETS.find((entry) => entry.value === size);
+    if (preset) {
+      return `${preset.hint} The prayer bar also uses a height band so Small–Maximum look different.`;
+    }
+    return 'Relative share of leftover space, with a matching prayer-bar height band.';
+  }
+  if (component === 'content' && size <= 0) {
+    return 'Fills leftover space when no other block is set to a fixed share — keeps the layout stable as slides change.';
+  }
+  const preset = ZONE_SIZE_PRESETS.find((entry) => entry.value === size);
+  if (preset) return preset.hint;
+  return 'Fine-tune how much vertical space this block takes when other blocks are flexible.';
+}
+
+/**
+ * Content carousel Auto (size 0) claims leftover space when it is the only
+ * flexible zone — prevents slide-to-slide layout jump. Explicit weights share
+ * leftover with siblings as usual.
+ */
+export function resolveContentZoneSize(zone: LayoutZone, zones: LayoutZone[]): number {
+  if (zone.component !== 'content') return zone.size;
+  if (zone.size > 0) return zone.size;
+
+  const hasOtherFlexible = zones.some((entry) => {
+    if (!entry.visible || entry.id === zone.id) return false;
+    if (entry.component === 'jumuah-bar' || entry.component === 'footer') {
+      return false;
+    }
+    return entry.size > 0;
+  });
+
+  return hasOtherFlexible ? 0 : 1;
+}
+
+/**
+ * Effective flex weight after component-specific rules.
+ * - jumuah-bar: always intrinsic (height is content-driven; use fontScale)
+ * - content: Auto claims leftover when sole flexible zone
+ * - prayer-only: resolvePrayerFocusZoneSize
+ */
+export function resolveEffectiveZoneSize(
+  zone: LayoutZone,
+  zones: LayoutZone[],
+  structure: LayoutStructure,
+): number {
+  if (zone.component === 'jumuah-bar') return 0;
+  if (zone.component === 'content') return resolveContentZoneSize(zone, zones);
+  return resolvePrayerFocusZoneSize(zone, zones, structure);
+}
+
+const PRAYER_STRIP_HEIGHT_BANDS: Array<{
+  weight: number;
+  className: string;
+  minHeight: string;
+  maxHeight: string;
+}> = [
+  { weight: 3, className: 'min-h-[6rem] max-h-[10rem]', minHeight: '6rem', maxHeight: '10rem' },
+  { weight: 5, className: 'min-h-[8rem] max-h-[12rem]', minHeight: '8rem', maxHeight: '12rem' },
+  { weight: 8, className: 'min-h-[10rem] max-h-[15rem]', minHeight: '10rem', maxHeight: '15rem' },
+  { weight: 12, className: 'min-h-[12rem] max-h-[18rem]', minHeight: '12rem', maxHeight: '18rem' },
+];
+
+function nearestPrayerStripHeightBand(size: number) {
+  let nearest = PRAYER_STRIP_HEIGHT_BANDS[0];
+  for (const band of PRAYER_STRIP_HEIGHT_BANDS) {
+    if (Math.abs(band.weight - size) < Math.abs(nearest.weight - size)) {
+      nearest = band;
+    }
+  }
+  return nearest;
+}
+
+/**
+ * Size-aware rem height bands for the horizontal prayer-times strip.
+ * Auto (0) = intrinsic; Small–Maximum map to ZONE_SIZE_PRESETS weights.
+ * Custom values snap to the nearest preset band.
+ */
+export function prayerStripHeightClassName(size: number): string {
+  if (size <= 0) return 'min-h-0';
+  return nearestPrayerStripHeightBand(size).className;
+}
+
+/**
+ * Inline min/max height for the prayer strip so bands win over flex `min-h-0`.
+ */
+export function prayerStripHeightStyle(
+  size: number,
+): { minHeight: string; maxHeight: string } | undefined {
+  if (size <= 0) return undefined;
+  const band = nearestPrayerStripHeightBand(size);
+  return { minHeight: band.minHeight, maxHeight: band.maxHeight };
+}
+
 function sanitiseStructure(raw: unknown): LayoutStructure {
   if (typeof raw === 'string' && (LAYOUT_STRUCTURES as readonly string[]).includes(raw)) {
     return raw as LayoutStructure;
