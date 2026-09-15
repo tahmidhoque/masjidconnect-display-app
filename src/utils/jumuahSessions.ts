@@ -5,6 +5,9 @@
  * payloads only have the primary `jummahKhutbah` / `jummahJamaat` pair.
  * Displays must render every session when the array is present, and fall
  * back to the legacy fields when it is absent or empty.
+ *
+ * `jamaat` is optional (portal #228): khutbah-only sessions send `jamaat: null`
+ * or an empty string. Those must still be shown, without fabricating a Jamaat time.
  */
 
 import type { JumuahSession } from '../api/models';
@@ -16,18 +19,32 @@ function trimString(value: unknown): string {
 }
 
 /**
- * Parse a single session object from the API. Returns null when jamaat is missing.
+ * True when a Jumu'ah clock field is a non-empty string.
+ * Null, undefined, non-strings, and blank/whitespace are treated as absent.
+ */
+export function hasJumuahClockTime(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function optionalClockTime(value: unknown): string | null {
+  const trimmed = trimString(value);
+  return trimmed || null;
+}
+
+/**
+ * Parse a single session object from the API.
+ * Returns null when neither khutbah nor jamaat is present.
  */
 function parseSession(raw: unknown): JumuahSession | null {
   if (!raw || typeof raw !== 'object') return null;
   const rec = raw as Record<string, unknown>;
-  const jamaat = trimString(rec.jamaat);
-  if (!jamaat) return null;
-  const khutbahRaw = trimString(rec.khutbah);
+  const jamaat = optionalClockTime(rec.jamaat);
+  const khutbah = optionalClockTime(rec.khutbah);
+  if (!jamaat && !khutbah) return null;
   const label = trimString(rec.label) || DEFAULT_SESSION_LABEL;
   return {
     label,
-    khutbah: khutbahRaw || null,
+    khutbah,
     jamaat,
   };
 }
@@ -50,13 +67,13 @@ export function normaliseJumuahSessions(day: unknown): JumuahSession[] {
     if (fromArray.length > 0) return fromArray;
   }
 
-  const jamaat = trimString(rec.jummahJamaat);
-  if (!jamaat) return [];
-  const khutbah = trimString(rec.jummahKhutbah);
+  const jamaat = optionalClockTime(rec.jummahJamaat);
+  const khutbah = optionalClockTime(rec.jummahKhutbah);
+  if (!jamaat && !khutbah) return [];
   return [
     {
       label: DEFAULT_SESSION_LABEL,
-      khutbah: khutbah || null,
+      khutbah,
       jamaat,
     },
   ];
