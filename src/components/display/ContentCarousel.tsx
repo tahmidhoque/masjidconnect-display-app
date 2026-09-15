@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import logger from '@/utils/logger';
-import { resolveMediaFit } from '@/utils/mediaSlide';
+import { isViewportFullscreenFit, resolveMediaFit } from '@/utils/mediaSlide';
 import type { MediaFit } from '@/utils/mediaSlide';
 import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import {
@@ -65,6 +65,39 @@ function collectItemMediaUrls(items: CarouselItem[]): string[] {
   }
   return urls;
 }
+
+/**
+ * Smart Size poster: whole image letterboxed over a blurred zoomed copy of
+ * itself. Renders inside the content carousel zone — never the viewport portal.
+ */
+const SmartFitImage: React.FC<{
+  src: string;
+  onReady?: () => void;
+}> = ({ src, onReady }) => (
+  <div
+    data-media-fit="smart"
+    className="relative min-h-0 flex-1 overflow-hidden"
+  >
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-2xl"
+      loading="eager"
+      decoding="async"
+    />
+    <div className="absolute inset-0 bg-midnight/40" aria-hidden />
+    <img
+      src={src}
+      alt=""
+      className="gpu-accelerated relative h-full w-full object-contain object-center"
+      loading="eager"
+      decoding="async"
+      onLoad={onReady}
+      onError={onReady}
+    />
+  </div>
+);
 
 /**
  * Upper bound (seconds) for how long a single VIDEO slide can stay on screen.
@@ -184,7 +217,7 @@ export interface CarouselItem {
    * Slide presentation mode — `fullscreen` takes over the entire display
    * (hides prayer panel, header and footer); `inline` stays within the
    * carousel content area. Defaults to `inline` when absent.
-   * MEDIA_SLIDE and VIDEO use `mediaFit` instead (smart/cover = fullscreen).
+   * MEDIA_SLIDE and VIDEO use `mediaFit` instead (cover = fullscreen; smart stays in-zone).
    */
   displayMode?: 'fullscreen' | 'inline';
 }
@@ -447,13 +480,13 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   );
 
   /**
-   * Edge-to-edge stage for posters that fill the screen — cancels layout padding
-   * (see LandscapeLayout / PortraitLayout). Both `smart` (blurred backdrop) and
-   * `cover` (crop) go edge-to-edge; `contain` stays inline within the content box.
+   * Full-viewport stage for Cover media — portals to `#orientation-portal-root`
+   * and hides prayer chrome. Smart Size stays inside the content carousel zone
+   * (blurred backdrop, whole asset visible). Contain stays inline with a plain letterbox.
    */
   const isFullscreenMedia = useMemo(() => {
     if (!currentItem) return false;
-    if (effectiveMediaFit !== 'smart' && effectiveMediaFit !== 'cover') return false;
+    if (!isViewportFullscreenFit(effectiveMediaFit)) return false;
     if (isVideoSlide) return true;
     if (!isMediaSlide) return false;
     return currentItem.mediaKind === 'image' || currentItem.mediaKind === 'pdf';
@@ -923,32 +956,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
             <MediaPdfPage
               url={resolvedMediaUrl!}
               title={item.title ?? 'Poster'}
-              fit={effectiveMediaFit === 'cover' ? 'cover' : 'contain'}
-              mode={effectiveMediaFit}
+              fit="cover"
+              mode="cover"
               className="min-h-0 flex-1"
               onReady={onMediaAssetLoaded}
             />
-          ) : effectiveMediaFit === 'smart' ? (
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              <img
-                src={resolvedMediaUrl}
-                alt=""
-                aria-hidden
-                className="gpu-accelerated absolute inset-0 h-full w-full scale-110 object-cover object-center blur-2xl"
-                loading="eager"
-                decoding="async"
-              />
-              <div className="absolute inset-0 bg-midnight/40" aria-hidden />
-              <img
-                src={resolvedMediaUrl}
-                alt=""
-                className="gpu-accelerated relative h-full w-full object-contain object-center"
-                loading="eager"
-                decoding="async"
-                onLoad={onMediaAssetLoaded}
-                onError={onMediaAssetLoaded}
-              />
-            </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
               <img
@@ -1092,16 +1104,16 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
               </Suspense>
             ) : isVideoSlide && resolvedVideoUrl ? (
               isFullscreenMedia ? (
-                /* Smart/cover render edge-to-edge via the fullscreen portal above. */
+                /* Cover renders edge-to-edge via the fullscreen portal above. */
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
               ) : (
-                /* Inline 'contain' fit — video within the content box, prayer chrome stays visible. */
-                <div className="flex flex-1 min-h-0 w-full flex-col">
+                /* Inline contain/smart — video within the content box, prayer chrome stays visible. */
+                <div className="flex flex-1 min-h-0 w-full flex-col" data-media-fit={effectiveMediaFit}>
                   <Suspense fallback={null}>
                     <VideoSlide
                       url={resolvedVideoUrl}
                       title={item.title}
-                      fit="contain"
+                      fit={effectiveMediaFit === 'cover' ? 'contain' : effectiveMediaFit}
                       muted={item.muted ?? true}
                       loop={safeItems.length <= 1}
                       onReady={onMediaAssetLoaded}
@@ -1115,18 +1127,24 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
               isFullscreenMedia ? (
                 <div className="min-h-0 flex-1 w-full shrink-0" aria-hidden />
               ) : (
-                /* Inline 'contain' fit — whole poster within the content box,
-                   prayer chrome stays visible. Smart/cover render edge-to-edge
-                   via the fullscreen portal above. */
-                <div className="flex flex-1 min-h-0 w-full flex-col">
+                /* Inline contain / Smart Size — whole poster within the content box,
+                   prayer chrome stays visible. Cover renders edge-to-edge via the
+                   fullscreen portal above. */
+                <div
+                  className="flex flex-1 min-h-0 w-full flex-col"
+                  data-media-fit={effectiveMediaFit}
+                >
                   {item.mediaKind === 'pdf' ? (
                     <MediaPdfPage
                       url={resolvedMediaUrl}
                       title={item.title ?? 'Poster'}
                       fit="contain"
+                      mode={effectiveMediaFit === 'smart' ? 'smart' : 'contain'}
                       className="min-h-0 w-full flex-1"
                       onReady={onMediaAssetLoaded}
                     />
+                  ) : effectiveMediaFit === 'smart' ? (
+                    <SmartFitImage src={resolvedMediaUrl} onReady={onMediaAssetLoaded} />
                   ) : (
                     <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
                       <img
