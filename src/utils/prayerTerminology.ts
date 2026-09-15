@@ -39,6 +39,25 @@ export function resolveTomorrowColumnHeader(
 }
 
 /**
+ * Resolve a prayer row / phase name to the admin-configured label.
+ *
+ * On Fridays the Zuhr slot uses the `jummah` key so the in-prayer overlay
+ * matches the prayer panel ("Jumuah" / custom Friday label, not "Zuhr").
+ */
+export function resolvePrayerDisplayName(
+  prayerName: string | null | undefined,
+  terminology: TerminologyMap,
+  options?: { isJumuahToday?: boolean },
+): string | null {
+  if (!prayerName) return null;
+  if (options?.isJumuahToday && prayerName === 'Zuhr') {
+    return resolveTerminology(terminology, 'jummah', 'Jumuah');
+  }
+  const key = prayerRowNameToTerminologyKey(prayerName);
+  return key ? resolveTerminology(terminology, key, prayerName) : prayerName;
+}
+
+/**
  * Map UI prayer row names / phase labels to stable terminology keys.
  *
  * Note: Friday-specific logic ("Jumu'ah") is handled at the call-site because

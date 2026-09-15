@@ -20,7 +20,7 @@ import { resolveTerminology } from '../../utils/prayerTerminology';
 import prayerRugJamaatUrl from '../../assets/prayer-rug-jamaat.png';
 
 export interface InPrayerScreenProps {
-  /** Name of the prayer in progress (e.g. "Zuhr", "Asr") */
+  /** Terminology-resolved name of the prayer in progress (e.g. "Zhur", "Jumuah") */
   prayerName?: string | null;
   /** When 'post-jamaat': show "In progress"; else show "Jamaat in progress" */
   statusMessage?: 'jamaat' | 'post-jamaat';

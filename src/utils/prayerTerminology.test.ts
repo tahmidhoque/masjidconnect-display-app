@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { resolveTerminology, prayerRowNameToTerminologyKey } from './prayerTerminology';
+import { resolveTerminology, prayerRowNameToTerminologyKey, resolvePrayerDisplayName } from './prayerTerminology';
 import type { TerminologyKey } from '@/api/models';
 
 describe('resolveTerminology', () => {
@@ -40,6 +40,33 @@ describe('prayerRowNameToTerminologyKey', () => {
 
   it('returns null for unknown labels', () => {
     expect(prayerRowNameToTerminologyKey('SomethingElse')).toBeNull();
+  });
+});
+
+describe('resolvePrayerDisplayName', () => {
+  it('applies custom salah labels from displaySettings.terminology', () => {
+    const terminology = { zuhr: 'Zhur', asr: 'Asar' } as Partial<Record<TerminologyKey, string>>;
+    expect(resolvePrayerDisplayName('Zuhr', terminology)).toBe('Zhur');
+    expect(resolvePrayerDisplayName('Asr', terminology)).toBe('Asar');
+  });
+
+  it('falls back to the row name when terminology is missing', () => {
+    expect(resolvePrayerDisplayName('Zuhr', undefined)).toBe('Zuhr');
+    expect(resolvePrayerDisplayName('Zuhr', null)).toBe('Zuhr');
+  });
+
+  it('uses the jummah key for Friday Zuhr so the overlay matches the panel', () => {
+    const terminology = {
+      zuhr: 'Dhuhr',
+      jummah: 'Jumuah',
+    } as Partial<Record<TerminologyKey, string>>;
+    expect(resolvePrayerDisplayName('Zuhr', terminology, { isJumuahToday: true })).toBe('Jumuah');
+    expect(resolvePrayerDisplayName('Zuhr', terminology, { isJumuahToday: false })).toBe('Dhuhr');
+  });
+
+  it('returns null when the phase has no prayer name', () => {
+    expect(resolvePrayerDisplayName(null, undefined)).toBeNull();
+    expect(resolvePrayerDisplayName(undefined, undefined)).toBeNull();
   });
 });
 
