@@ -16,11 +16,18 @@
 import React from 'react';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
-import { resolveTerminology } from '../../utils/prayerTerminology';
+import {
+  resolveAnnouncementPrayerName,
+  resolveTerminology,
+} from '../../utils/prayerTerminology';
 
 export interface SilentPhonesGraphicProps {
   /** Landscape: two-column row — large graphic left, message and badge right. */
   landscapeSplit?: boolean;
+  /** Canonical prayer row name (e.g. "Maghrib", "Zuhr") for the imminent Jamaat. */
+  prayerName?: string | null;
+  /** Friday Zuhr slot — announcement uses the Jumuah terminology label. */
+  isJumuah?: boolean;
 }
 
 const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
@@ -95,9 +102,18 @@ const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
 
 const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
   landscapeSplit = false,
+  prayerName = null,
+  isJumuah = false,
 }) => {
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
+  const prayerLabel = resolveAnnouncementPrayerName(
+    prayerName,
+    terminology,
+    isJumuah,
+  );
+  /** e.g. "Maghrib Jamaat"; falls back to generic Jamaat when the name is unknown. */
+  const subject = prayerLabel ? `${prayerLabel} ${jamaatLabel}` : jamaatLabel;
 
   if (landscapeSplit) {
     return (
@@ -114,11 +130,11 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
               <span className="block leading-snug">silent</span>
             </h2>
             <p className="leading-snug silent-phones-graphic-split-sub">
-              or turn it off before {jamaatLabel} begins
+              or turn it off before {subject} begins
             </p>
           </div>
           <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
-            {jamaatLabel} is about to begin
+            {subject} is about to begin
           </span>
         </div>
       </div>
@@ -136,11 +152,11 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
           <span className="block leading-snug">silent</span>
         </h2>
         <p className="text-body text-text-secondary leading-relaxed">
-          or turn it off before {jamaatLabel} begins
+          or turn it off before {subject} begins
         </p>
       </div>
       <span className="badge badge-gold text-caption uppercase tracking-widest shrink-0">
-        {jamaatLabel} is about to begin
+        {subject} is about to begin
       </span>
     </div>
   );

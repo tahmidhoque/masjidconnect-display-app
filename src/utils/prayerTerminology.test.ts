@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { resolveTerminology, prayerRowNameToTerminologyKey, resolvePrayerDisplayName } from './prayerTerminology';
+import {
+  resolveTerminology,
+  prayerRowNameToTerminologyKey,
+  resolvePrayerDisplayName,
+  resolveAnnouncementPrayerName,
+} from './prayerTerminology';
 import type { TerminologyKey } from '@/api/models';
 
 describe('resolveTerminology', () => {
@@ -70,3 +75,23 @@ describe('resolvePrayerDisplayName', () => {
   });
 });
 
+describe('resolveAnnouncementPrayerName', () => {
+  it('returns the row name when terminology is missing', () => {
+    expect(resolveAnnouncementPrayerName('Maghrib', undefined)).toBe('Maghrib');
+  });
+
+  it('uses terminology for the matching prayer key', () => {
+    const terminology = { maghrib: '  Maghrib Salah  ' } as Partial<Record<TerminologyKey, string>>;
+    expect(resolveAnnouncementPrayerName('Maghrib', terminology)).toBe('Maghrib Salah');
+  });
+
+  it('uses jummah terminology when isJumuah is true', () => {
+    const terminology = { jummah: 'Jumuʿah', zuhr: 'Dhuhr' } as Partial<Record<TerminologyKey, string>>;
+    expect(resolveAnnouncementPrayerName('Zuhr', terminology, true)).toBe('Jumuʿah');
+  });
+
+  it('returns null when there is no prayer name', () => {
+    expect(resolveAnnouncementPrayerName(null, undefined)).toBeNull();
+    expect(resolveAnnouncementPrayerName('  ', undefined)).toBeNull();
+  });
+});

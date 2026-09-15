@@ -418,6 +418,43 @@ describe('contentSlice', () => {
       expect(result.postAdhanSupplication?.enabled).toBe(false);
       expect(result.jamaatInProgressMode).toBe('screen');
     });
+
+    it('accepts 12h-nop from displaySettings', () => {
+      const content = {
+        displaySettings: { timeFormat: '12h-nop' },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      expect(extractDisplaySettings(content).timeFormat).toBe('12h-nop');
+    });
+
+    it('keeps 12h with period and 24h unchanged', () => {
+      const twelve = {
+        displaySettings: { timeFormat: '12h' },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+      const twentyFour = {
+        displaySettings: { timeFormat: '24h' },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      expect(extractDisplaySettings(twelve).timeFormat).toBe('12h');
+      expect(extractDisplaySettings(twentyFour).timeFormat).toBe('24h');
+    });
+
+    it('falls back to 12h for an unknown timeFormat', () => {
+      const content = {
+        displaySettings: { timeFormat: 'banana' },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      expect(extractDisplaySettings(content).timeFormat).toBe('12h');
+    });
+
+    it('reads 12h-nop from screen contentConfig when displaySettings omit it', () => {
+      const content = {
+        displaySettings: {},
+        screen: { contentConfig: { timeFormat: '12h-nop' } },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      expect(extractDisplaySettings(content).timeFormat).toBe('12h-nop');
+    });
   });
 
   describe('reducers', () => {

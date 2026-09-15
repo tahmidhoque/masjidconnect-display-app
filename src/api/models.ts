@@ -296,9 +296,10 @@ export interface AnalyticsResponse {
 /**
  * Time format preference for displaying times
  * - '12h': 12-hour format with AM/PM (e.g., "4:30 PM")
+ * - '12h-nop': 12-hour format without AM/PM (e.g., "4:30")
  * - '24h': 24-hour format (e.g., "16:30")
  */
-export type TimeFormat = "12h" | "24h";
+export type TimeFormat = "12h" | "12h-nop" | "24h";
 
 /** Prayer row keys for per-salah jamaat-in-progress overrides (portal display settings). */
 export type SalahKey = "fajr" | "zuhr" | "asr" | "maghrib" | "isha" | "jumuah";
@@ -325,8 +326,8 @@ export interface DisplaySettings {
   ramadanMode: "auto" | "on" | "off";
   /** Resolved value: true if Ramadan mode should be shown (based on ramadanMode + Hijri date) */
   isRamadanActive: boolean;
-  /** "12h" = 5:30 AM, "24h" = 05:30 */
-  timeFormat: "12h" | "24h";
+  /** "12h" = 5:30 AM, "12h-nop" = 5:30, "24h" = 05:30 */
+  timeFormat: TimeFormat;
   /** Show imsak/sehri time in the prayer times section */
   showImsak: boolean;
   /** Show a column with tomorrow's jamaat times */

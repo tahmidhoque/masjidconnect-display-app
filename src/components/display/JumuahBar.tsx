@@ -20,7 +20,7 @@ import { resolveTerminology } from '../../utils/prayerTerminology';
 interface JumuahBarProps {
   /** When true (landscape), use tighter spacing */
   compact?: boolean;
-  /** Matches screen display setting (12h / 24h). */
+  /** Matches screen display setting (12h / 12h-nop / 24h). */
   timeFormat?: TimeFormat;
 }
 

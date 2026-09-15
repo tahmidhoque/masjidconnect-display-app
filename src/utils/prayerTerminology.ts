@@ -78,3 +78,25 @@ export function prayerRowNameToTerminologyKey(rowName: string): TerminologyKey |
   return null;
 }
 
+/**
+ * User-facing prayer name for announcements (silent phones, in-prayer, etc.).
+ * Friday Zuhr uses the `jummah` terminology key when `isJumuah` is set.
+ * Returns null when there is no prayer to name so callers can fall back to
+ * a generic Jamaat label.
+ */
+export function resolveAnnouncementPrayerName(
+  prayerName: string | null | undefined,
+  terminology: TerminologyMap,
+  isJumuah = false,
+): string | null {
+  if (isJumuah) {
+    return resolveTerminology(terminology, 'jummah', 'Jumuah');
+  }
+  if (typeof prayerName !== 'string') return null;
+  const trimmed = prayerName.trim();
+  if (!trimmed) return null;
+  const key = prayerRowNameToTerminologyKey(trimmed);
+  if (!key) return trimmed;
+  return resolveTerminology(terminology, key, trimmed);
+}
+

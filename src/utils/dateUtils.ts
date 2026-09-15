@@ -33,11 +33,38 @@ export const formatTimeTo12Hour = (timeString: string): string => {
   return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
 };
 
+/** Known portal time-format values. Unknown strings fall back to 12h. */
+const TIME_FORMATS: readonly TimeFormat[] = ["12h", "12h-nop", "24h"];
+
+/**
+ * Parse a portal/API time-format string. Returns undefined for unknown values
+ * so callers can apply their own fallback (legacy caches, typos).
+ */
+export function parseTimeFormat(value: unknown): TimeFormat | undefined {
+  if (typeof value !== "string") return undefined;
+  return (TIME_FORMATS as readonly string[]).includes(value)
+    ? (value as TimeFormat)
+    : undefined;
+}
+
+/**
+ * First recognised time format among the candidates, otherwise `'12h'`.
+ * Used when reading displaySettings / contentConfig so unknown values stay
+ * backwards-compatible with the historical 12-hour-with-period default.
+ */
+export function resolveTimeFormat(...candidates: unknown[]): TimeFormat {
+  for (const candidate of candidates) {
+    const parsed = parseTimeFormat(candidate);
+    if (parsed) return parsed;
+  }
+  return "12h";
+}
+
 /**
  * Parts for rendering time with optional small AM/PM subtext (keeps numeric column aligned like 24h).
  *
  * @param timeString - Time in 24-hour format (e.g., "16:30")
- * @param format - Time format preference ('12h' or '24h')
+ * @param format - Time format preference ('12h', '12h-nop', or '24h')
  * @returns { main: "5:39" | "17:39", period: "pm" | "am" | null }
  */
 export const getTimeDisplayParts = (
@@ -49,11 +76,11 @@ export const getTimeDisplayParts = (
   const [hours, minutes] = timeString.split(":").map(Number);
   if (isNaN(hours) || isNaN(minutes)) return { main: timeString, period: null };
 
-  if (format === "12h") {
+  if (format === "12h" || format === "12h-nop") {
     const period = hours >= 12 ? "pm" : "am";
     const displayHours = hours % 12 || 12;
     const main = `${displayHours}:${minutes.toString().padStart(2, "0")}`;
-    return { main, period };
+    return { main, period: format === "12h" ? period : null };
   }
 
   const main = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
@@ -64,12 +91,13 @@ export const getTimeDisplayParts = (
  * Format time string to display format based on the specified format preference
  *
  * @param timeString - Time in 24-hour format (e.g., "16:30")
- * @param format - Time format preference ('12h' or '24h'), defaults to '12h'
+ * @param format - Time format preference ('12h', '12h-nop', or '24h'), defaults to '12h'
  * @returns Formatted time string based on the format preference
  *
  * @example
  * formatTimeToDisplay("16:30", "24h") // Returns "16:30"
  * formatTimeToDisplay("16:30", "12h") // Returns "4:30 PM"
+ * formatTimeToDisplay("16:30", "12h-nop") // Returns "4:30"
  */
 export const formatTimeToDisplay = (
   timeString: string,
@@ -83,6 +111,11 @@ export const formatTimeToDisplay = (
 
   if (format === "12h") {
     return formatTimeTo12Hour(timeString);
+  }
+
+  if (format === "12h-nop") {
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, "0")}`;
   }
 
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
