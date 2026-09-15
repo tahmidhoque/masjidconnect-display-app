@@ -27,6 +27,7 @@ import { selectDisplaySettings, selectMasjidTimezone } from '../../store/slices/
 import { resolvePrayerDisplayName, resolveTerminology } from '../../utils/prayerTerminology';
 import { getEffectiveJamaat } from '../../utils/jumuahJamaat';
 import { defaultMasjidTimezone } from '../../config/environment';
+import { preJamaatLeadMinutes } from '../../utils/displaySettingsJamaat';
 
 interface PrayerCountdownProps {
   /** Current prayer phase — controls labels and in-prayer display */
@@ -38,14 +39,8 @@ interface PrayerCountdownProps {
 }
 
 /**
- * Minutes BEFORE jamaat that we flip to the "Jamaat in" countdown label.
- * Mirrors `JAMAAT_LEAD_MIN` in `usePrayerPhase` so the countdown label and
- * silent-phones screen always swap together (also covers A == J and A within
- * the lead window — the previous heuristic missed those cases).
+ * Sunrise is on the timetable but is never a countdown target.
  */
-const JAMAAT_LEAD_MIN = 5;
-
-/** Sunrise is on the timetable but is never a countdown target. */
 const COUNTDOWN_SKIP_PRAYERS = new Set(['Sunrise', 'Shuruq']);
 
 type SalahRow = {
@@ -98,7 +93,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   // when the Pi's system timezone is UTC.
   const now = useMasjidTime();
   const masjidTz = useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
-  const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  const displaySettings = useAppSelector(selectDisplaySettings);
+  const terminology = displaySettings?.terminology;
+  const jamaatLeadMin = preJamaatLeadMinutes(displaySettings);
   const postSalahCountdown = isPostSalahCountdown(phase, inPrayerSubPhase);
 
   /**
@@ -125,9 +122,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
    * countdown label and the silent-phones screen always agree.
    *
    *   - Before adhan, outside the lead window → count down to ADHAN
-   *   - Inside the lead window (`now >= J − JAMAAT_LEAD_MIN`) → count down to
+   *   - Inside the lead window (`now >= J − leadMinutes`) → count down to
    *     JAMAAT, even when adhan hasn't fired yet (handles A == J and
-   *     A within JAMAAT_LEAD_MIN of J)
+   *     A within the lead window of J)
    *   - Adhan passed, before jamaat → count down to JAMAAT
    *   - At/past jamaat AND phase === 'in-prayer' (jamaat sub-phase) → null
    *     (the in-prayer render branch shows "Jamaat in progress")
@@ -154,9 +151,9 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
     // Before adhan today
     if (A >= 0 && nowMin < A) {
-      // Lead window flip (only fires when A >= J − JAMAAT_LEAD_MIN, i.e. when
+      // Lead window flip (only fires when A >= J − lead, i.e. when
       // adhan and jamaat are within the lead window or equal)
-      if (J >= 0 && nowMin >= J - JAMAAT_LEAD_MIN) {
+      if (jamaatLeadMin > 0 && J >= 0 && nowMin >= J - jamaatLeadMin) {
         return { time: effectiveJamaat!, forceTomorrow: false, target: 'jamaat' };
       }
       return { time: countdownPrayer.time, forceTomorrow: false, target: 'adhan' };
@@ -189,7 +186,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     }
 
     return null;
-  }, [countdownPrayer, now, effectiveJamaat, phase, postSalahCountdown]);
+  }, [countdownPrayer, now, effectiveJamaat, phase, postSalahCountdown, jamaatLeadMin]);
 
   /**
    * Live countdown string. `targetTime` already depends on `now`, so this

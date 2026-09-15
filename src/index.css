@@ -1111,6 +1111,27 @@ html, body {
   line-height: 1.05;
 }
 
+/* Single-column sidebar — wider tiles, stacked prayer names */
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-1 .prayer-cue-tile .text-prayer-strip-label {
+  font-size: clamp(0.72rem, 12cqh, 1.05rem);
+  line-height: 1.08;
+}
+
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-1 .prayer-cue-tile .text-prayer-strip-time {
+  font-size: clamp(0.85rem, 14cqh, 1.2rem);
+  line-height: 1.08;
+}
+
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-1 .prayer-cue-tile .text-prayer-strip-jamaat-primary {
+  font-size: clamp(1.05rem, 26cqh, 2rem);
+  line-height: 1.04;
+}
+
+.prayer-strip-tiles--vertical.prayer-strip-tiles--cols-1 .prayer-cue-tile .text-prayer-strip-jamaat {
+  font-size: clamp(0.62rem, 10cqh, 0.88rem);
+  line-height: 1.05;
+}
+
 /* Two-column sidebar — larger tiles, distance-readable jamaat */
 .prayer-strip-tiles--vertical.prayer-strip-tiles--cols-2 .prayer-cue-tile .text-prayer-strip-label {
   font-size: clamp(0.72rem, 14cqh, 1.05rem);

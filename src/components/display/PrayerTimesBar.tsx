@@ -62,6 +62,8 @@ export interface PrayerTimesBarProps {
   showMasjidName?: boolean;
   countdownSlot?: React.ReactNode;
   clockPosition?: 'left' | 'right';
+  /** Vertical sidebar tile columns (default 2). */
+  tileColumns?: 1 | 2;
 }
 
 const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
@@ -83,6 +85,7 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
   showMasjidName = false,
   countdownSlot = null,
   clockPosition = 'left',
+  tileColumns = 2,
 }) => {
   const isSidebar = variant === 'sidebar';
   const now = useMasjidTime();
@@ -170,7 +173,7 @@ const PrayerTimesBar: React.FC<PrayerTimesBarProps> = ({
         <PrayerStripTileGrid
           orientation="vertical"
           tileCount={todaysPrayerTimes.length}
-          columnCount={2}
+          columnCount={tileColumns}
         >
           {todaysPrayerTimes.map((prayer) => (
             <PrayerCueTile

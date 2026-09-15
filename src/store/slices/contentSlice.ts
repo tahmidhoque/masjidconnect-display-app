@@ -101,6 +101,18 @@ function normaliseJamaatBySalah(
   return out;
 }
 
+const PRE_JAMAAT_SECONDS = [30, 60, 90, 120] as const;
+
+/** Portal pre-jamaat duration: 30 / 60 / 90 / 120 only; anything else omitted. */
+function normalisePreJamaatCountdownSeconds(
+  raw: unknown,
+): 30 | 60 | 90 | 120 | undefined {
+  if (typeof raw !== "number" || Number.isNaN(raw)) return undefined;
+  return (PRE_JAMAAT_SECONDS as readonly number[]).includes(raw)
+    ? (raw as 30 | 60 | 90 | 120)
+    : undefined;
+}
+
 /** Trim and keep a library content id; empty/invalid → null (screen fallback). */
 function normaliseJamaatInProgressContentId(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -457,6 +469,13 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
           : "screen",
     jamaatInProgressContentId: normaliseJamaatInProgressContentId(
       raw.jamaatInProgressContentId,
+    ),
+    preJamaatCountdownEnabled:
+      typeof raw.preJamaatCountdownEnabled === "boolean"
+        ? raw.preJamaatCountdownEnabled
+        : undefined,
+    preJamaatCountdownSeconds: normalisePreJamaatCountdownSeconds(
+      raw.preJamaatCountdownSeconds,
     ),
     terminology: normaliseTerminology(
       (raw as unknown as { terminology?: unknown; terminologyPreferences?: unknown }).terminology,

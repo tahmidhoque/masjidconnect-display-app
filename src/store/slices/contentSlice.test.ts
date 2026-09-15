@@ -405,6 +405,45 @@ describe('contentSlice', () => {
       });
     });
 
+    it('preserves Portal pre-jamaat countdown flag and allowed seconds', () => {
+      const content = {
+        displaySettings: {
+          preJamaatCountdownEnabled: true,
+          preJamaatCountdownSeconds: 90,
+        },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.preJamaatCountdownEnabled).toBe(true);
+      expect(result.preJamaatCountdownSeconds).toBe(90);
+    });
+
+    it('omits pre-jamaat fields when the API does not send them', () => {
+      const content = {
+        displaySettings: { timeFormat: '12h' },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.preJamaatCountdownEnabled).toBeUndefined();
+      expect(result.preJamaatCountdownSeconds).toBeUndefined();
+    });
+
+    it('drops disallowed pre-jamaat second values', () => {
+      const content = {
+        displaySettings: {
+          preJamaatCountdownEnabled: true,
+          preJamaatCountdownSeconds: 45,
+        },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.preJamaatCountdownEnabled).toBe(true);
+      expect(result.preJamaatCountdownSeconds).toBeUndefined();
+    });
+
     it('clamps out-of-range supplication durations and defaults missing blocks to disabled', () => {
       const content = {
         displaySettings: {

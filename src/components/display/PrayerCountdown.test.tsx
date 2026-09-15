@@ -12,6 +12,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import PrayerCountdown from './PrayerCountdown';
 import { createTestStore, AllTheProviders } from '@/test-utils';
+import { DEFAULT_DISPLAY_SETTINGS } from '@/store/slices/contentSlice';
+import type { DisplaySettings } from '@/api/models';
 
 vi.mock('@/utils/logger', () => ({
   default: { info: vi.fn(), debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
@@ -47,11 +49,17 @@ vi.mock('../../contexts/PrayerTimesContext', () => ({
 
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 
-function makeWrapper() {
+function makeWrapper(settings?: Partial<DisplaySettings>) {
   const store = createTestStore();
   const contentState = store.getState().content;
   const preloaded = {
-    content: { ...contentState, masjidTimezone: 'Europe/London' },
+    content: {
+      ...contentState,
+      masjidTimezone: 'Europe/London',
+      displaySettings: settings
+        ? { ...DEFAULT_DISPLAY_SETTINGS, ...contentState.displaySettings, ...settings }
+        : { ...contentState.displaySettings, ...DEFAULT_DISPLAY_SETTINGS },
+    },
   };
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
@@ -268,6 +276,53 @@ describe('PrayerCountdown — post-Salah countdown to next prayer', () => {
     expect(screen.getByText(/Fajr prayer in/i)).toBeInTheDocument();
     expect(screen.queryByText(/^0s$/)).not.toBeInTheDocument();
     expect(screen.getByText('h')).toBeInTheDocument();
+  });
+});
+
+describe('PrayerCountdown — Portal pre-jamaat lead', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  const zuhrTight = {
+    name: 'Zuhr',
+    time: '12:58',
+    jamaat: '13:00',
+    displayTime: '12:58 PM',
+    displayJamaat: '1:00 PM',
+    isNext: true,
+    isCurrent: false,
+    timeUntil: '',
+    jamaatTime: '13:00',
+  };
+
+  it('stays on the adhan label 4 min before jamaat when Portal lead is 60s', () => {
+    // 12:56 BST — inside the legacy 5-min window but outside a 60s Portal lead.
+    vi.setSystemTime(new Date('2026-06-15T11:56:00.000Z'));
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: zuhrTight,
+      currentPrayer: null,
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="countdown-adhan" />,
+      {
+        wrapper: makeWrapper({
+          preJamaatCountdownEnabled: true,
+          preJamaatCountdownSeconds: 60,
+        }),
+      },
+    );
+
+    expect(screen.getByText(/Zuhr prayer in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Jamaat in/i)).not.toBeInTheDocument();
   });
 });
 

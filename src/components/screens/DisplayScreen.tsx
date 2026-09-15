@@ -44,6 +44,7 @@ import {
   prayerStripHeightClassName,
   prayerStripHeightStyle,
   resolveEffectiveZoneSize,
+  resolvePrayerSidebarTileColumns,
 } from '../../types/displayLayout';
 import {
   Header,
@@ -928,6 +929,12 @@ const DisplayScreenInner: React.FC = () => {
     const region = inferZoneRegion(layoutStructure, 'prayer-times', zone.region);
     const variant = inferPrayerTimesLayout(region);
     const showEmbeddedCountdown = zone.options?.showCountdown !== false;
+    const tileColumns = resolvePrayerSidebarTileColumns({
+      variant,
+      structure: layoutStructure,
+      sidebarWidth: layoutStructureOptions?.sidebarWidth,
+      tileColumns: zone.options?.tileColumns,
+    });
     return (
       <PrayerTimesBar
         variant={variant}
@@ -946,6 +953,7 @@ const DisplayScreenInner: React.FC = () => {
         showTomorrowJamaat={displaySettings?.showTomorrowJamaat ?? false}
         tomorrowsJamaats={tomorrowsJamaats}
         clockPosition={layoutStructureOptions?.stripClockPosition ?? 'left'}
+        tileColumns={tileColumns}
         countdownSlot={
           showEmbeddedCountdown ? (
             <PrayerCountdown
