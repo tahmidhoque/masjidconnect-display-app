@@ -85,8 +85,10 @@ interface FormattedPrayerTime {
  * JamaatSoonSlot diff that may need the original Zuhr time.
  */
 export interface TomorrowsJamaatEntry {
-  /** Primary jamaat time in HH:mm. Friday Zuhr → `jummahJamaat`. */
+  /** Primary jamaat time in HH:mm. Friday Zuhr → `jummahJamaat`. Empty for Sunrise. */
   jamaat: string;
+  /** Adhan / start / sunrise time in HH:mm. Used when roll-forward swaps the start column. */
+  start?: string;
   /** True when the entry represents Jumuah replacing Zuhr (Friday only). */
   isJumuah?: boolean;
   /** When `isJumuah`, the regular `zuhrJamaat` for the same day (HH:mm). */
@@ -116,14 +118,12 @@ interface PrayerTimesHook {
   upcomingJumuahSessions: JumuahSession[];
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
-  /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
+  /** Tomorrow's start + jamaat times by prayer name (Fajr, Sunrise, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
   tomorrowsJamaats: TomorrowsJamaatsMap;
 }
 
 const PRAYER_NAMES = ["Fajr", "Sunrise", "Zuhr", "Asr", "Maghrib", "Isha"];
 const SKIP_PRAYERS = ["Sunrise"]; // Prayers to skip in countdown
-/** Prayers that have jamaat times (excludes Sunrise). */
-const PRAYERS_WITH_JAMAAT = ["Fajr", "Zuhr", "Asr", "Maghrib", "Isha"];
 
 /**
  * Resolve jamaat time from data object with case-insensitive key lookup.
@@ -143,14 +143,33 @@ function getJamaatTime(data: Record<string, unknown>, lowerName: string): string
 }
 
 /**
- * Build tomorrow's jamaats map from a day's prayer data.
+ * Resolve the Adhan / start time from a day's payload (case-insensitive).
+ * Sunrise uses the same lookup (`sunrise`).
+ */
+function getStartTime(data: Record<string, unknown>, lowerName: string): string | undefined {
+  const exact = data[lowerName];
+  if (typeof exact === "string" && exact.trim()) return exact;
+  const found = Object.keys(data).find((k) => k.toLowerCase() === lowerName);
+  if (found) {
+    const val = data[found];
+    return typeof val === "string" && val.trim() ? val : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Build tomorrow's start + jamaat map from a day's prayer data.
  *
  * When `isFridayDay` is true and the day has `jummahJamaat`, the Zuhr entry
  * reports the Jumuah congregational time as primary and sets `isJumuah` so
- * the panel/strip render a small "Jumuah" label under the time. The regular
- * `zuhrJamaat` is preserved on `alternateJamaat` for downstream consumers.
+ * the panel/strip render a small "Jumuah" label under the time. Start uses
+ * `jummahKhutbah` when present (same rule as today's Jumuah substitution).
+ * The regular `zuhrJamaat` is preserved on `alternateJamaat`.
  *
- * Returns null if no valid jamaats.
+ * Sunrise is included with a start time and an empty jamaat so roll-forward
+ * can swap tomorrow's sunrise after today's sunrise has passed.
+ *
+ * Returns null if no valid start or jamaat times.
  */
 function buildTomorrowsJamaats(
   dayData: PrayerTimes | null,
@@ -162,21 +181,28 @@ function buildTomorrowsJamaats(
   let hasAny = false;
   const jummahJamaat =
     typeof data.jummahJamaat === "string" ? data.jummahJamaat : undefined;
-  for (const name of PRAYERS_WITH_JAMAAT) {
-    const jamaat = getJamaatTime(data, name.toLowerCase());
+  const jummahKhutbah =
+    typeof data.jummahKhutbah === "string" ? data.jummahKhutbah : undefined;
+  for (const name of PRAYER_NAMES) {
+    const start = getStartTime(data, name.toLowerCase());
+    const jamaat =
+      name === "Sunrise" ? undefined : getJamaatTime(data, name.toLowerCase());
     if (name === "Zuhr" && isFridayDay && jummahJamaat) {
       map[name] = {
         jamaat: jummahJamaat,
+        start: jummahKhutbah || jummahJamaat || start,
         isJumuah: true,
         alternateJamaat: jamaat || undefined,
       };
       hasAny = true;
       continue;
     }
-    if (jamaat) {
-      map[name] = { jamaat };
-      hasAny = true;
-    }
+    if (!start && !jamaat) continue;
+    map[name] = {
+      jamaat: jamaat ?? "",
+      start,
+    };
+    hasAny = true;
   }
   return hasAny ? map : null;
 }

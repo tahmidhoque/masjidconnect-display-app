@@ -5,7 +5,9 @@
  * labels. During the jamaat (congregation) sub-phase, displays a calm
  * "Jamaat in progress" message instead of the countdown digits. Once that
  * window ends (post-supplication / minutesAfterJamaat), counts down to the
- * next salah — not a static "{finished prayer} prayer" label.
+ * next salah — not a static "{finished prayer} prayer" label. Adhan-target
+ * wording is "Fajr Adhan in" / "Fajr starts in" (terminology), never
+ * "Fajr prayer in".
  *
  * Computes the remaining time every second using useCurrentTime,
  * rather than relying on the static timeUntil from usePrayerTimes.
@@ -24,7 +26,7 @@ import type { PrayerPhase } from '../../hooks/usePrayerPhase';
 import CountdownDisplay from './CountdownDisplay';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings, selectMasjidTimezone } from '../../store/slices/contentSlice';
-import { resolvePrayerDisplayName, resolveTerminology } from '../../utils/prayerTerminology';
+import { resolveCountdownStartPhrase, resolvePrayerDisplayName, resolveTerminology } from '../../utils/prayerTerminology';
 import { getEffectiveJamaat } from '../../utils/jumuahJamaat';
 import { defaultMasjidTimezone } from '../../config/environment';
 import { preJamaatLeadMinutes } from '../../utils/displaySettingsJamaat';
@@ -97,6 +99,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   const terminology = displaySettings?.terminology;
   const jamaatLeadMin = preJamaatLeadMinutes(displaySettings);
   const postSalahCountdown = isPostSalahCountdown(phase, inPrayerSubPhase);
+  const adhanLabel = resolveTerminology(terminology, 'adhan', 'Start');
 
   /**
    * After jamaat ends, `nextPrayer` is still the finished salah for the rest
@@ -208,8 +211,8 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     () =>
       countingToJamaat
         ? (displayName ? `${displayName} ${jamaatLabel} in` : `${jamaatLabel} in`)
-        : (displayName ? `${displayName} prayer in` : 'Next prayer in'),
-    [countingToJamaat, displayName, jamaatLabel],
+        : resolveCountdownStartPhrase(displayName, adhanLabel),
+    [countingToJamaat, displayName, jamaatLabel, adhanLabel],
   );
 
   if (!countdownPrayer) {

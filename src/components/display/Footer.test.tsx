@@ -26,5 +26,6 @@ describe('Footer', () => {
       React.createElement(AllTheProviders, null, React.createElement(Footer)),
     );
     expect(screen.getByLabelText('MasjidConnect')).toBeInTheDocument();
+    expect(screen.getByText(/Powered by/i)).toBeInTheDocument();
   });
 });

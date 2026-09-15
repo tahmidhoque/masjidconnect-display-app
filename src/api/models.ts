@@ -333,10 +333,11 @@ export interface DisplaySettings {
   /** Show a column with tomorrow's jamaat times */
   showTomorrowJamaat: boolean;
   /**
-   * How tomorrow's jamaat times appear:
+   * How tomorrow's times appear:
    * - `off` — today's times only
    * - `column` — extra "Tomorrow's jamaat" column (legacy boolean maps here)
-   * - `roll-forward` — after jamaat finishes, swap row to tomorrow's time with colour cue
+   * - `roll-forward` — after the slot finishes (jamaat window, or sunrise time),
+   *   swap start/Adhan + jamaat to tomorrow with a colour cue
    */
   tomorrowJamaatMode?: 'off' | 'column' | 'roll-forward';
   /** Show Gregorian date in the clock / header area */
