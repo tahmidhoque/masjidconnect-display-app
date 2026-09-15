@@ -50,6 +50,7 @@ describe('ConnectionBanner', () => {
   });
 
   afterEach(() => {
+    window.history.pushState({}, '', '/');
     vi.useRealTimers();
   });
 
@@ -64,6 +65,14 @@ describe('ConnectionBanner', () => {
     expect(screen.getByLabelText('Connected')).toBeInTheDocument();
     expect(screen.queryByText('Reconnecting…')).not.toBeInTheDocument();
     expect(screen.queryByText('Server Unreachable')).not.toBeInTheDocument();
+  });
+
+  it('honours the dev ?banner=reconnecting preview immediately', () => {
+    window.history.pushState({}, '', '/?banner=reconnecting');
+    renderBanner();
+    expect(screen.getByText(LIVE_UPDATES_PAUSED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText('Reconnecting…')).not.toBeInTheDocument();
+    window.history.pushState({}, '', '/');
   });
 
   it('shows calm Live updates paused copy when reconnecting, not Reconnecting…', async () => {

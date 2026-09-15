@@ -35,9 +35,30 @@ import {
   resolveConnectivityBanner,
   shouldSuppressWifiWarning,
 } from '../../utils/connectionBannerLogic';
+import type { ConnectionStatusType } from '@/hooks/useConnectionStatus';
 
 /** Delay before showing the banner to prevent startup flash */
 export const DISPLAY_DELAY_MS = 5_000;
+
+const DEV_BANNER_STATUSES: readonly ConnectionStatusType[] = [
+  'connected',
+  'reconnecting',
+  'server-unreachable',
+  'no-internet',
+  'no-connection',
+];
+
+/**
+ * Dev-only `?banner=` override so footer states can be previewed without a live
+ * WebSocket. Stripped from production builds.
+ */
+function readDevBannerOverride(): ConnectionStatusType | null {
+  if (!import.meta.env.DEV) return null;
+  const value = new URLSearchParams(window.location.search).get('banner');
+  return DEV_BANNER_STATUSES.includes(value as ConnectionStatusType)
+    ? (value as ConnectionStatusType)
+    : null;
+}
 
 type BannerVariant = 'green' | 'orange' | 'red' | 'blue' | 'muted';
 
@@ -48,13 +69,14 @@ interface BannerState {
 }
 
 const ConnectionBanner: React.FC = () => {
-  const { status } = useConnectionStatus();
+  const { status: liveStatus } = useConnectionStatus();
+  const status = readDevBannerOverride() ?? liveStatus;
   const wifiStatus = useAppSelector(selectWifiStatus);
   const pendingRestart = useAppSelector(selectPendingRestart);
   const updatePhase = useAppSelector(selectUpdatePhase);
   const updateMessage = useAppSelector(selectUpdateMessage);
   const updateRestartAt = useAppSelector(selectUpdateRestartAt);
-  const [canShow, setCanShow] = useState(false);
+  const [canShow, setCanShow] = useState(() => readDevBannerOverride() !== null);
   const [updateSecondsLeft, setUpdateSecondsLeft] = useState<number | null>(null);
   const [restartSecondsLeft, setRestartSecondsLeft] = useState<number | null>(null);
 
