@@ -58,6 +58,10 @@ export const PRAYER_TIMES: PrayerTimes = {
   ishaJamaat: '23:00',
   jummahKhutbah: '13:15',
   jummahJamaat: '13:30',
+  jumuahSessions: [
+    { label: "1st Jumu'ah", khutbah: '13:15', jamaat: '13:30' },
+    { label: "2nd Jumu'ah", khutbah: '14:15', jamaat: '14:45' },
+  ],
 };
 
 export const BASE_SETTINGS: DisplaySettings = {

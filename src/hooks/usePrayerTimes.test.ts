@@ -62,6 +62,7 @@ describe('usePrayerTimes', () => {
       expect(result.current).toHaveProperty('jumuahTime');
       expect(result.current).toHaveProperty('upcomingJumuahJamaatRaw');
       expect(result.current).toHaveProperty('upcomingJumuahKhutbahRaw');
+      expect(result.current).toHaveProperty('upcomingJumuahSessions');
       expect(result.current).toHaveProperty('forbiddenPrayer');
       expect(Array.isArray(result.current.todaysPrayerTimes)).toBe(true);
     });
@@ -643,8 +644,76 @@ describe('usePrayerTimes', () => {
       await waitFor(() => {
         expect(result.current.upcomingJumuahJamaatRaw).toBe('13:30');
         expect(result.current.upcomingJumuahKhutbahRaw).toBe('13:00');
+        expect(result.current.upcomingJumuahSessions).toEqual([
+          { label: "Jumu'ah", khutbah: '13:00', jamaat: '13:30' },
+        ]);
       });
       expect(result.current.isJumuahToday).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('exposes every jumuahSessions[] congregation for the upcoming Friday', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const friday = dayjs.tz('2026-06-19', TEST_TZ).hour(11).minute(0).second(0).millisecond(0);
+    vi.setSystemTime(friday.toDate());
+
+    const weekPrayerTimes = {
+      data: [
+        {
+          date: '2026-06-19',
+          fajr: '05:30',
+          sunrise: '06:45',
+          zuhr: '12:15',
+          asr: '15:30',
+          maghrib: '18:20',
+          isha: '19:45',
+          fajrJamaat: '05:45',
+          zuhrJamaat: '12:30',
+          asrJamaat: '16:00',
+          maghribJamaat: '18:25',
+          ishaJamaat: '20:00',
+          jummahKhutbah: '13:00',
+          jummahJamaat: '13:30',
+          jumuahSessions: [
+            { label: "1st Jumu'ah", khutbah: '13:00', jamaat: '13:30' },
+            { label: "2nd Jumu'ah", khutbah: '14:15', jamaat: '14:45' },
+          ],
+        },
+      ],
+    } as PrayerTimes;
+
+    const store = createTestStore();
+    const contentState = store.getState().content;
+    const storeWithWeek = createTestStore({
+      content: {
+        ...contentState,
+        prayerTimes: weekPrayerTimes,
+        masjidTimezone: TEST_TZ,
+        timeFormat: '12h',
+      },
+    });
+    const preloaded = storeWithWeek.getState();
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        AllTheProviders,
+        { preloadedState: preloaded } as React.ComponentProps<typeof AllTheProviders>,
+        children,
+      );
+    const { result } = renderHook(() => usePrayerTimes(), { wrapper });
+    try {
+      await waitFor(() => {
+        expect(result.current.upcomingJumuahSessions).toHaveLength(2);
+      });
+      expect(result.current.upcomingJumuahSessions[0].label).toBe("1st Jumu'ah");
+      expect(result.current.upcomingJumuahSessions[1]).toEqual({
+        label: "2nd Jumu'ah",
+        khutbah: '14:15',
+        jamaat: '14:45',
+      });
+      expect(result.current.upcomingJumuahJamaatRaw).toBe('13:30');
+      expect(result.current.upcomingJumuahKhutbahRaw).toBe('13:00');
     } finally {
       vi.useRealTimers();
     }

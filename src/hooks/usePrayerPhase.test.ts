@@ -52,6 +52,7 @@ vi.mock('../contexts/PrayerTimesContext', () => ({
     jumuahKhutbahRaw: null,
     upcomingJumuahJamaatRaw: null,
     upcomingJumuahKhutbahRaw: null,
+    upcomingJumuahSessions: [],
     forbiddenPrayer: null,
     tomorrowsJamaats: null,
     currentDate: '',

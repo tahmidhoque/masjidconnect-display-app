@@ -64,6 +64,7 @@ function ZoneCell({ zone }: { zone: RenderedZone }) {
   const zoneStyle: React.CSSProperties = {
     ...(flexible ? { flex: `${zone.size} 1 0%` } : {}),
     ...(zone.fontScale !== 1 ? { zoom: zone.fontScale } : {}),
+    ...zone.style,
   };
 
   return (

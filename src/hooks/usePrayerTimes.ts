@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PrayerTimes, type DisplaySettings, type TimeFormat } from "../api/models";
+import { PrayerTimes, type DisplaySettings, type JumuahSession, type TimeFormat } from "../api/models";
 import apiClient from "../api/apiClient";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../store";
@@ -19,6 +19,7 @@ import { getCurrentForbiddenWindow } from "../utils/forbiddenPrayerTimes";
 import type { CurrentForbiddenState } from "../utils/forbiddenPrayerTimes";
 import logger from "../utils/logger";
 import { totalJamaatPhaseWindowForDisplayPrayer } from "../utils/displaySettingsJamaat";
+import { normaliseJumuahSessions } from "../utils/jumuahSessions";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -111,6 +112,8 @@ interface PrayerTimesHook {
   upcomingJumuahJamaatRaw: string | null;
   /** Next Friday khutbah (HH:mm) for landscape prayer strip. */
   upcomingJumuahKhutbahRaw: string | null;
+  /** Upcoming Friday congregations (`jumuahSessions[]`, with legacy fallback). */
+  upcomingJumuahSessions: JumuahSession[];
   /** When voluntary (nafl) prayer is discouraged (makruh times). */
   forbiddenPrayer: CurrentForbiddenState | null;
   /** Tomorrow's jamaat times by prayer name (Fajr, Zuhr, Asr, Maghrib, Isha). Null when no tomorrow data. */
@@ -240,6 +243,22 @@ function parseYmdInTz(dateStr: string, tz: string): dayjs.Dayjs | null {
   return parsed.isValid() ? parsed : null;
 }
 
+type UpcomingJummah = {
+  jamaat: string | null;
+  khutbah: string | null;
+  sessions: JumuahSession[];
+};
+
+function jummahFromDay(day: unknown): UpcomingJummah | null {
+  const sessions = normaliseJumuahSessions(day);
+  if (sessions.length === 0) return null;
+  return {
+    sessions,
+    jamaat: sessions[0].jamaat,
+    khutbah: sessions[0].khutbah,
+  };
+}
+
 /**
  * First row in the API week array on or after today whose date is Friday and has jummah fields.
  */
@@ -247,20 +266,15 @@ function findUpcomingFridayJummahInWeek(
   dataArr: (PrayerTimes & { date?: string })[],
   todayYmd: string,
   tz: string,
-): { jamaat: string | null; khutbah: string | null } | null {
+): UpcomingJummah | null {
   for (const row of dataArr) {
     const dateStr = row.date;
     if (!dateStr || typeof dateStr !== "string") continue;
     if (dateStr < todayYmd) continue;
     const local = parseYmdInTz(dateStr, tz);
     if (!local || local.day() !== 5) continue;
-    const rec = row as unknown as Record<string, unknown>;
-    const jamaat =
-      typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
-    const khutbah =
-      typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null;
-    if (!jamaat && !khutbah) continue;
-    return { jamaat, khutbah };
+    const fromRow = jummahFromDay(row);
+    if (fromRow) return fromRow;
   }
   return null;
 }
@@ -273,21 +287,14 @@ function resolveUpcomingFridayJummahRaw(
   todayYmd: string,
   tz: string,
   todayData: unknown,
-): { jamaat: string | null; khutbah: string | null } | null {
+): UpcomingJummah | null {
   if (dataArr?.length) {
     const fromWeek = findUpcomingFridayJummahInWeek(dataArr, todayYmd, tz);
     if (fromWeek) return fromWeek;
   }
   const todayLocal = parseYmdInTz(todayYmd, tz);
   if (!todayLocal || todayLocal.day() !== 5) return null;
-  if (!todayData || typeof todayData !== "object") return null;
-  const rec = todayData as Record<string, unknown>;
-  const jamaat =
-    typeof rec.jummahJamaat === "string" ? rec.jummahJamaat : null;
-  const khutbah =
-    typeof rec.jummahKhutbah === "string" ? rec.jummahKhutbah : null;
-  if (!jamaat && !khutbah) return null;
-  return { jamaat, khutbah };
+  return jummahFromDay(todayData);
 }
 
 export const usePrayerTimes = (): PrayerTimesHook => {
@@ -345,6 +352,9 @@ export const usePrayerTimes = (): PrayerTimesHook => {
   const [upcomingJumuahKhutbahRaw, setUpcomingJumuahKhutbahRaw] = useState<
     string | null
   >(null);
+  const [upcomingJumuahSessions, setUpcomingJumuahSessions] = useState<
+    JumuahSession[]
+  >([]);
   const [forbiddenPrayer, setForbiddenPrayer] =
     useState<CurrentForbiddenState | null>(null);
   const [tomorrowsJamaats, setTomorrowsJamaats] =
@@ -980,6 +990,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     const applyStripJummahState = () => {
       setUpcomingJumuahJamaatRaw(stripJummah?.jamaat ?? null);
       setUpcomingJumuahKhutbahRaw(stripJummah?.khutbah ?? null);
+      setUpcomingJumuahSessions(stripJummah?.sessions ?? []);
     };
 
     // Helper function to safely extract time
@@ -1624,6 +1635,7 @@ export const usePrayerTimes = (): PrayerTimesHook => {
     jumuahKhutbahRaw,
     upcomingJumuahJamaatRaw,
     upcomingJumuahKhutbahRaw,
+    upcomingJumuahSessions,
     forbiddenPrayer: effectiveForbiddenPrayer,
     tomorrowsJamaats,
   };

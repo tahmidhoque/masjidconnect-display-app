@@ -494,6 +494,20 @@ export interface ScheduledPlaylistAssignment {
   };
 }
 
+/**
+ * One Jumu'ah congregation on a Friday.
+ * Screen content APIs send these as `jumuahSessions[]` when a mosque has
+ * more than one congregation (or a named schedule).
+ */
+export interface JumuahSession {
+  /** Schedule name, e.g. "1st Jumu'ah" / "2nd Jumu'ah". */
+  label: string;
+  /** Khutbah start HH:mm, or null when not set. */
+  khutbah: string | null;
+  /** Jamaat / iqamah HH:mm. */
+  jamaat: string;
+}
+
 export interface PrayerTimes {
   date?: string;
   fajr: string;
@@ -511,6 +525,11 @@ export interface PrayerTimes {
   ishaJamaat: string;
   jummahKhutbah?: string;
   jummahJamaat?: string;
+  /**
+   * All Friday congregations when the portal sends dual (or more) Jumu'ah
+   * schedules. Older payloads omit this; fall back to jummahKhutbah/jummahJamaat.
+   */
+  jumuahSessions?: JumuahSession[];
   data?: PrayerTimes[]; // For new API format that returns an array of days
   success?: boolean;
   error?: null | string;
