@@ -526,8 +526,11 @@ export interface JumuahSession {
   label: string;
   /** Khutbah start HH:mm, or null when not set. */
   khutbah: string | null;
-  /** Jamaat / iqamah HH:mm. */
-  jamaat: string;
+  /**
+   * Jamaat / iqamah HH:mm, or null when the session is khutbah-only
+   * (portal optional jamaatTime — empty maps to null).
+   */
+  jamaat: string | null;
 }
 
 export interface PrayerTimes {

@@ -16,6 +16,7 @@ import { formatTimeToDisplay } from '../../utils/dateUtils';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings } from '../../store/slices/contentSlice';
 import { resolveTerminology } from '../../utils/prayerTerminology';
+import { hasJumuahClockTime } from '../../utils/jumuahSessions';
 
 interface JumuahBarProps {
   /** When true (landscape), use tighter spacing */
@@ -31,10 +32,11 @@ function sessionTimeLine(
   jamaatLabel: string,
 ): string {
   const parts: string[] = [];
-  if (session.khutbah) {
+  if (hasJumuahClockTime(session.khutbah)) {
     parts.push(`${khutbahLabel} ${formatTimeToDisplay(session.khutbah, timeFormat)}`);
   }
-  if (session.jamaat) {
+  // Omit Jamaat when null/blank — do not concatenate "Khutbah · —" or print "null".
+  if (hasJumuahClockTime(session.jamaat)) {
     parts.push(`${jamaatLabel} ${formatTimeToDisplay(session.jamaat, timeFormat)}`);
   }
   return parts.join(' · ');
@@ -55,14 +57,23 @@ const JumuahBar: React.FC<JumuahBarProps> = ({
     if (upcomingJumuahSessions && upcomingJumuahSessions.length > 0) {
       return upcomingJumuahSessions;
     }
-    if (!upcomingJumuahJamaatRaw && !upcomingJumuahKhutbahRaw) return [];
+    if (
+      !hasJumuahClockTime(upcomingJumuahJamaatRaw) &&
+      !hasJumuahClockTime(upcomingJumuahKhutbahRaw)
+    ) {
+      return [];
+    }
     return [
       {
         label: "Jumu'ah",
-        khutbah: upcomingJumuahKhutbahRaw,
-        jamaat: upcomingJumuahJamaatRaw ?? '',
+        khutbah: hasJumuahClockTime(upcomingJumuahKhutbahRaw)
+          ? upcomingJumuahKhutbahRaw
+          : null,
+        jamaat: hasJumuahClockTime(upcomingJumuahJamaatRaw)
+          ? upcomingJumuahJamaatRaw
+          : null,
       },
-    ].filter((session) => session.jamaat || session.khutbah);
+    ];
   }, [upcomingJumuahSessions, upcomingJumuahJamaatRaw, upcomingJumuahKhutbahRaw]);
 
   if (sessions.length === 0) return null;
