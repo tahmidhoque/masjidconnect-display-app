@@ -16,6 +16,7 @@ import {
   resolveTomorrowJamaatMode,
   tomorrowJamaatModeUsesColumn,
 } from "../../utils/tomorrowJamaatDisplay";
+import { resolveTimeFormat } from "../../utils/dateUtils";
 
 // Constants
 const MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — forceRefresh bypasses this
@@ -412,11 +413,10 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
     content?.displaySettings ??
     (content as { data?: { displaySettings?: DisplaySettings } })?.data?.displaySettings;
   const contentConfig = content?.screen?.contentConfig ?? content?.data?.screen?.contentConfig;
-  const timeFormatFromConfig = contentConfig?.timeFormat === "24h" ? "24h" : undefined;
   if (!raw || typeof raw !== "object") {
     return {
       ...DEFAULT_DISPLAY_SETTINGS,
-      timeFormat: timeFormatFromConfig ?? "12h",
+      timeFormat: resolveTimeFormat(contentConfig?.timeFormat),
     };
   }
   const minutesAfterJamaat = clampJamaatSettingMinutes(
@@ -435,7 +435,7 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
   return {
     ramadanMode: raw.ramadanMode ?? "auto",
     isRamadanActive: raw.isRamadanActive ?? false,
-    timeFormat: (raw.timeFormat === "24h" ? "24h" : raw.timeFormat === "12h" ? "12h" : undefined) ?? timeFormatFromConfig ?? "12h",
+    timeFormat: resolveTimeFormat(raw.timeFormat, contentConfig?.timeFormat),
     showImsak: raw.showImsak ?? false,
     tomorrowJamaatMode,
     showTomorrowJamaat: tomorrowJamaatModeUsesColumn(tomorrowJamaatMode),
@@ -645,11 +645,11 @@ export const refreshContent = createAsyncThunk(
       const fromContent = extractDisplaySettings(content);
       const fromStorage = await storageService.get<DisplaySettings>('displaySettings');
       const displaySettings = fromContent ?? fromStorage;
-      const timeFormat: TimeFormat =
-        displaySettings.timeFormat ||
-        content.screen?.contentConfig?.timeFormat ||
-        content.data?.screen?.contentConfig?.timeFormat ||
-        "12h";
+      const timeFormat = resolveTimeFormat(
+        displaySettings?.timeFormat,
+        content.screen?.contentConfig?.timeFormat,
+        content.data?.screen?.contentConfig?.timeFormat,
+      );
       // Apply orientation from screen content ONLY if no explicit orientation has been set.
       // If localStorage has `screen_orientation`, the user/admin has configured it via WebSocket
       // or command, so we should not overwrite it with possibly-stale API data.

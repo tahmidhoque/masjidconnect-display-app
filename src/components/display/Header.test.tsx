@@ -131,6 +131,20 @@ describe('Header — DST timezone clock display', () => {
 
     // 12h format: 11:00 AM → main part "11:00" with period "am"
     expect(screen.getByText(/11:00/)).toBeInTheDocument();
+    expect(screen.getByText(/^am$/i)).toBeInTheDocument();
+  });
+
+  it('shows 12-hour clock without AM/PM when timeFormat is 12h-nop', () => {
+    vi.setSystemTime(new Date('2026-03-29T10:00:00.000Z'));
+
+    render(
+      React.createElement(Header, { timeFormat: '12h-nop' }),
+      { wrapper: makeWrapper('Europe/London') },
+    );
+
+    expect(screen.getByText(/11:00/)).toBeInTheDocument();
+    expect(screen.queryByText(/^am$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^pm$/i)).not.toBeInTheDocument();
   });
 
   it('shows 10:00 UTC when masjidTimezone is UTC', () => {

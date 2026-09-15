@@ -20,6 +20,8 @@ import {
   formatTimeTo12Hour,
   getTimeDisplayParts,
   formatTimeToDisplay,
+  parseTimeFormat,
+  resolveTimeFormat,
   parseTimeString,
   getTimeDifferenceInMinutes,
   formatMinutesToDisplay,
@@ -108,6 +110,13 @@ describe('getTimeDisplayParts', () => {
   it('handles noon (12:00) in 12h format', () => {
     expect(getTimeDisplayParts('12:00', '12h')).toEqual({ main: '12:00', period: 'pm' });
   });
+
+  it('returns 12h main and null period when format is 12h-nop', () => {
+    expect(getTimeDisplayParts('16:30', '12h-nop')).toEqual({ main: '4:30', period: null });
+    expect(getTimeDisplayParts('09:00', '12h-nop')).toEqual({ main: '9:00', period: null });
+    expect(getTimeDisplayParts('00:00', '12h-nop')).toEqual({ main: '12:00', period: null });
+    expect(getTimeDisplayParts('12:00', '12h-nop')).toEqual({ main: '12:00', period: null });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -123,12 +132,51 @@ describe('formatTimeToDisplay', () => {
     expect(formatTimeToDisplay('16:30', '24h')).toBe('16:30');
   });
 
+  it('formats 12h-nop without AM/PM', () => {
+    expect(formatTimeToDisplay('16:30', '12h-nop')).toBe('4:30');
+    expect(formatTimeToDisplay('09:15', '12h-nop')).toBe('9:15');
+    expect(formatTimeToDisplay('00:00', '12h-nop')).toBe('12:00');
+    expect(formatTimeToDisplay('12:00', '12h-nop')).toBe('12:00');
+  });
+
   it('returns empty for empty input', () => {
     expect(formatTimeToDisplay('')).toBe('');
   });
 
   it('returns original for invalid input', () => {
     expect(formatTimeToDisplay('xx:yy', '24h')).toBe('xx:yy');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseTimeFormat / resolveTimeFormat
+// ---------------------------------------------------------------------------
+
+describe('parseTimeFormat', () => {
+  it('accepts known portal values', () => {
+    expect(parseTimeFormat('12h')).toBe('12h');
+    expect(parseTimeFormat('12h-nop')).toBe('12h-nop');
+    expect(parseTimeFormat('24h')).toBe('24h');
+  });
+
+  it('returns undefined for unknown or non-string values', () => {
+    expect(parseTimeFormat('12')).toBeUndefined();
+    expect(parseTimeFormat('banana')).toBeUndefined();
+    expect(parseTimeFormat(24)).toBeUndefined();
+    expect(parseTimeFormat(null)).toBeUndefined();
+    expect(parseTimeFormat(undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveTimeFormat', () => {
+  it('picks the first recognised candidate', () => {
+    expect(resolveTimeFormat('12h-nop', '24h')).toBe('12h-nop');
+    expect(resolveTimeFormat('nope', '24h')).toBe('24h');
+  });
+
+  it('falls back to 12h when nothing is recognised', () => {
+    expect(resolveTimeFormat()).toBe('12h');
+    expect(resolveTimeFormat('unknown', null, undefined)).toBe('12h');
   });
 });
 

@@ -40,7 +40,7 @@ interface HeaderProps {
   ramadanDay?: number | null;
   /** When true (e.g. portrait), show Ramadan as two lines: "Day X" then "Ramadan Mubarak" */
   ramadanTwoLines?: boolean;
-  /** Time display format (12h or 24h); defaults to 12h */
+  /** Time display format (12h, 12h-nop, or 24h); defaults to 12h */
   timeFormat?: TimeFormat;
   /** Days to add to the calculated Hijri date (from displaySettings.hijriDateAdjustment) */
   hijriDateAdjustment?: number;

@@ -218,14 +218,22 @@ const JamaatSoonSlot: React.FC<JamaatSoonSlotProps> = ({
     };
   }, [tomorrowChange]);
 
+  const silentPhones = (
+    <SilentPhonesGraphic
+      landscapeSplit={landscapeSplit}
+      prayerName={nextPrayer?.name}
+      isJumuah={nextPrayer?.isJumuah === true}
+    />
+  );
+
   /* No tomorrow change → preserve current behaviour exactly. */
   if (!tomorrowChange) {
-    return <SilentPhonesGraphic landscapeSplit={landscapeSplit} />;
+    return silentPhones;
   }
 
   const slide =
     activeIdx === 0 ? (
-      <SilentPhonesGraphic landscapeSplit={landscapeSplit} />
+      silentPhones
     ) : (
       <TomorrowsJamaatChangeSlide
         prayerName={tomorrowChange.prayerName}

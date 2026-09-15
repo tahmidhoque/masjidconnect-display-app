@@ -89,7 +89,7 @@ export interface LayoutBehaviourOverrides {
   >;
   jamaatInProgressMode?: 'screen' | 'dark' | 'content';
   jamaatInProgressContentId?: string | null;
-  timeFormat?: '12h' | '24h';
+  timeFormat?: '12h' | '12h-nop' | '24h';
   postAdhanSupplication?: {
     enabled?: boolean;
     delayMinutes?: number;
