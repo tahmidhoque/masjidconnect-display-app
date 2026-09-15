@@ -261,8 +261,8 @@ const Header: React.FC<HeaderProps> = ({
         }`}
         style={{
           background:
-            'linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)',
-          border: '1px solid rgba(255,255,255,0.08)',
+            'linear-gradient(180deg, var(--color-surface-hover) 0%, var(--color-surface) 100%)',
+          border: '1px solid var(--color-border)',
         }}
       >
         {showName && (
@@ -313,8 +313,8 @@ const Header: React.FC<HeaderProps> = ({
       }`}
       style={{
         background:
-          'linear-gradient(90deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.08) 100%)',
-        border: '1px solid rgba(255,255,255,0.08)',
+          'linear-gradient(90deg, var(--color-surface-hover) 0%, var(--color-surface) 50%, var(--color-surface-hover) 100%)',
+        border: '1px solid var(--color-border)',
       }}
     >
       {showName && (

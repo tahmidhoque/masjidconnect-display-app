@@ -106,6 +106,16 @@ const BURGUNDY_THEME: DisplayThemeOverrides = {
   tomorrowRoll: '#C9A0AE',
 };
 
+/* Soft cream light theme — validates panel/surface contrast on light backgrounds. */
+const LIGHT_CREAM_THEME: DisplayThemeOverrides = {
+  background: '#F5F1E8',
+  accent: '#2A7C6F',
+  highlight: '#D4A84A',
+  textPrimary: '#1A1A1A',
+  textSecondary: '#1A1A1AB3',
+  tomorrowRoll: '#6B8CAE',
+};
+
 /* ------------------------------------------------------------------ */
 /*  Layout builders                                                    */
 /* ------------------------------------------------------------------ */
@@ -538,6 +548,13 @@ export const SCENARIOS: Record<string, Scenario> = {
     id: 'ls-theme-burgundy',
     orientation: 'LANDSCAPE',
     layout: config('landscape', LS_STACK, BURGUNDY_THEME),
+    scheduleItems: [verse()],
+  },
+  /** Light cream theme — validates surface contrast on light backgrounds. */
+  'ls-theme-light-cream': {
+    id: 'ls-theme-light-cream',
+    orientation: 'LANDSCAPE',
+    layout: config('landscape', LS_STACK, LIGHT_CREAM_THEME),
     scheduleItems: [verse()],
   },
   /** Fullscreen dua under a custom theme — portal must inherit mosque colours. */
