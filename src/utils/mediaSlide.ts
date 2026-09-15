@@ -14,14 +14,22 @@ export function parseMediaFullscreenFlag(raw: unknown): boolean {
 
 /**
  * How a MEDIA_SLIDE asset is fitted to the display area:
- * - `smart`   — edge-to-edge; whole image shown over a blurred zoomed copy of itself
- *               (best for posters whose aspect ratio differs from the screen)
- * - `cover`   — edge-to-edge; fills the screen, edges may be cropped
+ * - `smart`   — whole image shown over a blurred zoomed copy of itself,
+ *               confined to the content carousel zone (not fullscreen)
+ * - `cover`   — edge-to-edge fullscreen; fills the viewport, edges may be cropped
  * - `contain` — inline within the carousel content box; whole image, plain letterbox
  */
 export type MediaFit = 'smart' | 'contain' | 'cover';
 
 const MEDIA_FIT_VALUES: readonly MediaFit[] = ['smart', 'contain', 'cover'];
+
+/**
+ * Cover (and only Cover) takes over the full viewport via `#orientation-portal-root`.
+ * Smart Size stays inside the content carousel zone, matching portal admin copy.
+ */
+export function isViewportFullscreenFit(fit: MediaFit): boolean {
+  return fit === 'cover';
+}
 
 /**
  * Resolve the effective fit mode for a MEDIA_SLIDE content blob.

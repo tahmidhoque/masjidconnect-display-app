@@ -82,7 +82,7 @@ import {
   selectDisplayLayoutRevision,
 } from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag, resolveMediaFit } from '../../utils/mediaSlide';
-import { resolveTerminology } from '../../utils/prayerTerminology';
+import { resolvePrayerDisplayName } from '../../utils/prayerTerminology';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -639,16 +639,14 @@ const DisplayScreenInner: React.FC = () => {
   const displaySettings = useAppSelector(selectDisplaySettings);
 
   /**
-   * On Fridays the in-prayer screen for the Zuhr slot must read "Jumu'ah" so
-   * the congregation sees "Jumu'ah Jamaat in progress" rather than "Zuhr".
-   * The label string itself is API-driven via `displaySettings.terminology`
-   * (key: `jummah`); we only swap when the phase has resolved to the Zuhr
-   * slot on a Friday so non-Zuhr prayers and non-Friday days are unchanged.
+   * In-prayer overlay label must match the prayer panel: portal
+   * `displaySettings.terminology` (e.g. Zhur/Dhuhr) plus Friday Zuhr → jummah.
    */
-  const inPrayerScreenName =
-    isJumuahToday && phasePrayerName === 'Zuhr'
-      ? resolveTerminology(displaySettings?.terminology, 'jummah', 'Jumuah')
-      : phasePrayerName;
+  const inPrayerScreenName = resolvePrayerDisplayName(
+    phasePrayerName,
+    displaySettings?.terminology,
+    { isJumuahToday },
+  );
 
   /* ---- Layout config (admin layout editor; falls back to built-in default) ---- */
   const layoutConfig = useAppSelector(selectDisplayLayoutConfig);

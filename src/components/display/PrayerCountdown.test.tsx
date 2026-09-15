@@ -150,3 +150,124 @@ describe('PrayerCountdown — after-Isha tomorrow regression', () => {
     expect(screen.getByText('h')).toBeInTheDocument();
   });
 });
+
+describe('PrayerCountdown — post-Salah countdown to next prayer', () => {
+  const zuhr = {
+    name: 'Zuhr',
+    time: '13:00',
+    jamaat: '13:30',
+    displayTime: '1:00 PM',
+    displayJamaat: '1:30 PM',
+    isNext: true,
+    isCurrent: true,
+    timeUntil: '',
+    jamaatTime: '13:30',
+  };
+  const asr = {
+    name: 'Asr',
+    time: '16:45',
+    jamaat: '17:15',
+    displayTime: '4:45 PM',
+    displayJamaat: '5:15 PM',
+    isNext: false,
+    isCurrent: false,
+    timeUntil: '',
+    jamaatTime: '17:15',
+  };
+  const fajr = {
+    name: 'Fajr',
+    time: '05:00',
+    jamaat: '05:30',
+    displayTime: '5:00 AM',
+    displayJamaat: '5:30 AM',
+    isNext: false,
+    isCurrent: false,
+    timeUntil: '',
+    jamaatTime: '05:30',
+  };
+  const isha = {
+    name: 'Isha',
+    time: '20:00',
+    jamaat: '20:15',
+    displayTime: '8:00 PM',
+    displayJamaat: '8:15 PM',
+    isNext: true,
+    isCurrent: true,
+    timeUntil: '',
+    jamaatTime: '20:15',
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('counts down to Asr during post-jamaat instead of a static Zuhr prayer label', () => {
+    // 13:40 BST — Zuhr jamaat (13:30) has ended; still inside minutesAfterJamaat.
+    vi.setSystemTime(new Date('2026-04-19T12:40:00.000Z'));
+
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: zuhr,
+      currentPrayer: zuhr,
+      todaysPrayerTimes: [fajr, zuhr, asr, isha],
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="in-prayer" inPrayerSubPhase="post-jamaat" />,
+      { wrapper: makeWrapper() },
+    );
+
+    expect(screen.queryByText(/^prayer$/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Asr prayer in/i)).toBeInTheDocument();
+    expect(screen.getByText('h')).toBeInTheDocument();
+    expect(screen.getByText('m')).toBeInTheDocument();
+  });
+
+  it('counts down to the next salah during post-jamaat supplication as well', () => {
+    vi.setSystemTime(new Date('2026-04-19T12:40:00.000Z'));
+
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: zuhr,
+      currentPrayer: zuhr,
+      todaysPrayerTimes: [fajr, zuhr, asr, isha],
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="in-prayer" inPrayerSubPhase="post-jamaat-supplication" />,
+      { wrapper: makeWrapper() },
+    );
+
+    expect(screen.getByText(/Asr prayer in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Jamaat in progress/i)).not.toBeInTheDocument();
+  });
+
+  it('counts down to tomorrow\'s Fajr during Isha post-jamaat', () => {
+    vi.setSystemTime(new Date('2026-04-19T19:40:00.000Z')); // 20:40 BST
+
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: isha,
+      currentPrayer: isha,
+      todaysPrayerTimes: [fajr, zuhr, asr, isha],
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="in-prayer" inPrayerSubPhase="post-jamaat" />,
+      { wrapper: makeWrapper() },
+    );
+
+    expect(screen.getByText(/Fajr prayer in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^0s$/)).not.toBeInTheDocument();
+    expect(screen.getByText('h')).toBeInTheDocument();
+  });
+});
+

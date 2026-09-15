@@ -284,6 +284,46 @@ describe('ContentCarousel', () => {
     expect(onFullscreenChange).toHaveBeenCalledWith(false);
   });
 
+  it('keeps Smart Size media inside the carousel zone (no fullscreen portal)', () => {
+    const onFullscreenChange = vi.fn();
+    const items = [
+      {
+        id: 'smart-1',
+        type: 'MEDIA_SLIDE',
+        title: 'Smart poster',
+        mediaUrl: 'https://cdn.example.com/smart.png',
+        mediaKind: 'image' as const,
+        mediaFit: 'smart' as const,
+        duration: 20,
+      },
+    ];
+    render(
+      <ContentCarousel items={items} interval={30} onFullscreenChange={onFullscreenChange} />,
+    );
+    expect(document.querySelector('[data-fullscreen-media-overlay]')).toBeNull();
+    expect(document.querySelector('[data-media-fit="smart"]')).toBeTruthy();
+    expect(document.querySelector('.blur-2xl')).toBeTruthy();
+    const imgs = document.querySelectorAll('img');
+    expect(imgs.length).toBeGreaterThanOrEqual(2);
+    expect(onFullscreenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('still portals Cover media to the viewport overlay', () => {
+    const items = [
+      {
+        id: 'cover-1',
+        type: 'MEDIA_SLIDE',
+        mediaUrl: 'https://cdn.example.com/cover.png',
+        mediaKind: 'image' as const,
+        mediaFit: 'cover' as const,
+        duration: 15,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} compact={false} />);
+    expect(document.querySelector('[data-fullscreen-media-overlay]')).toBeTruthy();
+    expect(document.querySelector('[data-media-fit="smart"]')).toBeNull();
+  });
+
   it('falls back to text layout when MEDIA_SLIDE row lacks mediaKind', () => {
     const items = [
       {

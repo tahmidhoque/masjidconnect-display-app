@@ -2,8 +2,10 @@
  * PrayerCountdown
  *
  * Shows a live countdown to the next prayer or jamaat, with phase-aware
- * labels. During `in-prayer` phase, displays a calm "Jamaat in progress"
- * message instead of the countdown digits.
+ * labels. During the jamaat (congregation) sub-phase, displays a calm
+ * "Jamaat in progress" message instead of the countdown digits. Once that
+ * window ends (post-supplication / minutesAfterJamaat), counts down to the
+ * next salah — not a static "{finished prayer} prayer" label.
  *
  * Computes the remaining time every second using useCurrentTime,
  * rather than relying on the static timeUntil from usePrayerTimes.
@@ -22,7 +24,7 @@ import type { PrayerPhase } from '../../hooks/usePrayerPhase';
 import CountdownDisplay from './CountdownDisplay';
 import { useAppSelector } from '../../store/hooks';
 import { selectDisplaySettings, selectMasjidTimezone } from '../../store/slices/contentSlice';
-import { prayerRowNameToTerminologyKey, resolveTerminology } from '../../utils/prayerTerminology';
+import { resolvePrayerDisplayName, resolveTerminology } from '../../utils/prayerTerminology';
 import { getEffectiveJamaat } from '../../utils/jumuahJamaat';
 import { defaultMasjidTimezone } from '../../config/environment';
 
@@ -43,6 +45,15 @@ interface PrayerCountdownProps {
  */
 const JAMAAT_LEAD_MIN = 5;
 
+/** Sunrise is on the timetable but is never a countdown target. */
+const COUNTDOWN_SKIP_PRAYERS = new Set(['Sunrise', 'Shuruq']);
+
+type SalahRow = {
+  name: string;
+  time: string;
+  jamaat?: string;
+};
+
 type CountdownTarget = {
   time: string;
   forceTomorrow: boolean;
@@ -50,17 +61,56 @@ type CountdownTarget = {
   target: 'jamaat' | 'adhan';
 };
 
+function isPostSalahCountdown(
+  phase?: PrayerPhase,
+  inPrayerSubPhase?: PrayerCountdownProps['inPrayerSubPhase'],
+): boolean {
+  return (
+    phase === 'in-prayer' &&
+    (inPrayerSubPhase === 'post-jamaat' || inPrayerSubPhase === 'post-jamaat-supplication')
+  );
+}
+
+/**
+ * Next salah after the prayer that just finished. Wraps Isha → Fajr.
+ */
+function nextSalahAfter(
+  prayers: SalahRow[] | undefined,
+  finishedName: string | undefined,
+): SalahRow | null {
+  if (!prayers?.length) return null;
+  const sequence = prayers.filter((p) => !COUNTDOWN_SKIP_PRAYERS.has(p.name));
+  if (sequence.length === 0) return null;
+  if (!finishedName) return sequence[0] ?? null;
+  const idx = sequence.findIndex((p) => p.name === finishedName);
+  if (idx < 0) return sequence[0] ?? null;
+  return sequence[(idx + 1) % sequence.length] ?? null;
+}
+
 const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
   phase,
   inPrayerSubPhase,
   variant = 'default',
 }) => {
-  const { nextPrayer, isJumuahToday, jumuahTime } = usePrayerTimesContext();
+  const { nextPrayer, currentPrayer, todaysPrayerTimes, isJumuahToday, jumuahTime } =
+    usePrayerTimesContext();
   // Use masjid-local time so comparisons against prayer strings are correct
   // when the Pi's system timezone is UTC.
   const now = useMasjidTime();
   const masjidTz = useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
+  const postSalahCountdown = isPostSalahCountdown(phase, inPrayerSubPhase);
+
+  /**
+   * After jamaat ends, `nextPrayer` is still the finished salah for the rest
+   * of the in-prayer window (strip highlight). Countdown must look ahead.
+   */
+  const countdownPrayer = useMemo(() => {
+    if (!postSalahCountdown) return nextPrayer;
+    return (
+      nextSalahAfter(todaysPrayerTimes, currentPrayer?.name ?? nextPrayer?.name) ?? nextPrayer
+    );
+  }, [postSalahCountdown, todaysPrayerTimes, currentPrayer?.name, nextPrayer]);
 
   /**
    * On Fridays, the countdown must target `jummahJamaat` even though
@@ -68,7 +118,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
    * to its own jamaat — `JumuahBar` displays the Friday time separately).
    * `getEffectiveJamaat` is the single source of truth for that swap.
    */
-  const effectiveJamaat = getEffectiveJamaat(nextPrayer, isJumuahToday, jumuahTime);
+  const effectiveJamaat = getEffectiveJamaat(countdownPrayer, isJumuahToday, jumuahTime);
 
   /**
    * Determine what to count down to. Mirrors the `usePrayerPhase` rule so the
@@ -79,8 +129,10 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
    *     JAMAAT, even when adhan hasn't fired yet (handles A == J and
    *     A within JAMAAT_LEAD_MIN of J)
    *   - Adhan passed, before jamaat → count down to JAMAAT
-   *   - At/past jamaat AND phase === 'in-prayer' → null (the in-prayer render
-   *     branch above takes over and shows "Jamaat in progress")
+   *   - At/past jamaat AND phase === 'in-prayer' (jamaat sub-phase) → null
+   *     (the in-prayer render branch shows "Jamaat in progress")
+   *   - At/past jamaat AND post-salah (post-jamaat / post-supplication) →
+   *     countdownPrayer is already the next salah; fall through to its adhan
    *   - At/past jamaat AND phase !== 'in-prayer' → tomorrow's adhan. This
    *     covers the after-Isha → tomorrow's Fajr branch in `usePrayerTimes`,
    *     which swaps `nextPrayer` to tomorrow's record but keeps the time as
@@ -92,11 +144,11 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
    *     fallback; the after-Isha case above handles the common path).
    */
   const targetTime = useMemo<CountdownTarget | null>(() => {
-    if (!nextPrayer) return null;
+    if (!countdownPrayer) return null;
 
     const nowMin = now.hour() * 60 + now.minute() + now.second() / 60;
-    const A = toMinutesFromMidnight(nextPrayer.time, nextPrayer.name);
-    const J = toMinutesFromMidnight(effectiveJamaat, nextPrayer.name);
+    const A = toMinutesFromMidnight(countdownPrayer.time, countdownPrayer.name);
+    const J = toMinutesFromMidnight(effectiveJamaat, countdownPrayer.name);
 
     if (A < 0 && J < 0) return null;
 
@@ -107,7 +159,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       if (J >= 0 && nowMin >= J - JAMAAT_LEAD_MIN) {
         return { time: effectiveJamaat!, forceTomorrow: false, target: 'jamaat' };
       }
-      return { time: nextPrayer.time, forceTomorrow: false, target: 'adhan' };
+      return { time: countdownPrayer.time, forceTomorrow: false, target: 'adhan' };
     }
 
     // Adhan passed (or missing) but jamaat still upcoming today
@@ -116,50 +168,43 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     }
 
     // At/past jamaat. Two possibilities:
-    //   (a) Active in-prayer window — DisplayScreen passes phase='in-prayer'
-    //       and the early-return branch above renders "Jamaat in progress".
+    //   (a) Active jamaat congregation — DisplayScreen passes phase='in-prayer'
+    //       and the early-return branch renders "Jamaat in progress".
     //       Returning null avoids a transient stale countdown during the tick
     //       between jamaat ringing and the phase machine catching up.
-    //   (b) After-Isha → tomorrow's Fajr (or any wrap-around). The hook has
-    //       already swapped `nextPrayer` to the next-day record but the time
-    //       strings are still HH:mm form, so they read as "in the past"
-    //       relative to today's `nowMin`. Count down to tomorrow's adhan.
+    //   (b) After-Isha → tomorrow's Fajr (or any wrap-around), including the
+    //       post-salah window where countdownPrayer is already tomorrow's Fajr
+    //       but the HH:mm string reads as "in the past" vs today's nowMin.
     if (J >= 0 && nowMin >= J) {
-      if (phase === 'in-prayer') return null;
+      if (phase === 'in-prayer' && !postSalahCountdown) return null;
       if (A >= 0) {
-        return { time: nextPrayer.time, forceTomorrow: true, target: 'adhan' };
+        return { time: countdownPrayer.time, forceTomorrow: true, target: 'adhan' };
       }
       return null;
     }
 
     // No jamaat in payload, adhan already passed → tomorrow's adhan.
     if (A >= 0) {
-      return { time: nextPrayer.time, forceTomorrow: true, target: 'adhan' };
+      return { time: countdownPrayer.time, forceTomorrow: true, target: 'adhan' };
     }
 
     return null;
-  }, [nextPrayer, now, effectiveJamaat, phase]);
+  }, [countdownPrayer, now, effectiveJamaat, phase, postSalahCountdown]);
 
   /**
-   * Live countdown string, recomputed every second via now (masjid tz).
-   * `now` is intentionally listed as a dependency even though it is not referenced
-   * in the function body — it acts as a 1-second tick trigger so the string refreshes.
+   * Live countdown string. `targetTime` already depends on `now`, so this
+   * recomputes every second without listing `now` again.
    */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const liveCountdown = useMemo(() => {
-    if (!targetTime) return nextPrayer ? '0s' : '';
+    if (!targetTime) return countdownPrayer ? '0s' : '';
     return getTimeUntilNextPrayer(targetTime.time, targetTime.forceTomorrow, {}, masjidTz);
-  }, [targetTime, now, nextPrayer, masjidTz]);
+  }, [targetTime, countdownPrayer, masjidTz]);
 
   const countingToJamaat = targetTime?.target === 'jamaat';
-  const displayName = useMemo(() => {
-    if (!nextPrayer?.name) return '';
-    if (nextPrayer.name === 'Zuhr' && isJumuahToday) {
-      return resolveTerminology(terminology, 'jummah', 'Jumuah');
-    }
-    const key = prayerRowNameToTerminologyKey(nextPrayer.name);
-    return key ? resolveTerminology(terminology, key, nextPrayer.name) : nextPrayer.name;
-  }, [nextPrayer?.name, isJumuahToday, terminology]);
+  const displayName = useMemo(
+    () => resolvePrayerDisplayName(countdownPrayer?.name, terminology, { isJumuahToday }) ?? '',
+    [countdownPrayer?.name, isJumuahToday, terminology],
+  );
 
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
   const countdownLabel = useMemo(
@@ -170,7 +215,7 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
     [countingToJamaat, displayName, jamaatLabel],
   );
 
-  if (!nextPrayer) {
+  if (!countdownPrayer) {
     return null;
   }
 
@@ -213,18 +258,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
       ? 'text-countdown-strip-label font-bold text-text-primary text-left min-w-0'
       : 'prayer-countdown-status font-bold text-text-primary';
 
-  /* ---- In-prayer: name in left half, status in right half (same midline as countdown) ---- */
-  if (phase === 'in-prayer') {
-    // post-jamaat: jamaat has finished — show "[prayerName] prayer" static (no countdown, no in-progress)
-    // jamaat: show "Jamaat in progress"
-    const statusText =
-      inPrayerSubPhase === 'post-jamaat' || inPrayerSubPhase === 'post-jamaat-supplication'
-        ? 'prayer'
-        : `${jamaatLabel} in progress`;
+  /* ---- Jamaat congregation: name in left half, status in right half ---- */
+  if (phase === 'in-prayer' && !postSalahCountdown) {
     return (
       <div className={outerClass}>
-        <span className={inPrayerLabelClass}>{displayName || nextPrayer.name}</span>
-        <span className={inPrayerValueClass}>{statusText}</span>
+        <span className={inPrayerLabelClass}>{displayName || countdownPrayer.name}</span>
+        <span className={inPrayerValueClass}>{`${jamaatLabel} in progress`}</span>
       </div>
     );
   }
