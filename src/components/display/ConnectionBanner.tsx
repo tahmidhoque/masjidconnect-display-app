@@ -13,13 +13,14 @@
  * States:
  *  - Green (dot only): WiFi + WS connected
  *  - Green (pill): "Up to date" after a successful update check
- *  - Orange: reconnecting, weak signal, or update in progress
+ *  - Muted: live (WebSocket) updates paused — display still showing saved content
+ *  - Orange: weak signal, or update in progress
  *  - Red: WiFi disconnected, no internet, or no adapter
  *  - Blue: hotspot active (user reconfiguring WiFi)
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Wifi, WifiOff, AlertTriangle, Radio, Settings } from 'lucide-react';
+import { Wifi, WifiOff, AlertTriangle, Radio, Settings, Pause } from 'lucide-react';
 import { isPiPlatform } from '../../config/platform';
 import useConnectionStatus from '../../hooks/useConnectionStatus';
 import { useAppSelector } from '../../store/hooks';
@@ -30,12 +31,36 @@ import {
   selectUpdateMessage,
   selectUpdateRestartAt,
 } from '../../store/slices/uiSlice';
-import { shouldSuppressWifiWarning } from '../../utils/connectionBannerLogic';
+import {
+  resolveConnectivityBanner,
+  shouldSuppressWifiWarning,
+} from '../../utils/connectionBannerLogic';
+import type { ConnectionStatusType } from '@/hooks/useConnectionStatus';
 
 /** Delay before showing the banner to prevent startup flash */
-const DISPLAY_DELAY_MS = 5_000;
+export const DISPLAY_DELAY_MS = 5_000;
 
-type BannerVariant = 'green' | 'orange' | 'red' | 'blue';
+const DEV_BANNER_STATUSES: readonly ConnectionStatusType[] = [
+  'connected',
+  'reconnecting',
+  'server-unreachable',
+  'no-internet',
+  'no-connection',
+];
+
+/**
+ * Dev-only `?banner=` override so footer states can be previewed without a live
+ * WebSocket. Stripped from production builds.
+ */
+function readDevBannerOverride(): ConnectionStatusType | null {
+  if (!import.meta.env.DEV) return null;
+  const value = new URLSearchParams(window.location.search).get('banner');
+  return DEV_BANNER_STATUSES.includes(value as ConnectionStatusType)
+    ? (value as ConnectionStatusType)
+    : null;
+}
+
+type BannerVariant = 'green' | 'orange' | 'red' | 'blue' | 'muted';
 
 interface BannerState {
   variant: BannerVariant;
@@ -44,13 +69,14 @@ interface BannerState {
 }
 
 const ConnectionBanner: React.FC = () => {
-  const { status } = useConnectionStatus();
+  const { status: liveStatus } = useConnectionStatus();
+  const status = readDevBannerOverride() ?? liveStatus;
   const wifiStatus = useAppSelector(selectWifiStatus);
   const pendingRestart = useAppSelector(selectPendingRestart);
   const updatePhase = useAppSelector(selectUpdatePhase);
   const updateMessage = useAppSelector(selectUpdateMessage);
   const updateRestartAt = useAppSelector(selectUpdateRestartAt);
-  const [canShow, setCanShow] = useState(false);
+  const [canShow, setCanShow] = useState(() => readDevBannerOverride() !== null);
   const [updateSecondsLeft, setUpdateSecondsLeft] = useState<number | null>(null);
   const [restartSecondsLeft, setRestartSecondsLeft] = useState<number | null>(null);
 
@@ -157,29 +183,19 @@ const ConnectionBanner: React.FC = () => {
     }
 
     // WebSocket / general connectivity states
-    if (status === 'no-internet' || status === 'no-connection') {
+    const connectivity = resolveConnectivityBanner(status, isPiPlatform);
+    if (connectivity) {
+      if (connectivity.variant === 'muted') {
+        return {
+          variant: 'muted',
+          icon: <Pause className={iconSize} />,
+          message: connectivity.message,
+        };
+      }
       return {
         variant: 'red',
         icon: <WifiOff className={iconSize} />,
-        message: isPiPlatform
-          ? 'No internet — press Ctrl+Shift+W for WiFi settings'
-          : 'No Internet',
-      };
-    }
-
-    if (status === 'reconnecting') {
-      return {
-        variant: 'orange',
-        icon: <Wifi className={`${iconSize} animate-subtle-pulse`} />,
-        message: 'Reconnecting…',
-      };
-    }
-
-    if (status === 'server-unreachable') {
-      return {
-        variant: 'orange',
-        icon: <AlertTriangle className={iconSize} />,
-        message: 'Server Unreachable',
+        message: connectivity.message,
       };
     }
 
@@ -196,6 +212,7 @@ const ConnectionBanner: React.FC = () => {
     orange: 'bg-alert-orange',
     red: 'bg-alert-red',
     blue: 'bg-[#3b82f6]',
+    muted: 'bg-text-muted',
   };
 
   // Dot-only mode: healthy state with nothing to say. Render a small coloured
@@ -206,6 +223,7 @@ const ConnectionBanner: React.FC = () => {
       orange: 'Connection warning',
       red: 'Disconnected',
       blue: 'WiFi setup mode',
+      muted: 'Live updates paused',
     };
     return (
       <span
@@ -221,6 +239,7 @@ const ConnectionBanner: React.FC = () => {
     orange: 'bg-alert-orange/15 border-alert-orange/30',
     red: 'bg-alert-red/15 border-alert-red/30',
     blue: 'bg-[#3b82f6]/15 border-[#3b82f6]/30',
+    muted: 'bg-surface border-border',
   };
 
   const textClass: Record<BannerVariant, string> = {
@@ -228,6 +247,7 @@ const ConnectionBanner: React.FC = () => {
     orange: 'text-alert-orange',
     red: 'text-alert-red',
     blue: 'text-[#93c5fd]',
+    muted: 'text-text-muted',
   };
 
   const iconColour: Record<BannerVariant, string> = {
@@ -235,6 +255,7 @@ const ConnectionBanner: React.FC = () => {
     orange: 'text-alert-orange',
     red: 'text-alert-red',
     blue: 'text-[#93c5fd]',
+    muted: 'text-text-muted',
   };
 
   return (
