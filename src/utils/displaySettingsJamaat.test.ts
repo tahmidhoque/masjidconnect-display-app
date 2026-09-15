@@ -10,6 +10,8 @@ import {
   postJamaatDelayMinutes,
   totalJamaatPhaseWindowForDisplayPrayer,
   jamaatPhaseMinutesForDisplayPrayer,
+  preJamaatLeadMinutes,
+  DEFAULT_JAMAAT_LEAD_MIN,
 } from "./displaySettingsJamaat";
 
 const baseSettings = (): DisplaySettings => ({
@@ -146,5 +148,62 @@ describe("totalJamaatPhaseWindowForDisplayPrayer", () => {
       postJamaatSupplication: { enabled: true, durationMinutes: 5 },
     };
     expect(totalJamaatPhaseWindowForDisplayPrayer(s, "Fajr")).toBe(25);
+  });
+});
+
+describe("preJamaatLeadMinutes", () => {
+  it("uses the 5-minute legacy lead when Portal settings are absent", () => {
+    expect(preJamaatLeadMinutes(null)).toBe(DEFAULT_JAMAAT_LEAD_MIN);
+    expect(preJamaatLeadMinutes(baseSettings())).toBe(5);
+  });
+
+  it("returns 0 when the Portal flag is disabled", () => {
+    expect(
+      preJamaatLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: false,
+        preJamaatCountdownSeconds: 120,
+      }),
+    ).toBe(0);
+  });
+
+  it("converts Portal seconds to fractional minutes when enabled", () => {
+    expect(
+      preJamaatLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: true,
+        preJamaatCountdownSeconds: 30,
+      }),
+    ).toBe(0.5);
+    expect(
+      preJamaatLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: true,
+        preJamaatCountdownSeconds: 60,
+      }),
+    ).toBe(1);
+    expect(
+      preJamaatLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: true,
+        preJamaatCountdownSeconds: 90,
+      }),
+    ).toBe(1.5);
+    expect(
+      preJamaatLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: true,
+        preJamaatCountdownSeconds: 120,
+      }),
+    ).toBe(2);
+  });
+
+  it("defaults to 60 seconds when enabled but duration is missing", () => {
+    expect(
+      preJamaatLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: true,
+      }),
+    ).toBe(1);
   });
 });

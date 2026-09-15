@@ -8,6 +8,44 @@ import { postJamaatSupplicationDurationMinutes } from "@/utils/displaySettingsSu
 
 const DEFAULT_MINUTES = 10;
 
+/** Back-compat lead when Portal pre-jamaat settings are absent. */
+export const DEFAULT_JAMAAT_LEAD_MIN = 5;
+
+/** Portal-allowed pre-jamaat overlay durations (seconds). */
+export const PRE_JAMAAT_COUNTDOWN_SECONDS = [30, 60, 90, 120] as const;
+
+export type PreJamaatCountdownSeconds = (typeof PRE_JAMAAT_COUNTDOWN_SECONDS)[number];
+
+const DEFAULT_PRE_JAMAAT_SECONDS: PreJamaatCountdownSeconds = 60;
+
+function isPreJamaatCountdownSeconds(value: unknown): value is PreJamaatCountdownSeconds {
+  return (
+    typeof value === "number" &&
+    (PRE_JAMAAT_COUNTDOWN_SECONDS as readonly number[]).includes(value)
+  );
+}
+
+/**
+ * Minutes before jamaat that silent-phones / pre-jamaat overlay starts.
+ * - Settings absent → 5 (legacy JAMAAT_LEAD_MIN)
+ * - `preJamaatCountdownEnabled: false` → 0 (overlay off)
+ * - enabled → Portal seconds (30/60/90/120) as fractional minutes; missing seconds → 60s
+ */
+export function preJamaatLeadMinutes(
+  settings: DisplaySettings | null | undefined,
+): number {
+  if (settings?.preJamaatCountdownEnabled === undefined) {
+    return DEFAULT_JAMAAT_LEAD_MIN;
+  }
+  if (settings.preJamaatCountdownEnabled !== true) {
+    return 0;
+  }
+  const seconds = isPreJamaatCountdownSeconds(settings.preJamaatCountdownSeconds)
+    ? settings.preJamaatCountdownSeconds
+    : DEFAULT_PRE_JAMAAT_SECONDS;
+  return seconds / 60;
+}
+
 function clampJamaatMinutes(value: number, fallback: number): number {
   if (typeof value !== "number" || Number.isNaN(value)) return fallback;
   return Math.max(5, Math.min(30, value));

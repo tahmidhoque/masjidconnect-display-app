@@ -5,6 +5,7 @@ import {
   prayerStripHeightStyle,
   resolveContentZoneSize,
   resolveEffectiveZoneSize,
+  resolvePrayerSidebarTileColumns,
   sanitiseLayoutConfig,
   zoneSizeHint,
   type LayoutZone,
@@ -156,5 +157,70 @@ describe('zoneSizeHint', () => {
 
   it('explains Auto content fills leftover space', () => {
     expect(zoneSizeHint(0, 'content')).toMatch(/leftover space/i);
+  });
+});
+
+describe('resolvePrayerSidebarTileColumns', () => {
+  it('defaults to 2 columns for strip layouts', () => {
+    expect(
+      resolvePrayerSidebarTileColumns({ variant: 'strip', structure: 'stack' }),
+    ).toBe(2);
+  });
+
+  it('keeps 2 columns on a wide prayer sidebar', () => {
+    expect(
+      resolvePrayerSidebarTileColumns({
+        variant: 'sidebar',
+        structure: 'sidebar-right',
+        sidebarWidth: 0.38,
+      }),
+    ).toBe(2);
+  });
+
+  it('uses 1 column for a narrow content-focus sidebar', () => {
+    expect(
+      resolvePrayerSidebarTileColumns({
+        variant: 'sidebar',
+        structure: 'sidebar-left',
+        sidebarWidth: 0.24,
+      }),
+    ).toBe(1);
+  });
+
+  it('honours an explicit tileColumns option over width', () => {
+    expect(
+      resolvePrayerSidebarTileColumns({
+        variant: 'sidebar',
+        structure: 'sidebar-right',
+        sidebarWidth: 0.38,
+        tileColumns: 1,
+      }),
+    ).toBe(1);
+    expect(
+      resolvePrayerSidebarTileColumns({
+        variant: 'sidebar',
+        structure: 'sidebar-left',
+        sidebarWidth: 0.24,
+        tileColumns: 2,
+      }),
+    ).toBe(2);
+  });
+});
+
+describe('sanitiseLayoutConfig — prayer tile columns', () => {
+  it('keeps a valid tileColumns option on the prayer-times zone', () => {
+    const config = baseConfig();
+    config.landscape.structure = 'sidebar-left';
+    const prayerZone = config.landscape.zones.find(
+      (zone: { component: string }) => zone.component === 'prayer-times',
+    );
+    if (prayerZone) {
+      prayerZone.region = 'sidebar';
+      prayerZone.options = { tileColumns: 1, showCountdown: true };
+    }
+    const result = sanitiseLayoutConfig(config);
+    const sanitised = result?.landscape.zones.find((zone) => zone.component === 'prayer-times');
+    expect(sanitised?.options?.tileColumns).toBe(1);
+    expect(sanitised?.options?.showCountdown).toBe(true);
   });
 });

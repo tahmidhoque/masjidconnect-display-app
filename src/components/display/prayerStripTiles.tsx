@@ -308,11 +308,13 @@ export const PrayerStripTileGrid: React.FC<PrayerStripTileGridProps> = ({
 
   const cols = Math.max(1, columnCount);
   const rows = Math.ceil(tileCount / cols);
-  const colsClass = cols > 1 ? `prayer-strip-tiles--cols-${cols}` : '';
+  const colsClass = `prayer-strip-tiles--cols-${cols}`;
 
   return (
     <div
       className={`prayer-strip-tiles prayer-strip-tiles--vertical ${colsClass} flex-1 min-h-0 min-w-0 ${className}`}
+      data-testid="prayer-strip-tile-grid"
+      data-tile-columns={cols}
       style={
         {
           '--tile-columns': cols,

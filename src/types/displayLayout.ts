@@ -44,6 +44,11 @@ export interface LayoutZoneHeaderOptions {
   showMasjidName?: boolean;
   /** Prayer times bar — embedded countdown (default true). */
   showCountdown?: boolean;
+  /**
+   * Vertical sidebar prayer cue tiles. Default 2-column; `1` stacks names
+   * in a single column (content-focus / narrower sidebar).
+   */
+  tileColumns?: 1 | 2;
 }
 
 export interface LayoutZone {
@@ -89,6 +94,8 @@ export interface LayoutBehaviourOverrides {
   >;
   jamaatInProgressMode?: 'screen' | 'dark' | 'content';
   jamaatInProgressContentId?: string | null;
+  preJamaatCountdownEnabled?: boolean;
+  preJamaatCountdownSeconds?: 30 | 60 | 90 | 120;
   timeFormat?: '12h' | '12h-nop' | '24h';
   postAdhanSupplication?: {
     enabled?: boolean;
@@ -179,6 +186,13 @@ const SPACING_SCALE_MAX = 2;
 const ZONE_SIZE_MAX = 12;
 const SIDEBAR_WIDTH_MIN = 0.12;
 const SIDEBAR_WIDTH_MAX = 0.4;
+/** Matches LayoutRenderer when structureOptions.sidebarWidth is omitted. */
+export const DEFAULT_SIDEBAR_WIDTH = 0.22;
+/**
+ * Sidebar fraction at or below this uses a single tile column (content-focus
+ * presets are ~0.24). Wider prayer sidebars (~0.38) keep the 2-col default.
+ */
+export const SINGLE_COLUMN_SIDEBAR_WIDTH_MAX = 0.28;
 
 const HEX_COLOUR_RE = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
@@ -187,6 +201,29 @@ const clamp = (value: number, min: number, max: number): number =>
 
 export function inferPrayerTimesLayout(region: LayoutRegion): PrayerTimesLayout {
   return region === 'sidebar' ? 'sidebar' : 'strip';
+}
+
+/**
+ * Vertical prayer-tile columns for a sidebar (or an explicit zone option).
+ * Existing 2-column grids stay the default; 1-column is used when the portal
+ * sets `tileColumns: 1` or when a left/right sidebar is narrow enough that
+ * two columns would crowd the content area.
+ */
+export function resolvePrayerSidebarTileColumns(args: {
+  variant: PrayerTimesLayout;
+  structure?: LayoutStructure;
+  sidebarWidth?: number;
+  tileColumns?: 1 | 2;
+}): 1 | 2 {
+  if (args.tileColumns === 1 || args.tileColumns === 2) {
+    return args.tileColumns;
+  }
+  if (args.variant !== 'sidebar') return 2;
+  const isSidebarStructure =
+    args.structure === 'sidebar-left' || args.structure === 'sidebar-right';
+  if (!isSidebarStructure) return 2;
+  const width = args.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH;
+  return width <= SINGLE_COLUMN_SIDEBAR_WIDTH_MAX ? 1 : 2;
 }
 
 export function inferZoneRegion(
@@ -440,6 +477,9 @@ function sanitiseZone(raw: unknown): LayoutZone | null {
     if (typeof opts.showHijriDate === 'boolean') parsed.showHijriDate = opts.showHijriDate;
     // showMasjidName in zone.options is deprecated — controlled via layout behaviour only.
     if (typeof opts.showCountdown === 'boolean') parsed.showCountdown = opts.showCountdown;
+    if (opts.tileColumns === 1 || opts.tileColumns === 2) {
+      parsed.tileColumns = opts.tileColumns;
+    }
     if (Object.keys(parsed).length > 0) options = parsed;
   }
 

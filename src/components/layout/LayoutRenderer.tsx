@@ -6,13 +6,13 @@
  */
 
 import React, { useMemo } from 'react';
-import type {
-  LayoutRegion,
-  LayoutStructure,
-  LayoutStructureOptions,
-  LayoutZoneComponent,
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  inferZoneRegion,
+  type LayoutStructure,
+  type LayoutStructureOptions,
+  type LayoutZoneComponent,
 } from '../../types/displayLayout';
-import { inferZoneRegion } from '../../types/displayLayout';
 import ZoneStackLayout, { type RenderedZone } from './ZoneStackLayout';
 
 export interface LayoutRendererProps {
@@ -26,8 +26,6 @@ export interface LayoutRendererProps {
   background?: React.ReactNode;
   themeStyle?: React.CSSProperties;
 }
-
-const DEFAULT_SIDEBAR_WIDTH = 0.22;
 
 const BASE_SPACING = {
   landscape: { top: 1, x: 1, bottom: 0, gap: 0.5 },

@@ -178,6 +178,18 @@ const lsSidebar = (side: 'left' | 'right'): OrientationLayoutConfig => ({
   ],
 });
 
+/** Content-focus: narrower sidebar so prayer tiles stack in one column. */
+const lsContentFocus = (side: 'left' | 'right'): OrientationLayoutConfig => ({
+  structure: side === 'left' ? 'sidebar-left' : 'sidebar-right',
+  structureOptions: { sidebarWidth: 0.24 },
+  spacingScale: 1,
+  zones: [
+    z('content', { size: 5 }),
+    z('prayer-times', { region: 'sidebar', size: 1, options: { tileColumns: 1 } }),
+    z('footer'),
+  ],
+});
+
 const LS_SPLIT_TOP: OrientationLayoutConfig = {
   structure: 'split-top',
   spacingScale: 1,
@@ -457,6 +469,12 @@ export const SCENARIOS: Record<string, Scenario> = {
     orientation: 'LANDSCAPE',
     layout: config('landscape', lsSidebar('left')),
     scheduleItems: [asma()],
+  },
+  'ls-content-focus-left': {
+    id: 'ls-content-focus-left',
+    orientation: 'LANDSCAPE',
+    layout: config('landscape', lsContentFocus('left')),
+    scheduleItems: [announcement()],
   },
   'ls-split-top': {
     id: 'ls-split-top',

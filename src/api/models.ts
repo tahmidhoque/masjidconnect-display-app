@@ -390,6 +390,17 @@ export interface DisplaySettings {
   jamaatInProgressContentId?: string | null;
 
   /**
+   * When true, silent-phones / pre-jamaat overlay uses `preJamaatCountdownSeconds`.
+   * Absent on older payloads — display keeps the 5-minute lead for back-compat.
+   */
+  preJamaatCountdownEnabled?: boolean;
+  /**
+   * Pre-jamaat overlay duration in seconds when enabled (Portal: 30 / 60 / 90 / 120).
+   * Converted to fractional minutes for the phase machine.
+   */
+  preJamaatCountdownSeconds?: 30 | 60 | 90 | 120;
+
+  /**
    * Mosque-specific terminology overrides (admin-controlled).
    * When missing, the display app falls back to its existing FE strings.
    *
