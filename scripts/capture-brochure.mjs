@@ -11,7 +11,7 @@
 
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer-core';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -19,9 +19,14 @@ const OUT_DIR = resolve(__dirname, '..', 'brochure-assets');
 const BASE = process.env.SHOWCASE_BASE ?? 'http://localhost:3001';
 
 const CHROME_PATHS = [
+  process.env.CHROME_PATH,
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+  '/usr/local/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  process.env.CHROME_PATH,
 ].filter(Boolean);
 
 const SCENARIOS = [
@@ -39,6 +44,7 @@ const SCENARIOS = [
   'slide-jumuah',
   'slide-video',
   'pt-full',
+  'pt-announcement',
   'pt-prayer-focus',
   'ls-theme-emerald',
   'ls-theme-purple',
@@ -47,7 +53,7 @@ const SCENARIOS = [
   'realtime-alert',
 ];
 
-const PORTRAIT = new Set(['pt-full', 'pt-prayer-focus']);
+const PORTRAIT = new Set(['pt-full', 'pt-announcement', 'pt-prayer-focus']);
 
 /** Optional CLI filter: `node scripts/capture-brochure.mjs emergency pt-full` */
 const ONLY = process.argv.slice(2);
@@ -63,7 +69,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
 
-  const executablePath = CHROME_PATHS[0];
+  const executablePath = CHROME_PATHS.find((p) => existsSync(p));
+  if (!executablePath) {
+    throw new Error(
+      'Chrome/Chromium not found. Install chromium or set CHROME_PATH.',
+    );
+  }
   console.log(`Using Chrome: ${executablePath}`);
   console.log(`Showcase base: ${BASE}`);
 
