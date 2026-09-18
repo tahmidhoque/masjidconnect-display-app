@@ -334,6 +334,9 @@ export const realtimeMiddleware: Middleware = (api: any) => {
                   await dispatch(mod.refreshPrayerTimes({ forceRefresh: true })).unwrap();
                   break;
                 case 'events':
+                  // Events may travel on the content envelope after a plan strip —
+                  // replace screen content first, then the dedicated events cache.
+                  await dispatch(mod.refreshContent({ forceRefresh: true })).unwrap();
                   await dispatch(mod.refreshEvents({ forceRefresh: true })).unwrap();
                   break;
                 default:

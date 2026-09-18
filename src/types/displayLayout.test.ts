@@ -7,6 +7,8 @@ import {
   resolveEffectiveZoneSize,
   resolvePrayerSidebarTileColumns,
   sanitiseLayoutConfig,
+  shouldCollapseEmptyContentZone,
+  ensureCorePrayerZones,
   zoneSizeHint,
   type LayoutZone,
 } from './displayLayout';
@@ -81,6 +83,59 @@ const zone = (
   size: 0,
   fontScale: 1,
   ...extra,
+});
+
+describe('shouldCollapseEmptyContentZone', () => {
+  it('collapses a leftover content zone when the playlist is empty', () => {
+    expect(
+      shouldCollapseEmptyContentZone({
+        hasCarouselItems: false,
+        contentOverlayActive: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps the content zone when slides are present', () => {
+    expect(
+      shouldCollapseEmptyContentZone({
+        hasCarouselItems: true,
+        contentOverlayActive: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps the content slot for jamaat-soon / in-prayer overlays', () => {
+    expect(
+      shouldCollapseEmptyContentZone({
+        hasCarouselItems: false,
+        contentOverlayActive: true,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('ensureCorePrayerZones', () => {
+  it('injects a prayer strip and footer when content collapses and no prayer widget remains', () => {
+    const zones = [
+      zone('content', { size: 5 }),
+      zone('footer'),
+    ];
+    const result = ensureCorePrayerZones(zones, {
+      hasPrayerTimes: true,
+      collapseEmptyContent: true,
+    });
+    expect(result.some((entry) => entry.component === 'prayer-times' && entry.visible)).toBe(true);
+    expect(result.some((entry) => entry.component === 'footer' && entry.visible)).toBe(true);
+  });
+
+  it('does not invent chrome while the carousel still has slides', () => {
+    const zones = [zone('content', { size: 5 }), zone('footer')];
+    const result = ensureCorePrayerZones(zones, {
+      hasPrayerTimes: true,
+      collapseEmptyContent: false,
+    });
+    expect(result.map((entry) => entry.component)).toEqual(['content', 'footer']);
+  });
 });
 
 describe('resolveContentZoneSize', () => {
@@ -222,5 +277,21 @@ describe('sanitiseLayoutConfig — prayer tile columns', () => {
     const sanitised = result?.landscape.zones.find((zone) => zone.component === 'prayer-times');
     expect(sanitised?.options?.tileColumns).toBe(1);
     expect(sanitised?.options?.showCountdown).toBe(true);
+  });
+});
+
+describe('sanitiseLayoutConfig — unknown zones', () => {
+  it('drops unknown zone components and keeps the prayer board', () => {
+    const config = baseConfig();
+    config.landscape.zones = [
+      { id: 'zone-streaming', component: 'live-stream', visible: true, size: 5, fontScale: 1 },
+      { id: 'zone-prayer-times', component: 'prayer-times', visible: true, size: 0, fontScale: 1 },
+      { id: 'zone-footer', component: 'footer', visible: true, size: 0, fontScale: 1 },
+    ];
+    const result = sanitiseLayoutConfig(config);
+    expect(result?.landscape.zones.map((zone) => zone.component)).toEqual([
+      'prayer-times',
+      'footer',
+    ]);
   });
 });

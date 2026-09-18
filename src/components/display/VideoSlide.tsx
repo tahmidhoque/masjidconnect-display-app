@@ -30,6 +30,8 @@ export interface VideoSlideProps {
   onReady?: () => void;
   /** Fires when the clip ends (not called while `loop` is true) — advances the carousel. */
   onEnded?: () => void;
+  /** Fires on load failure so the carousel can skip a broken clip. */
+  onError?: () => void;
   className?: string;
 }
 
@@ -41,14 +43,17 @@ const VideoSlide: React.FC<VideoSlideProps> = ({
   loop,
   onReady,
   onEnded,
+  onError,
   className = '',
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readyFiredRef = useRef(false);
   const onReadyRef = useRef(onReady);
   const onEndedRef = useRef(onEnded);
+  const onErrorRef = useRef(onError);
   onReadyRef.current = onReady;
   onEndedRef.current = onEnded;
+  onErrorRef.current = onError;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -66,8 +71,9 @@ const VideoSlide: React.FC<VideoSlideProps> = ({
     const handleEnded = () => onEndedRef.current?.();
     const handleError = () => {
       logger.error('[VideoSlide] Failed to load video', { url });
-      // Reveal + advance so a broken clip never freezes the carousel.
+      // Reveal + skip so a broken clip never freezes the carousel.
       fireReadyOnce();
+      onErrorRef.current?.();
       if (!loop) onEndedRef.current?.();
     };
 

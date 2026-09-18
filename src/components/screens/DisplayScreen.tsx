@@ -41,6 +41,8 @@ import {
   inferPrayerTimesLayout,
   inferZoneRegion,
   isPrayerOnlyLayout,
+  shouldCollapseEmptyContentZone,
+  ensureCorePrayerZones,
   prayerStripHeightClassName,
   prayerStripHeightStyle,
   resolveEffectiveZoneSize,
@@ -87,6 +89,7 @@ import {
 } from '../../store/slices/contentSlice';
 import { parseMediaFullscreenFlag, resolveMediaFit } from '../../utils/mediaSlide';
 import { resolvePrayerDisplayName } from '../../utils/prayerTerminology';
+import { hasJumuahClockTime } from '../../utils/jumuahSessions';
 import type { CarouselItem } from '../display/ContentCarousel';
 
 /**
@@ -639,7 +642,15 @@ const DisplayScreenInner: React.FC = () => {
   useJamaatBuzzer();
 
   /* ---- Forbidden (makruh) time for voluntary prayer ---- */
-  const { forbiddenPrayer, tomorrowsJamaats, isJumuahToday } = usePrayerTimesContext();
+  const {
+    forbiddenPrayer,
+    tomorrowsJamaats,
+    isJumuahToday,
+    todaysPrayerTimes,
+    upcomingJumuahSessions,
+    upcomingJumuahJamaatRaw,
+    upcomingJumuahKhutbahRaw,
+  } = usePrayerTimesContext();
   const timeFormat = useAppSelector(selectTimeFormat);
   const displaySettings = useAppSelector(selectDisplaySettings);
 
@@ -659,10 +670,28 @@ const DisplayScreenInner: React.FC = () => {
   const orientationLayout = isPortrait ? layoutConfig.portrait : layoutConfig.landscape;
   const layoutStructure = orientationLayout.structure ?? 'stack';
   const layoutStructureOptions = orientationLayout.structureOptions;
-  const hasVisibleHeader = orientationLayout.zones.some(
+  const contentOverlayActive =
+    adhanSupplicationActive ||
+    prayerPhase === 'jamaat-soon' ||
+    prayerPhase === 'in-prayer';
+  const collapseEmptyContent = shouldCollapseEmptyContentZone({
+    hasCarouselItems: carouselItems.length > 0,
+    contentOverlayActive,
+  });
+  const hasPrayerTimes = Array.isArray(todaysPrayerTimes) && todaysPrayerTimes.length > 0;
+  const hasJumuahSessions =
+    (Array.isArray(upcomingJumuahSessions) && upcomingJumuahSessions.length > 0) ||
+    hasJumuahClockTime(upcomingJumuahJamaatRaw) ||
+    hasJumuahClockTime(upcomingJumuahKhutbahRaw);
+  const layoutZones = ensureCorePrayerZones(orientationLayout.zones, {
+    hasPrayerTimes,
+    collapseEmptyContent,
+  });
+  const prayerOnly =
+    isPrayerOnlyLayout(layoutZones) || collapseEmptyContent;
+  const hasVisibleHeader = layoutZones.some(
     (zone) => zone.visible && zone.component === 'header',
   );
-  const prayerOnly = isPrayerOnlyLayout(orientationLayout.zones);
 
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
@@ -691,7 +720,7 @@ const DisplayScreenInner: React.FC = () => {
    * (avoids duplicating branding). Sidebar headers don't occupy the full
    * top strip, so the brand rail still renders there.
    */
-  const headerZoneForLogo = orientationLayout.zones.find(
+  const headerZoneForLogo = layoutZones.find(
     (zone) => zone.visible && zone.component === 'header',
   );
   const headerIsHorizontalForLogo =
@@ -1004,16 +1033,23 @@ const DisplayScreenInner: React.FC = () => {
     },
   };
 
-  const renderedZones: RenderedZone[] = orientationLayout.zones
-    .filter((zone) => zone.visible && !(carouselFullscreen && zone.component === 'footer'))
-    .map((zone) => {
+  const renderedZones: RenderedZone[] = layoutZones
+    .filter((zone) => {
+      if (!zone.visible) return false;
+      if (carouselFullscreen && zone.component === 'footer') return false;
+      if (collapseEmptyContent && zone.component === 'content') return false;
+      if (zone.component === 'jumuah-bar' && !hasJumuahSessions) return false;
+      return true;
+    })
+    .flatMap((zone) => {
       const component = zone.component;
       const entry = zoneRegistry[component];
+      if (!entry) return [];
       const region = inferZoneRegion(layoutStructure, component, zone.region);
       const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
       const effectiveSize = resolveEffectiveZoneSize(
         zone,
-        orientationLayout.zones,
+        layoutZones,
         layoutStructure,
       );
       const node =
@@ -1040,7 +1076,7 @@ const DisplayScreenInner: React.FC = () => {
           zoneStyle = prayerStripHeightStyle(zone.size);
         }
       }
-      return {
+      return [{
         id: zone.id,
         component,
         region: zone.region,
@@ -1050,7 +1086,7 @@ const DisplayScreenInner: React.FC = () => {
         style: zoneStyle,
         label: entry.label,
         node,
-      };
+      }];
     });
 
   return (

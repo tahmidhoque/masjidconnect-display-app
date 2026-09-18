@@ -260,6 +260,92 @@ export function isPrayerOnlyLayout(zones: LayoutZone[]): boolean {
   return hasVisibleNonFooter && !layoutHasVisibleContent(zones);
 }
 
+/**
+ * Display-side defensive only — not an entitlement gate.
+ *
+ * When the API leaves a content zone visible but the playlist is empty
+ * (premium slides stripped after a plan downgrade, or an empty schedule),
+ * collapse that zone so the prayer board fills the hall screen instead of
+ * an empty carousel. Prayer-phase overlays still need the content slot
+ * (jamaat-soon, in-prayer, post-adhan supplication).
+ */
+export function shouldCollapseEmptyContentZone(args: {
+  hasCarouselItems: boolean;
+  contentOverlayActive: boolean;
+}): boolean {
+  return !args.hasCarouselItems && !args.contentOverlayActive;
+}
+
+const CORE_PRAYER_TIMES_ZONE: LayoutZone = {
+  id: 'zone-prayer-times',
+  component: 'prayer-times',
+  visible: true,
+  size: 0,
+  fontScale: 1,
+};
+
+const CORE_COUNTDOWN_ZONE: LayoutZone = {
+  id: 'zone-countdown',
+  component: 'countdown',
+  visible: true,
+  size: 0,
+  fontScale: 1,
+};
+
+const CORE_HEADER_ZONE: LayoutZone = {
+  id: 'zone-header',
+  component: 'header',
+  visible: true,
+  size: 0,
+  fontScale: 1,
+};
+
+const CORE_FOOTER_ZONE: LayoutZone = {
+  id: 'zone-footer',
+  component: 'footer',
+  visible: true,
+  size: 0,
+  fontScale: 1,
+};
+
+/**
+ * After collapsing an empty content zone, guarantee the Free prayer board
+ * chrome if prayer times exist: prayer strip/panel, countdown (when the
+ * strip is absent), header (when the strip is absent), and footer.
+ * Does not invent a carousel or upgrade copy.
+ */
+export function ensureCorePrayerZones(
+  zones: LayoutZone[],
+  args: { hasPrayerTimes: boolean; collapseEmptyContent: boolean },
+): LayoutZone[] {
+  if (!args.hasPrayerTimes || !args.collapseEmptyContent) return zones;
+
+  const next = zones.map((zone) => ({ ...zone }));
+  const hasVisible = (component: LayoutZoneComponent) =>
+    next.some((zone) => zone.visible && zone.component === component);
+
+  if (!hasVisible('prayer-times') && !hasVisible('prayer-panel')) {
+    next.unshift({ ...CORE_PRAYER_TIMES_ZONE });
+  }
+  if (!hasVisible('prayer-times') && !hasVisible('countdown')) {
+    const footerIndex = next.findIndex((zone) => zone.component === 'footer');
+    const countdown = { ...CORE_COUNTDOWN_ZONE };
+    if (footerIndex >= 0) next.splice(footerIndex, 0, countdown);
+    else next.push(countdown);
+  }
+  if (!hasVisible('prayer-times') && !hasVisible('header')) {
+    next.unshift({ ...CORE_HEADER_ZONE });
+  }
+  if (!next.some((zone) => zone.component === 'footer')) {
+    next.push({ ...CORE_FOOTER_ZONE });
+  } else {
+    const footer = next.find((zone) => zone.component === 'footer');
+    if (footer) footer.visible = true;
+  }
+
+  return next;
+}
+
 export function layoutMainZonesEmpty(
   zones: LayoutZone[],
   structure: LayoutStructure,

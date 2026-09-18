@@ -73,7 +73,8 @@ function collectItemMediaUrls(items: CarouselItem[]): string[] {
 const SmartFitImage: React.FC<{
   src: string;
   onReady?: () => void;
-}> = ({ src, onReady }) => (
+  onError?: () => void;
+}> = ({ src, onReady, onError }) => (
   <div
     data-media-fit="smart"
     className="relative min-h-0 flex-1 overflow-hidden"
@@ -94,7 +95,7 @@ const SmartFitImage: React.FC<{
       loading="eager"
       decoding="async"
       onLoad={onReady}
-      onError={onReady}
+      onError={onError ?? onReady}
     />
   </div>
 );
@@ -308,7 +309,12 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fitLoopRafRef = useRef<number>(0);
 
-  const safeItems = useMemo(() => (items.length > 0 ? items : []), [items]);
+  const rawItems = useMemo(() => (items.length > 0 ? items : []), [items]);
+  const [failedSlideIds, setFailedSlideIds] = useState<Set<string>>(() => new Set());
+  const safeItems = useMemo(
+    () => rawItems.filter((it) => !failedSlideIds.has(it.id)),
+    [rawItems, failedSlideIds],
+  );
 
   const mediaRemoteUrls = useMemo(() => collectItemMediaUrls(safeItems), [safeItems]);
   const mediaUrlMap = useCachedMediaUrlMap(mediaRemoteUrls);
@@ -337,6 +343,19 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   safeItemsRef.current = safeItems;
   activeIdxRef.current = activeIdx;
 
+  /** Drop a slide whose media 404s so a stripped Full URL cannot brick the hall. */
+  const skipBrokenSlide = useCallback((id?: string) => {
+    const slideId = id ?? safeItemsRef.current[activeIdxRef.current]?.id;
+    if (!slideId) return;
+    logger.warn('[ContentCarousel] Skipping slide after media load failure', { id: slideId });
+    setFailedSlideIds((prev) => {
+      if (prev.has(slideId)) return prev;
+      const next = new Set(prev);
+      next.add(slideId);
+      return next;
+    });
+  }, []);
+
   /** Advance to the next slide with a crossfade */
   const advance = useCallback(() => {
     if (safeItems.length <= 1) return;
@@ -351,6 +370,11 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   const onMediaAssetLoaded = useCallback(() => {
     setMediaSlideAssetReady(true);
   }, []);
+
+  const onMediaAssetError = useCallback(() => {
+    skipBrokenSlide();
+    setMediaSlideAssetReady(true);
+  }, [skipBrokenSlide]);
 
   /**
    * Per-item auto-advance: use the current slide's duration (from API) or the
@@ -381,11 +405,23 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
     };
   }, [activeIdx, advance, interval, safeItems, safeItems.length]);
 
-  /** Reset index if items change */
+  /** Reset index and forgotten 404s when the playlist identity changes */
   useEffect(() => {
+    setFailedSlideIds(new Set());
     setActiveIdx(0);
     setPhase('in');
   }, [items]);
+
+  /** Clamp the index if the current slide was filtered out after a media 404. */
+  useEffect(() => {
+    if (safeItems.length === 0) {
+      setActiveIdx(0);
+      return;
+    }
+    if (activeIdx >= safeItems.length) {
+      setActiveIdx(0);
+    }
+  }, [safeItems.length, activeIdx]);
 
   /** Pick a random Asma al-Husna name when slide becomes active */
   useEffect(() => {
@@ -430,6 +466,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
         setMediaSlideAssetReady(true);
       };
       pre.onerror = () => {
+        skipBrokenSlide(it.id);
         setMediaSlideAssetReady(true);
       };
       pre.src = url;
@@ -447,7 +484,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
     return () => {
       if (pdfRevealTimer) clearTimeout(pdfRevealTimer);
     };
-  }, [mediaPreloadKey, resolveMediaUrl]);
+  }, [mediaPreloadKey, resolveMediaUrl, skipBrokenSlide]);
 
   const currentItem = safeItems[activeIdx] ?? safeItems[0];
   const isEventSlide = !!currentItem?.event;
@@ -853,11 +890,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   }, [item?.course, resolveMediaUrl]);
 
   if (safeItems.length === 0 || !item) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-text-muted text-body">No content to display</p>
-      </div>
-    );
+    // Empty playlist: stay silent. DisplayScreen collapses this zone so the
+    // prayer board fills the screen — no empty-state copy on a hall display.
+    return <div className="h-full w-full" aria-hidden />;
   }
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields
@@ -949,6 +984,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 loop={safeItems.length <= 1}
                 onReady={onMediaAssetLoaded}
                 onEnded={advance}
+                onError={onMediaAssetError}
                 className="min-h-0 flex-1"
               />
             </Suspense>
@@ -960,6 +996,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
               mode="cover"
               className="min-h-0 flex-1"
               onReady={onMediaAssetLoaded}
+              onError={onMediaAssetError}
             />
           ) : (
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -970,7 +1007,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 loading="eager"
                 decoding="async"
                 onLoad={onMediaAssetLoaded}
-                onError={onMediaAssetLoaded}
+                onError={onMediaAssetError}
               />
             </div>
           )}
@@ -1019,7 +1056,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                 >
                   {resolvedImageUrl && (
                     <div className="flex justify-center min-h-0 max-h-[18rem] w-full">
-                      <img src={resolvedImageUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+                      <img
+                        src={resolvedImageUrl}
+                        alt=""
+                        className="max-w-full max-h-full object-contain rounded-lg"
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none';
+                        }}
+                      />
                     </div>
                   )}
                   {displayTitle && <h2 className="text-carousel-title text-text-primary">{displayTitle}</h2>}
@@ -1118,6 +1162,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                       loop={safeItems.length <= 1}
                       onReady={onMediaAssetLoaded}
                       onEnded={advance}
+                      onError={onMediaAssetError}
                       className="min-h-0 w-full flex-1"
                     />
                   </Suspense>
@@ -1142,9 +1187,14 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                       mode={effectiveMediaFit === 'smart' ? 'smart' : 'contain'}
                       className="min-h-0 w-full flex-1"
                       onReady={onMediaAssetLoaded}
+                      onError={onMediaAssetError}
                     />
                   ) : effectiveMediaFit === 'smart' ? (
-                    <SmartFitImage src={resolvedMediaUrl} onReady={onMediaAssetLoaded} />
+                    <SmartFitImage
+                      src={resolvedMediaUrl}
+                      onReady={onMediaAssetLoaded}
+                      onError={onMediaAssetError}
+                    />
                   ) : (
                     <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
                       <img
@@ -1152,6 +1202,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                         alt=""
                         className="gpu-accelerated max-h-full max-w-full object-contain"
                         onLoad={onMediaAssetLoaded}
+                        onError={onMediaAssetError}
                       />
                     </div>
                   )}
@@ -1170,6 +1221,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
                         src={resolvedImageUrl}
                         alt=""
                         className="max-w-full max-h-full object-contain rounded-lg"
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none';
+                        }}
                       />
                     </div>
                   )}

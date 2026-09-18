@@ -225,6 +225,17 @@ describe('mediaCacheService.prefetchAndRetain', () => {
     vi.useRealTimers();
   });
 
+  it('wipes leftover premium media when clearWhenEmpty is set', async () => {
+    await mediaCacheService.getLocalUrl(STORAGE_A);
+    expect(localStorage.getItem('masjidconnect-media-meta-v1')).toBeTruthy();
+
+    await mediaCacheService.prefetchAndRetain([], { clearWhenEmpty: true });
+
+    const metaRaw = localStorage.getItem('masjidconnect-media-meta-v1');
+    const meta = JSON.parse(metaRaw!) as { entries: Array<{ url: string }> };
+    expect(meta.entries).toEqual([]);
+  });
+
   it('does not wipe the cache when given an empty URL list', async () => {
     await mediaCacheService.getLocalUrl(STORAGE_A);
     expect(localStorage.getItem('masjidconnect-media-meta-v1')).toBeTruthy();

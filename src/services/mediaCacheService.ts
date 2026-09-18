@@ -186,10 +186,15 @@ class MediaCacheService {
    * Prefetch a set of URLs in the background and drop cache entries that are
    * no longer referenced by the active playlist/content.
    *
-   * Empty `urls` does **not** wipe the cache — a text-only playlist must not
-   * discard previously downloaded assets that may return on the next sync.
+   * Empty `urls` does **not** wipe the cache by default — a text-only playlist
+   * must not discard previously downloaded assets that may return on the next
+   * sync. Pass `clearWhenEmpty` after a live Full → Free refetch so leftover
+   * premium posters/videos are dropped.
    */
-  async prefetchAndRetain(urls: string[]): Promise<void> {
+  async prefetchAndRetain(
+    urls: string[],
+    options?: { clearWhenEmpty?: boolean },
+  ): Promise<void> {
     const unique = [...new Set(urls.map((u) => u.trim()).filter(Boolean))];
     const cacheable = unique.filter((u) => this.isCacheable(u));
 
@@ -199,6 +204,10 @@ class MediaCacheService {
 
     if (cacheable.length > 0) {
       await this.retain(cacheable);
+      return;
+    }
+    if (options?.clearWhenEmpty) {
+      await this.retain([], { allowEmptyWipe: true });
     }
   }
 
@@ -207,10 +216,14 @@ class MediaCacheService {
    * Cache API + meta are purged immediately; in-memory blob: URLs are revoked
    * after a grace period so the carousel can finish swapping slides.
    */
-  async retain(keepUrls: string[]): Promise<void> {
+  async retain(
+    keepUrls: string[],
+    options?: { allowEmptyWipe?: boolean },
+  ): Promise<void> {
     const keep = new Set(keepUrls.filter((u) => this.isCacheable(u)));
-    if (keep.size === 0) {
-      // Never wipe the entire media cache when the keep-set is empty.
+    if (keep.size === 0 && !options?.allowEmptyWipe) {
+      // Never wipe the entire media cache when the keep-set is empty
+      // unless the caller opted in (authoritative live refetch).
       return;
     }
 

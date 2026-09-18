@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ContentLogoFrame, FooterLeadingLogo, LogoRail } from './MasjidLogo';
 import type { DisplayLogoConfig } from '@/types/displayLayout';
@@ -33,6 +33,13 @@ describe('LogoRail', () => {
 
   it('does not render for footer position', () => {
     render(<LogoRail src="/logo.png" config={footerConfig} />);
+    expect(document.querySelector('[data-logo-rail]')).toBeNull();
+  });
+
+  it('hides the rail when the logo image 404s', () => {
+    render(<LogoRail src="/missing-logo.png" config={topLeftConfig} />);
+    expect(document.querySelector('[data-logo-rail]')).toBeTruthy();
+    fireEvent.error(screen.getByAltText('Masjid logo'));
     expect(document.querySelector('[data-logo-rail]')).toBeNull();
   });
 

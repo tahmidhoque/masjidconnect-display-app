@@ -89,6 +89,47 @@ describe('contentSlice', () => {
       expect(state.timeFormat).toBe('12h');
     });
 
+    it('replaces a prior Full schedule with an empty live schedule', () => {
+      const fullSchedule = {
+        id: 'premium',
+        name: 'Full',
+        items: [{ id: 'video-1', order: 0, type: 'VIDEO', title: 'Clip' }],
+      };
+      const seeded = contentReducer(undefined, refreshContent.fulfilled({
+        content: mockScreenContent as never,
+        masjidName: 'Test Masjid',
+        masjidTimezone: 'Europe/London',
+        masjidLogoUrl: 'https://cdn.example/logo.png',
+        carouselTime: 30,
+        timeFormat: '12h' as const,
+        displaySettings: DEFAULT_DISPLAY_SETTINGS,
+        timestamp: new Date().toISOString(),
+        schedule: fullSchedule as never,
+        scheduledPlaylists: [{ id: 'pl-1' }] as never,
+        events: [{ id: 'e1' }] as never,
+      }, '', {}));
+      expect(seeded.schedule?.items).toHaveLength(1);
+      expect(seeded.masjidLogoUrl).toBe('https://cdn.example/logo.png');
+
+      const state = contentReducer(seeded, refreshContent.fulfilled({
+        content: mockScreenContent as never,
+        masjidName: 'Test Masjid',
+        masjidTimezone: 'Europe/London',
+        masjidLogoUrl: null,
+        carouselTime: 30,
+        timeFormat: '12h' as const,
+        displaySettings: DEFAULT_DISPLAY_SETTINGS,
+        timestamp: new Date().toISOString(),
+        schedule: { id: 'cleared-schedule', name: 'Schedule', items: [] },
+        scheduledPlaylists: null,
+        events: [],
+      }, '', {}));
+      expect(state.schedule?.items).toEqual([]);
+      expect(state.scheduledPlaylists).toBeNull();
+      expect(state.events).toEqual([]);
+      expect(state.masjidLogoUrl).toBeNull();
+    });
+
     it('does not update content when payload.skipped is true', () => {
       const payload = { skipped: true, reason: 'debounced' } as never;
       const prev = contentReducer(undefined, refreshContent.pending('', {}));
@@ -240,8 +281,25 @@ describe('contentSlice', () => {
         timestamp: new Date().toISOString(),
       };
       const prev = contentReducer(undefined, refreshEvents.pending('', {}));
-      const state = contentReducer(prev, refreshEvents.fulfilled(payload, '', {}));
+      const state = contentReducer(prev, refreshEvents.fulfilled(payload as never, '', {}));
       expect(state.events).toEqual(events);
+    });
+
+    it('replaces leftover Full events with an empty live list', () => {
+      const seeded = contentReducer(
+        undefined,
+        refreshEvents.fulfilled(
+          { events: [{ id: 'premium' }] as never, timestamp: new Date().toISOString() },
+          '',
+          {},
+        ),
+      );
+      expect(seeded.events).toHaveLength(1);
+      const state = contentReducer(
+        seeded,
+        refreshEvents.fulfilled({ events: [], timestamp: new Date().toISOString() }, '', {}),
+      );
+      expect(state.events).toEqual([]);
     });
   });
 

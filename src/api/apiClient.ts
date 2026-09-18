@@ -28,6 +28,12 @@ import credentialService from '../services/credentialService';
 import environment from '../config/environment';
 import logger from '../utils/logger';
 import {
+  EMPTY_SCHEDULE,
+  isEmptySchedulePayload,
+  pickEventsField,
+  pickScheduleField,
+} from '../utils/authoritativeContent';
+import {
   PAIRING_ENDPOINTS,
   SCREEN_ENDPOINTS,
   buildUrl,
@@ -447,15 +453,15 @@ class ApiClient {
         await storageService.set('screenContent', contentResponse);
         logger.debug('[ApiClient] Saved screen content to storageService');
 
-        // Extract schedule from multiple possible paths (backend may nest under data, playlist, etc.)
-        const schedule =
-          contentResponse.schedule ??
-          (contentResponse as { data?: { schedule?: unknown } }).data?.schedule ??
-          (contentResponse as { playlist?: unknown }).playlist ??
-          (contentResponse as { assignedSchedule?: { schedule?: unknown } }).assignedSchedule?.schedule;
-        if (schedule) {
-          await storageService.set('schedule', schedule);
-          logger.debug('[ApiClient] Saved schedule separately');
+        const scheduleField = pickScheduleField(contentResponse);
+        if (scheduleField.hasKey || scheduleField.raw != null) {
+          if (isEmptySchedulePayload(scheduleField.raw)) {
+            await storageService.set('schedule', EMPTY_SCHEDULE);
+            logger.debug('[ApiClient] Cleared persisted schedule (empty or omitted list)');
+          } else {
+            await storageService.set('schedule', scheduleField.raw);
+            logger.debug('[ApiClient] Saved schedule separately');
+          }
         }
 
         if (contentResponse.prayerTimes) {
@@ -463,9 +469,12 @@ class ApiClient {
           logger.debug('[ApiClient] Saved prayer times from content');
         }
 
-        if (contentResponse.events) {
-          await storageService.set('events', contentResponse.events);
-          logger.debug('[ApiClient] Saved events from content');
+        const eventsField = pickEventsField(contentResponse);
+        if (eventsField.hasKey) {
+          await storageService.set('events', eventsField.events);
+          logger.debug('[ApiClient] Saved events from content', {
+            count: eventsField.events.length,
+          });
         }
 
         // Persist displaySettings for Redux (admin-controlled screen customisation)
@@ -483,8 +492,13 @@ class ApiClient {
         await storageService.set('prayerTimes', payload);
         logger.debug('[ApiClient] Saved prayer times to storageService');
       } else if (cacheKey === CACHE_KEYS.EVENTS) {
-        await storageService.set('events', data);
-        logger.debug('[ApiClient] Saved events to storageService');
+        const events = Array.isArray(data)
+          ? data
+          : (data as EventsResponse)?.events;
+        await storageService.set('events', Array.isArray(events) ? events : []);
+        logger.debug('[ApiClient] Saved events to storageService', {
+          count: Array.isArray(events) ? events.length : 0,
+        });
       }
     } catch (error) {
       logger.error('[ApiClient] Failed to save to storageService', { cacheKey, error });
