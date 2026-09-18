@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { realtimeMiddleware, cleanupRealtimeMiddleware } from './realtimeMiddleware';
 import { createTestStore } from '@/test-utils/mock-store';
+import * as contentSlice from '../slices/contentSlice';
 
 const mockPerformFactoryReset = vi.fn();
 const mockOn = vi.fn(() => () => {});
@@ -332,5 +333,82 @@ describe('realtimeMiddleware', () => {
       }),
     );
     expect(mockClearAlert).not.toHaveBeenCalled();
+  });
+
+  function startAuthenticatedWithHandlers() {
+    const handlers = new Map<string, (data?: unknown) => void>();
+    mockOn.mockImplementation(
+      ((event: string, handler: (data?: unknown) => void) => {
+        handlers.set(event, handler);
+        return () => {
+          handlers.delete(event);
+        };
+      }) as never,
+    );
+    const store = createTestStore({
+      auth: {
+        isAuthenticated: true,
+        isPaired: true,
+        screenId: 's',
+        apiKey: 'k',
+        masjidId: 'm',
+      } as never,
+    });
+    const middleware = realtimeMiddleware({
+      getState: store.getState,
+      dispatch: store.dispatch,
+    } as never);
+    const next = vi.fn((a: unknown) => a);
+    const dispatch = middleware(next);
+    dispatch({
+      type: 'auth/checkPairingStatus/fulfilled',
+      payload: { isPaired: true, credentials: { screenId: 's', apiKey: 'k', masjidId: 'm' } },
+    });
+    vi.advanceTimersByTime(100);
+    return { handlers, store };
+  }
+
+  it('content:invalidate schedule_assignment / display_settings / events refetch screen content', async () => {
+    const mockThunk = () => {
+      const thunk = () => {
+        const result = Promise.resolve();
+        return Object.assign(result, { unwrap: () => Promise.resolve() });
+      };
+      return thunk as never;
+    };
+    const refreshContentSpy = vi.spyOn(contentSlice, 'refreshContent').mockImplementation(mockThunk);
+    const refreshEventsSpy = vi.spyOn(contentSlice, 'refreshEvents').mockImplementation(mockThunk);
+    const refreshPrayerTimesSpy = vi.spyOn(contentSlice, 'refreshPrayerTimes').mockImplementation(mockThunk);
+
+    const { handlers } = startAuthenticatedWithHandlers();
+    const invalidate = handlers.get('content:invalidate');
+    expect(invalidate).toBeDefined();
+
+    const flushInvalidate = async (ms = 0) => {
+      if (ms > 0) await vi.advanceTimersByTimeAsync(ms);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    invalidate?.({ type: 'schedule_assignment' });
+    await flushInvalidate(400);
+    expect(refreshContentSpy).toHaveBeenCalledWith({ forceRefresh: true });
+
+    refreshContentSpy.mockClear();
+    invalidate?.({ type: 'display_settings' });
+    await flushInvalidate(400);
+    expect(refreshContentSpy).toHaveBeenCalledWith({ forceRefresh: true });
+
+    refreshContentSpy.mockClear();
+    refreshEventsSpy.mockClear();
+    invalidate?.({ type: 'events' });
+    await flushInvalidate(0);
+    await flushInvalidate(600);
+    expect(refreshContentSpy).toHaveBeenCalledWith({ forceRefresh: true });
+    expect(refreshEventsSpy).toHaveBeenCalledWith({ forceRefresh: true });
+
+    refreshContentSpy.mockRestore();
+    refreshEventsSpy.mockRestore();
+    refreshPrayerTimesSpy.mockRestore();
   });
 });

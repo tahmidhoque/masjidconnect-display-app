@@ -28,6 +28,8 @@ export interface MediaPdfPageProps {
   className?: string;
   /** Fires once when the first frame has been painted (or load/render failed). */
   onReady?: () => void;
+  /** Fires when the PDF cannot be loaded or rendered — carousel skips the slide. */
+  onError?: () => void;
 }
 
 const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
@@ -37,13 +39,16 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
   mode,
   className = '',
   onReady,
+  onError,
 }) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const readyFiredRef = useRef(false);
   const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   onReadyRef.current = onReady;
+  onErrorRef.current = onError;
   const isSmart = mode === 'smart';
   // Data URL of the rendered page, reused as a blurred backdrop in smart mode.
   const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
@@ -103,6 +108,7 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
       logger.error('[MediaPdfPage] Failed to render page', {
         error: err instanceof Error ? err.message : String(err),
       });
+      onErrorRef.current?.();
       fireReadyOnce();
     }
   }, [fit, isSmart]);
@@ -132,6 +138,7 @@ const MediaPdfPage: React.FC<MediaPdfPageProps> = ({
         logger.error('[MediaPdfPage] Failed to load PDF', {
           error: err instanceof Error ? err.message : String(err),
         });
+        onErrorRef.current?.();
         fireReadyOnce();
       });
 

@@ -80,6 +80,23 @@ describe('Header — rendering', () => {
     expect(screen.queryByText(/Ramadan/)).not.toBeInTheDocument();
   });
 
+  it('hides the masjid logo when logo is null or omitted', () => {
+    const { rerender } = render(React.createElement(Header, { logo: null }), {
+      wrapper: makeWrapper(),
+    });
+    expect(screen.queryByAltText('Masjid logo')).not.toBeInTheDocument();
+
+    rerender(
+      React.createElement(Header, {
+        logo: { src: '/logo.png', side: 'left', size: 'medium', background: 'none' },
+      }),
+    );
+    expect(screen.getByAltText('Masjid logo')).toHaveAttribute('src', '/logo.png');
+
+    rerender(React.createElement(Header, { logo: null }));
+    expect(screen.queryByAltText('Masjid logo')).not.toBeInTheDocument();
+  });
+
   it('displays the Hijri date when not in Ramadan mode', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-29T10:00:00.000Z'));

@@ -17,6 +17,13 @@ import {
   tomorrowJamaatModeUsesColumn,
 } from "../../utils/tomorrowJamaatDisplay";
 import { resolveTimeFormat } from "../../utils/dateUtils";
+import {
+  EMPTY_SCHEDULE,
+  normaliseEventsList,
+  pickEmergencyFromContent,
+  resolveAuthoritativeCarousel,
+} from "../../utils/authoritativeContent";
+import emergencyAlertService from "../../services/emergencyAlertService";
 
 // Constants
 const MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — forceRefresh bypasses this
@@ -593,6 +600,7 @@ export const refreshContent = createAsyncThunk(
 
       // Use sync service for robust data fetching.
       let syncSucceeded = false;
+      let syncedFromCache = false;
       let syncedContent: ScreenContent | null = null;
       try {
         const syncResult = await syncService.syncContent({ forceRefresh });
@@ -601,6 +609,7 @@ export const refreshContent = createAsyncThunk(
           return { skipped: true, reason: 'superseded' };
         }
         syncSucceeded = syncResult.success === true;
+        syncedFromCache = syncResult.fromCache === true;
         if (syncSucceeded && syncResult.data) {
           syncedContent = unwrapScreenContentPayload(syncResult.data);
         }
@@ -620,16 +629,61 @@ export const refreshContent = createAsyncThunk(
         throw new Error(syncSucceeded ? "No content received from server" : "Sync failed and no cached content available");
       }
 
-      // Prefer schedule from the content we just synced (API may embed it under various paths); fall back to separate key
-      const scheduleFromContent = pickSchedulePayloadFromScreenContent(content);
-      const scheduleFromStorage = await storageService.get<any>('schedule');
-      const scheduleData = scheduleFromContent ?? scheduleFromStorage;
-      const schedule = scheduleData ? normalizeScheduleData(scheduleData) : null;
+      /**
+       * Live network payload is authoritative. Do not fall back to LocalForage
+       * schedule/playlists when Cloud omitted or emptied them (Full → Free).
+       * Cached / failed fetches keep offline residue so the hall still renders.
+       */
+      const liveAuthoritative = syncSucceeded && !!syncedContent && !syncedFromCache;
 
-      const eventsData = await storageService.get<any>('events');
-      const events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
+      let schedule: Schedule | null = null;
+      let scheduledPlaylistsArray: ScheduledPlaylistAssignment[] | null | undefined;
+      let hasScheduledPlaylistsKey = false;
+      let events: Event[] | undefined;
 
-      const { hasScheduledPlaylistsKey, scheduledPlaylistsArray } = pickScheduledPlaylists(content);
+      if (liveAuthoritative) {
+        const resolved = resolveAuthoritativeCarousel(content);
+        if (resolved.emptySchedule) {
+          schedule = resolved.emptySchedule;
+          await storageService.set('schedule', EMPTY_SCHEDULE);
+          logger.info('[Content] Cleared persisted schedule after live refetch (empty or omitted)');
+        } else {
+          schedule = normalizeScheduleData(resolved.scheduleRaw);
+          await storageService.set('schedule', schedule);
+        }
+
+        hasScheduledPlaylistsKey = true;
+        scheduledPlaylistsArray = resolved.scheduledPlaylists;
+        if (!resolved.scheduledPlaylists) {
+          logger.info('[Content] Cleared persisted playlists after live refetch (empty or omitted)');
+        }
+
+        if (resolved.eventsFromContent.hasKey) {
+          events = resolved.eventsFromContent.events;
+          await storageService.set('events', events);
+        } else {
+          const eventsData = await storageService.get<any>('events');
+          events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
+        }
+
+        const emergencyField = pickEmergencyFromContent(content);
+        if (emergencyField.shouldClear) {
+          emergencyAlertService.clearAlert();
+          logger.info('[Content] Cleared emergency overlay after live refetch (payload cleared emergency)');
+        }
+      } else {
+        const scheduleFromContent = pickSchedulePayloadFromScreenContent(content);
+        const scheduleFromStorage = await storageService.get<any>('schedule');
+        const scheduleData = scheduleFromContent ?? scheduleFromStorage;
+        schedule = scheduleData ? normalizeScheduleData(scheduleData) : null;
+
+        const eventsData = await storageService.get<any>('events');
+        events = Array.isArray(eventsData) ? eventsData : eventsData?.events ?? eventsData ?? [];
+
+        const picked = pickScheduledPlaylists(content);
+        hasScheduledPlaylistsKey = picked.hasScheduledPlaylistsKey;
+        scheduledPlaylistsArray = picked.scheduledPlaylistsArray;
+      }
 
       // Extract masjid information
       const masjidName = extractMasjidName(content);
@@ -696,7 +750,9 @@ export const refreshContent = createAsyncThunk(
         masjidLogoUrl,
         scheduledPlaylists: scheduledPlaylistsArray,
       });
-      void mediaCacheService.prefetchAndRetain(mediaUrls).catch((err) => {
+      void mediaCacheService.prefetchAndRetain(mediaUrls, {
+        clearWhenEmpty: liveAuthoritative,
+      }).catch((err) => {
         logger.warn('[Content] Media prefetch failed', { error: String(err) });
       });
 
@@ -709,8 +765,10 @@ export const refreshContent = createAsyncThunk(
         timeFormat,
         displaySettings,
         timestamp: new Date().toISOString(),
-        schedule: schedule ?? undefined,
-        scheduledPlaylists: hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined,
+        schedule: liveAuthoritative ? (schedule ?? EMPTY_SCHEDULE) : (schedule ?? undefined),
+        scheduledPlaylists: liveAuthoritative
+          ? (scheduledPlaylistsArray ?? null)
+          : (hasScheduledPlaylistsKey ? scheduledPlaylistsArray : undefined),
         events: events ?? undefined,
       };
     } catch (error: any) {
@@ -938,11 +996,21 @@ export const refreshEvents = createAsyncThunk(
       const { forceRefresh = false } = options;
       logger.debug("[Content] Refreshing events...", { forceRefresh });
 
+      let syncSucceeded = false;
+      let syncedFromCache = false;
+      let liveEvents: Event[] | null = null;
+
       if (forceRefresh) {
         try {
           const syncResult = await syncService.syncEvents({ forceRefresh: true });
-          if (syncResult.success) {
-            logger.debug("[Content] Events sync completed successfully");
+          syncSucceeded = syncResult.success === true;
+          syncedFromCache = syncResult.fromCache === true;
+          if (syncSucceeded) {
+            liveEvents = normaliseEventsList(syncResult.data);
+            logger.debug("[Content] Events sync completed successfully", {
+              count: liveEvents.length,
+              fromCache: syncedFromCache,
+            });
           } else {
             logger.warn("[Content] Events sync unsuccessful, falling back to cached data", {
               error: syncResult.error,
@@ -956,10 +1024,23 @@ export const refreshEvents = createAsyncThunk(
         }
       }
 
-      const events = await storageService.get<any>('events');
+      /**
+       * Live network payload is authoritative. An empty Free events list
+       * must replace leftover Full events in Redux and LocalForage.
+       */
+      const liveAuthoritative = forceRefresh && syncSucceeded && !syncedFromCache;
+      if (liveAuthoritative) {
+        const events = liveEvents ?? [];
+        await storageService.set('events', events);
+        return {
+          events,
+          timestamp: new Date().toISOString(),
+        };
+      }
 
+      const stored = await storageService.get<unknown>('events');
       return {
-        events: events || [],
+        events: normaliseEventsList(stored),
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {

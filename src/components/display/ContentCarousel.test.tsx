@@ -97,6 +97,55 @@ describe('ContentCarousel', () => {
     expect(screen.queryByText(/no content to display/i)).not.toBeInTheDocument();
   });
 
+  it('skips a media slide when the image 404s and shows the next slide', async () => {
+    const items = [
+      {
+        id: 'bad-media',
+        type: 'MEDIA_SLIDE',
+        title: 'Broken poster',
+        mediaUrl: 'https://cdn.example.com/gone.webp',
+        mediaKind: 'image' as const,
+        mediaFit: 'contain' as const,
+        duration: 20,
+      },
+      {
+        id: 'ok-text',
+        type: 'ANNOUNCEMENT',
+        title: 'Hall notice',
+        body: 'Prayer times still showing',
+        duration: 20,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    const img = document.querySelector('img');
+    expect(img).toBeTruthy();
+    fireEvent.error(img!);
+    await waitFor(() => {
+      expect(screen.getByText('Hall notice')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Broken poster')).not.toBeInTheDocument();
+  });
+
+  it('fails soft when the only media slide 404s — no empty-state copy, hall stays up', () => {
+    const items = [
+      {
+        id: 'only-bad',
+        type: 'MEDIA_SLIDE',
+        title: 'Gone',
+        mediaUrl: 'https://cdn.example.com/404.webp',
+        mediaKind: 'image' as const,
+        mediaFit: 'contain' as const,
+        duration: 15,
+      },
+    ];
+    render(<ContentCarousel items={items} interval={30} />);
+    const img = document.querySelector('img');
+    expect(img).toBeTruthy();
+    fireEvent.error(img!);
+    expect(screen.queryByText(/no content to display/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/upgrade/i)).not.toBeInTheDocument();
+  });
+
   it('renders the same body content in landscape and portrait (compact) mode', () => {
     const items = [
       {

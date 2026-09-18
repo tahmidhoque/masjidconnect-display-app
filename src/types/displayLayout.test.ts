@@ -8,6 +8,7 @@ import {
   resolvePrayerSidebarTileColumns,
   sanitiseLayoutConfig,
   shouldCollapseEmptyContentZone,
+  ensureCorePrayerZones,
   zoneSizeHint,
   type LayoutZone,
 } from './displayLayout';
@@ -110,6 +111,30 @@ describe('shouldCollapseEmptyContentZone', () => {
         contentOverlayActive: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe('ensureCorePrayerZones', () => {
+  it('injects a prayer strip and footer when content collapses and no prayer widget remains', () => {
+    const zones = [
+      zone('content', { size: 5 }),
+      zone('footer'),
+    ];
+    const result = ensureCorePrayerZones(zones, {
+      hasPrayerTimes: true,
+      collapseEmptyContent: true,
+    });
+    expect(result.some((entry) => entry.component === 'prayer-times' && entry.visible)).toBe(true);
+    expect(result.some((entry) => entry.component === 'footer' && entry.visible)).toBe(true);
+  });
+
+  it('does not invent chrome while the carousel still has slides', () => {
+    const zones = [zone('content', { size: 5 }), zone('footer')];
+    const result = ensureCorePrayerZones(zones, {
+      hasPrayerTimes: true,
+      collapseEmptyContent: false,
+    });
+    expect(result.map((entry) => entry.component)).toEqual(['content', 'footer']);
   });
 });
 
