@@ -8,10 +8,13 @@ import { postJamaatSupplicationDurationMinutes } from "@/utils/displaySettingsSu
 
 const DEFAULT_MINUTES = 10;
 
-/** Back-compat lead when Portal pre-jamaat settings are absent. */
+/** Classic silent-phones overlay lead (300s) when Portal `silencePhones*` is omitted. */
 export const DEFAULT_JAMAAT_LEAD_MIN = 5;
+export const DEFAULT_SILENCE_PHONES_SECONDS = 300;
+export const SILENCE_PHONES_SECONDS_MIN = 60;
+export const SILENCE_PHONES_SECONDS_MAX = 600;
 
-/** Portal-allowed pre-jamaat overlay durations (seconds). */
+/** Portal-allowed Client A pre-jamaat countdown chrome durations (seconds). */
 export const PRE_JAMAAT_COUNTDOWN_SECONDS = [30, 60, 90, 120] as const;
 
 export type PreJamaatCountdownSeconds = (typeof PRE_JAMAAT_COUNTDOWN_SECONDS)[number];
@@ -26,10 +29,49 @@ function isPreJamaatCountdownSeconds(value: unknown): value is PreJamaatCountdow
 }
 
 /**
- * Minutes before jamaat that silent-phones / pre-jamaat overlay starts.
- * - Settings absent → 5 (legacy JAMAAT_LEAD_MIN)
- * - `preJamaatCountdownEnabled: false` → 0 (overlay off)
- * - enabled → Portal seconds (30/60/90/120) as fractional minutes; missing seconds → 60s
+ * Clamp Portal `silencePhonesSecondsBeforeJamaat` into 60–600. Invalid → 300.
+ */
+export function clampSilencePhonesSeconds(
+  value: unknown,
+  fallback: number = DEFAULT_SILENCE_PHONES_SECONDS,
+): number {
+  if (typeof value !== "number" || Number.isNaN(value)) return fallback;
+  return Math.max(
+    SILENCE_PHONES_SECONDS_MIN,
+    Math.min(SILENCE_PHONES_SECONDS_MAX, Math.round(value)),
+  );
+}
+
+/**
+ * Minutes before jamaat that the silent-phones overlay starts.
+ *
+ * Independent of Client A `preJamaatCountdown*` (countdown chrome only).
+ * - omit / `silencePhonesEnabled` not false → ON, 300s (classic 5 min)
+ * - `silencePhonesEnabled: false` → overlay off
+ * - `silencePhonesSecondsBeforeJamaat` present → that many seconds (clamped 60–600)
+ *
+ * `#39` wrongly drove this from `preJamaatCountdownEnabled`. Portal always sends
+ * that flag as `false`, which zeroed the lead and hid the overlay for default masjids.
+ */
+export function silencePhonesLeadMinutes(
+  settings: DisplaySettings | null | undefined,
+): number {
+  if (settings?.silencePhonesEnabled === false) {
+    return 0;
+  }
+  if (typeof settings?.silencePhonesSecondsBeforeJamaat === "number") {
+    return clampSilencePhonesSeconds(settings.silencePhonesSecondsBeforeJamaat) / 60;
+  }
+  return DEFAULT_JAMAAT_LEAD_MIN;
+}
+
+/**
+ * Minutes before jamaat that Client A countdown chrome flips to the Jamaat target.
+ * Overlay timing must use `silencePhonesLeadMinutes` — do not call this for jamaat-soon.
+ *
+ * - Settings absent → 5 (older payloads)
+ * - `preJamaatCountdownEnabled: false` → 0 (Portal schema default / chrome off)
+ * - enabled → Portal seconds (30/60/90/120); missing seconds → 60s
  */
 export function preJamaatLeadMinutes(
   settings: DisplaySettings | null | undefined,

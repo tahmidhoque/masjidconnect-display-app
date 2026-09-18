@@ -11,6 +11,7 @@ import {
   totalJamaatPhaseWindowForDisplayPrayer,
   jamaatPhaseMinutesForDisplayPrayer,
   preJamaatLeadMinutes,
+  silencePhonesLeadMinutes,
   DEFAULT_JAMAAT_LEAD_MIN,
 } from "./displaySettingsJamaat";
 
@@ -151,13 +152,83 @@ describe("totalJamaatPhaseWindowForDisplayPrayer", () => {
   });
 });
 
+describe("silencePhonesLeadMinutes", () => {
+  it("uses the 5-minute classic overlay when Portal silencePhones* are omitted", () => {
+    expect(silencePhonesLeadMinutes(null)).toBe(DEFAULT_JAMAAT_LEAD_MIN);
+    expect(silencePhonesLeadMinutes(baseSettings())).toBe(5);
+  });
+
+  it("does not let Portal preJamaatCountdownEnabled false kill the overlay", () => {
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: false,
+        preJamaatCountdownSeconds: 60,
+      }),
+    ).toBe(DEFAULT_JAMAAT_LEAD_MIN);
+  });
+
+  it("does not let Client A countdown chrome change the overlay window", () => {
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        preJamaatCountdownEnabled: true,
+        preJamaatCountdownSeconds: 30,
+      }),
+    ).toBe(DEFAULT_JAMAAT_LEAD_MIN);
+  });
+
+  it("returns 0 when silence-phones is explicitly disabled", () => {
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        silencePhonesEnabled: false,
+        silencePhonesSecondsBeforeJamaat: 300,
+        preJamaatCountdownEnabled: true,
+        preJamaatCountdownSeconds: 120,
+      }),
+    ).toBe(0);
+  });
+
+  it("honours custom silencePhonesSecondsBeforeJamaat", () => {
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        silencePhonesSecondsBeforeJamaat: 180,
+        preJamaatCountdownEnabled: false,
+      }),
+    ).toBe(3);
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        silencePhonesSecondsBeforeJamaat: 300,
+      }),
+    ).toBe(5);
+  });
+
+  it("clamps custom overlay seconds into 60–600", () => {
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        silencePhonesSecondsBeforeJamaat: 10,
+      }),
+    ).toBe(1);
+    expect(
+      silencePhonesLeadMinutes({
+        ...baseSettings(),
+        silencePhonesSecondsBeforeJamaat: 900,
+      }),
+    ).toBe(10);
+  });
+});
+
 describe("preJamaatLeadMinutes", () => {
-  it("uses the 5-minute legacy lead when Portal settings are absent", () => {
+  it("uses the 5-minute lead when Portal countdown settings are absent", () => {
     expect(preJamaatLeadMinutes(null)).toBe(DEFAULT_JAMAAT_LEAD_MIN);
     expect(preJamaatLeadMinutes(baseSettings())).toBe(5);
   });
 
-  it("returns 0 when the Portal flag is disabled", () => {
+  it("returns 0 when Client A countdown chrome is disabled", () => {
     expect(
       preJamaatLeadMinutes({
         ...baseSettings(),
@@ -167,7 +238,7 @@ describe("preJamaatLeadMinutes", () => {
     ).toBe(0);
   });
 
-  it("converts Portal seconds to fractional minutes when enabled", () => {
+  it("converts Portal seconds to fractional minutes when countdown chrome is enabled", () => {
     expect(
       preJamaatLeadMinutes({
         ...baseSettings(),
@@ -198,7 +269,7 @@ describe("preJamaatLeadMinutes", () => {
     ).toBe(2);
   });
 
-  it("defaults to 60 seconds when enabled but duration is missing", () => {
+  it("defaults to 60 seconds when countdown chrome is enabled but duration is missing", () => {
     expect(
       preJamaatLeadMinutes({
         ...baseSettings(),

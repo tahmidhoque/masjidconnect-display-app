@@ -7,8 +7,10 @@
  * or in-prayer calm screen).
  *
  * Phase rule (J = jamaat minutes-from-midnight, A = adhan minutes-from-midnight,
- * lead minutes = silent-phones / pre-jamaat overlay; Portal `preJamaatCountdown*`
- * when present, else `DEFAULT_JAMAAT_LEAD_MIN` = 5):
+ * lead minutes = silent-phones overlay via `silencePhonesLeadMinutes`:
+ * omit → 5 min / 300s; `silencePhonesEnabled: false` → off; custom seconds
+ * when Portal sends `silencePhonesSecondsBeforeJamaat`. Client A
+ * `preJamaatCountdown*` is countdown chrome only and must not gate this overlay):
  *   countdown-adhan  — Normal display. Carousel visible, counting down to adhan.
  *   countdown-jamaat — Adhan passed, still more than the lead window to jamaat.
  *   jamaat-soon      — Within the lead window of jamaat (regardless of adhan).
@@ -42,7 +44,7 @@ import {
   jamaatPhaseMinutesForDisplayPrayer,
   postJamaatDelayMinutes,
   postJamaatSupplicationWindowMinutes,
-  preJamaatLeadMinutes,
+  silencePhonesLeadMinutes,
   DEFAULT_JAMAAT_LEAD_MIN,
 } from '@/utils/displaySettingsJamaat';
 import { isPostAdhanSupplicationActive } from '@/utils/displaySettingsSupplications';
@@ -84,7 +86,7 @@ export interface PrayerPhaseData {
 
 /**
  * Minutes BEFORE jamaat that the silent-phones / jamaat-soon screen shows
- * when Portal pre-jamaat settings are absent. Prefer `preJamaatLeadMinutes`.
+ * when Portal `silencePhones*` is omitted. Prefer `silencePhonesLeadMinutes`.
  */
 export const JAMAAT_LEAD_MIN = DEFAULT_JAMAAT_LEAD_MIN;
 
@@ -160,7 +162,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     const now = nowMinutesInTz(currentTime, masjidTz);
     const delayMin = postJamaatDelayMinutes(displaySettings);
-    const jamaatLeadMin = preJamaatLeadMinutes(displaySettings);
+    const jamaatLeadMin = silencePhonesLeadMinutes(displaySettings);
 
     /**
      * Resolve the in-prayer window (J ≤ now ≤ J + progress + delay) for a
@@ -253,7 +255,7 @@ export const usePrayerPhase = (): PrayerPhaseData => {
 
     // 4) Within the silent-phones lead window — fires regardless of A so the
     //    screen still shows when adhan == jamaat or A is inside the window.
-    //    Lead of 0 (Portal disabled) never matches `now < J`.
+    //    Lead of 0 (`silencePhonesEnabled: false`) never matches `now < J`.
     if (jamaatLeadMin > 0 && now >= J - jamaatLeadMin && now < J) {
       return { phase: 'jamaat-soon', prayerName: nextPrayer.name };
     }
