@@ -20,6 +20,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { usePrayerTimesContext } from '../../contexts/PrayerTimesContext';
 import type { TomorrowsJamaatsMap } from '../../hooks/usePrayerTimes';
+import useMasjidTime from '../../hooks/useMasjidTime';
+import { useAppSelector } from '../../store/hooks';
+import { selectMasjidTimezone } from '../../store/slices/contentSlice';
+import { defaultMasjidTimezone } from '../../config/environment';
+import { getTimeUntilNextPrayer } from '../../utils/dateUtils';
+import { getEffectiveJamaat } from '../../utils/jumuahJamaat';
 import SilentPhonesGraphic from './SilentPhonesGraphic';
 import TomorrowsJamaatChangeSlide from './TomorrowsJamaatChangeSlide';
 
@@ -143,7 +149,20 @@ export interface JamaatSoonSlotProps {
 const JamaatSoonSlot: React.FC<JamaatSoonSlotProps> = ({
   landscapeSplit = false,
 }) => {
-  const { nextPrayer, tomorrowsJamaats } = usePrayerTimesContext();
+  const { nextPrayer, tomorrowsJamaats, isJumuahToday, jumuahTime } =
+    usePrayerTimesContext();
+  /* Subscribe to the 1s masjid clock so the overlay countdown ticks. */
+  useMasjidTime();
+  const masjidTz =
+    useAppSelector(selectMasjidTimezone) || defaultMasjidTimezone;
+  const effectiveJamaat = getEffectiveJamaat(
+    nextPrayer ?? undefined,
+    isJumuahToday,
+    jumuahTime,
+  );
+  const jamaatCountdown = effectiveJamaat
+    ? getTimeUntilNextPrayer(effectiveJamaat, false, {}, masjidTz) || null
+    : null;
 
   /* Dev override flag, kept reactive via custom event. */
   const [forceFlag, setForceFlag] = useState<TomorrowJamaatChangeForce | undefined>(
@@ -223,6 +242,7 @@ const JamaatSoonSlot: React.FC<JamaatSoonSlotProps> = ({
       landscapeSplit={landscapeSplit}
       prayerName={nextPrayer?.name}
       isJumuah={nextPrayer?.isJumuah === true}
+      jamaatCountdown={jamaatCountdown}
     />
   );
 

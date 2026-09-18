@@ -152,6 +152,12 @@ const PrayerCountdown: React.FC<PrayerCountdownProps> = ({
 
     if (A < 0 && J < 0) return null;
 
+    // Overlay window: hall chrome must read "{PRAYER} JAMAAT IN Xm Xs"
+    // (Osman CCTV). Independent of Client A preJamaatCountdown lead.
+    if (phase === 'jamaat-soon' && J >= 0 && nowMin < J) {
+      return { time: effectiveJamaat!, forceTomorrow: false, target: 'jamaat' };
+    }
+
     // Before adhan today
     if (A >= 0 && nowMin < A) {
       // Lead window flip (only fires when A >= J − lead, i.e. when

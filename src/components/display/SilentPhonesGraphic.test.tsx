@@ -72,4 +72,14 @@ describe('SilentPhonesGraphic', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Sunset Congregation is about to begin')).toBeInTheDocument();
   });
+
+  it('shows the live Jamaat countdown headline with the prayer name', () => {
+    renderGraphic({ prayerName: 'Fajr', jamaatCountdown: '3m 54s' });
+
+    expect(screen.getByTestId('silence-phones-countdown')).toBeInTheDocument();
+    expect(screen.getByText('Fajr Jamaat in')).toBeInTheDocument();
+    expect(screen.getByLabelText('3m 54s')).toBeInTheDocument();
+    expect(screen.getByText('Please switch your phone to')).toBeInTheDocument();
+    expect(screen.getByText('silent')).toBeInTheDocument();
+  });
 });

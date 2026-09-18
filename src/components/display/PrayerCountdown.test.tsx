@@ -324,6 +324,40 @@ describe('PrayerCountdown — Portal pre-jamaat lead', () => {
     expect(screen.getByText(/Zuhr starts in/i)).toBeInTheDocument();
     expect(screen.queryByText(/Jamaat in/i)).not.toBeInTheDocument();
   });
+
+  it('shows Jamaat countdown during jamaat-soon even when Portal countdown chrome is off', () => {
+    // Osman overlay: 4 min before Zuhr Jamaat; preJamaatCountdownEnabled is the
+    // Portal schema default (false) and must not keep the label on Adhan.
+    vi.setSystemTime(new Date('2026-06-15T11:56:00.000Z'));
+    (usePrayerTimesContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      nextPrayer: {
+        name: 'Zuhr',
+        time: '12:15',
+        jamaat: '13:00',
+        displayTime: '12:15 PM',
+        displayJamaat: '1:00 PM',
+        isNext: true,
+        isCurrent: false,
+        timeUntil: '',
+        jamaatTime: '13:00',
+      },
+      currentPrayer: null,
+      isJumuahToday: false,
+      jumuahTime: null,
+    });
+
+    render(
+      <PrayerCountdown phase="jamaat-soon" />,
+      {
+        wrapper: makeWrapper({
+          preJamaatCountdownEnabled: false,
+          preJamaatCountdownSeconds: 60,
+        }),
+      },
+    );
+
+    expect(screen.getByText(/Zuhr Jamaat in/i)).toBeInTheDocument();
+  });
 });
 
 describe('PrayerCountdown — Adhan / starts wording', () => {
