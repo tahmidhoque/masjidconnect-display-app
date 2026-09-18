@@ -94,6 +94,7 @@ describe('ContentCarousel', () => {
   it('renders without crashing when items is empty', () => {
     const { container } = render(<ContentCarousel items={[]} interval={30} />);
     expect(container).toBeInTheDocument();
+    expect(screen.queryByText(/no content to display/i)).not.toBeInTheDocument();
   });
 
   it('renders the same body content in landscape and portrait (compact) mode', () => {

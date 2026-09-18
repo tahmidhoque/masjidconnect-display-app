@@ -853,11 +853,9 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
   }, [item?.course, resolveMediaUrl]);
 
   if (safeItems.length === 0 || !item) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-text-muted text-body">No content to display</p>
-      </div>
-    );
+    // Empty playlist: stay silent. DisplayScreen collapses this zone so the
+    // prayer board fills the screen — no empty-state copy on a hall display.
+    return <div className="h-full w-full" aria-hidden />;
   }
 
   // When the item carries a `names` array (ASMA_AL_HUSNA), resolve the fields

@@ -260,6 +260,22 @@ export function isPrayerOnlyLayout(zones: LayoutZone[]): boolean {
   return hasVisibleNonFooter && !layoutHasVisibleContent(zones);
 }
 
+/**
+ * Display-side defensive only — not an entitlement gate.
+ *
+ * When the API leaves a content zone visible but the playlist is empty
+ * (premium slides stripped after a plan downgrade, or an empty schedule),
+ * collapse that zone so the prayer board fills the hall screen instead of
+ * an empty carousel. Prayer-phase overlays still need the content slot
+ * (jamaat-soon, in-prayer, post-adhan supplication).
+ */
+export function shouldCollapseEmptyContentZone(args: {
+  hasCarouselItems: boolean;
+  contentOverlayActive: boolean;
+}): boolean {
+  return !args.hasCarouselItems && !args.contentOverlayActive;
+}
+
 export function layoutMainZonesEmpty(
   zones: LayoutZone[],
   structure: LayoutStructure,

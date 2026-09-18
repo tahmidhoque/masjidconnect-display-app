@@ -41,6 +41,7 @@ import {
   inferPrayerTimesLayout,
   inferZoneRegion,
   isPrayerOnlyLayout,
+  shouldCollapseEmptyContentZone,
   prayerStripHeightClassName,
   prayerStripHeightStyle,
   resolveEffectiveZoneSize,
@@ -662,7 +663,16 @@ const DisplayScreenInner: React.FC = () => {
   const hasVisibleHeader = orientationLayout.zones.some(
     (zone) => zone.visible && zone.component === 'header',
   );
-  const prayerOnly = isPrayerOnlyLayout(orientationLayout.zones);
+  const contentOverlayActive =
+    adhanSupplicationActive ||
+    prayerPhase === 'jamaat-soon' ||
+    prayerPhase === 'in-prayer';
+  const collapseEmptyContent = shouldCollapseEmptyContentZone({
+    hasCarouselItems: carouselItems.length > 0,
+    contentOverlayActive,
+  });
+  const prayerOnly =
+    isPrayerOnlyLayout(orientationLayout.zones) || collapseEmptyContent;
 
   /* ---- Compose slots ---- */
   const hijriDateAdjustment = displaySettings?.hijriDateAdjustment ?? 0;
@@ -1005,10 +1015,16 @@ const DisplayScreenInner: React.FC = () => {
   };
 
   const renderedZones: RenderedZone[] = orientationLayout.zones
-    .filter((zone) => zone.visible && !(carouselFullscreen && zone.component === 'footer'))
-    .map((zone) => {
+    .filter((zone) => {
+      if (!zone.visible) return false;
+      if (carouselFullscreen && zone.component === 'footer') return false;
+      if (collapseEmptyContent && zone.component === 'content') return false;
+      return true;
+    })
+    .flatMap((zone) => {
       const component = zone.component;
       const entry = zoneRegistry[component];
+      if (!entry) return [];
       const region = inferZoneRegion(layoutStructure, component, zone.region);
       const prayerVariant = component === 'prayer-times' ? inferPrayerTimesLayout(region) : null;
       const effectiveSize = resolveEffectiveZoneSize(
@@ -1040,7 +1056,7 @@ const DisplayScreenInner: React.FC = () => {
           zoneStyle = prayerStripHeightStyle(zone.size);
         }
       }
-      return {
+      return [{
         id: zone.id,
         component,
         region: zone.region,
@@ -1050,7 +1066,7 @@ const DisplayScreenInner: React.FC = () => {
         style: zoneStyle,
         label: entry.label,
         node,
-      };
+      }];
     });
 
   return (
