@@ -20,6 +20,7 @@ import {
   resolveAnnouncementPrayerName,
   resolveTerminology,
 } from '../../utils/prayerTerminology';
+import CountdownDisplay from './CountdownDisplay';
 
 export interface SilentPhonesGraphicProps {
   /** Landscape: two-column row — large graphic left, message and badge right. */
@@ -28,6 +29,8 @@ export interface SilentPhonesGraphicProps {
   prayerName?: string | null;
   /** Friday Zuhr slot — announcement uses the Jumuah terminology label. */
   isJumuah?: boolean;
+  /** Live remaining time (e.g. "3m 54s") shown as "{Prayer} Jamaat in …". */
+  jamaatCountdown?: string | null;
 }
 
 const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
@@ -100,10 +103,27 @@ const ProhibitionSvg: React.FC<{ className: string }> = ({ className }) => (
   </svg>
 );
 
+const JamaatCountdownHeadline: React.FC<{
+  subject: string;
+  value: string;
+  align?: 'center' | 'start';
+}> = ({ subject, value, align = 'center' }) => (
+  <p
+    className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 text-gold font-extrabold uppercase tracking-wider ${
+      align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
+    }`}
+    data-testid="silence-phones-countdown"
+  >
+    <span className="leading-snug">{subject} in</span>
+    <CountdownDisplay value={value} className="text-gold font-extrabold" />
+  </p>
+);
+
 const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
   landscapeSplit = false,
   prayerName = null,
   isJumuah = false,
+  jamaatCountdown = null,
 }) => {
   const terminology = useAppSelector(selectDisplaySettings)?.terminology;
   const jamaatLabel = resolveTerminology(terminology, 'jamaat', 'Jamaat');
@@ -114,16 +134,25 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
   );
   /** e.g. "Maghrib Jamaat"; falls back to generic Jamaat when the name is unknown. */
   const subject = prayerLabel ? `${prayerLabel} ${jamaatLabel}` : jamaatLabel;
+  const countdown = typeof jamaatCountdown === 'string' && jamaatCountdown.trim() !== ''
+    ? jamaatCountdown.trim()
+    : null;
 
   if (landscapeSplit) {
     return (
-      <div className="silent-phones-graphic--split panel grid grid-cols-[1.12fr_1fr] h-full min-h-0 max-h-full overflow-hidden gap-x-5 items-center">
+      <div
+        className="silent-phones-graphic--split panel grid grid-cols-[1.12fr_1fr] h-full min-h-0 max-h-full overflow-hidden gap-x-5 items-center"
+        data-testid="silence-phones-overlay"
+      >
         <div className="flex items-center justify-center min-h-0 min-w-0 h-full py-1">
           <div className="animate-subtle-pulse flex items-center justify-center h-full max-h-[16rem] w-full max-w-[16rem]">
             <ProhibitionSvg className="h-full w-full max-h-[16rem] max-w-[16rem] drop-shadow-lg object-contain" />
           </div>
         </div>
         <div className="flex flex-col justify-center gap-y-5 min-w-0 min-h-0 py-1 text-left items-start">
+          {countdown ? (
+            <JamaatCountdownHeadline subject={subject} value={countdown} align="start" />
+          ) : null}
           <div className="flex flex-col gap-y-4 w-full min-w-0">
             <h2 className="text-text-primary font-bold flex flex-col gap-y-2 silent-phones-graphic-split-title">
               <span className="block leading-snug">Please switch your phone to</span>
@@ -142,7 +171,13 @@ const SilentPhonesGraphic: React.FC<SilentPhonesGraphicProps> = ({
   }
 
   return (
-    <div className="panel flex flex-col items-center justify-center h-full min-h-0 max-h-full overflow-hidden gap-y-10 text-center">
+    <div
+      className="panel flex flex-col items-center justify-center h-full min-h-0 max-h-full overflow-hidden gap-y-8 text-center"
+      data-testid="silence-phones-overlay"
+    >
+      {countdown ? (
+        <JamaatCountdownHeadline subject={subject} value={countdown} />
+      ) : null}
       <div className="animate-subtle-pulse shrink-0">
         <ProhibitionSvg className="w-[11rem] h-[11rem] drop-shadow-lg" />
       </div>

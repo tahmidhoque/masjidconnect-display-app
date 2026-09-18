@@ -94,6 +94,10 @@ export interface LayoutBehaviourOverrides {
   >;
   jamaatInProgressMode?: 'screen' | 'dark' | 'content';
   jamaatInProgressContentId?: string | null;
+  /** Omit / true → overlay on. Only explicit false hides silent-phones. */
+  silencePhonesEnabled?: boolean;
+  /** Seconds before Jamaat for the overlay. Omit → 300. Clamped 60–600. */
+  silencePhonesSecondsBeforeJamaat?: number;
   preJamaatCountdownEnabled?: boolean;
   preJamaatCountdownSeconds?: 30 | 60 | 90 | 120;
   timeFormat?: '12h' | '12h-nop' | '24h';

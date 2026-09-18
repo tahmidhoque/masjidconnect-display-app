@@ -169,7 +169,7 @@ describe('usePrayerPhase', () => {
     });
   });
 
-  describe('Portal preJamaatCountdown settings', () => {
+  describe('Portal silence-phones overlay vs Client A countdown chrome', () => {
     beforeEach(() => {
       mockNextRef.value = { name: 'Zuhr', time: '12:15', jamaat: '13:00' };
     });
@@ -190,8 +190,23 @@ describe('usePrayerPhase', () => {
       });
     }
 
-    it('starts jamaat-soon 2 minutes before jamaat when enabled at 120s', () => {
-      setMasjidTime('12:58');
+    it('shows jamaat-soon at 5 min with default settings (omit silencePhones*)', () => {
+      setMasjidTime('12:55');
+      const { result } = renderWithSettings({});
+      expect(result.current.phase).toBe('jamaat-soon');
+    });
+
+    it('still shows jamaat-soon when Portal sends preJamaatCountdownEnabled false', () => {
+      setMasjidTime('12:56');
+      const { result } = renderWithSettings({
+        preJamaatCountdownEnabled: false,
+        preJamaatCountdownSeconds: 60,
+      });
+      expect(result.current.phase).toBe('jamaat-soon');
+    });
+
+    it('does not let Client A 120s countdown chrome shrink the overlay', () => {
+      setMasjidTime('12:57');
       const { result } = renderWithSettings({
         preJamaatCountdownEnabled: true,
         preJamaatCountdownSeconds: 120,
@@ -199,20 +214,28 @@ describe('usePrayerPhase', () => {
       expect(result.current.phase).toBe('jamaat-soon');
     });
 
-    it('stays on countdown-jamaat 3 minutes before jamaat when enabled at 120s', () => {
-      setMasjidTime('12:57');
+    it('does not enter jamaat-soon when silence-phones is explicitly disabled', () => {
+      setMasjidTime('12:56');
       const { result } = renderWithSettings({
-        preJamaatCountdownEnabled: true,
-        preJamaatCountdownSeconds: 120,
+        silencePhonesEnabled: false,
+        preJamaatCountdownEnabled: false,
+        preJamaatCountdownSeconds: 60,
       });
       expect(result.current.phase).toBe('countdown-jamaat');
     });
 
-    it('does not enter jamaat-soon when the Portal flag is disabled', () => {
-      setMasjidTime('12:56');
+    it('starts jamaat-soon 2 minutes before jamaat when overlay is 120s', () => {
+      setMasjidTime('12:58');
       const { result } = renderWithSettings({
-        preJamaatCountdownEnabled: false,
-        preJamaatCountdownSeconds: 120,
+        silencePhonesSecondsBeforeJamaat: 120,
+      });
+      expect(result.current.phase).toBe('jamaat-soon');
+    });
+
+    it('stays on countdown-jamaat 3 minutes before jamaat when overlay is 120s', () => {
+      setMasjidTime('12:57');
+      const { result } = renderWithSettings({
+        silencePhonesSecondsBeforeJamaat: 120,
       });
       expect(result.current.phase).toBe('countdown-jamaat');
     });

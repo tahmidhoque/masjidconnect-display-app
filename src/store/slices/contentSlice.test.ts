@@ -502,6 +502,43 @@ describe('contentSlice', () => {
       expect(result.preJamaatCountdownSeconds).toBeUndefined();
     });
 
+    it('preserves explicit silence-phones overlay knobs', () => {
+      const content = {
+        displaySettings: {
+          silencePhonesEnabled: false,
+          silencePhonesSecondsBeforeJamaat: 180,
+        },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.silencePhonesEnabled).toBe(false);
+      expect(result.silencePhonesSecondsBeforeJamaat).toBe(180);
+    });
+
+    it('omits silence-phones knobs when the API does not send them', () => {
+      const content = {
+        displaySettings: { timeFormat: '12h' },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0];
+
+      const result = extractDisplaySettings(content);
+
+      expect(result.silencePhonesEnabled).toBeUndefined();
+      expect(result.silencePhonesSecondsBeforeJamaat).toBeUndefined();
+    });
+
+    it('clamps silencePhonesSecondsBeforeJamaat into 60–600', () => {
+      const tooSmall = extractDisplaySettings({
+        displaySettings: { silencePhonesSecondsBeforeJamaat: 10 },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0]);
+      expect(tooSmall.silencePhonesSecondsBeforeJamaat).toBe(60);
+
+      const tooLarge = extractDisplaySettings({
+        displaySettings: { silencePhonesSecondsBeforeJamaat: 900 },
+      } as unknown as Parameters<typeof extractDisplaySettings>[0]);
+      expect(tooLarge.silencePhonesSecondsBeforeJamaat).toBe(600);
+    });
+
     it('clamps out-of-range supplication durations and defaults missing blocks to disabled', () => {
       const content = {
         displaySettings: {

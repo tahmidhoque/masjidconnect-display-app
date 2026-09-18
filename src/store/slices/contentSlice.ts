@@ -17,6 +17,7 @@ import {
   tomorrowJamaatModeUsesColumn,
 } from "../../utils/tomorrowJamaatDisplay";
 import { resolveTimeFormat } from "../../utils/dateUtils";
+import { clampSilencePhonesSeconds } from "../../utils/displaySettingsJamaat";
 import {
   EMPTY_SCHEDULE,
   normaliseEventsList,
@@ -118,6 +119,12 @@ function normalisePreJamaatCountdownSeconds(
   return (PRE_JAMAAT_SECONDS as readonly number[]).includes(raw)
     ? (raw as 30 | 60 | 90 | 120)
     : undefined;
+}
+
+/** Portal silent-phones seconds-before: clamp 60–600; omit non-numbers so 300s applies. */
+function normaliseSilencePhonesSecondsBeforeJamaat(raw: unknown): number | undefined {
+  if (typeof raw !== "number" || Number.isNaN(raw)) return undefined;
+  return clampSilencePhonesSeconds(raw);
 }
 
 /** Trim and keep a library content id; empty/invalid → null (screen fallback). */
@@ -476,6 +483,13 @@ export const extractDisplaySettings = (content: ScreenContent | null): DisplaySe
           : "screen",
     jamaatInProgressContentId: normaliseJamaatInProgressContentId(
       raw.jamaatInProgressContentId,
+    ),
+    silencePhonesEnabled:
+      typeof raw.silencePhonesEnabled === "boolean"
+        ? raw.silencePhonesEnabled
+        : undefined,
+    silencePhonesSecondsBeforeJamaat: normaliseSilencePhonesSecondsBeforeJamaat(
+      raw.silencePhonesSecondsBeforeJamaat,
     ),
     preJamaatCountdownEnabled:
       typeof raw.preJamaatCountdownEnabled === "boolean"

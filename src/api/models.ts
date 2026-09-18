@@ -391,13 +391,22 @@ export interface DisplaySettings {
   jamaatInProgressContentId?: string | null;
 
   /**
-   * When true, silent-phones / pre-jamaat overlay uses `preJamaatCountdownSeconds`.
-   * Absent on older payloads — display keeps the 5-minute lead for back-compat.
+   * Silent-phones overlay kill-switch. Omit / true → overlay on (classic 300s).
+   * Only explicit `false` hides it. Independent of `preJamaatCountdownEnabled`.
+   */
+  silencePhonesEnabled?: boolean;
+  /**
+   * Seconds before Jamaat to show the silent-phones overlay. Omit → 300.
+   * Clamped 60–600. Independent of `preJamaatCountdownSeconds` (30|60|90|120).
+   */
+  silencePhonesSecondsBeforeJamaat?: number;
+  /**
+   * Client A countdown chrome only — not the silent-phones overlay.
+   * Portal schema default is `false`; that must not hide the overlay.
    */
   preJamaatCountdownEnabled?: boolean;
   /**
-   * Pre-jamaat overlay duration in seconds when enabled (Portal: 30 / 60 / 90 / 120).
-   * Converted to fractional minutes for the phase machine.
+   * Client A countdown chrome duration (Portal: 30 / 60 / 90 / 120).
    */
   preJamaatCountdownSeconds?: 30 | 60 | 90 | 120;
 
