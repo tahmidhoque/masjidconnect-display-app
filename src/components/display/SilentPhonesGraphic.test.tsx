@@ -73,13 +73,28 @@ describe('SilentPhonesGraphic', () => {
     expect(screen.getByText('Sunset Congregation is about to begin')).toBeInTheDocument();
   });
 
-  it('shows the live Jamaat countdown headline with the prayer name', () => {
-    renderGraphic({ prayerName: 'Fajr', jamaatCountdown: '3m 54s' });
+  it('shows the phone graphic and silence copy without a Jamaat countdown', () => {
+    renderGraphic({ prayerName: 'Fajr' });
 
-    expect(screen.getByTestId('silence-phones-countdown')).toBeInTheDocument();
-    expect(screen.getByText('Fajr Jamaat in')).toBeInTheDocument();
-    expect(screen.getByLabelText('3m 54s')).toBeInTheDocument();
+    expect(screen.getByTestId('silence-phones-overlay')).toBeInTheDocument();
+    expect(screen.queryByTestId('silence-phones-countdown')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fajr Jamaat in')).not.toBeInTheDocument();
     expect(screen.getByText('Please switch your phone to')).toBeInTheDocument();
     expect(screen.getByText('silent')).toBeInTheDocument();
+    expect(
+      screen.getByText('or turn it off before Fajr Jamaat begins'),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the landscape split free of a Jamaat countdown', () => {
+    renderGraphic({ prayerName: 'Asr', landscapeSplit: true });
+
+    expect(screen.getByTestId('silence-phones-overlay')).toBeInTheDocument();
+    expect(screen.queryByTestId('silence-phones-countdown')).not.toBeInTheDocument();
+    expect(screen.queryByText('Asr Jamaat in')).not.toBeInTheDocument();
+    expect(screen.getByText('Please switch your phone to')).toBeInTheDocument();
+    expect(
+      screen.getByText('or turn it off before Asr Jamaat begins'),
+    ).toBeInTheDocument();
   });
 });
