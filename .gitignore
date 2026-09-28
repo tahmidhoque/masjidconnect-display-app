@@ -51,7 +51,7 @@ yarn-error.log*
 .yarn-integrity
 
 # Cursor specific files
-.cursor/
+!.cursor/
 
 # Release archives
 *.tar.gz
