@@ -1,0 +1,36 @@
+---
+description: Design context for the MasjidConnect Display App — users, brand personality, aesthetic direction, accessibility. Apply when making UI, layout, or visual design decisions.
+globs:
+alwaysApply: true
+---
+
+# MasjidConnect Display App — Design Context
+
+## Users
+
+Worshippers and mosque visitors who glance at digital signage screens while in the mosque. Context: passive viewing from a distance (10–15+ feet), no interaction required. The job to be done: quickly see prayer times, countdown to next prayer, announcements, and events. Mosque staff deploy and maintain the displays; they are not the primary viewers.
+
+## Brand Personality
+
+**Traditional, trustworthy, clear.** Voice: calm, welcoming, no clutter. Emotional goals: calm and welcoming — the display should feel like a reliable, unobtrusive presence that supports worship rather than distracts.
+
+## Aesthetic Direction
+
+- **Visual tone**: Clean, minimal display application. Reference: MasjidBox display app — clean, readable, purpose-built for mosque signage.
+- **Theme**: Dark mode only (midnight blue background). Ramadan theme: green-and-gold palette variant.
+- **Anti-references**: Avoid busy, cluttered, or corporate dashboards. No playful or overly decorative elements.
+
+## Accessibility & Inclusion
+
+- **Viewing distance**: Must be readable from a reasonable distance on 1080p+ TVs. Typography and contrast are critical.
+- **Resolution**: Design reference 1280×720; scales proportionally to 1080p, 4K. Rem-based typography; no viewport units in text.
+- **Contrast**: High contrast for text (white on midnight, gold accents). Ensure text-primary, text-secondary, text-muted hierarchy is legible.
+- **Motion**: GPU-safe only; no backdrop-filter (Raspberry Pi). Avoid animations that could cause discomfort; subtle, purposeful motion only.
+
+## Design Principles
+
+1. **Calm and welcoming** — Every visual choice should support a sense of calm. Avoid urgency, noise, or visual stress.
+2. **Traditional, trustworthy, clear** — Use established patterns. Information hierarchy must be obvious. No ambiguity.
+3. **Readable from distance** — Typography scale (text-clock, text-countdown, text-prayer, etc.) is sized for 10–15 ft viewing. Prioritise legibility over density.
+4. **Clean display application** — Minimal chrome, clear purpose. No clutter. Reference MasjidBox-style clean displays.
+5. **Accessibility first** — Contrast, sizing, and hierarchy must support viewers at 1080p+ from a reasonable distance. This is non-negotiable.

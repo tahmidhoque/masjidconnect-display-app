@@ -1,0 +1,172 @@
+---
+description: Tailwind CSS v4 styling conventions — design tokens, component classes, typography, animations, and Raspberry Pi constraints.
+globs:
+  - src/components/**
+  - src/index.css
+alwaysApply: false
+---
+
+# Tailwind CSS v4 Styling Rules
+
+## Resolution-independent scaling
+
+The app is **resolution-independent**: it looks proportionally the same at 720p, 1080p, 4K, etc.
+
+- **Design reference**: 1280×720 (720p). Root `font-size` on `html` is set from viewport: `clamp(10px, calc(16px * (100vmin / 720)), 48px)` so 1rem scales with the smaller viewport dimension and the 720p look is preserved at all resolutions.
+- **Typography** uses **rem-only** `clamp()` values (no `vw`) so it scales only via the root; do NOT reintroduce viewport units in typography classes.
+- **Spacing and layout**: Tailwind utilities are rem-based, so they scale automatically. Prefer rem or Tailwind rem-based utilities; **avoid fixed `px`** in component classes or inline styles (e.g. use `w-[16.25rem]` instead of `w-[260px]`) so new UI scales on all displays.
+
+## Configuration Approach
+
+This project uses **Tailwind CSS v4** with the Vite plugin (`@tailwindcss/vite`).
+
+- There is **no `tailwind.config.js`** file.
+- All design tokens are defined via the `@theme` directive in `src/index.css`.
+- Do NOT create a `tailwind.config.js` or `tailwind.config.ts`.
+- Do NOT install `tailwindcss` as a PostCSS plugin — it is a Vite plugin.
+
+```css
+/* src/index.css */
+@import "tailwindcss";
+
+@theme {
+  --color-midnight: #0A2647;
+  --color-emerald: #2A9D8F;
+  --color-gold: #E9C46A;
+  /* ... */
+}
+```
+
+## Design Tokens
+
+### Colour Palette
+
+| Token | Hex | Usage |
+|---|---|---|
+| `midnight` / `midnight-light` / `midnight-dark` | `#0A2647` / `#144272` / `#061A33` | Primary background, cards |
+| `emerald` / `emerald-light` / `emerald-dark` | `#2A9D8F` / `#3DBFAE` / `#1F7A6F` | Accents, active prayer, CTAs |
+| `gold` / `gold-light` / `gold-dark` | `#E9C46A` / `#F0D48A` / `#D4A84A` | Headings, highlights |
+| `surface` / `surface-hover` / `surface-active` | `rgba(255,255,255, 0.08/0.12/0.16)` | Semi-transparent surfaces |
+| `border` / `border-strong` | `rgba(255,255,255, 0.12/0.2)` | Dividers, outlines |
+| `text-primary` / `text-secondary` / `text-muted` | `#FFF` / `70%` / `50%` | Text hierarchy |
+| `alert-red` / `alert-orange` / `alert-green` | `#E63946` / `#F4A261` / `#2A9D8F` | Alerts and status |
+
+Use these as Tailwind utilities: `bg-midnight`, `text-gold`, `border-border`, etc.
+
+### Fonts
+
+| Token | Family | Usage |
+|---|---|---|
+| `--font-sans` | `'Poppins', system-ui, sans-serif` | All Latin text |
+| `--font-arabic` | `'Amiri', 'Traditional Arabic', serif` | Arabic/Quranic text |
+
+Fonts are **self-hosted** in `src/assets/fonts/` — do NOT use Google Fonts CDN.
+
+### Animation Durations
+
+| Token | Value | Usage |
+|---|---|---|
+| `--duration-fast` | 150ms | Micro-interactions |
+| `--duration-normal` | 300ms | Standard transitions |
+| `--duration-slow` | 500ms | Deliberate animations |
+| `--duration-crossfade` | 700ms | Screen transitions |
+
+## Custom Component Classes
+
+Defined in `src/index.css` as `@layer components`. Use these instead of recreating from scratch:
+
+### Layout
+
+| Class | Purpose |
+|---|---|
+| `.card` | Rounded surface container with border |
+| `.card-elevated` | Card with subtle shadow (no backdrop-filter) |
+| `.panel` | Larger content section with padding |
+| `.divider` | Horizontal separator line |
+| `.fullscreen` | Fixed, full-viewport container |
+
+### Badges
+
+| Class | Purpose |
+|---|---|
+| `.badge` | Base badge style |
+| `.badge-emerald` | Green/active badge |
+| `.badge-gold` | Highlighted badge |
+| `.badge-red` | Alert/warning badge |
+
+### Typography (rem-only — scales with root)
+
+| Class | Sizing |
+|---|---|
+| `.text-display` | `clamp(2rem, 3.5rem, 4rem)` — large countdown/time display |
+| `.text-heading` | `clamp(1.25rem, 1.75rem, 2rem)` — section headings |
+| `.text-subheading` | `clamp(0.9rem, 1.1rem, 1.25rem)` — sub-sections |
+| `.text-body` | `clamp(0.8rem, 0.95rem, 1rem)` — body text |
+| `.text-caption` | `clamp(0.65rem, 0.75rem, 0.85rem)` — small labels |
+| `.arabic-text` | RTL direction, Arabic font family, larger line height |
+
+### Animations
+
+| Class | Effect |
+|---|---|
+| `.animate-fade-in` | Opacity 0→1 crossfade |
+| `.animate-fade-out` | Opacity 1→0 crossfade |
+| `.animate-subtle-pulse` | Gentle scale pulse for active prayer |
+| `.animate-slide-in-right` | Slide in from the right |
+| `.animate-scale-in` | Scale up from 95% to 100% |
+| `.animate-countdown-tick` | Countdown digit change animation |
+| `.animate-shimmer` | Loading shimmer/skeleton effect |
+
+### Performance
+
+| Class | Purpose |
+|---|---|
+| `.gpu-accelerated` | `transform: translateZ(0)`, `will-change: transform`, `backface-visibility: hidden` |
+
+## Styling Patterns
+
+### Utility-first on elements
+
+Apply Tailwind classes directly. Use template literals for conditional classes:
+
+```tsx
+// CORRECT: Tailwind utilities + conditional
+<div className={`
+  flex items-center justify-between px-4 py-2.5 rounded-lg
+  transition-colors duration-normal
+  ${isActive ? 'bg-emerald/15 border border-emerald/30' : ''}
+`}>
+```
+
+### No CSS-in-JS
+
+- Do NOT use styled-components, Emotion, or MUI `sx` prop.
+- Do NOT use inline `style={}` except for dynamic values that cannot be expressed as utilities (e.g., rotation transforms, computed positions).
+
+### No backdrop-filter
+
+`backdrop-filter: blur()` is too expensive for Raspberry Pi GPU. Cards use solid/semi-transparent backgrounds instead.
+
+### Typography and scaling
+
+Typography classes use rem-only `clamp()` so they scale with the root font-size. Do NOT add `vw`/`vh` to typography or media-query breakpoints for text sizing — scaling is driven solely by the root so all resolutions stay proportional.
+
+### Icons
+
+Use `lucide-react` for all icons. Do NOT add other icon libraries.
+
+```tsx
+import { Clock, Wifi, AlertTriangle } from 'lucide-react';
+
+<Clock className="w-5 h-5 text-gold" />
+```
+
+## Do NOT
+
+- Create a `tailwind.config.js` or `tailwind.config.ts`
+- Install MUI, Chakra, or any component library
+- Use `@apply` excessively — prefer utility classes on elements
+- Use `backdrop-filter` or heavy `box-shadow` (RPi performance)
+- Load fonts from external CDNs
+- Add responsive breakpoints for different screen sizes (kiosk is fixed resolution)
+- Use fixed `px` in component classes or inline styles for layout/sizing — use rem or Tailwind rem-based utilities so the UI scales on all display resolutions

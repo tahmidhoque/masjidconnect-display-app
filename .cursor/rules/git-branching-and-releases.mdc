@@ -1,0 +1,62 @@
+---
+description: Git branching (feature/refactor/bugfix), commit prefixes, and cut-a-release-from-master workflow.
+alwaysApply: true
+---
+
+# Git Branching & Release Workflow
+
+## Branching
+
+- Do all new development on a branch; leave the default branch (e.g. `master` or `main`) untouched.
+- Use branch name prefixes so the type of work is clear:
+  - `feature/` — new features
+  - `refactor/` — refactoring
+  - `bugfix/` — bug fixes
+  - `chore/` — maintenance, tooling, config
+  - `docs/` — documentation only
+
+Examples: `feature/prayer-countdown`, `bugfix/sync-retry`, `refactor/redux-slices`.
+
+## Commit messages
+
+- Use the same prefixes in commit messages and include the feature/area name:
+  - `feature/prayer-times: add countdown to next prayer`
+  - `bugfix/sync: retry on 5xx`
+  - `refactor/api: extract display client`
+  - `chore: bump deps`
+
+## Cut a release from master
+
+When asked to **cut a release from the current head of master** (or the default branch), follow these steps exactly.
+
+### 1. Bump version
+
+- Determine **major**, **minor**, or **patch** from what changed since the last version (changelog, merge commits, or conventional commits):
+  - **Major**: Breaking changes (e.g. config or API contract changes that affect existing installs).
+  - **Minor**: New features or non-breaking additions.
+  - **Patch**: Bug fixes and small, non-breaking changes.
+- Update `package.json` using the existing scripts (do not edit version by hand):
+  - `npm run version:bump:major`
+  - `npm run version:bump:minor`
+  - `npm run version:bump:patch`
+
+### 2. Commit the version bump on the default branch
+
+- Ensure you are on the default branch (e.g. `master` or `main`).
+- Commit only the version bump, e.g. `chore: release 1.2.0` or `Release 1.2.0`.
+- This ensures the tagged commit has `package.json` matching the tag (required by the GitHub workflow).
+
+### 3. Create the release branch
+
+- From the current HEAD of the default branch (after the bump):
+  - `git checkout -b release/<version>`
+- Use the version number **without** the `v` prefix (e.g. `release/1.2.0`).
+
+### 4. Tag and push
+
+- Create the tag on the release branch HEAD:
+  - `git tag v<version>` (e.g. `git tag v1.2.0`).
+- Push the release branch and the tag:
+  - `git push origin release/<version>`
+  - `git push origin v<version>`
+- Pushing the `v*` tag triggers `.github/workflows/build-and-release.yml` and creates the GitHub Release.

@@ -1,0 +1,133 @@
+---
+description: Essential project context for the MasjidConnect Display App — constraints, tech stack, architecture, directory structure. Always applied.
+globs:
+alwaysApply: true
+---
+
+# MasjidConnect Display App — Project Overview
+
+## What This Application Is
+
+A **digital signage application** for mosques. Screens display:
+
+- Prayer times (Adhan and Jamaat) with countdown to next prayer
+- Announcements and events
+- Emergency alerts (full-screen overlay)
+- Islamic content (Hadith, Quranic verses)
+
+## Critical Design Constraints
+
+| Constraint | Detail |
+|---|---|
+| **No user input** | End users never interact with the display (except initial QR-code pairing) |
+| **Offline-first** | Must work reliably without internet — cached data is always available |
+| **Always-on** | Runs 24/7 on Raspberry Pi; must self-heal from errors without manual intervention |
+| **Low-powered hardware** | Primary target is Raspberry Pi 4 — every render and allocation matters |
+| **Display-only** | Global `cursor: none`, no scrollbars, no text selection, kiosk mode |
+
+## Current Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React 18 + TypeScript 5 |
+| Build tool | Vite 7 (`@vitejs/plugin-react`) |
+| Styling | Tailwind CSS v4 (`@tailwindcss/vite`) — CSS-based config, NO `tailwind.config.js` |
+| State | Redux Toolkit + Redux Persist (localStorage) |
+| Real-time | Socket.io-client + custom `realtimeService` |
+| HTTP | Axios with retry + offline fallback |
+| Storage | LocalForage (IndexedDB) → localStorage fallback |
+| PWA | `vite-plugin-pwa` with Workbox service worker |
+| Icons | `lucide-react` |
+| Date/time | `date-fns` + `dayjs` |
+| Runtime | **Chromium kiosk mode** on Raspberry Pi — NOT Electron |
+
+> **Electron has been removed.** The app is a standard Vite SPA served by a lightweight
+> Node.js static server (`deploy/server.mjs`) and displayed in Chromium kiosk mode.
+> Do NOT add Electron dependencies or reference Electron APIs.
+
+## Data Flow
+
+```
+API (portal.masjidconnect.co.uk)
+  ↓
+API Client (src/api/masjidDisplayClient.ts | apiClient.ts)
+  ↓
+Redux Async Thunks (contentSlice, authSlice)
+  ↓
+Redux Store (src/store/index.ts)
+  ↓ ←→ Middleware (realtimeMiddleware, emergencyMiddleware)
+  ↓
+Redux Persist → localStorage
+  ↓
+React Components ← Custom Hooks + Selectors
+```
+
+## Storage Hierarchy
+
+1. **LocalForage** (IndexedDB via `storageService`) — primary for large/cached data
+2. **localStorage** (via Redux Persist) — persisted Redux state
+3. **In-memory cache** (Map inside API clients) — request deduplication, short TTL
+
+## Directory Structure
+
+```
+src/
+├── api/                 # API clients, models, endpoints
+├── assets/              # Logos, fonts, SVG patterns
+├── components/
+│   ├── screens/         # Top-level phase screens (Loading, Pairing, Display)
+│   ├── layout/          # Orientation wrappers (Landscape, Portrait, OrientationWrapper)
+│   └── display/         # Reusable display pieces (Header, Footer, PrayerTimesPanel, etc.)
+├── config/              # Environment configuration (wraps import.meta.env)
+├── hooks/               # Custom React hooks
+├── services/            # Singleton service layer
+├── store/
+│   ├── slices/          # Redux slices (auth, content, ui, emergency)
+│   ├── middleware/       # Custom middleware (realtime, emergency)
+│   ├── hooks.ts         # Typed useAppDispatch / useAppSelector
+│   └── index.ts         # Store configuration + persist setup
+├── types/               # Global type declarations
+├── utils/               # Logger, date utils, admin URL utils
+├── App.tsx              # Root component — routing, error boundary, emergency overlay
+├── main.tsx             # Entry point — Provider, PersistGate
+└── index.css            # Tailwind import + @theme design tokens + global styles
+deploy/
+├── server.mjs           # Node.js static file server (port 3001)
+├── kiosk.sh             # Chromium kiosk launcher
+├── install.sh           # Raspberry Pi installation script
+└── *.service            # systemd unit files
+scripts/                 # Build, optimisation, and validation scripts
+.github/workflows/       # CI/CD — build for ARM, create .deb, publish GitHub Release
+```
+
+## Custom Hooks (use these — do NOT reimplement)
+
+| Hook | Purpose |
+|---|---|
+| `useAppLoader` | App lifecycle phases: `startup` → `pairing` → `loading` → `ready` |
+| `usePrayerTimes` | Prayer time calculations, current/next prayer, Hijri date |
+| `useCurrentTime` | Reactive current time (updates every second) |
+| `useConnectionStatus` | Network and WebSocket connection state |
+| `useRotationHandling` | Physical vs desired orientation, CSS rotation logic |
+| `useDevKeyboard` | Development-only keyboard shortcuts (Alt+1–7 for alerts, Escape to clear) |
+
+## Services (all singletons — import the default export)
+
+| Service | Purpose |
+|---|---|
+| `storageService` | Persistent storage via LocalForage with localStorage fallback |
+| `syncService` | Periodic data sync with backend, debounced polling |
+| `credentialService` | Screen pairing credentials — normalises multiple storage formats |
+| `realtimeService` | WebSocket/SSE connection management |
+| `emergencyAlertService` | Emergency alert handling and expiry tracking |
+| `networkStatusService` | Online/offline detection with event emitter |
+| `remoteControlService` | Remote command handling from admin portal |
+
+## Path Alias
+
+`@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.json`).
+
+```typescript
+import logger from '@/utils/logger';
+import usePrayerTimes from '@/hooks/usePrayerTimes';
+```

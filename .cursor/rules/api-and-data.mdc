@@ -1,0 +1,211 @@
+---
+description: API client patterns, data handling, offline-first caching, service singletons, credential management, and environment configuration.
+globs:
+  - src/api/**
+  - src/services/**
+  - src/config/**
+alwaysApply: false
+---
+
+# API & Data Handling Rules
+
+## API Clients
+
+There are two API clients. Both follow the same patterns:
+
+### `src/api/masjidDisplayClient.ts` — Legacy, Comprehensive
+
+- Axios-based HTTP client (singleton)
+- Built-in credential management (stores in multiple formats for backwards compatibility)
+- In-memory cache (`Map`) with TTL + LocalForage persistence
+- Request deduplication (prevents duplicate concurrent requests)
+- Exponential backoff retry on failure
+- Endpoint-level backoff tracking (stops hammering failing endpoints)
+- Network status monitoring integration
+
+### `src/api/apiClient.ts` — Newer, Cleaner
+
+- Axios-based HTTP client
+- Uses `credentialService` for auth (cleaner separation)
+- Uses `storageService` for caching
+- Retry with exponential backoff
+- Offline fallback via LocalForage
+
+**Rule**: When adding new API calls, prefer using the existing client patterns. Do NOT
+create a third API client.
+
+## API Response Shape
+
+All backend responses follow this wrapper:
+
+```typescript
+{
+  success: boolean;
+  data: T;        // The actual payload — ALWAYS nested in .data
+  error?: string;
+  message?: string;
+}
+```
+
+**CRITICAL**: Always access `response.data` to get the payload, not `response` directly.
+
+```typescript
+// CORRECT
+const response = await masjidDisplayClient.getScreenContent();
+if (response.success && response.data) {
+  return response.data;
+}
+
+// WRONG — returns the wrapper, not the payload
+const data = await masjidDisplayClient.getScreenContent();
+return data;
+```
+
+## Cache TTLs
+
+| Data type | TTL | Strategy |
+|---|---|---|
+| Screen content | 5 minutes | NetworkFirst, fallback to cache |
+| Prayer times | 10 min (legacy) / 24 hr (new) | CacheFirst with background refresh |
+| Events | 30 minutes | NetworkFirst |
+| Sync status | 1 minute | NetworkFirst |
+
+## Offline-First Pattern
+
+Every API call must have an offline fallback:
+
+```typescript
+// CORRECT: Try network, fall back to cache
+try {
+  const response = await apiClient.getContent();
+  await storageService.set('content_cache', response.data);
+  return response.data;
+} catch (error) {
+  const cached = await storageService.get('content_cache');
+  if (cached) return cached;
+  throw error; // Only throw if no cache available
+}
+
+// WRONG: No fallback
+const data = await apiClient.getContent(); // Throws when offline
+```
+
+## Data Normalisation
+
+**CRITICAL**: The backend returns inconsistent formats for the same data type.
+Always normalise before storing in Redux:
+
+```typescript
+// Backend might return any of these for the same endpoint:
+// Format 1: { data: { announcements: [...] } }
+// Format 2: { data: [...] }
+// Format 3: [...]
+
+const normalise = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data?.announcements) return data.announcements;
+  if (data?.items) return data.items;
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  return [];
+};
+```
+
+Do NOT assume a single format. Always guard against both arrays and objects with nested arrays.
+
+## Service Singletons
+
+All services export a singleton instance as the default export:
+
+```typescript
+// CORRECT: Import the singleton
+import storageService from '@/services/storageService';
+import credentialService from '@/services/credentialService';
+import syncService from '@/services/syncService';
+
+// WRONG: Re-instantiate
+import { StorageService } from '@/services/storageService';
+const storage = new StorageService(); // Creates a duplicate!
+```
+
+### Service Responsibilities
+
+| Service | Purpose | Key Methods |
+|---|---|---|
+| `storageService` | Persistent data via LocalForage → localStorage | `get()`, `set()`, `remove()`, `clear()` |
+| `syncService` | Periodic backend sync with debouncing | `startSync()`, `stopSync()`, `syncNow()` |
+| `credentialService` | Pairing credentials, normalises formats | `saveCredentials()`, `getCredentials()`, `clearCredentials()` |
+| `realtimeService` | WebSocket/SSE connections | `connect()`, `disconnect()`, event listeners |
+| `emergencyAlertService` | Emergency alert handling + expiry | `setAlert()`, `clearAlert()`, event listeners |
+| `networkStatusService` | Online/offline detection | `isOnline()`, event emitter |
+| `remoteControlService` | Remote commands from admin portal | `handleCommand()`, event listeners |
+
+## Credential Management
+
+**CRITICAL**: Always use `credentialService` for credentials. Never access localStorage directly.
+
+```typescript
+// CORRECT
+import credentialService from '@/services/credentialService';
+const creds = await credentialService.getCredentials();
+// Returns: { screenId, apiKey, masjidId } (normalised)
+
+// WRONG
+const screenId = localStorage.getItem('screenId');       // Fragile, format varies
+const creds = JSON.parse(localStorage.getItem('creds')); // Multiple formats exist
+```
+
+The credential service normalises between multiple historical storage formats that
+accumulated during development. It is the single source of truth for auth credentials.
+
+## Environment Configuration
+
+Environment variables are accessed via `src/config/environment.ts`, which wraps
+Vite's `import.meta.env`:
+
+```typescript
+import { environment } from '@/config/environment';
+
+const apiUrl = environment.apiUrl;
+const realtimeUrl = environment.realtimeUrl;
+```
+
+**Rules**:
+- Do NOT use `process.env` — that is Node.js only and unavailable in the browser
+- Do NOT access `import.meta.env` directly in components — use the `environment` config
+- Vite exposes variables prefixed with `VITE_`
+- Production API URL defaults to `https://portal.masjidconnect.co.uk`
+
+## Debouncing
+
+API calls use a debounce/throttle pattern to prevent excessive requests:
+
+```typescript
+const MIN_REFRESH_INTERVAL = 30_000; // 30 seconds
+
+// Check timestamp before fetching
+const now = Date.now();
+if (now - lastUpdate < MIN_REFRESH_INTERVAL) {
+  return; // Skip — too soon
+}
+```
+
+The `syncService` also uses a `debounceMap` pattern for named operations:
+
+```typescript
+const debounceMap = new Map<string, ReturnType<typeof setTimeout>>();
+
+function debounced(key: string, fn: () => void, delay: number) {
+  if (debounceMap.has(key)) clearTimeout(debounceMap.get(key)!);
+  debounceMap.set(key, setTimeout(fn, delay));
+}
+```
+
+## Do NOT
+
+- Create additional API clients — use the existing two
+- Access `response` instead of `response.data` for API payloads
+- Assume a single data format from the backend — always normalise
+- Use `localStorage` directly for credentials — use `credentialService`
+- Use `process.env` — use `import.meta.env` via `environment` config
+- Make API calls from components — go through Redux async thunks
+- Skip offline fallback in any data-fetching code path

@@ -1,0 +1,190 @@
+---
+description: Redux Toolkit state management — slices, async thunks, middleware, persistence, selectors, and typed hooks.
+globs:
+  - src/store/**
+alwaysApply: false
+---
+
+# Redux State Management Rules
+
+## Store Configuration
+
+The store is configured in `src/store/index.ts` with:
+
+- **Redux Toolkit** `configureStore`
+- **Redux Persist** for offline capability (persists to `localStorage`)
+- **Custom middleware** for real-time events and emergency alerts
+- **State validation transform** for safe rehydration
+
+## Slices
+
+### `authSlice` — Authentication & Pairing
+
+| Field | Type | Purpose |
+|---|---|---|
+| `isAuthenticated` | boolean | Whether the screen is authenticated |
+| `isPaired` | boolean | Whether pairing is complete |
+| `pairingCode` | string | Current pairing code for QR display |
+| `pairingCodeExpiresAt` | string | Expiry timestamp of pairing code |
+| `screenId` / `apiKey` / `masjidId` | string | Stored credentials |
+| `pairingError` / `authError` | string | Error messages |
+
+**Thunks**: `requestPairingCode`, `checkPairingStatus`, `initializeFromStorage`
+
+### `contentSlice` — Content & Prayer Times
+
+| Field | Type | Purpose |
+|---|---|---|
+| `screenContent` | object | Full screen content from API |
+| `prayerTimes` | object | Today's prayer times |
+| `schedule` | array | Weekly schedule data |
+| `events` | array | Upcoming events |
+| `masjidName` / `masjidTimezone` | string | Masjid metadata |
+| `carouselTime` / `timeFormat` | mixed | Display settings |
+| `showPrayerAnnouncement` | boolean | Prayer announcement overlay flag |
+| `isPrayerTimesLoading` / `isScheduleLoading` / etc. | boolean | Per-field loading states |
+| `prayerTimesError` / `scheduleError` / etc. | string | Per-field error states |
+| `lastPrayerTimesUpdate` / etc. | number | Timestamps for cache invalidation |
+
+**Thunks**: `refreshContent`, `refreshPrayerTimes`, `refreshSchedule`, `refreshEvents`, `loadCachedContent`, `refreshAllContent`
+
+### `uiSlice` — UI State (NOT persisted)
+
+| Field | Type | Purpose |
+|---|---|---|
+| `orientation` | `'LANDSCAPE' \| 'PORTRAIT'` | Current display orientation |
+| `isOffline` / `wasOffline` | boolean | Network connectivity state |
+| `isInitializing` / `initializationStage` | mixed | Startup progress |
+| `showLoadingScreen` / `showContent` | boolean | Screen visibility flags |
+| `isKioskMode` | boolean | Kiosk mode detection |
+| `hasError` / `errorMessage` | mixed | Global error state |
+
+### `emergencySlice` — Emergency Alerts
+
+| Field | Type | Purpose |
+|---|---|---|
+| `currentAlert` | object \| null | Active emergency alert |
+| `isConnected` / `isConnecting` | boolean | Real-time connection state |
+| `reconnectAttempts` | number | Reconnection counter |
+
+## Persistence
+
+| Slice | Persisted? | Why |
+|---|---|---|
+| `auth` | Yes | Credentials must survive restarts |
+| `content` | Yes | Offline-first: cached data available immediately |
+| `emergency` | Yes | Active alerts persist across restarts |
+| `ui` | **No** | Transient state resets on restart (orientation, loading, errors) |
+
+**Rules**:
+- NEVER store functions or non-serialisable data in persisted slices
+- ALWAYS handle rehydration edge cases (stale data, schema changes)
+- Use `blacklist` for `ui` in the persist config
+
+## Middleware
+
+### `realtimeMiddleware`
+
+Listens to `realtimeService` events and dispatches Redux actions:
+
+- Initialises WebSocket connection on authentication
+- Handles: `connect`, `disconnect`, `reconnect`, `content:update`, `emergency:alert`, `orientation:change`, `remote:command`
+- Triggers content refresh on `content:update` events
+- Cleans up on logout
+
+### `emergencyMiddleware`
+
+Bridges `emergencyAlertService` with Redux:
+
+- Syncs alert state between the service singleton and Redux
+- Initialises/disconnects based on auth state
+- Cleans up on logout
+
+## Typed Hooks
+
+Always use the typed hooks from `src/store/hooks.ts`:
+
+```typescript
+// CORRECT: Typed hooks
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+
+const dispatch = useAppDispatch();
+const prayerTimes = useAppSelector((state) => state.content.prayerTimes);
+
+// WRONG: Untyped hooks
+import { useDispatch, useSelector } from 'react-redux';
+```
+
+## Async Thunk Rules
+
+### ALL API calls go through thunks
+
+```typescript
+// CORRECT: API call in thunk
+export const refreshContent = createAsyncThunk(
+  'content/refreshContent',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await masjidDisplayClient.getScreenContent();
+      return response.data; // Always access .data
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// WRONG: API call in component
+useEffect(() => {
+  masjidDisplayClient.getScreenContent().then(setData); // Bypasses Redux
+}, []);
+```
+
+### Debouncing
+
+Content thunks enforce a 30-second minimum interval between fetches to prevent excessive
+API calls. Check `lastUpdate` timestamps before dispatching refresh thunks.
+
+### Data normalisation in thunks
+
+The backend returns inconsistent formats. Normalise in the thunk before storing in state:
+
+```typescript
+// Handle both array and object-with-nested-array formats
+const normalise = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data?.items) return data.items;
+  if (data?.announcements) return data.announcements;
+  return [];
+};
+```
+
+## Selector Rules
+
+### Define selectors in slice files
+
+```typescript
+// In contentSlice.ts
+export const selectPrayerTimes = (state: RootState) => state.content.prayerTimes;
+export const selectMasjidName = (state: RootState) => state.content.masjidName;
+export const selectIsContentLoading = (state: RootState) => state.content.isPrayerTimesLoading;
+```
+
+### Use selectors in components
+
+```typescript
+// CORRECT: Imported selector
+import { selectPrayerTimes } from '@/store/slices/contentSlice';
+const prayerTimes = useAppSelector(selectPrayerTimes);
+
+// WRONG: Inline selector with deep path
+const prayerTimes = useAppSelector(state => state.content.prayerTimes?.data?.times);
+```
+
+## Do NOT
+
+- Call APIs directly from components — always use async thunks
+- Store non-serialisable data (functions, class instances, Dates) in persisted slices
+- Create new slices without considering persistence requirements
+- Use `useDispatch`/`useSelector` — use `useAppDispatch`/`useAppSelector` from `src/store/hooks.ts`
+- Mutate state outside of Redux Toolkit reducers (Immer handles mutations inside reducers)
+- Dispatch rapid-fire refresh thunks — respect the 30-second debounce interval

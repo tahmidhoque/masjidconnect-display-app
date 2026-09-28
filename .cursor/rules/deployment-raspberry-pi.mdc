@@ -1,0 +1,169 @@
+---
+description: Deployment architecture — Chromium kiosk on Raspberry Pi, systemd services, CI/CD pipeline, installation, and RPi optimisation.
+globs:
+  - deploy/**
+  - .github/workflows/**
+  - scripts/**
+alwaysApply: false
+---
+
+# Deployment & Raspberry Pi Rules
+
+## Runtime Architecture
+
+The app runs as a **standard Vite SPA** served by a lightweight Node.js static server and
+displayed in Chromium kiosk mode.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Raspberry Pi                                       │
+│                                                     │
+│  systemd: masjidconnect-display.service             │
+│  ├── Node.js server (deploy/server.mjs)             │
+│  └── Serves dist/ on http://localhost:3001          │
+│                                                     │
+│  systemd: masjidconnect-kiosk.service               │
+│  ├── Chromium in --kiosk mode                       │
+│  └── Points at http://localhost:3001                │
+│                                                     │
+│  /opt/masjidconnect/                                │
+│  ├── dist/          (Vite production build)         │
+│  ├── deploy/        (server, kiosk script, services)│
+│  └── package.json                                   │
+└─────────────────────────────────────────────────────┘
+```
+
+## Key Deployment Files
+
+### `deploy/server.mjs` — Static File Server
+
+- Pure Node.js HTTP server (no Express dependency)
+- Serves the Vite `dist/` directory
+- SPA fallback: all non-file routes serve `index.html`
+- Cache headers: hashed assets get 1-year immutable cache; HTML gets `no-cache`
+- Health check endpoint: `GET /health` returns `{ status: "ok", uptime: <seconds> }`
+- Port: `3001` (configurable via `PORT` env var)
+
+### `deploy/kiosk.sh` — Chromium Kiosk Launcher
+
+Disables screen sleep (`xset`), hides cursor (`unclutter`), waits for server health check,
+then launches Chromium with these critical flags:
+
+| Flag | Purpose |
+|---|---|
+| `--kiosk` | Full-screen, no address bar |
+| `--noerrdialogs` | Suppress error pop-ups |
+| `--disable-infobars` | No automation banners |
+| `--enable-gpu-rasterization` | GPU rendering |
+| `--enable-oop-rasterization` | Off-process GPU raster for stability |
+| `--disable-dev-shm-usage` | Use /tmp instead of /dev/shm (avoids RPi limits) |
+| `--force-device-scale-factor=1` | Prevent display scaling issues |
+| `--autoplay-policy=no-user-gesture-required` | Allow autoplay |
+| `--disable-session-crashed-bubble` | No crash recovery prompts |
+
+### `deploy/install.sh` — Installation Script
+
+Run with `sudo ./deploy/install.sh` or (after extracting the release tarball) `sudo /opt/masjidconnect/deploy/install.sh`. The script resolves the app directory from its own path, so it works from any working directory. It:
+
+1. Validates Node.js 18+ is installed
+2. Installs Chromium and `unclutter` if missing
+3. Copies `dist/`, `deploy/`, and `package.json` to `/opt/masjidconnect/`
+4. Installs both systemd unit files into `/etc/systemd/system/`
+5. Enables both services for boot (`systemctl enable` → start on boot)
+6. Starts the services
+
+### systemd Services
+
+| Service | What it runs | Depends on |
+|---|---|---|
+| `masjidconnect-display.service` | `node deploy/server.mjs` | network-online.target |
+| `masjidconnect-kiosk.service` | `bash deploy/kiosk.sh` | masjidconnect-display.service, graphical.target |
+
+Manage with:
+```bash
+systemctl status masjidconnect-display
+systemctl status masjidconnect-kiosk
+journalctl -u masjidconnect-display -f
+```
+
+### WiFi setup after install (no internet at boot)
+
+When the Pi boots with no LAN and no WiFi, the kiosk still starts and shows the display app. To configure WiFi after the fact:
+
+**Option A — Show WiFi setup on the display (recommended)**  
+1. Connect a USB keyboard. Press **Ctrl+Alt+F2** (or F3/F4) to switch to a text console.  
+2. Log in (e.g. `pi` + password).  
+3. Run: `sudo /opt/masjidconnect/deploy/show-wifi-setup.sh`  
+4. The display switches to the WiFi setup page. Scan, choose network, enter password, connect.  
+5. When done, close the window or click “Start display”. Restart the kiosk: `sudo systemctl start masjidconnect-kiosk`
+
+**Option B — OS-level WiFi (raspi-config / nmtui)**  
+From the same TTY (Ctrl+Alt+F2, then login):  
+- `sudo raspi-config` → Network Options → Wi-fi, or  
+- `sudo nmtui` (if NetworkManager is installed) to add WiFi.  
+Then reboot or run `sudo systemctl start masjidconnect-kiosk` if you had stopped it.
+
+The script `deploy/show-wifi-setup.sh` stops the kiosk, runs `deploy/wifi-setup-server.mjs` (port 3002), and launches Chromium on the display to the WiFi setup UI. It requires `wifi-setup-server.mjs` and Chromium to be present under `/opt/masjidconnect/deploy/`.
+
+## CI/CD Pipeline
+
+### GitHub Actions: `.github/workflows/build-and-release.yml`
+
+**Triggers**: Push to `main`, version tags (`v*`), manual dispatch.
+
+**Steps**:
+1. Validate semver version from `package.json`
+2. `npm ci` + lint
+3. `npm run package` (TypeScript check, Vite build, create `.tar.gz`)
+4. Validate archive (exists, non-trivial size)
+5. Upload as GitHub Actions artefact
+
+**Release job** (on tag or manual dispatch):
+1. Download artefact
+2. Generate SHA256 checksums
+3. Create GitHub Release with `.tar.gz` and checksums
+
+### Versioning
+
+- Semver in `package.json`
+- Bump commands: `npm run version:bump:major`, `version:bump:minor`, `version:bump:patch`
+- Tags: `v1.2.3` format triggers release
+
+### Packaging
+
+`scripts/package-release.sh` (also available as `npm run package`):
+
+1. Runs `npm run build` (TypeScript check + Vite build)
+2. Writes `dist/version.json` with version, git hash, and build timestamp
+3. Creates `masjidconnect-display-<version>.tar.gz` containing `dist/`, `deploy/`,
+   helper scripts, and `package.json`
+
+The archive is architecture-independent (HTML/CSS/JS + Node.js server).
+
+## Raspberry Pi Optimisation
+
+`scripts/optimize-raspberry-pi.sh` configures:
+
+| Setting | Value | Why |
+|---|---|---|
+| CPU governor | `performance` | Consistent rendering, no throttling |
+| `vm.swappiness` | 10 | Reduce swap usage on limited RAM |
+| GPU memory | 128 MB | Enough for Chromium GPU rasterisation |
+| Graphics driver | VC4 KMS V3D | Hardware-accelerated graphics |
+| HDMI | 1080p 60 Hz forced | Prevent resolution negotiation issues |
+| Overscan | Disabled (config.txt + KMS) | Avoid display cut-off on TVs; run `raspi-config nonint do_overscan_kms 1 1` on already-flashed Pi if needed |
+
+**Display and TV:** For full picture on a TV, set the TV to **Just Scan** / **Screen Fit** / **Full Pixel** or **PC mode** (no overscan). The Pi side is configured by the image and `optimize-raspberry-pi.sh`.
+
+## Environment Variables
+
+Set in `.env` files or as GitHub Actions secrets:
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `VITE_API_URL` | Production | `https://portal.masjidconnect.co.uk` | API base URL |
+| `VITE_REALTIME_URL` | No | `https://masjidconnect-realtime.fly.dev` | WebSocket server URL |
+| `PORT` | Deploy | `3001` | Static server port |
+
+Environment is accessed via `src/config/environment.ts` which wraps `import.meta.env` (Vite).
+Do NOT use `process.env` — that is Node.js only.

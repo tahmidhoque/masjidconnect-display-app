@@ -1,0 +1,42 @@
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":3},"timestamp":1772119918571,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":3},"timestamp":1772119934277,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":3},"timestamp":1772119949985,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":3},"timestamp":1772119965698,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":3},"timestamp":1772119981405,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772119986084,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":3},"timestamp":1772119986085,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":3,"firstId":"cmm3mhddc00258owcgc2v43xu"},"timestamp":1772119986085,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"DisplayScreen.tsx:carouselKey","message":"carousel key in use","data":{"carouselKey":"cmm2z4ipg006f8or5ddc1z8zk-3-cmm3mhddc00258owcgc2v43xu","lastScheduleUpdate":"2026-02-26T15:33:06.080Z","scheduleId":"cmm2z4ipg006f8or5ddc1z8zk","itemsCount":3},"timestamp":1772119986086,"hypothesisId":"E","runId":"post-fix"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772119986086,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":3},"timestamp":1772119986086,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":3,"firstId":"cmm3mhddc00258owcgc2v43xu"},"timestamp":1772119986087,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772119996484,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":7},"timestamp":1772119996484,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772119996485,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"DisplayScreen.tsx:carouselKey","message":"carousel key in use","data":{"carouselKey":"cmlwtkkmd000z8ow6hi4oed8v-7-cmm3mho99002p8owc1hw4lgcc","lastScheduleUpdate":"2026-02-26T15:33:16.481Z","scheduleId":"cmlwtkkmd000z8ow6hi4oed8v","itemsCount":7},"timestamp":1772119996485,"hypothesisId":"E","runId":"post-fix"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772119996485,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":7},"timestamp":1772119996485,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772119996485,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772119997973,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"DisplayScreen.tsx:carouselKey","message":"carousel key in use","data":{"carouselKey":"cmlwtkkmd000z8ow6hi4oed8v-7-cmm3mho99002p8owc1hw4lgcc","lastScheduleUpdate":"2026-02-26T15:33:17.971Z","scheduleId":"cmlwtkkmd000z8ow6hi4oed8v","itemsCount":7},"timestamp":1772119997974,"hypothesisId":"E","runId":"post-fix"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772119999774,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"DisplayScreen.tsx:carouselKey","message":"carousel key in use","data":{"carouselKey":"cmlwtkkmd000z8ow6hi4oed8v-7-cmm3mho99002p8owc1hw4lgcc","lastScheduleUpdate":"2026-02-26T15:33:19.773Z","scheduleId":"cmlwtkkmd000z8ow6hi4oed8v","itemsCount":7},"timestamp":1772119999775,"hypothesisId":"E","runId":"post-fix"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":7},"timestamp":1772120019776,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:advance","message":"advance called","data":{"safeItemsLength":7},"timestamp":1772120030489,"hypothesisId":"D"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772120040194,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":7},"timestamp":1772120040194,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120040194,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772120040197,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":7},"timestamp":1772120040200,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120040201,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772120041116,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":7},"timestamp":1772120041116,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120041116,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772120041118,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:mount","message":"ContentCarousel mounted","data":{"itemsLength":7},"timestamp":1772120041119,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120041119,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120049223,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:unmount","message":"ContentCarousel unmounted","data":{},"timestamp":1772120049222,"hypothesisId":"A"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120049224,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120050124,"hypothesisId":"B"}
+{"sessionId":"417af0","location":"ContentCarousel.tsx:resetEffect","message":"reset to index 0 (items changed)","data":{"itemsLength":7,"firstId":"cmm3mho99002p8owc1hw4lgcc"},"timestamp":1772120050125,"hypothesisId":"B"}

@@ -1,0 +1,246 @@
+---
+description: Performance rules for Raspberry Pi — memory management, rendering optimisation, CSS constraints, PWA caching, logging, and kiosk mode.
+globs:
+alwaysApply: true
+---
+
+# Performance & Raspberry Pi Rules
+
+These rules apply to **every change**. The app runs 24/7 on Raspberry Pi 4 hardware with
+limited CPU, GPU, and RAM. Every render, allocation, and animation matters.
+
+## Memory Management
+
+### ALWAYS clean up side effects
+
+Every `setInterval`, `setTimeout`, event listener, and subscription MUST be cleaned up
+in the `useEffect` return function:
+
+```typescript
+// CORRECT: Cleanup on unmount
+useEffect(() => {
+  const interval = setInterval(tick, 1000);
+  const handler = () => dispatch(setOffline(true));
+  window.addEventListener('offline', handler);
+
+  return () => {
+    clearInterval(interval);
+    window.removeEventListener('offline', handler);
+  };
+}, []);
+
+// WRONG: Memory leak — interval never cleared
+useEffect(() => {
+  setInterval(tick, 1000);
+}, []);
+```
+
+### Use refs for non-UI data
+
+If a value is needed for logic but does not trigger a re-render, use `useRef`:
+
+```typescript
+// CORRECT: Ref for tracking without re-render
+const lastFetchRef = useRef<number>(0);
+
+// WRONG: State for non-UI tracking (causes unnecessary re-render)
+const [lastFetch, setLastFetch] = useState(0);
+```
+
+### Avoid large objects in state
+
+Do NOT store raw API responses in React state if they contain nested data you never render.
+Extract only the fields you need, or store the full response in `storageService` and keep
+a lightweight version in Redux.
+
+## Rendering Optimisation
+
+### React.memo for expensive components
+
+Wrap components that receive stable props but have expensive render logic:
+
+```typescript
+const PrayerTimesPanel = React.memo(({ prayerTimes, nextPrayer }) => {
+  // Expensive grid rendering
+}, (prev, next) => {
+  return prev.nextPrayer === next.nextPrayer
+    && prev.prayerTimes === next.prayerTimes;
+});
+```
+
+### useMemo for expensive calculations
+
+```typescript
+// CORRECT: Memoised
+const sortedEvents = useMemo(
+  () => events.filter(e => !e.expired).sort((a, b) => a.date - b.date),
+  [events]
+);
+
+// WRONG: Recalculates every render
+const sortedEvents = events.filter(e => !e.expired).sort((a, b) => a.date - b.date);
+```
+
+### useCallback for handler references
+
+```typescript
+// CORRECT: Stable reference
+const handleTick = useCallback(() => {
+  dispatch(updateCountdown());
+}, [dispatch]);
+
+// WRONG: New function every render (breaks React.memo on children)
+const handleTick = () => dispatch(updateCountdown());
+```
+
+## CSS Performance Rules
+
+### Use `.gpu-accelerated` for animated elements
+
+The `.gpu-accelerated` class in `src/index.css` applies:
+- `transform: translateZ(0)` — promotes to GPU layer
+- `will-change: transform` — hints browser to optimise
+- `backface-visibility: hidden` — prevents rendering artefacts
+
+Apply it to any element with transitions or animations.
+
+### No backdrop-filter
+
+`backdrop-filter: blur()` is extremely expensive on RPi GPU. Cards use
+solid or semi-transparent `rgba()` backgrounds instead.
+
+```css
+/* WRONG: Crashes on RPi */
+.card { backdrop-filter: blur(10px); }
+
+/* CORRECT: Performant alternative */
+.card { background: rgba(255, 255, 255, 0.08); }
+```
+
+### Prefer CSS transitions over JS animations
+
+```tsx
+// CORRECT: CSS transition
+<div className="transition-opacity duration-normal" style={{ opacity: visible ? 1 : 0 }}>
+
+// WRONG: JS animation loop
+useEffect(() => {
+  let opacity = 0;
+  const frame = () => { opacity += 0.02; el.style.opacity = opacity; requestAnimationFrame(frame); };
+  frame();
+}, []);
+```
+
+### Minimal box-shadow
+
+Heavy `box-shadow` values cause GPU compositing overhead. Use sparingly and
+prefer border-based visual separation.
+
+### No external font loading
+
+Fonts (Poppins, Amiri) are self-hosted in `src/assets/fonts/`. Do NOT add `@import`
+from Google Fonts or any other CDN — this breaks offline mode and adds latency.
+
+## Build Optimisations
+
+### Terser minification
+
+Production builds use Terser to:
+- Drop all `console.*` calls
+- Drop `debugger` statements
+- Minify and tree-shake
+
+This means `console.log()` will silently disappear in production. Use the logger utility
+instead (it has its own persistence).
+
+### Code splitting
+
+`vite.config.ts` defines manual chunks:
+
+| Chunk | Contents |
+|---|---|
+| `vendor` | react, react-dom, react-router-dom |
+| `redux` | @reduxjs/toolkit, react-redux, redux-persist |
+| `io` | socket.io-client, axios |
+
+Do NOT remove these splits. They ensure the main bundle stays small and cacheable.
+
+### No source maps in production
+
+`sourcemap: false` in `vite.config.ts`. Do NOT enable source maps for production
+builds — they bloat the bundle and are not useful on a kiosk display.
+
+## PWA / Service Worker
+
+Configured via `vite-plugin-pwa` in `vite.config.ts`:
+
+| URL Pattern | Strategy | Cache TTL |
+|---|---|---|
+| API calls (`/api/`) | NetworkFirst (10s timeout) | 24 hours, 50 entries max |
+| Images (`.png`, `.jpg`, `.svg`, etc.) | CacheFirst | 30 days, 100 entries max |
+| Fonts (`.woff`, `.woff2`, etc.) | CacheFirst | 1 year, 20 entries max |
+| Static assets (`.js`, `.css`, `.html`) | Precached via globPatterns | Immutable (hashed filenames) |
+
+Registration type: `autoUpdate` — the service worker updates silently without prompting.
+
+## Logging
+
+### ALWAYS use the logger utility
+
+```typescript
+import logger from '@/utils/logger';
+
+// CORRECT
+logger.info('[PrayerTimes] Next prayer calculated', { name, time });
+logger.error('[Sync] Failed to refresh content', { error: err.message });
+logger.debug('[Carousel] Slide transition', { from: idx, to: nextIdx });
+logger.warn('[Network] Connection lost, using cached data');
+
+// WRONG — stripped in production, no structured context
+console.log('next prayer:', name);
+```
+
+### Logger levels
+
+| Level | Use for | Production |
+|---|---|---|
+| `error` | Critical failures that need attention | Kept |
+| `warn` | Potential problems, degraded states | Kept |
+| `info` | Important state changes, lifecycle events | Kept |
+| `debug` | Verbose debugging detail | Dev only |
+
+### Remove debug artefacts before committing
+
+Search for and remove:
+- `// #region agent log` blocks
+- Stray `console.log()` / `console.warn()` / `console.error()` calls
+- `debugger` statements
+- Hardcoded test data
+
+## Kiosk Mode Constraints
+
+The display runs in Chromium kiosk mode with these constraints:
+
+- `cursor: none !important` on all elements (set in `src/index.css`)
+- No scrollbars, no text selection
+- Screen sleep disabled via `xset` (in `deploy/kiosk.sh`)
+- Mouse cursor hidden after 0.5s via `unclutter`
+- No address bar, no Chrome UI, no error dialogs
+- Context menu and keyboard shortcuts prevented by `uiSlice` flags
+
+**Every UI element must be visible and legible without any user interaction.**
+
+## Checklist for Every Change
+
+Before submitting any code change, verify:
+
+- [ ] All `setInterval`/`setTimeout`/event listeners cleaned up in `useEffect` return
+- [ ] No `console.log()` — use `logger` utility
+- [ ] No `backdrop-filter` or heavy `box-shadow`
+- [ ] Expensive components wrapped in `React.memo`
+- [ ] Expensive calculations wrapped in `useMemo`
+- [ ] Handlers wrapped in `useCallback` where passed as props
+- [ ] No external CDN dependencies (fonts, scripts, stylesheets)
+- [ ] No `any` types unless absolutely unavoidable
+- [ ] TypeScript compiles: `npm run build`
+- [ ] **Linter passes: run `npm run lint` and fix any reported errors before claiming a change is complete.** Do not say a change is good or done until lint passes (including for files under `rpi-image/`, `deploy/`, and any other paths included in the lint config).

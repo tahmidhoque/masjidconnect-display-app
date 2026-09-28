@@ -1,0 +1,216 @@
+---
+description: Component architecture — phase-based routing, lazy loading, orientation handling, component structure, screen transitions, and error boundaries.
+globs:
+  - src/components/**
+  - src/hooks/**
+  - src/App.tsx
+alwaysApply: false
+---
+
+# Component Patterns
+
+## Screen Routing
+
+There is **no React Router** in this project. Do NOT install or use `react-router-dom` for
+navigation. Screen transitions are managed by `useAppLoader` phases in `src/App.tsx`:
+
+```
+startup → pairing → loading → ready
+   ↓          ↓                  ↓
+LoadingScreen  PairingScreen   DisplayScreen
+```
+
+The `AppRoutes` component in `App.tsx` determines which screen to render based on the
+current phase. Transitions use crossfade animations (700ms) with a minimum loading
+time of 3500ms to prevent flicker.
+
+```typescript
+const targetScreen = useMemo((): ScreenType => {
+  if (phase === 'pairing' && hasPairingCode) return 'pairing';
+  if (phase === 'ready') return 'display';
+  return 'loading';
+}, [phase, hasPairingCode]);
+```
+
+## Lazy Loading
+
+All screen-level components are loaded with `React.lazy()`:
+
+```typescript
+const LoadingScreen = lazy(() => import('./components/screens/LoadingScreen'));
+const PairingScreen = lazy(() => import('./components/screens/PairingScreen'));
+const DisplayScreen = lazy(() => import('./components/screens/DisplayScreen'));
+```
+
+Wrapped in `<Suspense fallback={null}>` — the loading overlay handles visual feedback
+during the initial load, so Suspense fallback is intentionally null.
+
+## Component Hierarchy
+
+```
+src/components/
+├── screens/           Top-level phase components (one per app phase)
+│   ├── LoadingScreen    Progress bar, task list, logo animation
+│   ├── PairingScreen    QR code display for pairing
+│   └── DisplayScreen    Main display — delegates to layout components
+├── layout/            Orientation-aware wrappers
+│   ├── OrientationWrapper   Detects physical vs desired orientation, applies CSS rotation
+│   ├── LandscapeLayout      Landscape-specific grid layout
+│   └── PortraitLayout       Portrait-specific stacked layout
+└── display/           Reusable display components
+    ├── Header             Masjid name, date, connection status
+    ├── Footer             Branding, version info
+    ├── PrayerTimesPanel   Prayer times grid with active/next highlighting
+    ├── PrayerCountdown    Countdown timer to next prayer
+    ├── ContentCarousel    Rotating announcements/events/Islamic content
+    └── IslamicPattern     Background decorative SVG pattern
+```
+
+**Rules**:
+- `screens/` components handle top-level data fetching and phase logic
+- `layout/` components handle orientation and spatial arrangement only
+- `display/` components are reusable and receive data via props or selectors
+- Barrel exports in `index.ts` files for `layout/` and `display/`
+
+## Orientation Handling
+
+The app supports both landscape and portrait orientations. The desired orientation comes
+from the backend (`screenContent.screen.orientation`). If the physical display orientation
+does not match the desired one, `OrientationWrapper` applies a CSS 90-degree rotation:
+
+```typescript
+const { shouldRotate } = useRotationHandling(orientation);
+
+// When shouldRotate is true, the layout is rendered inside a container with:
+// transform: translate(-50%, -50%) rotate(90deg)
+// width: 100vh / height: 100vw (swapped dimensions)
+```
+
+This is a CSS-only rotation — no Electron or OS-level rotation is used.
+
+## Component Structure Order
+
+Every component should follow this ordering:
+
+```typescript
+/**
+ * ComponentName
+ *
+ * Brief description of what this component renders and why.
+ */
+const ComponentName: React.FC<Props> = ({ prop1, prop2 }) => {
+  // 1. Redux hooks
+  const dispatch = useAppDispatch();
+  const data = useAppSelector(selectData);
+
+  // 2. Refs (for preventing re-renders, tracking previous values)
+  const previousValueRef = useRef<string | null>(null);
+
+  // 3. Local state
+  const [isVisible, setIsVisible] = useState(false);
+
+  // 4. Effects (with cleanup)
+  useEffect(() => {
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 5. Memoised callbacks
+  const handleEvent = useCallback(() => {
+    dispatch(someAction());
+  }, [dispatch]);
+
+  // 6. Render helpers (for complex sub-sections)
+  const renderHeader = () => <div>...</div>;
+
+  // 7. Loading / error guards (early returns)
+  if (isLoading) return <div className="animate-shimmer" />;
+  if (error) return <div className="text-alert-red">{error}</div>;
+  if (!data) return null;
+
+  // 8. Main render
+  return (
+    <div className="panel">
+      {renderHeader()}
+      {/* ... */}
+    </div>
+  );
+};
+
+export default ComponentName;
+```
+
+**Rules**:
+- All components use `default export`
+- JSDoc comment on every component explaining its purpose
+- Always check loading/error/null states before rendering data
+- Use `useAppDispatch` and `useAppSelector` (typed hooks), not `useDispatch`/`useSelector`
+
+## Error Boundary
+
+`App.tsx` wraps the entire app in `<ErrorBoundary>` from `react-error-boundary`:
+
+- Displays an error message with a "Reload" button
+- Calls `window.location.reload()` on reset (auto-recovery for kiosk mode)
+- Logs errors via `logger.error()`
+
+Do NOT add additional error boundaries unless isolating a specific failure domain
+(e.g., a single carousel slide that should not crash the entire display).
+
+## Emergency Overlay
+
+The `EmergencyOverlay` in `App.tsx` renders a full-screen alert when `emergencySlice.currentAlert`
+is non-null:
+
+- Colour schemes: red, orange, amber, blue, green, purple, dark
+- Fade-in/fade-out animation with mount/unmount lifecycle
+- Auto-clears when `expiresAt` passes
+- Respects orientation rotation
+- Z-index 9999 — always on top of everything
+
+## Screen Transition System
+
+Transitions between screens use a controlled animation system:
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `TRANSITION_MS` | 700ms | Crossfade duration |
+| `MIN_LOADING_MS` | 3500ms | Minimum time on loading screen (prevents flicker) |
+| `POST_READY_DELAY` | 400ms | Delay after ready before transitioning |
+
+The loading screen is an overlay that fades out to reveal the content screen underneath.
+This prevents a blank flash during lazy-loading.
+
+## Custom Hooks Usage
+
+Do NOT reimplement logic that exists in these hooks:
+
+| Hook | Returns | Use for |
+|---|---|---|
+| `useAppLoader` | `phase`, `overallProgress`, `currentTask`, `tasks`, `hasPairingCode` | App lifecycle |
+| `usePrayerTimes` | Prayer times, current/next prayer, countdown, Hijri date | Prayer display |
+| `useCurrentTime` | Reactive `Date` object, updates every second | Clock display |
+| `useConnectionStatus` | Online/offline state, WebSocket status | Status indicators |
+| `useRotationHandling` | `shouldRotate`, rotation styles | Orientation |
+| `useDevKeyboard` | (void — registers keyboard listeners) | Dev shortcuts |
+
+```typescript
+// CORRECT: Use the existing hook
+import usePrayerTimes from '@/hooks/usePrayerTimes';
+const { prayerTimes, nextPrayer, countdown } = usePrayerTimes();
+
+// WRONG: Reimplement prayer time logic
+const nextPrayer = useMemo(() => {
+  // 50 lines of calculation that already exists in usePrayerTimes
+}, []);
+```
+
+## Do NOT
+
+- Install or use React Router — routing is phase-based in `App.tsx`
+- Add `onClick` handlers or interactive elements (this is a display-only app)
+- Add additional error boundaries without justification
+- Use untyped `useDispatch`/`useSelector` — use the typed variants from `src/store/hooks.ts`
+- Create components without JSDoc comments
+- Skip loading/error/null guards before rendering data
+- Add user-facing scrollbars, text inputs, or form elements
